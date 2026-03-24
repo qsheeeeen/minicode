@@ -1,0 +1,24 @@
+import fs from 'fs/promises';
+
+export const editTool = {
+  name: 'edit',
+  description: 'Edit a file by replacing exact text. oldText must match exactly.',
+  input_schema: {
+    type: 'object' as const,
+    properties: {
+      path: { type: 'string' },
+      oldText: { type: 'string' },
+      newText: { type: 'string' }
+    },
+    required: ['path', 'oldText', 'newText']
+  },
+  execute: async (args: { path: string; oldText: string; newText: string }) => {
+    let content = await fs.readFile(args.path, 'utf-8');
+    if (!content.includes(args.oldText)) {
+      throw new Error('oldText not found in file');
+    }
+    content = content.replace(args.oldText, args.newText);
+    await fs.writeFile(args.path, content, 'utf-8');
+    return `Edited ${args.path}`;
+  }
+};
