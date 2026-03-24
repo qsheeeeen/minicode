@@ -1,17 +1,16 @@
-security hook，自动检查
-cli -agent export 递归调用自己
+会话持久化（保存/恢复对话）
+上下文压缩
+全局提示词，项目提示词
+中文提示词
+/xxx 预定义命令
 
- - 会话持久化（保存/恢复对话）
- - 上下文压缩
- - 自定义系统提示词
- - TUI 界面
- 
- - 更多工具（grep, find, ls）
 
- skill？
+命令行：
+    输入提示词
+    控制tools
 
- subagent
+tool：
+    递归调用自己
+    security hook，自动检查
 
- 中文提示词
-
- 
+skill？

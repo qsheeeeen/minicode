@@ -60,12 +60,4 @@ src/
     └── bash.ts
 ```
 
-## Roadmap
-
-- [ ] Session persistence
-- [ ] Context compression
-- [ ] Custom system prompts
-- [ ] TUI interface
-- [ ] More tools (grep, find, ls)
-- [ ] Sub-agents
-- [ ] Skills system
+See [TODO.md](TODO.md) for planned features.
