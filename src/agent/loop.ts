@@ -26,6 +26,7 @@ type ToolDef = {
   name: string;
   description: string;
   input_schema: Record<string, unknown>;
+  format?: (args: any) => string;
   execute: (args: any) => Promise<string>;
 };
 
@@ -74,6 +75,8 @@ export class Agent {
           // 执行工具
           const tool = this.tools.get(toolBlock.name);
           if (tool) {
+            const display = tool.format ? tool.format(toolBlock.input as any) : `${toolBlock.name} ${JSON.stringify(toolBlock.input)}`;
+            console.log(`\n${display}`);
             try {
               const result = await tool.execute(toolBlock.input as any);
               this.messages.push({

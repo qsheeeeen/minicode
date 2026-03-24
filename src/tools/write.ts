@@ -12,6 +12,10 @@ export const writeTool = {
     },
     required: ['path', 'content']
   },
+  format: (args: { path: string; content: string }) => {
+    const lines = args.content.split('\n').length;
+    return `✏️  ${args.path} (${lines} lines)`;
+  },
   execute: async (args: { path: string; content: string }) => {
     const dir = path.dirname(args.path);
     await fs.mkdir(dir, { recursive: true });

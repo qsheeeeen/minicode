@@ -11,3 +11,7 @@ cli -agent export 递归调用自己
  skill？
 
  subagent
+
+ 中文提示词
+
+ 
