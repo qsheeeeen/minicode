@@ -2,7 +2,7 @@ import fs from 'fs/promises';
 
 export const editTool = {
   name: 'edit',
-  description: 'Edit a file by replacing exact text. oldText must match exactly.',
+  description: 'Edit a file by replacing exact text. The oldText must match exactly (including whitespace). Use this for precise, surgical edits.',
   input_schema: {
     type: 'object' as const,
     properties: {

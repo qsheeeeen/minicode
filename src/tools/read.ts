@@ -2,7 +2,7 @@ import fs from 'fs/promises';
 
 export const readTool = {
   name: 'read',
-  description: 'Read the contents of a file. Defaults to first 2000 lines.',
+  description: 'Read the contents of a file. Supports text files. Defaults to first 2000 lines. Use offset/limit for large files.',
   input_schema: {
     type: 'object' as const,
     properties: {

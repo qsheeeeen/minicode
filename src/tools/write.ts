@@ -3,7 +3,7 @@ import path from 'path';
 
 export const writeTool = {
   name: 'write',
-  description: 'Write content to a file. Creates parent directories if needed.',
+  description: 'Write content to a file. Creates the file if it doesn\'t exist, overwrites if it does. Automatically creates parent directories.',
   input_schema: {
     type: 'object' as const,
     properties: {

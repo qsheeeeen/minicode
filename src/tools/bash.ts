@@ -2,7 +2,7 @@ import { spawn } from 'child_process';
 
 export const bashTool = {
   name: 'bash',
-  description: 'Execute a bash command in the current working directory.',
+  description: 'Execute a bash command in the current working directory. Returns stdout and stderr. Optionally provide a timeout in seconds.',
   input_schema: {
     type: 'object' as const,
     properties: {
