@@ -19,7 +19,7 @@ export interface Providers {
 
 export interface Config {
   providers?: Providers;
-  defaultProvider?: string;
+  model?: string;  // format: model@provider, e.g. "glm-4.7@zhipu"
 }
 
 const CONFIG_PATH = path.join(__dirname, '../config.json');
@@ -41,8 +41,17 @@ export async function loadConfig(): Promise<Config> {
 
 export async function getProviderConfig(provider?: string): Promise<ProviderConfig | undefined> {
   const config = await loadConfig();
-  const providerName = provider || config.defaultProvider || 'anthropic';
-  return config.providers?.[providerName];
+  if (!provider) {
+    // Try to extract provider from model config
+    const spec = config.model;
+    if (spec) {
+      const parts = spec.split('@');
+      provider = parts[1] || Object.keys(config.providers || {})[0];
+    } else {
+      provider = Object.keys(config.providers || {})[0];
+    }
+  }
+  return config.providers?.[provider];
 }
 
 export async function getApiKey(provider?: string): Promise<string | undefined> {
@@ -58,4 +67,26 @@ export async function getBaseURL(provider?: string): Promise<string | undefined>
 export async function getModel(provider?: string): Promise<string | undefined> {
   const providerConfig = await getProviderConfig(provider);
   return providerConfig?.model;
+}
+
+export async function getModelConfig(modelSpecifier?: string): Promise<{ provider: string; model: string; apiKey: string; baseURL?: string } | null> {
+  const config = await loadConfig();
+  const spec = modelSpecifier || config.model;
+
+  if (!spec) return null;
+
+  // Parse "model@provider" or just "model"
+  const parts = spec.split('@');
+  const modelName = parts[0];
+  const providerName = parts[1] || Object.keys(config.providers || {})[0];
+
+  const providerConfig = config.providers?.[providerName];
+  if (!providerConfig?.apiKey) return null;
+
+  return {
+    provider: providerName,
+    model: modelName,
+    apiKey: providerConfig.apiKey,
+    baseURL: providerConfig.baseURL
+  };
 }
