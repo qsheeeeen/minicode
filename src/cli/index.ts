@@ -4,7 +4,10 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { Agent } from '../agent/loop.js';
 import { getModelConfig, getCompressionThreshold } from '../config.js';
-import { renameSession, getMostRecentSession, listSessionsWithInfo, SessionInfo } from '../utils/session.js';
+import { SessionManager, SessionInfo } from '../utils/session.js';
+
+// Create session manager instance
+const sessionManager = new SessionManager();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -83,7 +86,7 @@ if (sessionName) {
   await agent.loadFromSession(sessionName);
 } else if (resumeRecent) {
   // Resume most recent session
-  const recent = await getMostRecentSession();
+  const recent = await sessionManager.getMostRecent();
   if (recent) {
     await agent.loadFromSession(recent, true);
   } else {
@@ -160,7 +163,7 @@ async function runRepl() {
 
       // No argument - show numbered list and wait for selection
       if (!arg) {
-        const sessions = await listSessionsWithInfo();
+        const sessions = await sessionManager.list();
         if (sessions.length === 0) {
           console.log('No sessions found. Use /new to create one.');
           console.log();
@@ -222,7 +225,7 @@ async function runRepl() {
         continue;
       }
       const oldName = agent.currentSession;
-      await renameSession(oldName, newName);
+      await sessionManager.rename(oldName, newName);
       agent.currentSession = newName;
       console.log(`Renamed session: ${oldName} -> ${newName}`);
       console.log();

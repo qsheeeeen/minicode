@@ -1,7 +1,7 @@
 import { AnthropicClient, MessageParam, Tool, Anthropic } from '../llm/anthropic.js';
 import { readTool, writeTool, editTool, bashTool } from '../tools/index.js';
 import { system, toolCall, toolResult, error, progress, raw } from '../utils/logger.js';
-import { loadSession, saveSession } from '../utils/session.js';
+import { SessionManager, SessionData } from '../utils/session.js';
 
 const SYSTEM_PROMPT = `You are an expert coding assistant. You help users with coding tasks by reading files, executing commands, editing code, and writing new files.
 
@@ -42,12 +42,14 @@ export class Agent {
   private totalTokens = 0;
   private lastShownThreshold = 0;
   public currentSession: string = 'default';
+  private sessionManager: SessionManager;
 
   constructor(apiKey?: string, baseURL?: string, model?: string, contextLength?: number, compressionThresholdRatio?: number) {
     this.client = new AnthropicClient(apiKey, baseURL);
     this.model = model;
     this.contextLength = contextLength || 200000;
     this.compressionThresholdRatio = compressionThresholdRatio || 0.8;
+    this.sessionManager = new SessionManager();
     this.tools = new Map<string, ToolDef>([
       ['read', readTool as ToolDef],
       ['write', writeTool as ToolDef],
@@ -194,7 +196,7 @@ ${JSON.stringify(messagesToSummarize, null, 2)}`;
   }
 
   async loadFromSession(name: string, showHistory = false): Promise<boolean> {
-    const data = await loadSession(name);
+    const data = await this.sessionManager.get(name);
     if (!data) return false;
 
     this.messages = data.messages as MessageParam[];
@@ -243,7 +245,7 @@ ${JSON.stringify(messagesToSummarize, null, 2)}`;
   }
 
   private async saveToSession(): Promise<void> {
-    await saveSession(this.currentSession, {
+    await this.sessionManager.save(this.currentSession, {
       model: this.model || 'unknown',
       messages: this.messages as any,
       totalTokens: this.totalTokens,
