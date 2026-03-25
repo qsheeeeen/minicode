@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Development
 
 ```bash
-# Run in development mode (watch file changes not supported, use manual restart)
+# Run in development mode (no watch mode, manual restart required)
 npm run dev
 
 # Build to dist/
@@ -13,38 +13,63 @@ npm run build
 
 # Run built CLI
 npm run start
+
+# Direct prompt mode (non-interactive)
+npm run start "read package.json"
+npm run start -- --model glm-4.7@zhipu "list files"
 ```
 
 ## Architecture
 
-A minimal coding agent built with TypeScript. Uses Anthropic's Claude API with tool use.
+A minimal coding agent with tool use. Entry point is a REPL CLI that can also run single prompts.
 
-**Entry point:** `src/cli/index.ts` - readline REPL interface
+**Entry point:** `src/cli/index.ts` - Handles CLI args, config loading, and REPL/direct modes
 
-**Core loop:** `src/agent/loop.ts` - Agent class that:
-- Maintains message history in memory
-- Handles Claude responses with tool_use blocks
-- Executes tools and feeds results back to Claude
-- Loops until no more tool calls
+**Core loop:** `src/agent/loop.ts` - Agent class with two-pass execution:
+1. First pass: Collects all tool calls, displays text blocks
+2. Second pass: Executes all tools in parallel via `Promise.allSettled()`, pushes results back
 
-**LLM layer:** `src/llm/anthropic.ts` - Thin wrapper around Anthropic SDK
+**LLM layer:** `src/llm/anthropic.ts` - Thin Anthropic SDK wrapper
 
-**Tools:** `src/tools/` - Each tool exports a `{ name, description, input_schema, execute }` object. Available tools: read, write, edit, bash.
+**Tools:** `src/tools/*.ts` - Each exports `{ name, description, input_schema, format, execute }`
 
-**Config:** `src/config.ts` - Loads `config.json` from project root (not tracked in git). See `config.example.json`.
+## Config Format
 
-## Adding a New Tool
+`config.json` (not tracked) uses provider-based model selection:
 
-1. Create file in `src/tools/` exporting a tool definition
-2. Register in Agent constructor (`src/agent/loop.ts`)
-3. Export from `src/tools/index.ts`
-
-Tool definition shape:
-```typescript
+```json
 {
-  name: string;
-  description: string;
-  input_schema: Record<string, unknown>;  // Anthropic tool schema
-  execute: (args: any) => Promise<string>;
+  "providers": {
+    "anthropic": { "apiKey": "...", "baseURL": "...", "model": "claude-sonnet-4-5" },
+    "zhipu": { "apiKey": "...", "baseURL": "...", "model": "glm-4.7" }
+  },
+  "model": "glm-4.7@zhipu"
 }
 ```
+
+Model specifier format: `model@provider` or just `model` (uses first provider).
+
+Priority for model selection: CLI `--model` arg > `MODEL` env var > config.json.
+
+## Adding a Tool
+
+Tool definition in `src/tools/`:
+
+```typescript
+export const toolName = {
+  name: string,
+  description: string,
+  input_schema: Record<string, unknown>,
+  format?: (args) => string,  // Display format, e.g., "Bash(ls -la)"
+  execute: (args) => Promise<string>
+};
+```
+
+Register in `src/agent/loop.ts` constructor and export from `src/tools/index.ts`.
+
+## CLI Arguments
+
+- `--model <spec>` - Override model (e.g., `glm-4.7@zhipu`)
+- `--version, -v` - Show version
+- `--help, -h` - Show usage
+- `[prompt]` - Direct prompt mode (runs and exits)
