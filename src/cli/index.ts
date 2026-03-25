@@ -18,14 +18,27 @@ if (!providerConfig?.apiKey) {
 }
 
 const agent = new Agent(providerConfig.apiKey, providerConfig.baseURL, providerConfig.model);
-console.log(`Using provider: ${providerName} (model: ${providerConfig.model || 'default'})\n`);
+
+function showBanner() {
+  console.log();
+  console.log('  ╔═══════════════════════════════════════════════════════╗');
+  console.log('  ║                    Coding Agent                       ║');
+  console.log('  ╠═══════════════════════════════════════════════════════╣');
+  console.log(`  ║  Provider: ${providerName.padEnd(30)} ║`);
+  console.log(`  ║  Model:    ${(providerConfig!.model || 'default').padEnd(30)} ║`);
+  console.log(`  ║  BaseURL:  ${(providerConfig!.baseURL || 'N/A').substring(0, 30).padEnd(30)} ║`);
+  console.log('  ╠═══════════════════════════════════════════════════════╣');
+  console.log('  ║  Type "exit" to quit                                 ║');
+  console.log('  ╚═══════════════════════════════════════════════════════╝');
+  console.log();
+}
 
 function ask(query: string): Promise<string> {
   return new Promise(resolve => rl.question(query, resolve));
 }
 
 async function main() {
-  console.log('Coding Agent - Type "exit" to quit\n');
+  showBanner();
 
   while (true) {
     const input = await ask('> ');
