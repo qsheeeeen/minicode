@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Development
 
 ```bash
-# Run in development mode (no watch mode, manual restart required)
+# Development mode
 npm run dev
 
 # Build to dist/
@@ -14,24 +14,48 @@ npm run build
 # Run built CLI
 npm run start
 
-# Direct prompt mode (non-interactive)
+# Direct prompt mode
 npm run start "read package.json"
 npm run start -- --model glm-4.7@zhipu "list files"
 ```
 
 ## Architecture
 
-A minimal coding agent with tool use. Entry point is a REPL CLI that can also run single prompts.
+A minimal coding agent with REPL interface, tool use, and session persistence.
 
-**Entry point:** `src/cli/index.ts` - Handles CLI args, config loading, and REPL/direct modes
+**Structure:**
+```
+src/
+├── cli.ts           # REPL entry point, CLI args, session commands
+├── agent.ts         # Agent class with two-pass tool execution loop
+├── config.ts        # Provider-based model config loader
+├── tools/           # Tool implementations (read, write, edit, bash)
+├── utils/
+│   ├── logger.ts    # Emoji-prefixed logging (ℹ️🔧⏳❌)
+│   └── session.ts   # SessionManager class for persistence
+└── llm/
+    └── anthropic.ts # Anthropic SDK wrapper
+```
 
-**Core loop:** `src/agent/loop.ts` - Agent class with two-pass execution:
-1. First pass: Collects all tool calls, displays text blocks
-2. Second pass: Executes all tools in parallel via `Promise.allSettled()`, pushes results back
+**Core Flow (Agent.run()):**
+1. Send messages + tool definitions to LLM
+2. **First pass:** Display text responses, collect tool calls
+3. **Second pass:** Execute all tools in parallel via `Promise.allSettled()`
+4. Push tool results as user messages, repeat until no more tool calls
+5. Auto-save session after each complete exchange
 
-**LLM layer:** `src/llm/anthropic.ts` - Thin Anthropic SDK wrapper
+**Sessions:**
+- Stored in `~/.minicode/sessions/<project-hash>/`
+- One SessionManager instance per project (hash based on cwd)
+- REPL/direct mode create new sessions by default
+- Use `--session <name>` or `--resume` to specify
 
-**Tools:** `src/tools/*.ts` - Each exports `{ name, description, input_schema, format, execute }`
+**REPL Commands (must start with `/`):**
+- `/new <name>` - Create new session
+- `/resume [n|name]` - List and select session, or load by name/number
+- `/rename <name>` - Rename current session
+- `/compress` - Compress conversation history
+- `/exit` - Quit
 
 ## Config Format
 
@@ -47,9 +71,7 @@ A minimal coding agent with tool use. Entry point is a REPL CLI that can also ru
 }
 ```
 
-Model specifier format: `model@provider` or just `model` (uses first provider).
-
-Priority for model selection: CLI `--model` arg > `MODEL` env var > config.json.
+Model specifier: `model@provider` or just `model`. Priority: CLI arg > MODEL env var > config.
 
 ## Adding a Tool
 
@@ -65,11 +87,13 @@ export const toolName = {
 };
 ```
 
-Register in `src/agent/loop.ts` constructor and export from `src/tools/index.ts`.
+Register in `src/agent.ts` constructor and export from `src/tools/index.ts`.
 
-## CLI Arguments
+## Logging
 
-- `--model <spec>` - Override model (e.g., `glm-4.7@zhipu`)
-- `--version, -v` - Show version
-- `--help, -h` - Show usage
-- `[prompt]` - Direct prompt mode (runs and exits)
+Use emoji-prefixed functions from `utils/logger.ts`:
+- `system()` - ℹ️ System messages
+- `toolCall()` - 🔧 Tool calls
+- `progress()` - ⏳ Progress (no newline)
+- `error()` - ❌ Errors
+- `raw()` - Plain output
