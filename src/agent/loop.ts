@@ -34,9 +34,11 @@ export class Agent {
   private client: AnthropicClient;
   private tools: Map<string, ToolDef>;
   private messages: MessageParam[] = [];
+  private model?: string;
 
-  constructor(apiKey?: string, baseURL?: string) {
+  constructor(apiKey?: string, baseURL?: string, model?: string) {
     this.client = new AnthropicClient(apiKey, baseURL);
+    this.model = model;
     this.tools = new Map<string, ToolDef>([
       ['read', readTool as ToolDef],
       ['write', writeTool as ToolDef],
@@ -56,7 +58,7 @@ export class Agent {
           description: t.description,
           input_schema: t.input_schema
         })) as Tool[],
-        { system: SYSTEM_PROMPT }
+        { system: SYSTEM_PROMPT, model: this.model }
       );
 
       // 处理响应

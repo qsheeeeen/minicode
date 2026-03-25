@@ -14,7 +14,7 @@ if (!config.anthropicApiKey) {
   process.exit(1);
 }
 
-const agent = new Agent(config.anthropicApiKey, config.baseURL);
+const agent = new Agent(config.anthropicApiKey, config.baseURL, config.model);
 
 function ask(query: string): Promise<string> {
   return new Promise(resolve => rl.question(query, resolve));
