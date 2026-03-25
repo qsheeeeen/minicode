@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import readline from 'readline';
 import { Agent } from '../agent/loop.js';
-import { loadConfig } from '../config.js';
+import { loadConfig, getProviderConfig } from '../config.js';
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -9,12 +9,16 @@ const rl = readline.createInterface({
 });
 
 const config = await loadConfig();
-if (!config.anthropicApiKey) {
-  console.error('Error: No API key found. Please set anthropicApiKey in config.json');
+const providerName = process.env.PROVIDER || config.defaultProvider || 'anthropic';
+const providerConfig = await getProviderConfig(providerName);
+
+if (!providerConfig?.apiKey) {
+  console.error(`Error: No API key found for provider "${providerName}". Please configure it in config.json`);
   process.exit(1);
 }
 
-const agent = new Agent(config.anthropicApiKey, config.baseURL, config.model);
+const agent = new Agent(providerConfig.apiKey, providerConfig.baseURL, providerConfig.model);
+console.log(`Using provider: ${providerName} (model: ${providerConfig.model || 'default'})\n`);
 
 function ask(query: string): Promise<string> {
   return new Promise(resolve => rl.question(query, resolve));

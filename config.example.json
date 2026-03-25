@@ -1,5 +1,15 @@
 {
-  "anthropicApiKey": "your-api-key-here",
-  "baseURL": "https://api.anthropic.com",
-  "model": "claude-sonnet-4-5"
+  "providers": {
+    "anthropic": {
+      "apiKey": "your-anthropic-api-key",
+      "baseURL": "https://api.anthropic.com",
+      "model": "claude-sonnet-4-5"
+    },
+    "zhipu": {
+      "apiKey": "your-zhipu-api-key",
+      "baseURL": "https://open.bigmodel.cn/api/paas/v4",
+      "model": "glm-4.7"
+    }
+  },
+  "defaultProvider": "anthropic"
 }

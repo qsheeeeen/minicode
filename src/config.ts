@@ -5,10 +5,21 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-export interface Config {
-  anthropicApiKey?: string;
+export interface ProviderConfig {
+  apiKey?: string;
   baseURL?: string;
   model?: string;
+}
+
+export interface Providers {
+  anthropic?: ProviderConfig;
+  zhipu?: ProviderConfig;
+  [key: string]: ProviderConfig | undefined;
+}
+
+export interface Config {
+  providers?: Providers;
+  defaultProvider?: string;
 }
 
 const CONFIG_PATH = path.join(__dirname, '../config.json');
@@ -28,7 +39,23 @@ export async function loadConfig(): Promise<Config> {
   }
 }
 
-export async function getApiKey(): Promise<string | undefined> {
+export async function getProviderConfig(provider?: string): Promise<ProviderConfig | undefined> {
   const config = await loadConfig();
-  return config.anthropicApiKey;
+  const providerName = provider || config.defaultProvider || 'anthropic';
+  return config.providers?.[providerName];
+}
+
+export async function getApiKey(provider?: string): Promise<string | undefined> {
+  const providerConfig = await getProviderConfig(provider);
+  return providerConfig?.apiKey;
+}
+
+export async function getBaseURL(provider?: string): Promise<string | undefined> {
+  const providerConfig = await getProviderConfig(provider);
+  return providerConfig?.baseURL;
+}
+
+export async function getModel(provider?: string): Promise<string | undefined> {
+  const providerConfig = await getProviderConfig(provider);
+  return providerConfig?.model;
 }
