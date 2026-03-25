@@ -13,7 +13,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Read version from package.json
-const packagePath = path.join(__dirname, '../../package.json');
+const packagePath = path.join(__dirname, '../package.json');
 const packageJson = JSON.parse(await import('fs/promises').then(fs => fs.readFile(packagePath, 'utf-8')));
 const VERSION = packageJson.version;
 
