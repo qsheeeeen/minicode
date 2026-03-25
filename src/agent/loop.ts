@@ -65,6 +65,9 @@ export class Agent {
       const assistantMsg: MessageParam = { role: 'assistant', content: [] };
       let hasToolCalls = false;
 
+      // First pass: collect tool calls and display text
+      const toolCalls: Array<{ block: Anthropic.Messages.ToolUseBlock; tool: ToolDef }> = [];
+
       for (const block of response.content) {
         if (block.type === 'text') {
           console.log((block as any).text);
@@ -74,33 +77,38 @@ export class Agent {
           const toolBlock = block as Anthropic.Messages.ToolUseBlock;
           (assistantMsg.content as any).push(block);
 
-          // 执行工具
           const tool = this.tools.get(toolBlock.name);
           if (tool) {
             const display = tool.format ? tool.format(toolBlock.input as any) : `${toolBlock.name} ${JSON.stringify(toolBlock.input)}`;
-            console.log(`\n${display}`);
-            try {
-              const result = await tool.execute(toolBlock.input as any);
-              this.messages.push({
-                role: 'user',
-                content: [{
-                  type: 'tool_result',
-                  tool_use_id: toolBlock.id,
-                  content: result
-                }]
-              });
-            } catch (e) {
-              this.messages.push({
-                role: 'user',
-                content: [{
-                  type: 'tool_result',
-                  tool_use_id: toolBlock.id,
-                  content: `Error: ${(e as Error).message}`
-                }]
-              });
-            }
+            console.log(display);
+            toolCalls.push({ block: toolBlock, tool });
           }
         }
+      }
+
+      // Second pass: execute all tools in parallel
+      if (toolCalls.length > 0) {
+        process.stdout.write(`Running ${toolCalls.length} tool${toolCalls.length > 1 ? 's' : ''}... `);
+        const results = await Promise.allSettled(
+          toolCalls.map(({ block, tool }) => tool.execute(block.input as any))
+        );
+        console.log('Done.');
+
+        // Push all results back
+        results.forEach((result, i) => {
+          const { block } = toolCalls[i];
+          const content = result.status === 'fulfilled'
+            ? result.value
+            : `Error: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`;
+          this.messages.push({
+            role: 'user',
+            content: [{
+              type: 'tool_result',
+              tool_use_id: block.id,
+              content
+            }]
+          });
+        });
       }
 
       this.messages.push(assistantMsg);

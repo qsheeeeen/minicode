@@ -13,8 +13,8 @@ export const editTool = {
     required: ['path', 'oldText', 'newText']
   },
   format: (args: { path: string; oldText: string; newText: string }) => {
-    const preview = args.oldText.slice(0, 30).replace(/\n/g, '\\n');
-    return `✂️  ${args.path} "${preview}${args.oldText.length > 30 ? '...' : ''}"`;
+    const preview = args.oldText.slice(0, 20).replace(/\n/g, '\\n');
+    return `Edit(${args.path}, "${preview}${args.oldText.length > 20 ? '...' : ''}")`;
   },
   execute: async (args: { path: string; oldText: string; newText: string }) => {
     let content = await fs.readFile(args.path, 'utf-8');

@@ -13,14 +13,14 @@ export const readTool = {
     required: ['path']
   },
   format: (args: { path: string; offset?: number; limit?: number }) => {
-    let info = `📖 ${args.path}`;
+    let info = `Read(${args.path}`;
     if (args.offset || args.limit) {
       const parts = [];
-      if (args.offset) parts.push(`line ${args.offset}`);
-      if (args.limit) parts.push(`${args.limit} lines`);
-      info += ` (${parts.join(', ')})`;
+      if (args.offset) parts.push(`offset: ${args.offset}`);
+      if (args.limit) parts.push(`limit: ${args.limit}`);
+      info += `, ${parts.join(', ')}`;
     }
-    return info;
+    return info + ')';
   },
   execute: async (args: { path: string; offset?: number; limit?: number }) => {
     const content = await fs.readFile(args.path, 'utf-8');

@@ -12,7 +12,7 @@ export const bashTool = {
     required: ['command']
   },
   format: (args: { command: string; timeout?: number }) => {
-    return `$ ${args.command}`;
+    return `Bash(${args.command})`;
   },
   execute: async (args: { command: string; timeout?: number }): Promise<string> => {
     return new Promise((resolve, reject) => {

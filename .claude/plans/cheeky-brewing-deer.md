@@ -1,65 +1,71 @@
-# Plan: Add Command Line Arguments
+# Plan: Parallel Tool Execution
 
 ## Context
-User wants to add CLI argument support to Mini Code for:
-1. **Model config override**: Allow specifying model/provider via command line instead of just `MODEL` env var
-2. **Info commands**: Add `--version` and `--help` flags
+Currently, tools execute sequentially even when Claude returns multiple independent tool calls in a single response. This is inefficient for operations like reading multiple files or running independent bash commands.
 
-## Current State
-- Entry point: `src/cli/index.ts` - currently reads config from `config.json` and `MODEL` env var
-- No argument parsing library in dependencies
-- Version is hardcoded as "v1.0.0" in banner
+## Current Implementation
+**File**: `src/agent/loop.ts` (lines 68-104)
+
+Tools execute one-by-one in a for loop:
+```typescript
+for (const block of response.content) {
+  if (block.type === 'tool_use') {
+    const result = await tool.execute(toolBlock.input);  // Sequential
+    // push result
+  }
+}
+```
 
 ## Implementation Plan
 
-### 1. Add CLI Argument Parsing
-**File**: `src/cli/index.ts`
+### 1. Collect All Tool Calls First
+**File**: `src/agent/loop.ts`
 
-Parse `process.argv` for flags:
-- `--model <spec>` - Override model in format `model@provider` (e.g., `glm-4.7@zhipu`)
-- `--version` / `-v` - Show version and exit
-- `--help` / `-h` - Show usage and exit
+- First pass: Collect all `tool_use` blocks, display text blocks immediately
+- Second pass: Execute all tool calls in parallel using `Promise.all()`
 
-Priority: CLI args > MODEL env var > config.json
-
-### 2. Dynamic Version from package.json
-**File**: `src/cli/index.ts`
-
-Read version from `package.json` instead of hardcoding:
+### 2. Parallel Execution with Promise.all()
 ```typescript
-const packageJson = JSON.parse(await fs.readFile('package.json', 'utf-8'));
-const VERSION = packageJson.version;
-```
+// First pass: collect tool calls and display text
+const toolCalls: Array<{block, tool, display}> = [];
 
-### 3. Help Output
-Display usage information:
-```
-Mini Code - A minimal coding agent
+for (const block of response.content) {
+  if (block.type === 'text') {
+    console.log((block as any).text);
+    (assistantMsg.content as any).push(block);
+  } else if (block.type === 'tool_use') {
+    const tool = this.tools.get(toolBlock.name);
+    if (tool) {
+      const display = tool.format ? tool.format(toolBlock.input) : `${toolBlock.name} ...`;
+      console.log(`\n${display}`);
+      toolCalls.push({ block: toolBlock, tool, display });
+    }
+  }
+}
 
-Usage:
-  minicode [options]
+// Second pass: execute all tools in parallel
+const results = await Promise.allSettled(
+  toolCalls.map(({ block, tool }) => tool.execute(block.input))
+);
 
-Options:
-  --model <spec>   Model specification (e.g., glm-4.7@zhipu)
-  --version, -v    Show version
-  --help, -h       Show this help
+// Push all results back
+results.forEach((result, i) => {
+  const { block } = toolCalls[i];
+  const content = result.status === 'fulfilled' ? result.value : `Error: ${result.reason.message}`;
+  this.messages.push({
+    role: 'user',
+    content: [{ type: 'tool_result', tool_use_id: block.id, content }]
+  });
+});
 ```
 
 ## Critical Files
-- `src/cli/index.ts` - Add argument parsing logic
-- `package.json` - Read version dynamically
+- `src/agent/loop.ts` - Main loop, lines 64-104
 
 ## Verification
 ```bash
-# Test version
-npm run start -- --version
+# Test with a prompt that triggers multiple reads
+echo "Read package.json and tsconfig.json" | npm run start
 
-# Test help
-npm run start -- --help
-
-# Test model override
-npm run start -- --model glm-4.7@zhipu
-
-# Normal run should still work
-npm run start
+# Should see both tool calls executed in parallel (faster completion)
 ```
