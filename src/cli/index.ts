@@ -3,7 +3,7 @@ import readline from 'readline';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { Agent } from '../agent/loop.js';
-import { getModelConfig } from '../config.js';
+import { getModelConfig, getCompressionThreshold } from '../config.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -34,6 +34,9 @@ for (let i = 0; i < args.length; i++) {
     console.log('\nExamples:');
     console.log('  minicode                       # Start interactive mode');
     console.log('  minicode "read package.json"   # Run prompt directly');
+    console.log('\nIn REPL mode:');
+    console.log('  /compress or /c                # Compress conversation history');
+    console.log('  exit                           # Quit');
     process.exit(0);
   } else if (arg === '--model') {
     modelOverride = args[++i];
@@ -45,13 +48,20 @@ for (let i = 0; i < args.length; i++) {
 
 // Priority: CLI args > MODEL env var > config.json
 const modelConfig = await getModelConfig(modelOverride ?? process.env.MODEL);
+const compressionThreshold = await getCompressionThreshold();
 
 if (!modelConfig) {
   console.error('Error: No valid model configuration found. Please set model in config.json (format: "model@provider")');
   process.exit(1);
 }
 
-const agent = new Agent(modelConfig.apiKey, modelConfig.baseURL, modelConfig.model);
+const agent = new Agent(
+  modelConfig.apiKey,
+  modelConfig.baseURL,
+  modelConfig.model,
+  modelConfig.contextLength,
+  compressionThreshold
+);
 
 function showBanner(config: { provider: string; model: string; baseURL?: string }) {
   console.log(`Mini Code v${VERSION}`);
@@ -76,6 +86,13 @@ async function runRepl() {
     const input = await ask('> ');
     if (input === 'exit') break;
     if (!input.trim()) continue;
+
+    // Handle special commands
+    if (input === '/compress' || input === '/c') {
+      await agent.compress();
+      console.log();
+      continue;
+    }
 
     await agent.run(input);
     console.log();

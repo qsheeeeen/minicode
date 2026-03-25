@@ -35,16 +35,61 @@ export class Agent {
   private tools: Map<string, ToolDef>;
   private messages: MessageParam[] = [];
   private model?: string;
+  private contextLength: number;
+  private compressionThresholdRatio: number;
+  private totalTokens = 0;
 
-  constructor(apiKey?: string, baseURL?: string, model?: string) {
+  constructor(apiKey?: string, baseURL?: string, model?: string, contextLength?: number, compressionThresholdRatio?: number) {
     this.client = new AnthropicClient(apiKey, baseURL);
     this.model = model;
+    this.contextLength = contextLength || 200000;
+    this.compressionThresholdRatio = compressionThresholdRatio || 0.8;
     this.tools = new Map<string, ToolDef>([
       ['read', readTool as ToolDef],
       ['write', writeTool as ToolDef],
       ['edit', editTool as ToolDef],
       ['bash', bashTool as ToolDef]
     ]);
+  }
+
+  async compress(): Promise<void> {
+    const recentCount = 10;
+    if (this.messages.length <= recentCount + 2) {
+      console.log('(Not enough messages to compress)');
+      return;
+    }
+
+    console.log(`(Compressing ${this.messages.length - recentCount} messages, ${this.totalTokens.toLocaleString()} tokens...)`);
+
+    const messagesToSummarize = this.messages.slice(0, -recentCount);
+    const summaryPrompt = `Summarize the following conversation concisely. Focus on:
+- What was being worked on
+- Key decisions made
+- Current state
+
+Keep it brief and actionable.
+
+Conversation:
+${JSON.stringify(messagesToSummarize, null, 2)}`;
+
+    try {
+      const summary = await this.client.chat(
+        [{ role: 'user', content: summaryPrompt }],
+        [],
+        { model: this.model, maxTokens: 1000 }
+      );
+
+      const summaryText = (summary.content[0] as any)?.text || 'Conversation summary unavailable';
+      this.messages = [
+        { role: 'user', content: `[Previous conversation summary]\n${summaryText}` },
+        ...this.messages.slice(-recentCount)
+      ];
+
+      this.totalTokens = 0;
+      console.log(`(Compressed to ${this.messages.length} messages)`);
+    } catch (e) {
+      console.log(`(Compression failed: ${(e as Error).message})`);
+    }
   }
 
   async run(userMessage: string): Promise<void> {
@@ -60,6 +105,18 @@ export class Agent {
         })) as Tool[],
         { system: SYSTEM_PROMPT, model: this.model }
       );
+
+      // Track token usage
+      if (response.usage) {
+        this.totalTokens += response.usage.input_tokens + response.usage.output_tokens;
+        console.log(`\n[Context: ${this.totalTokens.toLocaleString()} / ${this.contextLength.toLocaleString()} tokens]`);
+
+        // Auto-compression check
+        const threshold = Math.floor(this.contextLength * this.compressionThresholdRatio);
+        if (this.totalTokens > threshold) {
+          await this.compress();
+        }
+      }
 
       // 处理响应
       const assistantMsg: MessageParam = { role: 'assistant', content: [] };

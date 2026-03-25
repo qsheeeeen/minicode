@@ -9,6 +9,7 @@ export interface ProviderConfig {
   apiKey?: string;
   baseURL?: string;
   model?: string;
+  contextLength?: number;
 }
 
 export interface Providers {
@@ -20,6 +21,7 @@ export interface Providers {
 export interface Config {
   providers?: Providers;
   model?: string;  // format: model@provider, e.g. "glm-4.7@zhipu"
+  compressionThreshold?: number;  // 0-1, compress at this ratio of context
 }
 
 const CONFIG_PATH = path.join(__dirname, '../config.json');
@@ -69,7 +71,7 @@ export async function getModel(provider?: string): Promise<string | undefined> {
   return providerConfig?.model;
 }
 
-export async function getModelConfig(modelSpecifier?: string): Promise<{ provider: string; model: string; apiKey: string; baseURL?: string } | null> {
+export async function getModelConfig(modelSpecifier?: string): Promise<{ provider: string; model: string; apiKey: string; baseURL?: string; contextLength?: number } | null> {
   const config = await loadConfig();
   const spec = modelSpecifier || config.model;
 
@@ -87,6 +89,12 @@ export async function getModelConfig(modelSpecifier?: string): Promise<{ provide
     provider: providerName,
     model: modelName,
     apiKey: providerConfig.apiKey,
-    baseURL: providerConfig.baseURL
+    baseURL: providerConfig.baseURL,
+    contextLength: providerConfig.contextLength
   };
+}
+
+export async function getCompressionThreshold(): Promise<number> {
+  const config = await loadConfig();
+  return config.compressionThreshold ?? 0.8;
 }

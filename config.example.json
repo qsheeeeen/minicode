@@ -3,13 +3,16 @@
     "anthropic": {
       "apiKey": "your-anthropic-api-key",
       "baseURL": "https://api.anthropic.com",
-      "model": "claude-sonnet-4-5"
+      "model": "claude-sonnet-4-5",
+      "contextLength": 200000
     },
     "zhipu": {
       "apiKey": "your-zhipu-api-key",
       "baseURL": "https://open.bigmodel.cn/api/paas/v4",
-      "model": "glm-4.7"
+      "model": "glm-4.7",
+      "contextLength": 128000
     }
   },
-  "model": "claude-sonnet-4-5@anthropic"
+  "model": "claude-sonnet-4-5@anthropic",
+  "compressionThreshold": 0.8
 }
