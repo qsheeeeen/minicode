@@ -18,17 +18,10 @@ if (!modelConfig) {
 const agent = new Agent(modelConfig.apiKey, modelConfig.baseURL, modelConfig.model);
 
 function showBanner(config: { provider: string; model: string; baseURL?: string }) {
-  console.log();
-  console.log('  ╔═══════════════════════════════════════════════════════╗');
-  console.log('  ║                    Coding Agent                       ║');
-  console.log('  ╠═══════════════════════════════════════════════════════╣');
-  console.log(`  ║  Provider: ${config.provider.padEnd(30)} ║`);
-  console.log(`  ║  Model:    ${config.model.padEnd(30)} ║`);
-  console.log(`  ║  BaseURL:  ${(config.baseURL || 'N/A').substring(0, 30).padEnd(30)} ║`);
-  console.log('  ╠═══════════════════════════════════════════════════════╣');
-  console.log('  ║  Type "exit" to quit                                 ║');
-  console.log('  ╚═══════════════════════════════════════════════════════╝');
-  console.log();
+  console.log(`Mini Code v1.0.0`);
+  console.log(`Provider: ${config.provider}`);
+  console.log(`Model: ${config.model}`);
+  console.log('---');
 }
 
 function ask(query: string): Promise<string> {
