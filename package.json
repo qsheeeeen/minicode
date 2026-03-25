@@ -2,12 +2,12 @@
   "name": "minicode",
   "version": "1.0.0",
   "description": "minicode 一个minimal coding agent，方案待讨论",
-  "main": "dist/cli/index.js",
+  "main": "dist/cli.js",
   "type": "module",
   "scripts": {
-    "dev": "tsx src/cli/index.ts",
+    "dev": "tsx src/cli.ts",
     "build": "tsc",
-    "start": "node dist/cli/index.js"
+    "start": "node dist/cli.js"
   },
   "keywords": [],
   "author": "",

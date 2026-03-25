@@ -2,9 +2,9 @@
 import readline from 'readline';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { Agent } from '../agent/index.js';
-import { getModelConfig, getCompressionThreshold } from '../config.js';
-import { SessionManager, SessionInfo } from '../utils/session.js';
+import { Agent } from './agent.js';
+import { getModelConfig, getCompressionThreshold } from './config.js';
+import { SessionManager, SessionInfo } from './utils/session.js';
 
 // Create session manager instance
 const sessionManager = new SessionManager();

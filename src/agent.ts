@@ -1,7 +1,7 @@
-import { AnthropicClient, MessageParam, Tool, Anthropic } from '../llm/anthropic.js';
-import { readTool, writeTool, editTool, bashTool } from '../tools/index.js';
-import { system, toolCall, toolResult, error, progress, raw } from '../utils/logger.js';
-import { SessionManager, SessionData } from '../utils/session.js';
+import { AnthropicClient, MessageParam, Tool, Anthropic } from './llm/anthropic.js';
+import { readTool, writeTool, editTool, bashTool } from './tools/index.js';
+import { system, toolCall, toolResult, error, progress, raw } from './utils/logger.js';
+import { SessionManager, SessionData } from './utils/session.js';
 
 const SYSTEM_PROMPT = `You are an expert coding assistant. You help users with coding tasks by reading files, executing commands, editing code, and writing new files.
 
