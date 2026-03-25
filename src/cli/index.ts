@@ -2,7 +2,7 @@
 import readline from 'readline';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { Agent } from '../agent/loop.js';
+import { Agent } from '../agent/index.js';
 import { getModelConfig, getCompressionThreshold } from '../config.js';
 import { SessionManager, SessionInfo } from '../utils/session.js';
 
