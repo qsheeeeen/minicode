@@ -31,6 +31,33 @@ export async function listSessions(): Promise<string[]> {
   return entries.filter(e => e.endsWith('.json')).map(e => e.replace('.json', ''));
 }
 
+export interface SessionInfo {
+  name: string;
+  updatedAt: string;
+}
+
+export async function listSessionsWithInfo(): Promise<SessionInfo[]> {
+  const dir = await getSessionDir();
+  const entries = await fs.readdir(dir).catch(() => []);
+  const sessions: SessionInfo[] = [];
+
+  for (const entry of entries) {
+    if (!entry.endsWith('.json')) continue;
+    const name = entry.replace('.json', '');
+    const data = await loadSession(name);
+    if (data) {
+      sessions.push({ name, updatedAt: data.updatedAt });
+    }
+  }
+
+  return sessions.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+}
+
+export async function getMostRecentSession(): Promise<string | null> {
+  const sessions = await listSessionsWithInfo();
+  return sessions.length > 0 ? sessions[0].name : null;
+}
+
 export async function loadSession(name: string): Promise<SessionData | null> {
   const dir = await getSessionDir();
   const filePath = path.join(dir, `${name}.json`);

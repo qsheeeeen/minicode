@@ -193,14 +193,53 @@ ${JSON.stringify(messagesToSummarize, null, 2)}`;
     await this.saveToSession();
   }
 
-  async loadFromSession(name: string): Promise<boolean> {
+  async loadFromSession(name: string, showHistory = false): Promise<boolean> {
     const data = await loadSession(name);
     if (!data) return false;
 
     this.messages = data.messages as MessageParam[];
     this.totalTokens = data.totalTokens;
     this.currentSession = name;
+    if (showHistory) {
+      this.showHistory();
+    }
     return true;
+  }
+
+  showHistory(): void {
+    for (const msg of this.messages) {
+      if (msg.role === 'user') {
+        const content = msg.content;
+        if (Array.isArray(content)) {
+          // Tool results - skip showing (internal data)
+          continue;
+        }
+        // User text message - use raw() like original display
+        raw(content);
+      } else if (msg.role === 'assistant') {
+        const content = msg.content;
+        if (Array.isArray(content)) {
+          // Has tool calls or mixed content
+          for (const block of content) {
+            if (block.type === 'text') {
+              // Assistant text response - use raw() like original display
+              raw((block as any).text);
+            } else if (block.type === 'tool_use') {
+              // Tool call - use toolCall() like original display
+              const tool = this.tools.get(block.name);
+              const display = tool?.format
+                ? tool.format((block as any).input)
+                : `${block.name} ${JSON.stringify((block as any).input)}`;
+              toolCall(display);
+            }
+          }
+        } else {
+          // Simple text response - use raw() like original display
+          raw(content);
+        }
+      }
+    }
+    console.log();
   }
 
   private async saveToSession(): Promise<void> {

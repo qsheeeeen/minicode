@@ -4,7 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { Agent } from '../agent/loop.js';
 import { getModelConfig, getCompressionThreshold } from '../config.js';
-import { listSessions, deleteSession, renameSession } from '../utils/session.js';
+import { renameSession, getMostRecentSession, listSessionsWithInfo, SessionInfo } from '../utils/session.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -18,6 +18,8 @@ const VERSION = packageJson.version;
 const args = process.argv.slice(2);
 let modelOverride: string | undefined;
 let directPrompt: string | undefined;
+let sessionName: string | undefined;
+let resumeRecent = false;
 
 for (let i = 0; i < args.length; i++) {
   const arg = args[i];
@@ -29,23 +31,29 @@ for (let i = 0; i < args.length; i++) {
     console.log('Usage:');
     console.log('  minicode [options] [prompt]\n');
     console.log('Options:');
-    console.log('  --model <spec>   Model specification (e.g., glm-4.7@zhipu)');
-    console.log('  --version, -v    Show version');
-    console.log('  --help, -h       Show this help');
+    console.log('  --model <spec>    Model specification (e.g., glm-4.7@zhipu)');
+    console.log('  --session <name>  Session name (creates new or resumes existing)');
+    console.log('  --resume          Resume most recent session');
+    console.log('  --version, -v     Show version');
+    console.log('  --help, -h        Show this help');
     console.log('\nExamples:');
-    console.log('  minicode                       # Start interactive mode');
-    console.log('  minicode "read package.json"   # Run prompt directly');
+    console.log('  minicode                        # Start interactive mode');
+    console.log('  minicode "read package.json"    # Run prompt directly');
+    console.log('  minicode --session feature-a    # Use specific session');
+    console.log('  minicode --resume               # Resume most recent session');
     console.log('\nIn REPL mode:');
-    console.log('  /compress or /c                # Compress conversation history');
-    console.log('  /ls                            # List sessions');
+    console.log('  /compress                      # Compress conversation history');
     console.log('  /new <name>                    # Create new session');
-    console.log('  /switch <name> or /s <name>    # Switch session');
-    console.log('  /rm <name>                     # Delete session');
+    console.log('  /resume [number|name]          # List or resume session');
     console.log('  /rename <new-name>             # Rename current session');
-    console.log('  exit                           # Quit');
+    console.log('  /exit                          # Quit');
     process.exit(0);
   } else if (arg === '--model') {
     modelOverride = args[++i];
+  } else if (arg === '--session') {
+    sessionName = args[++i];
+  } else if (arg === '--resume') {
+    resumeRecent = true;
   } else if (!arg.startsWith('--')) {
     // Non-option argument is the prompt
     directPrompt = arg;
@@ -68,6 +76,26 @@ const agent = new Agent(
   modelConfig.contextLength,
   compressionThreshold
 );
+
+// Initialize session
+if (sessionName) {
+  // Specific session requested
+  await agent.loadFromSession(sessionName);
+} else if (resumeRecent) {
+  // Resume most recent session
+  const recent = await getMostRecentSession();
+  if (recent) {
+    await agent.loadFromSession(recent, true);
+  } else {
+    // No recent session, create new
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    agent.startNewSession(`repl-${timestamp}`);
+  }
+} else {
+  // Create new session
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  agent.startNewSession(`repl-${timestamp}`);
+}
 
 function showBanner(config: { provider: string; model: string; baseURL?: string }, session: string) {
   console.log(`Mini Code v${VERSION}`);
@@ -100,29 +128,16 @@ async function runRepl() {
     });
   }
 
-  // Auto-load default session
-  await agent.loadFromSession('default');
   showBanner(modelConfig!, agent.currentSession);
 
   while (true) {
     const input = await ask('> ');
-    if (input === 'exit') break;
+    if (input === '/exit') break;
     if (!input.trim()) continue;
 
     // Handle special commands
-    if (input === '/compress' || input === '/c') {
+    if (input === '/compress') {
       await agent.compress();
-      console.log();
-      continue;
-    }
-
-    if (input === '/ls') {
-      const sessions = await listSessions();
-      console.log('Sessions:');
-      for (const s of sessions) {
-        const current = s === agent.currentSession ? ' (current)' : '';
-        console.log(`  ${s}${current}`);
-      }
       console.log();
       continue;
     }
@@ -140,38 +155,62 @@ async function runRepl() {
       continue;
     }
 
-    if (input.startsWith('/switch ') || input.startsWith('/s ')) {
-      const name = input.startsWith('/switch ') ? input.slice(8).trim() : input.slice(3).trim();
-      if (!name) {
-        console.log('Usage: /switch <session-name> or /s <session-name>');
-        console.log();
-        continue;
-      }
-      const loaded = await agent.loadFromSession(name);
-      if (loaded) {
-        console.log(`Switched to session: ${name}`);
-      } else {
-        console.log(`Session not found: ${name} (use /new to create)`);
-      }
-      console.log();
-      continue;
-    }
+    if (input === '/resume' || input.startsWith('/resume ')) {
+      const arg = input === '/resume' ? '' : input.slice(8).trim();
 
-    if (input.startsWith('/rm ')) {
-      const name = input.slice(4).trim();
-      if (!name) {
-        console.log('Usage: /rm <session-name>');
+      // No argument - show numbered list and wait for selection
+      if (!arg) {
+        const sessions = await listSessionsWithInfo();
+        if (sessions.length === 0) {
+          console.log('No sessions found. Use /new to create one.');
+          console.log();
+          continue;
+        }
+        console.log('Sessions (most recent first):');
+        for (let i = 0; i < sessions.length; i++) {
+          const s = sessions[i];
+          const current = s.name === agent.currentSession ? ' (current)' : '';
+          console.log(`  ${i + 1}. ${s.name}${current}`);
+        }
+
+        // Wait for user to select a number
+        const selection = await ask('Select session number (or Enter to cancel): ');
+        if (!selection.trim()) {
+          console.log('Cancelled.');
+          console.log();
+          continue;
+        }
+
+        const num = parseInt(selection, 10);
+        if (isNaN(num) || num < 1 || num > sessions.length) {
+          console.log(`Invalid selection. Use 1-${sessions.length}`);
+          console.log();
+          continue;
+        }
+
+        const name = sessions[num - 1].name;
+        rl.pause();
         console.log();
+        const loaded = await agent.loadFromSession(name, true);
+        rl.resume();
+
+        if (!loaded) {
+          console.log(`Failed to load session: ${name}`);
+          console.log();
+        }
         continue;
       }
-      if (name === agent.currentSession) {
-        console.log('Cannot delete current session');
-        console.log();
-        continue;
-      }
-      await deleteSession(name);
-      console.log(`Deleted session: ${name}`);
+
+      // Argument provided - direct load by name
+      rl.pause();
       console.log();
+      const loaded = await agent.loadFromSession(arg, true);
+      rl.resume();
+
+      if (!loaded) {
+        console.log(`Session not found: ${arg} (use /new to create)`);
+        console.log();
+      }
       continue;
     }
 
@@ -198,6 +237,10 @@ async function runRepl() {
 }
 
 async function runDirect(prompt: string) {
+  // Create a new session for direct mode
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  const sessionName = `direct-${timestamp}`;
+  agent.startNewSession(sessionName);
   await agent.run(prompt);
 }
 
