@@ -1,5 +1,7 @@
 import { AnthropicClient, MessageParam, Tool, Anthropic } from '../llm/anthropic.js';
 import { readTool, writeTool, editTool, bashTool } from '../tools/index.js';
+import { system, toolCall, toolResult, error, progress, raw } from '../utils/logger.js';
+import { loadSession, saveSession } from '../utils/session.js';
 
 const SYSTEM_PROMPT = `You are an expert coding assistant. You help users with coding tasks by reading files, executing commands, editing code, and writing new files.
 
@@ -38,6 +40,8 @@ export class Agent {
   private contextLength: number;
   private compressionThresholdRatio: number;
   private totalTokens = 0;
+  private lastShownThreshold = 0;
+  public currentSession: string = 'default';
 
   constructor(apiKey?: string, baseURL?: string, model?: string, contextLength?: number, compressionThresholdRatio?: number) {
     this.client = new AnthropicClient(apiKey, baseURL);
@@ -55,11 +59,11 @@ export class Agent {
   async compress(): Promise<void> {
     const recentCount = 10;
     if (this.messages.length <= recentCount + 2) {
-      console.log('(Not enough messages to compress)');
+      system('(Not enough messages to compress)');
       return;
     }
 
-    console.log(`(Compressing ${this.messages.length - recentCount} messages, ${this.totalTokens.toLocaleString()} tokens...)`);
+    system(`(Compressing ${this.messages.length - recentCount} messages, ${this.totalTokens.toLocaleString()} tokens...)`);
 
     const messagesToSummarize = this.messages.slice(0, -recentCount);
     const summaryPrompt = `Summarize the following conversation concisely. Focus on:
@@ -86,9 +90,9 @@ ${JSON.stringify(messagesToSummarize, null, 2)}`;
       ];
 
       this.totalTokens = 0;
-      console.log(`(Compressed to ${this.messages.length} messages)`);
+      system(`(Compressed to ${this.messages.length} messages)`);
     } catch (e) {
-      console.log(`(Compression failed: ${(e as Error).message})`);
+      error(`(Compression failed: ${(e as Error).message})`);
     }
   }
 
@@ -109,7 +113,18 @@ ${JSON.stringify(messagesToSummarize, null, 2)}`;
       // Track token usage
       if (response.usage) {
         this.totalTokens += response.usage.input_tokens + response.usage.output_tokens;
-        console.log(`\n[Context: ${this.totalTokens.toLocaleString()} / ${this.contextLength.toLocaleString()} tokens]`);
+        const ratio = this.totalTokens / this.contextLength;
+        const percentage = Math.floor(ratio * 100);
+
+        // Show only at 25%, 50%, 75%, 90%
+        const thresholds = [25, 50, 75, 90];
+        for (const t of thresholds) {
+          if (percentage >= t && this.lastShownThreshold < t) {
+            system(`[${percentage}% context]`);
+            this.lastShownThreshold = t;
+            break;
+          }
+        }
 
         // Auto-compression check
         const threshold = Math.floor(this.contextLength * this.compressionThresholdRatio);
@@ -127,7 +142,7 @@ ${JSON.stringify(messagesToSummarize, null, 2)}`;
 
       for (const block of response.content) {
         if (block.type === 'text') {
-          console.log((block as any).text);
+          raw((block as any).text);
           (assistantMsg.content as any).push(block);
         } else if (block.type === 'tool_use') {
           hasToolCalls = true;
@@ -137,21 +152,24 @@ ${JSON.stringify(messagesToSummarize, null, 2)}`;
           const tool = this.tools.get(toolBlock.name);
           if (tool) {
             const display = tool.format ? tool.format(toolBlock.input as any) : `${toolBlock.name} ${JSON.stringify(toolBlock.input)}`;
-            console.log(display);
+            toolCall(display);
             toolCalls.push({ block: toolBlock, tool });
           }
         }
       }
 
+      // Push assistant message first (contains tool_use blocks)
+      this.messages.push(assistantMsg);
+
       // Second pass: execute all tools in parallel
       if (toolCalls.length > 0) {
-        process.stdout.write(`Running ${toolCalls.length} tool${toolCalls.length > 1 ? 's' : ''}... `);
+        progress(`Running ${toolCalls.length} tool${toolCalls.length > 1 ? 's' : ''}... `);
         const results = await Promise.allSettled(
           toolCalls.map(({ block, tool }) => tool.execute(block.input as any))
         );
-        console.log('Done.');
+        raw('Done.');
 
-        // Push all results back
+        // Push all results back (as user messages with tool_result)
         results.forEach((result, i) => {
           const { block } = toolCalls[i];
           const content = result.status === 'fulfilled'
@@ -168,9 +186,37 @@ ${JSON.stringify(messagesToSummarize, null, 2)}`;
         });
       }
 
-      this.messages.push(assistantMsg);
-
       if (!hasToolCalls) break;
     }
+
+    // Auto-save after each complete exchange
+    await this.saveToSession();
+  }
+
+  async loadFromSession(name: string): Promise<boolean> {
+    const data = await loadSession(name);
+    if (!data) return false;
+
+    this.messages = data.messages as MessageParam[];
+    this.totalTokens = data.totalTokens;
+    this.currentSession = name;
+    return true;
+  }
+
+  private async saveToSession(): Promise<void> {
+    await saveSession(this.currentSession, {
+      model: this.model || 'unknown',
+      messages: this.messages as any,
+      totalTokens: this.totalTokens,
+      createdAt: '',
+      updatedAt: ''
+    });
+  }
+
+  startNewSession(name: string): void {
+    this.messages = [];
+    this.totalTokens = 0;
+    this.lastShownThreshold = 0;
+    this.currentSession = name;
   }
 }
