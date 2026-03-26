@@ -1,9 +1,9 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import os from 'os';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const CONFIG_DIR = path.join(os.homedir(), '.minicode');
+const CONFIG_PATH = path.join(CONFIG_DIR, 'config.json');
 
 export interface ProviderConfig {
   apiKey?: string;
@@ -26,14 +26,13 @@ export interface Config {
   thinkingTokens?: number;  // tokens budget for thinking (default 20000)
 }
 
-const CONFIG_PATH = path.join(__dirname, '../config.json');
-
 let cachedConfig: Config | null = null;
 
 export async function loadConfig(): Promise<Config> {
   if (cachedConfig) return cachedConfig;
 
   try {
+    await fs.mkdir(CONFIG_DIR, { recursive: true });
     const content = await fs.readFile(CONFIG_PATH, 'utf-8');
     cachedConfig = JSON.parse(content) as Config;
     return cachedConfig ?? {};
