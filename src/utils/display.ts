@@ -3,13 +3,19 @@
  * Provides an abstraction layer for different display modes
  */
 
-export type MessageRole = 'user' | 'assistant' | 'system' | 'tool' | 'error';
+import type { MessageRole, DisplayMessage } from './session-display.js';
 
-export interface DisplayMessage {
-  role: MessageRole;
-  content: string;
-  timestamp?: Date;
-}
+// Re-export for convenience
+export type { MessageRole, DisplayMessage };
+
+export type DisplayCallback = {
+  onMessage?: (msg: DisplayMessage) => void;
+  onStreamStart?: () => void;
+  onStreamChunk?: (chunk: string) => void;
+  onStreamEnd?: () => void;
+  onStatusUpdate?: (status: string) => void;
+  onTokenUpdate?: (tokens: number) => void;
+};
 
 export interface DisplayAdapter {
   /** Display a system message */
@@ -42,15 +48,6 @@ export interface DisplayAdapter {
   /** Clear display */
   clear?(): void;
 }
-
-export type DisplayCallback = {
-  onMessage?: (msg: DisplayMessage) => void;
-  onStreamStart?: () => void;
-  onStreamChunk?: (chunk: string) => void;
-  onStreamEnd?: () => void;
-  onStatusUpdate?: (status: string) => void;
-  onTokenUpdate?: (tokens: number) => void;
-};
 
 /**
  * Console-based display adapter (fallback for development/debugging)

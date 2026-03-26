@@ -2,13 +2,18 @@
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { render } from 'ink';
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { Box, Text, useInput, useApp } from 'ink';
 import TextInput from 'ink-text-input';
 import { Agent } from './agent.js';
 import { getModelConfig, getCompressionThreshold, getThinkingConfig } from './config.js';
 import { SessionManager } from './utils/session.js';
-import { CallbackDisplay, DisplayCallback, DisplayAdapter, DisplayMessage } from './utils/display.js';
+import { CallbackDisplay, DisplayMessage } from './utils/display.js';
+import { SessionDisplayImpl } from './utils/session-display.js';
+import { CommandRegistry, type CommandContext } from './cli/commands.js';
+
+// Create command registry instance
+const commandRegistry = new CommandRegistry();
 import { Message } from './components/Message.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -96,14 +101,26 @@ function App({ initialPrompt }: { initialPrompt?: string }) {
   const [tokenCount, setTokenCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [mode, setMode] = useState<'chat' | 'session-list'>('chat');
-  const [sessionList, setSessionList] = useState<Array<{ name: string }>>([]);
-  const [selectedIndex, setSelectedIndex] = useState(0);
+  // Consolidated session list state
+  const [sessionListState, setSessionListState] = useState<{
+    sessions: Array<{ name: string }>;
+    selectedIndex: number;
+  }>({ sessions: [], selectedIndex: 0 });
   const [inputValue, setInputValue] = useState('');
   const [autoSubmitPending, setAutoSubmitPending] = useState(!!initialPrompt);
 
   const agentRef = useRef<Agent | null>(null);
   const streamingRef = useRef<string>('');
   const { exit } = useApp();
+
+  // Helper functions for session list state
+  const setSessionList = (sessions: Array<{ name: string }>) => {
+    setSessionListState(prev => ({ ...prev, sessions }));
+  };
+
+  const setSelectedIndex = (index: number) => {
+    setSessionListState(prev => ({ ...prev, selectedIndex: index }));
+  };
 
   // Update streaming ref when state changes
   useEffect(() => {
@@ -134,24 +151,31 @@ function App({ initialPrompt }: { initialPrompt?: string }) {
       onTokenUpdate: setTokenCount
     });
 
-    const agent = new Agent(
-      modelConfig!.apiKey,
-      modelConfig!.baseURL,
-      modelConfig!.model,
-      modelConfig!.contextLength,
-      compressionThreshold,
-      thinkingConfig.enabled,
-      thinkingConfig.tokens,
-      displayAdapter
-    );
+    const agent = new Agent({
+      apiKey: modelConfig!.apiKey,
+      baseURL: modelConfig!.baseURL,
+      model: modelConfig!.model,
+      contextLength: modelConfig!.contextLength,
+      compressionThresholdRatio: compressionThreshold,
+      thinkingEnabled: thinkingConfig.enabled,
+      thinkingTokens: thinkingConfig.tokens,
+      display: displayAdapter
+    });
 
     agentRef.current = agent;
 
     // Load initial session
     const loadInitial = async () => {
       if (sessionName || resumeRecent) {
-        const loaded = await agent.loadFromSession(initialSession, false);
-        if (!loaded && sessionName) {
+        const loaded = await agent.loadFromSession(initialSession);
+        if (loaded) {
+          // Load display messages using SessionDisplay
+          const sessionDisplay = new SessionDisplayImpl(sessionManager);
+          const displayMessages = await sessionDisplay.loadForTUI(initialSession);
+          if (displayMessages.length > 0) {
+            setMessages(displayMessages);
+          }
+        } else if (sessionName) {
           setMessages([{ role: 'system', content: `Created new session: ${sessionName}`, timestamp: new Date() }]);
         }
       }
@@ -165,44 +189,20 @@ function App({ initialPrompt }: { initialPrompt?: string }) {
   const handleSubmit = useCallback(async (value: string) => {
     if (!value.trim() || !agentRef.current) return;
 
-    if (value === '/exit') { exit(); return; }
-    if (value === '/compress') {
-      setIsLoading(true);
-      await agentRef.current.compress();
-      setIsLoading(false);
-      return;
-    }
-    if (value.startsWith('/new ')) {
-      const name = value.slice(5).trim();
-      if (name) {
-        agentRef.current.startNewSession(name);
-        setCurrentSession(name);
-        setMessages([{ role: 'system', content: `Created session: ${name}`, timestamp: new Date() }]);
-      }
-      return;
-    }
-    if (value.startsWith('/rename ')) {
-      const newName = value.slice(8).trim();
-      if (newName) {
-        const oldName = agentRef.current.currentSession;
-        await sessionManager.rename(oldName, newName);
-        agentRef.current.currentSession = newName;
-        setCurrentSession(newName);
-        setMessages(prev => [...prev, { role: 'system', content: `Renamed: ${oldName} -> ${newName}`, timestamp: new Date() }]);
-      }
-      return;
-    }
-    if (value.startsWith('/resume ')) {
-      const arg = value.slice(8).trim();
-      const loaded = await agentRef.current.loadFromSession(arg, false);
-      if (loaded) {
-        setCurrentSession(arg);
-        setMessages([{ role: 'system', content: `Loaded session: ${arg}`, timestamp: new Date() }]);
-      } else {
-        setMessages(prev => [...prev, { role: 'error', content: `Session not found: ${arg}`, timestamp: new Date() }]);
-      }
-      return;
-    }
+    // Try command registry first
+    const commandContext: CommandContext = {
+      agent: agentRef.current,
+      sessionManager,
+      setMessages,
+      setCurrentSession,
+      setMode,
+      setSessionList,
+      setSelectedIndex,
+      exit
+    };
+
+    const isCommand = await commandRegistry.parseAndExecute(value, commandContext);
+    if (isCommand) return;
 
     // Regular message
     setMessages(prev => [...prev, { role: 'user', content: value, timestamp: new Date() }]);
@@ -225,16 +225,16 @@ function App({ initialPrompt }: { initialPrompt?: string }) {
 
   // Session list overlay
   if (mode === 'session-list') {
-    useInput((input, key) => {
+    useInput((_input, key) => {
       if (key.return) {
-        handleSubmit(`/resume ${sessionList[selectedIndex]?.name}`);
+        handleSubmit(`/resume ${sessionListState.sessions[sessionListState.selectedIndex]?.name}`);
         setMode('chat');
       } else if (key.escape) {
         setMode('chat');
       } else if (key.upArrow) {
-        setSelectedIndex(i => Math.max(0, i - 1));
+        setSessionListState(prev => ({ ...prev, selectedIndex: Math.max(0, prev.selectedIndex - 1) }));
       } else if (key.downArrow) {
-        setSelectedIndex(i => Math.min(sessionList.length - 1, i + 1));
+        setSessionListState(prev => ({ ...prev, selectedIndex: Math.min(prev.sessions.length - 1, prev.selectedIndex + 1) }));
       }
     });
 
@@ -242,9 +242,9 @@ function App({ initialPrompt }: { initialPrompt?: string }) {
       <Box flexDirection="column" paddingX={1} paddingY={1} borderStyle="double" borderColor="blue">
         <Text bold color="blue" underline>Sessions</Text>
         <Text dimColor> ↑↓ navigate, Enter select, Esc cancel</Text>
-        {sessionList.map((s, i) => (
-          <Text key={s.name} color={i === selectedIndex ? 'blue' : 'white'} bold={i === selectedIndex}>
-            {i === selectedIndex ? '> ' : '  '}{s.name}
+        {sessionListState.sessions.map((s, i) => (
+          <Text key={s.name} color={i === sessionListState.selectedIndex ? 'blue' : 'white'} bold={i === sessionListState.selectedIndex}>
+            {i === sessionListState.selectedIndex ? '> ' : '  '}{s.name}
           </Text>
         ))}
       </Box>
@@ -306,19 +306,7 @@ function App({ initialPrompt }: { initialPrompt?: string }) {
           onChange={setInputValue}
           onSubmit={async (value) => {
             setInputValue('');
-            if (value === '/resume' || value.startsWith('/resume ')) {
-              const arg = value.slice(8).trim();
-              if (!arg) {
-                const sessions = await sessionManager.list();
-                setSessionList(sessions.map(s => ({ name: s.name })));
-                setSelectedIndex(0);
-                setMode('session-list');
-              } else {
-                await handleSubmit(value);
-              }
-            } else {
-              await handleSubmit(value);
-            }
+            await handleSubmit(value);
           }}
           placeholder="Type a message or /command..."
         />

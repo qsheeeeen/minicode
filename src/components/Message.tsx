@@ -7,19 +7,8 @@ interface MessageProps {
   isStreaming?: boolean;
 }
 
-// Format tool content to extract tool name
-function formatToolContent(content: string): { tool: string; rest: string } {
-  // Extract tool name from patterns like "Read(package.json)" or "(Read 28 lines, 582 chars)"
-  const match = content.match(/^(\w+)\((.*?)\)/);
-  if (match) {
-    return { tool: match[1], rest: match[2] };
-  }
-  const match2 = content.match(/^\((\w+)\s+(.*?)\)/);
-  if (match2) {
-    return { tool: match2[1], rest: match2[2] };
-  }
-  return { tool: 'Tool', rest: content };
-}
+// Tool names for detection (all built-in tools start with uppercase)
+const TOOL_NAMES = ['Read', 'Write', 'Edit', 'Bash'];
 
 export function Message({ role, content, isStreaming }: MessageProps) {
   // User message - dim color to distinguish from assistant
@@ -42,8 +31,8 @@ export function Message({ role, content, isStreaming }: MessageProps) {
 
   // Tool call/result
   if (role === 'tool') {
-    // Check if it's a tool call (has parentheses like "Read(...)") or result
-    const isToolCall = /^[A-Z]\w+\(/.test(content);
+    // Check if it's a tool call by matching known tool names followed by parenthesis
+    const isToolCall = TOOL_NAMES.some(name => content.startsWith(`${name}(`));
     if (isToolCall) {
       // Tool call - show in yellow
       return (

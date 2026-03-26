@@ -28,8 +28,8 @@ export interface Config {
 
 let cachedConfig: Config | null = null;
 
-export async function loadConfig(): Promise<Config> {
-  if (cachedConfig) return cachedConfig;
+export async function loadConfig(refresh = false): Promise<Config> {
+  if (cachedConfig && !refresh) return cachedConfig;
 
   try {
     await fs.mkdir(CONFIG_DIR, { recursive: true });
@@ -40,6 +40,10 @@ export async function loadConfig(): Promise<Config> {
     // 配置文件不存在，返回空配置
     return {};
   }
+}
+
+export function invalidateConfig(): void {
+  cachedConfig = null;
 }
 
 export async function getProviderConfig(provider?: string): Promise<ProviderConfig | undefined> {

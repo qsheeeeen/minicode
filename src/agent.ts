@@ -1,8 +1,15 @@
 import { AnthropicClient, MessageParam, Tool, Anthropic } from './llm/anthropic.js';
-import { readTool, writeTool, editTool, bashTool } from './tools/index.js';
-import { system, toolCall, toolResult, error, progress, raw, DisplayAdapter, CallbackDisplay } from './utils/display.js';
-import { SessionManager, SessionData } from './utils/session.js';
-import { getThinkingConfig } from './config.js';
+import { readTool, writeTool, editTool, bashTool, ToolRegistry, ToolDef } from './tools/index.js';
+import { system, toolCall, toolResult, error, progress, raw, DisplayAdapter } from './utils/display.js';
+import { SessionManager } from './utils/session.js';
+import { TokenManager, TokenManagerImpl } from './services/token-manager.js';
+import { CompressionService, CompressionServiceImpl } from './services/compression-service.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const README_PATH = path.join(__dirname, '..', '..', 'README.md');
 
 const SYSTEM_PROMPT = `You are an expert coding assistant. You help users with coding tasks by reading files, executing commands, editing code, and writing new files.
 
@@ -22,48 +29,56 @@ Guidelines:
 - Show file paths clearly when working with files
 
 Documentation:
-- Your own documentation (including custom model setup and theme creation) is at: /path/to/README.md
-- Read it when users ask about features, configuration, or setup, and especially if the user asks you to add a custom model or provider, or create a custom theme.`;
+- For minicode documentation (features, configuration, setup), read: ${README_PATH}
+- Refer to it when users ask about features, configuration, or setup, or when adding custom models/providers.`;
 
-type ToolDef = {
-  name: string;
-  description: string;
-  input_schema: Record<string, unknown>;
-  format?: (args: any) => string;
-  execute: (args: any) => Promise<string>;
-};
+export interface AgentConfig {
+  apiKey?: string;
+  baseURL?: string;
+  model?: string;
+  contextLength?: number;
+  compressionThresholdRatio?: number;
+  thinkingEnabled?: boolean;
+  thinkingTokens?: number;
+  display?: DisplayAdapter;
+  tokenManager?: TokenManager;
+  compressionService?: CompressionService;
+}
 
 export class Agent {
   private client: AnthropicClient;
-  private tools: Map<string, ToolDef>;
+  private toolRegistry: ToolRegistry;
   private messages: MessageParam[] = [];
   private model?: string;
   private contextLength: number;
   private compressionThresholdRatio: number;
-  private totalTokens = 0;
-  private lastShownThreshold = 0;
+  private tokenManager: TokenManager;
+  private compressionService: CompressionService;
   public currentSession: string = 'default';
   private sessionManager: SessionManager;
   private thinkingEnabled: boolean;
   private thinkingTokens: number;
   private display: DisplayAdapter;
 
-  constructor(apiKey?: string, baseURL?: string, model?: string, contextLength?: number, compressionThresholdRatio?: number, thinkingEnabled?: boolean, thinkingTokens?: number, display?: DisplayAdapter) {
-    this.client = new AnthropicClient(apiKey, baseURL);
-    this.model = model;
-    this.contextLength = contextLength || 200000;
-    this.compressionThresholdRatio = compressionThresholdRatio || 0.8;
-    this.thinkingEnabled = thinkingEnabled || false;
-    this.thinkingTokens = thinkingTokens || 20000;
+  constructor(config: AgentConfig = {}) {
+    this.client = new AnthropicClient(config.apiKey, config.baseURL);
+    this.model = config.model;
+    this.contextLength = config.contextLength || 200000;
+    this.compressionThresholdRatio = config.compressionThresholdRatio || 0.8;
+    this.thinkingEnabled = config.thinkingEnabled || false;
+    this.thinkingTokens = config.thinkingTokens || 20000;
     this.sessionManager = new SessionManager();
-    this.tools = new Map<string, ToolDef>([
-      ['read', readTool as ToolDef],
-      ['write', writeTool as ToolDef],
-      ['edit', editTool as ToolDef],
-      ['bash', bashTool as ToolDef]
-    ]);
+    this.tokenManager = config.tokenManager || new TokenManagerImpl();
+    this.compressionService = config.compressionService || new CompressionServiceImpl();
+    this.toolRegistry = new ToolRegistry();
+
+    // Register built-in tools
+    this.toolRegistry.register(readTool as ToolDef);
+    this.toolRegistry.register(writeTool as ToolDef);
+    this.toolRegistry.register(editTool as ToolDef);
+    this.toolRegistry.register(bashTool as ToolDef);
     // Use provided display or create default console display
-    this.display = display || {
+    this.display = config.display || {
       system, toolCall, toolResult, error, progress, raw,
       streamStart: () => {},
       streamChunk: () => {},
@@ -83,33 +98,12 @@ export class Agent {
       return;
     }
 
-    this.display.system(`(Compressing ${this.messages.length - recentCount} messages, ${this.totalTokens.toLocaleString()} tokens...)`);
-
-    const messagesToSummarize = this.messages.slice(0, -recentCount);
-    const summaryPrompt = `Summarize the following conversation concisely. Focus on:
-- What was being worked on
-- Key decisions made
-- Current state
-
-Keep it brief and actionable.
-
-Conversation:
-${JSON.stringify(messagesToSummarize, null, 2)}`;
+    const totalTokens = this.tokenManager.getTotal();
+    this.display.system(`(Compressing ${this.messages.length - recentCount} messages, ${totalTokens.toLocaleString()} tokens...)`);
 
     try {
-      const summary = await this.client.chat(
-        [{ role: 'user', content: summaryPrompt }],
-        [],
-        { model: this.model, maxTokens: 1000 }
-      );
-
-      const summaryText = (summary.content[0] as any)?.text || 'Conversation summary unavailable';
-      this.messages = [
-        { role: 'user', content: `[Previous conversation summary]\n${summaryText}` },
-        ...this.messages.slice(-recentCount)
-      ];
-
-      this.totalTokens = 0;
+      this.messages = await this.compressionService.compress(this.messages, this.client, this.model);
+      this.tokenManager.reset();
       this.display.system(`(Compressed to ${this.messages.length} messages)`);
     } catch (e) {
       this.display.error(`(Compression failed: ${(e as Error).message})`);
@@ -122,7 +116,7 @@ ${JSON.stringify(messagesToSummarize, null, 2)}`;
     while (true) {
       const response = await this.client.chat(
         this.messages,
-        Array.from(this.tools.values()).map(t => ({
+        this.toolRegistry.getAll().map(t => ({
           name: t.name,
           description: t.description,
           input_schema: t.input_schema
@@ -137,23 +131,23 @@ ${JSON.stringify(messagesToSummarize, null, 2)}`;
 
       // Track token usage
       if (response.usage) {
-        this.totalTokens += response.usage.input_tokens + response.usage.output_tokens;
-        const ratio = this.totalTokens / this.contextLength;
+        this.tokenManager.addTokens(response.usage.input_tokens, response.usage.output_tokens);
+        const ratio = this.tokenManager.getRatio(this.contextLength);
         const percentage = Math.floor(ratio * 100);
 
         // Show only at 25%, 50%, 75%, 90%
         const thresholds = [25, 50, 75, 90];
+        const lastShown = this.tokenManager.getLastShownThreshold();
         for (const t of thresholds) {
-          if (percentage >= t && this.lastShownThreshold < t) {
+          if (percentage >= t && lastShown < t) {
             this.display.system(`[${percentage}% context]`);
-            this.lastShownThreshold = t;
+            this.tokenManager.updateThreshold(t);
             break;
           }
         }
 
         // Auto-compression check
-        const threshold = Math.floor(this.contextLength * this.compressionThresholdRatio);
-        if (this.totalTokens > threshold) {
+        if (this.tokenManager.shouldCompress(this.contextLength, this.compressionThresholdRatio)) {
           await this.compress();
         }
       }
@@ -176,9 +170,8 @@ ${JSON.stringify(messagesToSummarize, null, 2)}`;
           const toolBlock = block as Anthropic.Messages.ToolUseBlock;
           (assistantMsg.content as any).push(block);
 
-          const tool = this.tools.get(toolBlock.name);
+          const tool = this.toolRegistry.get(toolBlock.name);
           if (tool) {
-            const display = tool.format ? tool.format(toolBlock.input as any) : `${toolBlock.name} ${JSON.stringify(toolBlock.input)}`;
             toolCalls.push({ block: toolBlock, tool });
           }
         }
@@ -211,7 +204,7 @@ ${JSON.stringify(messagesToSummarize, null, 2)}`;
 
         // Display results and push to messages
         results.forEach((result, i) => {
-          const { block, tool } = toolCalls[i];
+          const { block, tool: _tool } = toolCalls[i];
           const content = result.status === 'fulfilled'
             ? result.value
             : `Error: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`;
@@ -249,60 +242,27 @@ ${JSON.stringify(messagesToSummarize, null, 2)}`;
     await this.saveToSession();
   }
 
-  async loadFromSession(name: string, showHistory = false): Promise<boolean> {
+  async loadFromSession(name: string): Promise<boolean> {
     const data = await this.sessionManager.get(name);
     if (!data) return false;
 
     this.messages = data.messages as MessageParam[];
-    this.totalTokens = data.totalTokens;
+    // Restore token count from session
+    const totalTokens = data.totalTokens || 0;
+    this.tokenManager.reset();
+    // Manually set the token count by adding it
+    if (totalTokens > 0) {
+      this.tokenManager.addTokens(totalTokens, 0);
+    }
     this.currentSession = name;
-    if (showHistory) {
-      this.showHistory();
-    }
     return true;
-  }
-
-  showHistory(): void {
-    for (const msg of this.messages) {
-      if (msg.role === 'user') {
-        const content = msg.content;
-        if (Array.isArray(content)) {
-          // Tool results - skip showing (internal data)
-          continue;
-        }
-        // User text message - use raw() like original display
-        this.display.raw(content);
-      } else if (msg.role === 'assistant') {
-        const content = msg.content;
-        if (Array.isArray(content)) {
-          // Has tool calls or mixed content
-          for (const block of content) {
-            if (block.type === 'text') {
-              // Assistant text response - use raw() like original display
-              this.display.raw((block as any).text);
-            } else if (block.type === 'tool_use') {
-              // Tool call - use toolCall() like original display
-              const tool = this.tools.get(block.name);
-              const display = tool?.format
-                ? tool.format((block as any).input)
-                : `${block.name} ${JSON.stringify((block as any).input)}`;
-              this.display.toolCall(display);
-            }
-          }
-        } else {
-          // Simple text response - use raw() like original display
-          this.display.raw(content);
-        }
-      }
-    }
-    console.log();
   }
 
   private async saveToSession(): Promise<void> {
     await this.sessionManager.save(this.currentSession, {
       model: this.model || 'unknown',
       messages: this.messages as any,
-      totalTokens: this.totalTokens,
+      totalTokens: this.tokenManager.getTotal(),
       createdAt: '',
       updatedAt: ''
     });
@@ -310,8 +270,7 @@ ${JSON.stringify(messagesToSummarize, null, 2)}`;
 
   startNewSession(name: string): void {
     this.messages = [];
-    this.totalTokens = 0;
-    this.lastShownThreshold = 0;
+    this.tokenManager.reset();
     this.currentSession = name;
   }
 }
