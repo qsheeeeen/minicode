@@ -59,23 +59,23 @@ export class ConsoleDisplay implements DisplayAdapter {
   private buffer: string = '';
 
   system(msg: string): void {
-    console.log(`ℹ️  ${msg}`);
+    console.log(`[System] ${msg}`);
   }
 
   toolCall(msg: string): void {
-    console.log(`🔧 ${msg}`);
+    console.log(`[Tool] ${msg}`);
   }
 
   toolResult(msg: string): void {
-    console.log(`📤 ${msg}`);
+    console.log(`${msg}`);
   }
 
   error(msg: string): void {
-    console.log(`❌ ${msg}`);
+    console.log(`[Error] ${msg}`);
   }
 
   progress(msg: string): void {
-    process.stdout.write(`⏳ ${msg}`);
+    process.stdout.write(`... ${msg}`);
   }
 
   raw(text: string): void {
@@ -110,10 +110,12 @@ export class CallbackDisplay implements DisplayAdapter {
   }
 
   toolCall(msg: string): void {
+    // Show tool call as a message so user sees what's being executed
     this.callbacks.onMessage?.({ role: 'tool', content: msg, timestamp: new Date() });
   }
 
   toolResult(msg: string): void {
+    // Show tool results as output
     this.callbacks.onMessage?.({ role: 'tool', content: msg, timestamp: new Date() });
   }
 
@@ -126,6 +128,7 @@ export class CallbackDisplay implements DisplayAdapter {
   }
 
   raw(text: string): void {
+    // Raw output - show as assistant message (for direct mode compatibility)
     this.callbacks.onMessage?.({ role: 'assistant', content: text, timestamp: new Date() });
   }
 

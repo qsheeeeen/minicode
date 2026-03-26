@@ -8,7 +8,8 @@ import TextInput from 'ink-text-input';
 import { Agent } from './agent.js';
 import { getModelConfig, getCompressionThreshold, getThinkingConfig } from './config.js';
 import { SessionManager } from './utils/session.js';
-import { CallbackDisplay, ConsoleDisplay, DisplayCallback, DisplayAdapter, DisplayMessage } from './utils/display.js';
+import { CallbackDisplay, DisplayCallback, DisplayAdapter, DisplayMessage } from './utils/display.js';
+import { Message } from './components/Message.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -21,7 +22,7 @@ const VERSION = packageJson.version;
 // Parse CLI arguments
 const args = process.argv.slice(2);
 let modelOverride: string | undefined;
-let directPrompt: string | undefined;
+let initialPrompt: string | undefined;
 let sessionName: string | undefined;
 let resumeRecent = false;
 
@@ -40,9 +41,9 @@ for (let i = 0; i < args.length; i++) {
     console.log('  --version, -v     Show version');
     console.log('  --help, -h        Show this help');
     console.log('\nExamples:');
-    console.log('  minicode                        # Start TUI mode');
-    console.log('  minicode "list files"           # Run prompt directly');
-    console.log('  minicode --session feature-a    # Use specific session');
+    console.log('  minicode                    # Start TUI');
+    console.log('  minicode "list files"       # Start TUI and auto-run prompt');
+    console.log('  minicode --session my-session # Use specific session');
     console.log('\nIn TUI mode:');
     console.log('  /compress       # Compress conversation history');
     console.log('  /new <name>     # Create new session');
@@ -57,8 +58,8 @@ for (let i = 0; i < args.length; i++) {
   } else if (arg === '--resume') {
     resumeRecent = true;
   } else if (!arg.startsWith('--')) {
-    // Non-option argument is the prompt
-    directPrompt = arg;
+    // Non-option argument is the initial prompt
+    initialPrompt = arg;
   }
 }
 
@@ -85,31 +86,8 @@ if (sessionName) {
   initialSession = `session-${Date.now()}`;
 }
 
-// Direct prompt mode (non-TUI)
-async function runDirect(prompt: string) {
-  const display = new ConsoleDisplay();
-  const agent = new Agent(
-    modelConfig!.apiKey,
-    modelConfig!.baseURL,
-    modelConfig!.model,
-    modelConfig!.contextLength,
-    compressionThreshold,
-    thinkingConfig.enabled,
-    thinkingConfig.tokens,
-    display
-  );
-
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-  agent.startNewSession(`direct-${timestamp}`);
-
-  console.log(`Mini Code v${VERSION}`);
-  console.log(`Model: ${modelConfig!.provider}:${modelConfig!.model}`);
-  console.log('---');
-  await agent.run(prompt);
-}
-
 // Main App Component for TUI mode
-function App() {
+function App({ initialPrompt }: { initialPrompt?: string }) {
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [currentSession, setCurrentSession] = useState(initialSession);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -121,6 +99,7 @@ function App() {
   const [sessionList, setSessionList] = useState<Array<{ name: string }>>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [inputValue, setInputValue] = useState('');
+  const [autoSubmitPending, setAutoSubmitPending] = useState(!!initialPrompt);
 
   const agentRef = useRef<Agent | null>(null);
   const streamingRef = useRef<string>('');
@@ -236,6 +215,14 @@ function App() {
     }
   }, [exit]);
 
+  // Auto-submit initial prompt if provided
+  useEffect(() => {
+    if (autoSubmitPending && agentRef.current && initialPrompt) {
+      setAutoSubmitPending(false);
+      handleSubmit(initialPrompt);
+    }
+  }, [autoSubmitPending, initialPrompt, handleSubmit]);
+
   // Session list overlay
   if (mode === 'session-list') {
     useInput((input, key) => {
@@ -298,18 +285,13 @@ function App() {
           </Box>
         ) : (
           <Box flexDirection="column">
-            {messages.map((msg, i) => {
-              const color = msg.role === 'user' ? 'blue' : msg.role === 'error' ? 'red' : msg.role === 'tool' ? 'yellow' : msg.role === 'system' ? 'gray' : 'white';
-              const prefix = msg.role === 'user' ? '> ' : msg.role === 'tool' ? '🔧 ' : msg.role === 'error' ? '❌ ' : msg.role === 'system' ? 'ℹ️ ' : '';
-              return (
-                <Box key={i} marginBottom={1}>
-                  <Text color={color}>{prefix}{msg.content}</Text>
-                </Box>
-              );
-            })}
+            {messages.map((msg, i) => (
+              <Message key={i} role={msg.role} content={msg.content} />
+            ))}
             {isStreaming && (
-              <Box marginBottom={1}>
-                <Text color="white">{streamingContent}</Text>
+              <Box marginBottom={0}>
+                <Text>{streamingContent}</Text>
+                <Text dimColor inverse>▋</Text>
               </Box>
             )}
           </Box>
@@ -318,7 +300,7 @@ function App() {
 
       {/* Input */}
       <Box borderStyle="single" borderColor="gray" paddingX={1}>
-        <Text color="blue" bold>{isLoading ? '⏳ ' : '> '}</Text>
+        <Text color="blue" bold>{isLoading ? '...' : '> '}</Text>
         <TextInput
           value={inputValue}
           onChange={setInputValue}
@@ -345,9 +327,5 @@ function App() {
   );
 }
 
-// Start TUI or direct mode
-if (directPrompt) {
-  await runDirect(directPrompt);
-} else {
-  render(<App />);
-}
+// Start TUI
+render(<App initialPrompt={initialPrompt} />);

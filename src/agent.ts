@@ -179,17 +179,22 @@ ${JSON.stringify(messagesToSummarize, null, 2)}`;
           const tool = this.tools.get(toolBlock.name);
           if (tool) {
             const display = tool.format ? tool.format(toolBlock.input as any) : `${toolBlock.name} ${JSON.stringify(toolBlock.input)}`;
-            this.display.toolCall(display);
             toolCalls.push({ block: toolBlock, tool });
           }
         }
       }
 
-      // Stream text content if any
+      // Stream text content first (before tool calls)
       if (textContent) {
         this.display.streamStart();
         this.display.streamChunk(textContent);
         this.display.streamEnd();
+      }
+
+      // Then display tool calls
+      for (const { block, tool } of toolCalls) {
+        const display = tool.format ? tool.format(block.input as any) : `${block.name} ${JSON.stringify(block.input)}`;
+        this.display.toolCall(display);
       }
 
       // Push assistant message first (contains tool_use blocks)
@@ -201,7 +206,8 @@ ${JSON.stringify(messagesToSummarize, null, 2)}`;
         const results = await Promise.allSettled(
           toolCalls.map(({ block, tool }) => tool.execute(block.input as any))
         );
-        this.display.raw('Done.');
+        // Clear progress line
+        this.display.raw('');
 
         // Display results and push to messages
         results.forEach((result, i) => {
@@ -212,7 +218,15 @@ ${JSON.stringify(messagesToSummarize, null, 2)}`;
 
           // Display tool result
           if (result.status === 'fulfilled') {
-            this.display.toolResult(content);
+            if (block.name === 'read') {
+              // For read tool, show summary (content is sent to LLM)
+              const lines = content.split('\n').length;
+              const chars = content.length;
+              this.display.system(`(Read ${lines} lines, ${chars} chars)`);
+            } else {
+              // Show result for other tools
+              this.display.toolResult(content);
+            }
           } else {
             this.display.error(content);
           }
