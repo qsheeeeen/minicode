@@ -25,7 +25,7 @@ export function Message({ role, content, isStreaming }: MessageProps) {
   // User message - dim color to distinguish from assistant
   if (role === 'user') {
     return (
-      <Box marginBottom={0} paddingX={1} width="100%">
+      <Box marginBottom={0} paddingX={0} width="100%">
         <Text dimColor>{content}</Text>
       </Box>
     );
@@ -34,7 +34,7 @@ export function Message({ role, content, isStreaming }: MessageProps) {
   // Assistant message - clean text
   if (role === 'assistant') {
     return (
-      <Box marginBottom={0} flexDirection="column">
+      <Box marginBottom={0} paddingX={1} flexDirection="column">
         <Text>{content}</Text>
       </Box>
     );
@@ -47,14 +47,14 @@ export function Message({ role, content, isStreaming }: MessageProps) {
     if (isToolCall) {
       // Tool call - show in yellow
       return (
-        <Box marginBottom={0}>
+        <Box marginBottom={0} paddingX={1}>
           <Text color="yellow">{content}</Text>
         </Box>
       );
     } else {
       // Tool result - dim color
       return (
-        <Box marginBottom={0} paddingX={1}>
+        <Box marginBottom={0} paddingX={2}>
           <Text dimColor>{content}</Text>
         </Box>
       );
