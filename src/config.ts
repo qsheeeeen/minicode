@@ -22,6 +22,8 @@ export interface Config {
   providers?: Providers;
   model?: string;  // format: model@provider, e.g. "glm-4.7@zhipu"
   compressionThreshold?: number;  // 0-1, compress at this ratio of context
+  thinking?: boolean;  // enable extended thinking
+  thinkingTokens?: number;  // tokens budget for thinking (default 20000)
 }
 
 const CONFIG_PATH = path.join(__dirname, '../config.json');
@@ -97,4 +99,12 @@ export async function getModelConfig(modelSpecifier?: string): Promise<{ provide
 export async function getCompressionThreshold(): Promise<number> {
   const config = await loadConfig();
   return config.compressionThreshold ?? 0.8;
+}
+
+export async function getThinkingConfig(): Promise<{ enabled: boolean; tokens: number }> {
+  const config = await loadConfig();
+  return {
+    enabled: config.thinking ?? false,
+    tokens: config.thinkingTokens ?? 20000
+  };
 }

@@ -1,12 +1,10 @@
-会话持久化（保存/恢复对话）
-上下文压缩
+config 控制一个provider 多个model
+config 挪到 ~/.minicode/
 全局提示词，项目提示词
 中文提示词
-/xxx 预定义命令
 
 
 命令行：
-    输入提示词
     控制tools
 
 tool：

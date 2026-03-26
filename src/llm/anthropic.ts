@@ -6,6 +6,8 @@ export interface ChatOptions {
   model?: string;
   maxTokens?: number;
   system?: string;
+  thinking?: boolean;
+  thinkingTokens?: number;
 }
 
 export type MessageParam = Anthropic.Messages.MessageParam;
@@ -27,12 +29,21 @@ export class AnthropicClient {
     tools: Tool[],
     options: ChatOptions = {}
   ): Promise<Message> {
-    return await this.client.messages.create({
+    const params: any = {
       model: options.model || 'claude-sonnet-4-5',
       max_tokens: options.maxTokens || 8192,
       system: options.system,
       messages,
       tools
-    });
+    };
+
+    if (options.thinking) {
+      params.thinking = {
+        type: 'enabled',
+        budget_tokens: options.thinkingTokens || 20000
+      };
+    }
+
+    return await this.client.messages.create(params);
   }
 }

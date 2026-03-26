@@ -3,7 +3,7 @@ import readline from 'readline';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { Agent } from './agent.js';
-import { getModelConfig, getCompressionThreshold } from './config.js';
+import { getModelConfig, getCompressionThreshold, getThinkingConfig } from './config.js';
 import { SessionManager, SessionInfo } from './utils/session.js';
 
 // Create session manager instance
@@ -66,6 +66,7 @@ for (let i = 0; i < args.length; i++) {
 // Priority: CLI args > MODEL env var > config.json
 const modelConfig = await getModelConfig(modelOverride ?? process.env.MODEL);
 const compressionThreshold = await getCompressionThreshold();
+const thinkingConfig = await getThinkingConfig();
 
 if (!modelConfig) {
   console.error('Error: No valid model configuration found. Please set model in config.json (format: "model@provider")');
@@ -77,7 +78,9 @@ const agent = new Agent(
   modelConfig.baseURL,
   modelConfig.model,
   modelConfig.contextLength,
-  compressionThreshold
+  compressionThreshold,
+  thinkingConfig.enabled,
+  thinkingConfig.tokens
 );
 
 // Initialize session

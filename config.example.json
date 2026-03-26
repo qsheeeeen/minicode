@@ -14,5 +14,7 @@
     }
   },
   "model": "claude-sonnet-4-5@anthropic",
-  "compressionThreshold": 0.8
+  "compressionThreshold": 0.8,
+  "thinking": false,
+  "thinkingTokens": 20000
 }

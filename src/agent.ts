@@ -2,6 +2,7 @@ import { AnthropicClient, MessageParam, Tool, Anthropic } from './llm/anthropic.
 import { readTool, writeTool, editTool, bashTool } from './tools/index.js';
 import { system, toolCall, toolResult, error, progress, raw } from './utils/logger.js';
 import { SessionManager, SessionData } from './utils/session.js';
+import { getThinkingConfig } from './config.js';
 
 const SYSTEM_PROMPT = `You are an expert coding assistant. You help users with coding tasks by reading files, executing commands, editing code, and writing new files.
 
@@ -43,12 +44,16 @@ export class Agent {
   private lastShownThreshold = 0;
   public currentSession: string = 'default';
   private sessionManager: SessionManager;
+  private thinkingEnabled: boolean;
+  private thinkingTokens: number;
 
-  constructor(apiKey?: string, baseURL?: string, model?: string, contextLength?: number, compressionThresholdRatio?: number) {
+  constructor(apiKey?: string, baseURL?: string, model?: string, contextLength?: number, compressionThresholdRatio?: number, thinkingEnabled?: boolean, thinkingTokens?: number) {
     this.client = new AnthropicClient(apiKey, baseURL);
     this.model = model;
     this.contextLength = contextLength || 200000;
     this.compressionThresholdRatio = compressionThresholdRatio || 0.8;
+    this.thinkingEnabled = thinkingEnabled || false;
+    this.thinkingTokens = thinkingTokens || 20000;
     this.sessionManager = new SessionManager();
     this.tools = new Map<string, ToolDef>([
       ['read', readTool as ToolDef],
@@ -109,7 +114,12 @@ ${JSON.stringify(messagesToSummarize, null, 2)}`;
           description: t.description,
           input_schema: t.input_schema
         })) as Tool[],
-        { system: SYSTEM_PROMPT, model: this.model }
+        {
+          system: SYSTEM_PROMPT,
+          model: this.model,
+          thinking: this.thinkingEnabled,
+          thinkingTokens: this.thinkingTokens
+        }
       );
 
       // Track token usage
