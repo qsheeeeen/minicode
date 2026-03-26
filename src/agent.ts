@@ -1,6 +1,6 @@
 import { AnthropicClient, MessageParam, Tool, Anthropic } from './llm/anthropic.js';
 import { readTool, writeTool, editTool, bashTool } from './tools/index.js';
-import { system, toolCall, toolResult, error, progress, raw } from './utils/logger.js';
+import { system, toolCall, toolResult, error, progress, raw, DisplayAdapter, CallbackDisplay } from './utils/display.js';
 import { SessionManager, SessionData } from './utils/session.js';
 import { getThinkingConfig } from './config.js';
 
@@ -46,8 +46,9 @@ export class Agent {
   private sessionManager: SessionManager;
   private thinkingEnabled: boolean;
   private thinkingTokens: number;
+  private display: DisplayAdapter;
 
-  constructor(apiKey?: string, baseURL?: string, model?: string, contextLength?: number, compressionThresholdRatio?: number, thinkingEnabled?: boolean, thinkingTokens?: number) {
+  constructor(apiKey?: string, baseURL?: string, model?: string, contextLength?: number, compressionThresholdRatio?: number, thinkingEnabled?: boolean, thinkingTokens?: number, display?: DisplayAdapter) {
     this.client = new AnthropicClient(apiKey, baseURL);
     this.model = model;
     this.contextLength = contextLength || 200000;
@@ -61,16 +62,28 @@ export class Agent {
       ['edit', editTool as ToolDef],
       ['bash', bashTool as ToolDef]
     ]);
+    // Use provided display or create default console display
+    this.display = display || {
+      system, toolCall, toolResult, error, progress, raw,
+      streamStart: () => {},
+      streamChunk: () => {},
+      streamEnd: () => {}
+    };
+  }
+
+  /** Set or update the display adapter */
+  setDisplay(display: DisplayAdapter): void {
+    this.display = display;
   }
 
   async compress(): Promise<void> {
     const recentCount = 10;
     if (this.messages.length <= recentCount + 2) {
-      system('(Not enough messages to compress)');
+      this.display.system('(Not enough messages to compress)');
       return;
     }
 
-    system(`(Compressing ${this.messages.length - recentCount} messages, ${this.totalTokens.toLocaleString()} tokens...)`);
+    this.display.system(`(Compressing ${this.messages.length - recentCount} messages, ${this.totalTokens.toLocaleString()} tokens...)`);
 
     const messagesToSummarize = this.messages.slice(0, -recentCount);
     const summaryPrompt = `Summarize the following conversation concisely. Focus on:
@@ -97,9 +110,9 @@ ${JSON.stringify(messagesToSummarize, null, 2)}`;
       ];
 
       this.totalTokens = 0;
-      system(`(Compressed to ${this.messages.length} messages)`);
+      this.display.system(`(Compressed to ${this.messages.length} messages)`);
     } catch (e) {
-      error(`(Compression failed: ${(e as Error).message})`);
+      this.display.error(`(Compression failed: ${(e as Error).message})`);
     }
   }
 
@@ -132,7 +145,7 @@ ${JSON.stringify(messagesToSummarize, null, 2)}`;
         const thresholds = [25, 50, 75, 90];
         for (const t of thresholds) {
           if (percentage >= t && this.lastShownThreshold < t) {
-            system(`[${percentage}% context]`);
+            this.display.system(`[${percentage}% context]`);
             this.lastShownThreshold = t;
             break;
           }
@@ -151,10 +164,12 @@ ${JSON.stringify(messagesToSummarize, null, 2)}`;
 
       // First pass: collect tool calls and display text
       const toolCalls: Array<{ block: Anthropic.Messages.ToolUseBlock; tool: ToolDef }> = [];
+      let textContent = '';
 
       for (const block of response.content) {
         if (block.type === 'text') {
-          raw((block as any).text);
+          const text = (block as any).text;
+          textContent += text;
           (assistantMsg.content as any).push(block);
         } else if (block.type === 'tool_use') {
           hasToolCalls = true;
@@ -164,10 +179,17 @@ ${JSON.stringify(messagesToSummarize, null, 2)}`;
           const tool = this.tools.get(toolBlock.name);
           if (tool) {
             const display = tool.format ? tool.format(toolBlock.input as any) : `${toolBlock.name} ${JSON.stringify(toolBlock.input)}`;
-            toolCall(display);
+            this.display.toolCall(display);
             toolCalls.push({ block: toolBlock, tool });
           }
         }
+      }
+
+      // Stream text content if any
+      if (textContent) {
+        this.display.streamStart();
+        this.display.streamChunk(textContent);
+        this.display.streamEnd();
       }
 
       // Push assistant message first (contains tool_use blocks)
@@ -175,18 +197,26 @@ ${JSON.stringify(messagesToSummarize, null, 2)}`;
 
       // Second pass: execute all tools in parallel
       if (toolCalls.length > 0) {
-        progress(`Running ${toolCalls.length} tool${toolCalls.length > 1 ? 's' : ''}... `);
+        this.display.progress(`Running ${toolCalls.length} tool${toolCalls.length > 1 ? 's' : ''}... `);
         const results = await Promise.allSettled(
           toolCalls.map(({ block, tool }) => tool.execute(block.input as any))
         );
-        raw('Done.');
+        this.display.raw('Done.');
 
-        // Push all results back (as user messages with tool_result)
+        // Display results and push to messages
         results.forEach((result, i) => {
-          const { block } = toolCalls[i];
+          const { block, tool } = toolCalls[i];
           const content = result.status === 'fulfilled'
             ? result.value
             : `Error: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`;
+
+          // Display tool result
+          if (result.status === 'fulfilled') {
+            this.display.toolResult(content);
+          } else {
+            this.display.error(content);
+          }
+
           this.messages.push({
             role: 'user',
             content: [{
@@ -227,7 +257,7 @@ ${JSON.stringify(messagesToSummarize, null, 2)}`;
           continue;
         }
         // User text message - use raw() like original display
-        raw(content);
+        this.display.raw(content);
       } else if (msg.role === 'assistant') {
         const content = msg.content;
         if (Array.isArray(content)) {
@@ -235,19 +265,19 @@ ${JSON.stringify(messagesToSummarize, null, 2)}`;
           for (const block of content) {
             if (block.type === 'text') {
               // Assistant text response - use raw() like original display
-              raw((block as any).text);
+              this.display.raw((block as any).text);
             } else if (block.type === 'tool_use') {
               // Tool call - use toolCall() like original display
               const tool = this.tools.get(block.name);
               const display = tool?.format
                 ? tool.format((block as any).input)
                 : `${block.name} ${JSON.stringify((block as any).input)}`;
-              toolCall(display);
+              this.display.toolCall(display);
             }
           }
         } else {
           // Simple text response - use raw() like original display
-          raw(content);
+          this.display.raw(content);
         }
       }
     }
