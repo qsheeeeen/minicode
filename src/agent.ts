@@ -104,6 +104,7 @@ export class Agent {
     try {
       this.messages = await this.compressionService.compress(this.messages, this.client, this.model);
       this.tokenManager.reset();
+      this.display.updateTokenCount?.(0);
       this.display.system(`(Compressed to ${this.messages.length} messages)`);
     } catch (e) {
       this.display.error(`(Compression failed: ${(e as Error).message})`);
@@ -132,6 +133,7 @@ export class Agent {
       // Track token usage
       if (response.usage) {
         this.tokenManager.addTokens(response.usage.input_tokens, response.usage.output_tokens);
+        this.display.updateTokenCount?.(this.tokenManager.getTotal());
         const ratio = this.tokenManager.getRatio(this.contextLength);
         const percentage = Math.floor(ratio * 100);
 
@@ -254,6 +256,8 @@ export class Agent {
     if (totalTokens > 0) {
       this.tokenManager.addTokens(totalTokens, 0);
     }
+    // Update display with restored token count
+    this.display.updateTokenCount?.(this.tokenManager.getTotal());
     this.currentSession = name;
     return true;
   }

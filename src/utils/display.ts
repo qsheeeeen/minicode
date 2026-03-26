@@ -45,6 +45,9 @@ export interface DisplayAdapter {
   /** End streaming */
   streamEnd(): void;
 
+  /** Update token count display */
+  updateTokenCount?(tokens: number): void;
+
   /** Clear display */
   clear?(): void;
 }
@@ -139,6 +142,10 @@ export class CallbackDisplay implements DisplayAdapter {
 
   streamEnd(): void {
     this.callbacks.onStreamEnd?.();
+  }
+
+  updateTokenCount(tokens: number): void {
+    this.callbacks.onTokenUpdate?.(tokens);
   }
 
   clear(): void {
