@@ -91,6 +91,13 @@ if (sessionName) {
   initialSession = `session-${Date.now()}`;
 }
 
+// Context progress bar
+function makeBar(used: number, total: number, width: number): string {
+  const ratio = Math.min(1, used / total);
+  const filled = Math.round(ratio * width);
+  return '█'.repeat(filled) + '░'.repeat(width - filled);
+}
+
 // Main App Component for TUI mode
 function App({ initialPrompt }: { initialPrompt?: string }) {
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
@@ -269,8 +276,6 @@ function App({ initialPrompt }: { initialPrompt?: string }) {
         </Box>
         <Box>
           <Text dimColor>{currentSession}</Text>
-          <Text dimColor> | </Text>
-          <Text color={tokenCount > 100000 ? 'yellow' : 'blue'}>{tokenCount.toLocaleString()}T</Text>
           {(isLoading || status) && <Text dimColor> | </Text>}
           {isLoading && <Text color="magenta">Running...</Text>}
           {status && !isLoading && <Text color="magenta">{status}</Text>}
@@ -310,6 +315,20 @@ function App({ initialPrompt }: { initialPrompt?: string }) {
           }}
           placeholder="Type a message or /command..."
         />
+      </Box>
+
+      {/* Status bar: tokens + context progress */}
+      <Box paddingX={1}>
+        <Text dimColor>{tokenCount.toLocaleString()}T</Text>
+        <Text dimColor> │</Text>
+        <Text color={
+          tokenCount / (modelConfig?.contextLength || 200000) > 0.9 ? 'red' :
+          tokenCount / (modelConfig?.contextLength || 200000) > 0.7 ? 'yellow' : 'green'
+        }>
+          {makeBar(tokenCount, modelConfig?.contextLength || 200000, 20)}
+        </Text>
+        <Text dimColor>│ </Text>
+        <Text dimColor>{Math.min(100, Math.floor(tokenCount / (modelConfig?.contextLength || 200000) * 100))}%</Text>
       </Box>
     </Box>
   );
