@@ -21,7 +21,10 @@ A minimal coding agent powered by LLMs. Simple, opinionated, hackable.
        "anthropic": {
          "apiKey": "sk-ant-...",
          "baseURL": "https://api.anthropic.com",
-         "model": "claude-sonnet-4-5"
+         "models": {
+           "claude-sonnet-4-5": {},
+           "claude-opus-4": { "contextLength": 200000 }
+         }
        }
      },
      "model": "claude-sonnet-4-5@anthropic",
@@ -31,7 +34,7 @@ A minimal coding agent powered by LLMs. Simple, opinionated, hackable.
    }
    ```
 
-   Model specifier format: `model@provider`. You can define multiple providers and switch between them.
+   Model specifier format: `model@provider`. Each provider can define multiple models with per-model overrides (e.g. `contextLength`). The old single `model` field still works.
 
 2. Install and run:
 

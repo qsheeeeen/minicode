@@ -5,11 +5,14 @@ import os from 'os';
 const CONFIG_DIR = path.join(os.homedir(), '.minicode');
 const CONFIG_PATH = path.join(CONFIG_DIR, 'config.json');
 
+export interface ModelConfig {
+  contextLength?: number;
+}
+
 export interface ProviderConfig {
   apiKey?: string;
   baseURL?: string;
-  model?: string;
-  contextLength?: number;
+  models?: Record<string, ModelConfig>;
 }
 
 export interface Providers {
@@ -71,11 +74,6 @@ export async function getBaseURL(provider?: string): Promise<string | undefined>
   return providerConfig?.baseURL;
 }
 
-export async function getModel(provider?: string): Promise<string | undefined> {
-  const providerConfig = await getProviderConfig(provider);
-  return providerConfig?.model;
-}
-
 export async function getModelConfig(modelSpecifier?: string): Promise<{ provider: string; model: string; apiKey: string; baseURL?: string; contextLength?: number } | null> {
   const config = await loadConfig();
   const spec = modelSpecifier || config.model;
@@ -90,12 +88,16 @@ export async function getModelConfig(modelSpecifier?: string): Promise<{ provide
   const providerConfig = config.providers?.[providerName];
   if (!providerConfig?.apiKey) return null;
 
+  // Resolve contextLength from per-model config
+  const modelConfig = providerConfig.models?.[modelName];
+  const contextLength = modelConfig?.contextLength;
+
   return {
     provider: providerName,
     model: modelName,
     apiKey: providerConfig.apiKey,
     baseURL: providerConfig.baseURL,
-    contextLength: providerConfig.contextLength
+    contextLength
   };
 }
 

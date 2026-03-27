@@ -57,9 +57,16 @@ A minimal coding agent with **ink-based TUI**, tool use, and session persistence
 {
   "providers": {
     "anthropic": { "apiKey": "...", "baseURL": "...", "model": "claude-sonnet-4-5" },
-    "zhipu": { "apiKey": "...", "baseURL": "...", "model": "glm-4.7" }
+    "zhipu": {
+      "apiKey": "...",
+      "baseURL": "...",
+      "models": {
+        "glm-4.7": { "contextLength": 128000 },
+        "glm-5.1": { "contextLength": 200000 }
+      }
+    }
   },
-  "model": "glm-4.7@zhipu",
+  "model": "glm-5.1@zhipu",
   "compressionThreshold": 0.8,
   "thinking": true,
   "thinkingTokens": 20000
