@@ -214,12 +214,10 @@ export class Agent {
           // Display tool result
           if (result.status === 'fulfilled') {
             if (block.name === 'read') {
-              // For read tool, show summary (content is sent to LLM)
               const lines = content.split('\n').length;
               const chars = content.length;
-              this.display.system(`(Read ${lines} lines, ${chars} chars)`);
+              this.display.toolResult(`Read ${lines} lines, ${chars} chars`);
             } else {
-              // Show result for other tools
               this.display.toolResult(content);
             }
           } else {
