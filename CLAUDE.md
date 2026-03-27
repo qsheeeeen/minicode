@@ -5,70 +5,51 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Development
 
 ```bash
-# Development mode (TUI)
-npm run dev
-
-# Build to dist/
-npm run build
-
-# Run built TUI
-npm run start
-
-# Run with initial prompt
-npm run start "list files"
+npm run dev          # Development mode via tsx (TUI)
+npm run build        # TypeScript compile to dist/
+npm run start        # Run built TUI from dist/
+npm run start "prompt"  # Run with initial prompt
 ```
+
+No test framework or linter is configured.
 
 ## Architecture
 
-A minimal coding agent with **ink-based TUI**, tool use, and session persistence.
+A minimal coding agent with **ink-based TUI**, tool use, and session persistence. All interaction happens through the TUI — there is no separate console mode.
 
-**TUI-First Design:** The CLI uses ink (React for CLIs) for the interface. All interaction happens through the TUI - there is no separate console/direct mode.
+### Source Layout
 
-**Structure:**
-```
-src/
-├── cli.tsx              # TUI app entry point, CLI args
-├── agent.ts             # Agent class with two-pass tool execution
-├── config.ts            # Provider-based model config loader
-├── components/
-│   └── Message.tsx      # Message display component (user/assistant/tool/system/error)
-├── tools/               # Tool implementations
-│   ├── index.ts         # Tool exports
-│   ├── read.ts          # File reading
-│   ├── write.ts         # File writing
-│   ├── edit.ts          # Surgical text replacement
-│   └── bash.ts          # Command execution
-├── utils/
-│   ├── display.ts       # Display adapter abstraction (Console/Callback)
-│   ├── session.ts       # SessionManager for persistence
-│   └── logger.ts        # Legacy emoji logging (mostly unused)
-└── llm/
-    └── anthropic.ts     # Anthropic SDK wrapper
-```
+- `src/cli.tsx` — ink React app entry. Parses CLI args, creates Agent with CallbackDisplay, manages TUI state (messages, streaming, sessions, input)
+- `src/agent.ts` — Core `Agent` class. Owns the conversation loop, delegates to services
+- `src/config.ts` — Provider-based model config from `~/.minicode/config.json`. Model specifier format: `model@provider`
+- `src/llm/anthropic.ts` — Thin wrapper around `@anthropic-ai/sdk`. Handles chat with tools and optional extended thinking
+- `src/tools/` — Tool implementations + `ToolRegistry`
+- `src/services/` — Cross-cutting services (`TokenManager`, `CompressionService`)
+- `src/cli/commands.ts` — `CommandRegistry` for `/` commands (exit, compress, new, rename, resume)
+- `src/utils/` — Display adapters, session persistence, session-to-display conversion
+- `src/components/Message.tsx` — Single React component rendering messages by role
 
-**Core Flow (Agent.run()):**
-1. Send messages + tool definitions to LLM
-2. **First pass:** Stream text responses, collect tool calls
-3. **Second pass:** Execute all tools in parallel via `Promise.allSettled()`
-4. Push tool results as user messages, repeat until no more tool calls
-5. Auto-save session after each complete exchange
+### Core Loop (`Agent.run()`)
 
-**Display System:**
-- `DisplayAdapter` interface abstracts TUI vs console output
-- `CallbackDisplay` - for TUI, uses React state callbacks
-- `ConsoleDisplay` - fallback for debugging
-- Messages flow: `onMessage` → adds to React state → rendered by `Message` component
-- Streaming: `onStreamStart/Chunk/End` → temporary state → committed to messages
+1. Push user message, then loop: send messages + tool defs to LLM
+2. First pass: collect text blocks and tool_use blocks from response
+3. Display text via streaming, then show tool call names
+4. Second pass: execute all tools in parallel via `Promise.allSettled()`
+5. Push tool results as user messages, repeat until no tool calls
+6. Track tokens via `TokenManager`, auto-compress when exceeding threshold ratio
+7. Auto-save session after each complete exchange
 
-**TUI Commands (start with `/`):**
-- `/new <name>` - Create new session
-- `/resume` - List sessions (arrow keys + Enter to select)
-- `/resume <name>` - Load specific session
-- `/rename <name>` - Rename current session
-- `/compress` - Compress conversation history
-- `/exit` or `Ctrl+C` - Quit
+### Key Patterns
 
-## Config Format
+**Registry pattern** — Both tools and TUI commands use a `Map<string, T>` registry with `register()`/`get()`/`getAll()`. Tools are registered in `Agent` constructor; commands are registered in `commands.ts` module scope. `ToolRegistry` also supports `autoDiscover()` for directory-based loading.
+
+**Display adapter** — `DisplayAdapter` interface abstracts output. `CallbackDisplay` fires React state callbacks for TUI. `ConsoleDisplay` writes to stdout as fallback. The agent only calls display methods — it never touches React state directly.
+
+**Service injection** — `Agent` constructor accepts optional `TokenManager` and `CompressionService` overrides (defaults to `*Impl` classes). This enables testing without real API calls.
+
+**Session display bridge** — `SessionDisplay`/`SessionDisplayImpl` converts raw `SessionData` (Anthropic message format) into `DisplayMessage[]` for TUI rendering, handling the mismatch between tool_use blocks and display roles.
+
+### Config Format
 
 `~/.minicode/config.json` (not tracked):
 
@@ -85,36 +66,33 @@ src/
 }
 ```
 
-Model specifier: `model@provider`. Priority: CLI arg > MODEL env var > config.
+Priority: CLI `--model` arg > `MODEL` env var > config `model` field.
 
-## Sessions
+### Adding a Tool
 
-Stored in `~/.minicode/sessions/<project-hash>/`. Per-project isolation based on cwd hash. Auto-save after each exchange. Supports compression at configurable token threshold.
-
-## Adding a Tool
-
-Tool definition in `src/tools/`:
+1. Create file in `src/tools/` exporting a `ToolDef` (interface defined in `src/tools/index.ts`):
 
 ```typescript
-export const toolName = {
+export const myTool: ToolDef = {
   name: string,
   description: string,
   input_schema: Record<string, unknown>,
-  format?: (args) => string,  // Display format, e.g., "Bash(ls -la)"
+  format?: (args) => string,    // Display string, e.g. "Bash(ls -la)"
   execute: (args) => Promise<string>
 };
 ```
 
-Register in `src/agent.ts` constructor tools Map and export from `src/tools/index.ts`.
+2. Register in `Agent` constructor: `this.toolRegistry.register(myTool)`
+3. Export from `src/tools/index.ts`
 
-## TUI Styling
+### TUI Commands
 
-Messages render via `src/components/Message.tsx`:
-- User: dim color background
-- Assistant: plain white text
-- Tool call: yellow (e.g., `Bash(ls -la)`)
-- Tool result: dim color
-- System: gray prefix `[System]`
-- Error: red prefix `[Error]`
+Handled by `CommandRegistry` in `src/cli/commands.ts`. Each command gets a `CommandContext` with agent, session manager, and React state setters. To add a command: call `commandRegistry.register({ name, description, handler })` in that file.
 
-No emoji used. No brackets around tool calls.
+### TUI Styling
+
+`Message` component renders by role: user=dim, assistant=white, tool call=yellow, tool result=dim, system=`[System]` gray, error=`[Error]` red. Tool calls are detected by matching known tool names (`Read`, `Write`, `Edit`, `Bash`) followed by `(`. No emoji.
+
+### Sessions
+
+Stored as JSON in `~/.minicode/sessions/<project-hash>/` (MD5 of cwd, 12 chars). Include messages + token count. Auto-saved after each exchange.
