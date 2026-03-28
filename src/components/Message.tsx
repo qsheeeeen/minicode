@@ -15,7 +15,7 @@ export function Message({ role, content, isStreaming }: MessageProps) {
   if (role === 'user') {
     return (
       <Box marginBottom={0} paddingX={0} width="100%">
-        <Text dimColor>{content}</Text>
+        <Text backgroundColor="gray" color="white">{content}</Text>
       </Box>
     );
   }
@@ -23,7 +23,7 @@ export function Message({ role, content, isStreaming }: MessageProps) {
   // Assistant message - clean text
   if (role === 'assistant') {
     return (
-      <Box marginBottom={0} paddingX={1} flexDirection="column">
+      <Box marginBottom={0} paddingX={4} flexDirection="column">
         <Text>{content}</Text>
       </Box>
     );
@@ -33,8 +33,8 @@ export function Message({ role, content, isStreaming }: MessageProps) {
   if (role === 'thinking') {
     const preview = content.length > 200 ? content.slice(0, 200) + '...' : content;
     return (
-      <Box marginBottom={0} paddingX={1} flexDirection="column">
-        <Text color="gray">[Thinking] {preview}</Text>
+      <Box marginBottom={0} paddingX={4} flexDirection="column">
+        <Text dimColor>{preview}</Text>
       </Box>
     );
   }
@@ -46,14 +46,14 @@ export function Message({ role, content, isStreaming }: MessageProps) {
     if (isToolCall) {
       // Tool call - show in yellow
       return (
-        <Box marginBottom={0} paddingX={1}>
+        <Box marginBottom={0} paddingX={4}>
           <Text color="yellow">{content}</Text>
         </Box>
       );
     } else {
       // Tool result - dim color
       return (
-        <Box marginBottom={0} paddingX={2}>
+        <Box marginBottom={0} paddingX={8}>
           <Text dimColor>{content}</Text>
         </Box>
       );
@@ -64,7 +64,7 @@ export function Message({ role, content, isStreaming }: MessageProps) {
   if (role === 'system') {
     return (
       <Box marginBottom={0}>
-        <Text color="gray">[System]</Text>
+        <Text color="gray"></Text>
         <Text dimColor> {content}</Text>
       </Box>
     );
@@ -74,7 +74,7 @@ export function Message({ role, content, isStreaming }: MessageProps) {
   if (role === 'error') {
     return (
       <Box marginBottom={0}>
-        <Text color="red">[Error] {content}</Text>
+        <Text color="red">{content}</Text>
       </Box>
     );
   }
