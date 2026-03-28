@@ -152,30 +152,3 @@ export class CallbackDisplay implements DisplayAdapter {
     // No-op for callback display
   }
 }
-
-// Re-export logger functions using console display for backward compatibility
-const consoleDisplay = new ConsoleDisplay();
-
-export function system(msg: string): void {
-  consoleDisplay.system(msg);
-}
-
-export function toolCall(msg: string): void {
-  consoleDisplay.toolCall(msg);
-}
-
-export function toolResult(msg: string): void {
-  consoleDisplay.toolResult(msg);
-}
-
-export function error(msg: string): void {
-  consoleDisplay.error(msg);
-}
-
-export function progress(msg: string): void {
-  consoleDisplay.progress(msg);
-}
-
-export function raw(msg: string): void {
-  consoleDisplay.raw(msg);
-}

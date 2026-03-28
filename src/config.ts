@@ -119,3 +119,43 @@ export async function getPromptFile(): Promise<string> {
   const config = await loadConfig();
   return config.promptFile || 'MINICODE.md';
 }
+
+export interface ResolvedConfig {
+  model: { provider: string; model: string; apiKey: string; baseURL?: string; contextLength?: number } | null;
+  compressionThreshold: number;
+  thinking: { enabled: boolean; tokens: number };
+  promptFile: string;
+}
+
+export async function loadAllConfig(modelSpecifier?: string): Promise<ResolvedConfig> {
+  const config = await loadConfig();
+  const spec = modelSpecifier || process.env.MODEL || config.model;
+
+  let model: ResolvedConfig['model'] = null;
+  if (spec) {
+    const parts = spec.split('@');
+    const modelName = parts[0];
+    const providerName = parts[1] || Object.keys(config.providers || {})[0];
+    const providerConfig = config.providers?.[providerName];
+    if (providerConfig?.apiKey) {
+      const modelConfig = providerConfig.models?.[modelName];
+      model = {
+        provider: providerName,
+        model: modelName,
+        apiKey: providerConfig.apiKey,
+        baseURL: providerConfig.baseURL,
+        contextLength: modelConfig?.contextLength
+      };
+    }
+  }
+
+  return {
+    model,
+    compressionThreshold: config.compressionThreshold ?? 0.8,
+    thinking: {
+      enabled: config.thinking ?? false,
+      tokens: config.thinkingTokens ?? 20000
+    },
+    promptFile: config.promptFile || 'MINICODE.md'
+  };
+}

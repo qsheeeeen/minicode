@@ -1,6 +1,6 @@
 import { AnthropicClient, MessageParam, Tool, Anthropic } from './llm/anthropic.js';
 import { readTool, writeTool, editTool, bashTool, ToolRegistry, ToolDef } from './tools/index.js';
-import { system, toolCall, toolResult, error, progress, raw, DisplayAdapter } from './utils/display.js';
+import { ConsoleDisplay, type DisplayAdapter } from './utils/display.js';
 import { SessionManager } from './utils/session.js';
 import { TokenManager, TokenManagerImpl } from './services/token-manager.js';
 import { CompressionService, CompressionServiceImpl } from './services/compression-service.js';
@@ -62,6 +62,7 @@ export class Agent {
   private thinkingTokens: number;
   private display: DisplayAdapter;
   private userPrompt: string;
+  private userPromptInjected = false;
 
   constructor(config: AgentConfig = {}) {
     this.client = new AnthropicClient(config.apiKey, config.baseURL);
@@ -81,12 +82,7 @@ export class Agent {
     this.toolRegistry.register(editTool as ToolDef);
     this.toolRegistry.register(bashTool as ToolDef);
     // Use provided display or create default console display
-    this.display = config.display || {
-      system, toolCall, toolResult, error, progress, raw,
-      streamStart: () => {},
-      streamChunk: () => {},
-      streamEnd: () => {}
-    };
+    this.display = config.display ?? new ConsoleDisplay();
     this.userPrompt = config.userPrompt || '';
     if (config.sessionName) this.currentSession = config.sessionName;
   }
@@ -118,9 +114,10 @@ export class Agent {
 
   async run(userMessage: string): Promise<void> {
     // Inject user prompt as context on first run
-    if (this.messages.length === 0 && this.userPrompt) {
+    if (!this.userPromptInjected && this.userPrompt) {
       this.messages.push({ role: 'user', content: this.userPrompt });
       this.messages.push({ role: 'assistant', content: 'Understood.' });
+      this.userPromptInjected = true;
     }
 
     this.messages.push({ role: 'user', content: userMessage });
