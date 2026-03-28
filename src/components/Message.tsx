@@ -2,13 +2,10 @@ import React from 'react';
 import { Box, Text } from 'ink';
 
 interface MessageProps {
-  role: 'user' | 'assistant' | 'system' | 'tool' | 'error' | 'thinking';
+  role: 'user' | 'assistant' | 'system' | 'tool' | 'tool_result' | 'error' | 'thinking';
   content: string;
   isStreaming?: boolean;
 }
-
-// Tool names for detection (all built-in tools start with uppercase)
-const TOOL_NAMES = ['Read', 'Write', 'Edit', 'Bash'];
 
 export function Message({ role, content, isStreaming }: MessageProps) {
   // User message - dim color to distinguish from assistant
@@ -39,25 +36,22 @@ export function Message({ role, content, isStreaming }: MessageProps) {
     );
   }
 
-  // Tool call/result
+  // Tool call - show in yellow
   if (role === 'tool') {
-    // Check if it's a tool call by matching known tool names followed by parenthesis
-    const isToolCall = TOOL_NAMES.some(name => content.startsWith(`${name}(`));
-    if (isToolCall) {
-      // Tool call - show in yellow
-      return (
-        <Box marginBottom={0} paddingX={4}>
-          <Text color="yellow">{content}</Text>
-        </Box>
-      );
-    } else {
-      // Tool result - dim color
-      return (
-        <Box marginBottom={0} paddingX={8}>
-          <Text dimColor>{content}</Text>
-        </Box>
-      );
-    }
+    return (
+      <Box marginBottom={0} paddingX={4}>
+        <Text color="yellow">{content}</Text>
+      </Box>
+    );
+  }
+
+  // Tool result - dim color
+  if (role === 'tool_result') {
+    return (
+      <Box marginBottom={0} paddingX={8}>
+        <Text dimColor>{content}</Text>
+      </Box>
+    );
   }
 
   // System message - dim gray bracket prefix

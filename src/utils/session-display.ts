@@ -1,7 +1,7 @@
 import { SessionManager, SessionData } from './session.js';
 import { DisplayAdapter } from './display.js';
 
-export type MessageRole = 'user' | 'assistant' | 'system' | 'tool' | 'error' | 'thinking';
+export type MessageRole = 'user' | 'assistant' | 'system' | 'tool' | 'tool_result' | 'error' | 'thinking';
 
 export interface DisplayMessage {
   role: MessageRole;
@@ -39,7 +39,12 @@ export class SessionDisplayImpl implements SessionDisplay {
       if (msg.role === 'user') {
         const content = msg.content;
         if (Array.isArray(content)) {
-          // Tool results - skip (internal data)
+          // Tool results - display as tool_result messages
+          for (const block of content as Array<any>) {
+            if (block.type === 'tool_result') {
+              messages.push({ role: 'tool_result', content: typeof block.content === 'string' ? block.content : JSON.stringify(block.content), timestamp: new Date(data.updatedAt) });
+            }
+          }
           continue;
         }
         messages.push({ role: 'user', content, timestamp: new Date(data.updatedAt) });
@@ -74,6 +79,9 @@ export class SessionDisplayImpl implements SessionDisplay {
         break;
       case 'tool':
         display.toolCall(msg.content);
+        break;
+      case 'tool_result':
+        display.toolResult(msg.content);
         break;
       case 'system':
         display.system(msg.content);

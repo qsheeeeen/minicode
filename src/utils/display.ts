@@ -140,7 +140,7 @@ export class CallbackDisplay implements DisplayAdapter {
 
   toolResult(msg: string): void {
     // Show tool results as output
-    this.callbacks.onMessage?.({ role: 'tool', content: msg, timestamp: new Date() });
+    this.callbacks.onMessage?.({ role: 'tool_result', content: msg, timestamp: new Date() });
   }
 
   error(msg: string): void {
