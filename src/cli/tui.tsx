@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { Box, Text, useInput, useApp } from 'ink';
 import TextInput from 'ink-text-input';
 import { Agent } from '../agent.js';
+import type { MessageParam } from '../llm/anthropic.js';
 import type { ResolvedConfig } from '../config.js';
 import { CallbackDisplay, DisplayMessage } from '../utils/display.js';
 import { SessionDisplayImpl } from '../utils/session-display.js';
@@ -102,7 +103,6 @@ export function App({
       thinkingTokens: config.thinking.tokens,
       display: displayAdapter,
       userPrompt,
-      sessionName: initialSession
     });
 
     agentRef.current = agent;
@@ -110,14 +110,21 @@ export function App({
     // Load initial session
     const loadInitial = async () => {
       if (sessionName || resumeRecent) {
-        const loaded = await agent.loadFromSession(initialSession);
-        if (loaded) {
+        const data = await sessionManager.get(initialSession);
+        if (data) {
+          agent.setMessages(data.messages as MessageParam[]);
+          const totalTokens = data.totalTokens || 0;
+          if (totalTokens > 0) {
+            agent.setTokenCount(totalTokens);
+          }
+          agent.currentSession = initialSession;
           const sessionDisplay = new SessionDisplayImpl(sessionManager);
           const displayMessages = await sessionDisplay.loadForTUI(initialSession);
           if (displayMessages.length > 0) {
             setMessages(displayMessages);
           }
         } else if (sessionName) {
+          agent.currentSession = initialSession;
           setMessages([{ role: 'system', content: `Created new session: ${sessionName}`, timestamp: new Date() }]);
         }
       }
@@ -148,6 +155,17 @@ export function App({
     setIsLoading(true);
     try {
       await agentRef.current.run(value);
+      // Auto-save session after each exchange
+      const agent = agentRef.current;
+      if (agent) {
+        await sessionManager.save(agent.currentSession, {
+          model: config.model?.model || 'unknown',
+          messages: agent.getMessages() as any,
+          totalTokens: agent.getTokenCount(),
+          createdAt: '',
+          updatedAt: ''
+        });
+      }
     } finally {
       setIsLoading(false);
       setStatus('');

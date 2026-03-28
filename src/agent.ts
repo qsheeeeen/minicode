@@ -1,7 +1,6 @@
 import { AnthropicClient, MessageParam, Tool, Anthropic } from './llm/anthropic.js';
 import { readTool, writeTool, editTool, bashTool, ToolRegistry, ToolDef } from './tools/index.js';
 import { ConsoleDisplay, type DisplayAdapter } from './utils/display.js';
-import { SessionManager } from './utils/session.js';
 import { TokenManager, TokenManagerImpl } from './services/token-manager.js';
 import { CompressionService, CompressionServiceImpl } from './services/compression-service.js';
 import path from 'path';
@@ -44,7 +43,6 @@ export interface AgentConfig {
   tokenManager?: TokenManager;
   compressionService?: CompressionService;
   userPrompt?: string;
-  sessionName?: string;
 }
 
 export class Agent {
@@ -57,7 +55,6 @@ export class Agent {
   private tokenManager: TokenManager;
   private compressionService: CompressionService;
   public currentSession: string = 'default';
-  private sessionManager: SessionManager;
   private thinkingEnabled: boolean;
   private thinkingTokens: number;
   private display: DisplayAdapter;
@@ -71,7 +68,6 @@ export class Agent {
     this.compressionThresholdRatio = config.compressionThresholdRatio || 0.8;
     this.thinkingEnabled = config.thinkingEnabled || false;
     this.thinkingTokens = config.thinkingTokens || 20000;
-    this.sessionManager = new SessionManager();
     this.tokenManager = config.tokenManager || new TokenManagerImpl();
     this.compressionService = config.compressionService || new CompressionServiceImpl();
     this.toolRegistry = new ToolRegistry();
@@ -84,7 +80,6 @@ export class Agent {
     // Use provided display or create default console display
     this.display = config.display ?? new ConsoleDisplay();
     this.userPrompt = config.userPrompt || '';
-    if (config.sessionName) this.currentSession = config.sessionName;
   }
 
   /** Set or update the display adapter */
@@ -246,41 +241,33 @@ export class Agent {
       if (!hasToolCalls) break;
     }
 
-    // Auto-save after each complete exchange
-    await this.saveToSession();
+    // Auto-save is handled by TUI layer
   }
 
-  async loadFromSession(name: string): Promise<boolean> {
-    const data = await this.sessionManager.get(name);
-    if (!data) return false;
+  // Public accessors for session management (externalized)
+  getMessages(): MessageParam[] {
+    return this.messages;
+  }
 
-    this.messages = data.messages as MessageParam[];
-    // Restore token count from session
-    const totalTokens = data.totalTokens || 0;
+  setMessages(messages: MessageParam[]): void {
+    this.messages = messages;
+  }
+
+  getTokenCount(): number {
+    return this.tokenManager.getTotal();
+  }
+
+  setTokenCount(count: number): void {
     this.tokenManager.reset();
-    // Manually set the token count by adding it
-    if (totalTokens > 0) {
-      this.tokenManager.addTokens(totalTokens, 0);
+    if (count > 0) {
+      this.tokenManager.addTokens(count, 0);
     }
-    // Update display with restored token count
     this.display.updateTokenCount?.(this.tokenManager.getTotal());
-    this.currentSession = name;
-    return true;
   }
 
-  private async saveToSession(): Promise<void> {
-    await this.sessionManager.save(this.currentSession, {
-      model: this.model || 'unknown',
-      messages: this.messages as any,
-      totalTokens: this.tokenManager.getTotal(),
-      createdAt: '',
-      updatedAt: ''
-    });
-  }
-
-  startNewSession(name: string): void {
+  clearSession(): void {
     this.messages = [];
     this.tokenManager.reset();
-    this.currentSession = name;
+    this.userPromptInjected = false;
   }
 }

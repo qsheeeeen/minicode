@@ -78,7 +78,8 @@ commandRegistry.register({
   handler: async (args, ctx): Promise<void> => {
     const name = args.join(' ');
     if (name) {
-      ctx.agent.startNewSession(name);
+      ctx.agent.clearSession();
+      ctx.agent.currentSession = name;
       ctx.setCurrentSession(name);
       ctx.setMessages([{ role: 'system', content: `Created session: ${name}`, timestamp: new Date() }]);
     }
@@ -113,13 +114,19 @@ commandRegistry.register({
     } else {
       // Load specific session
       const name = args[0];
-      const loaded = await ctx.agent.loadFromSession(name);
-      if (loaded) {
+      const data = await ctx.sessionManager.get(name);
+      if (data) {
+        ctx.agent.setMessages(data.messages as any);
+        const totalTokens = data.totalTokens || 0;
+        if (totalTokens > 0) {
+          ctx.agent.setTokenCount(totalTokens);
+        }
+        ctx.agent.currentSession = name;
         ctx.setCurrentSession(name);
         const { SessionDisplayImpl } = await import('../utils/session-display.js');
         const sessionDisplay = new SessionDisplayImpl(ctx.sessionManager);
         const displayMessages = await sessionDisplay.loadForTUI(name);
-        ctx.setMessages(displayMessages.length > 0 ? displayMessages : [{ role: 'system', content: `Loaded session: ${name}`, timestamp: new Date() }]);
+        ctx.setMessages(displayMessages.length > 0 ? displayMessages: [{ role: 'system', content: `Loaded session: ${name}`, timestamp: new Date() }]);
       } else {
         ctx.setMessages(prev => [...prev, { role: 'error', content: `Session not found: ${name}`, timestamp: new Date() }]);
       }
