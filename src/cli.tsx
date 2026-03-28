@@ -6,11 +6,12 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { Box, Text, useInput, useApp } from 'ink';
 import TextInput from 'ink-text-input';
 import { Agent } from './agent.js';
-import { getModelConfig, getCompressionThreshold, getThinkingConfig } from './config.js';
+import { getModelConfig, getCompressionThreshold, getThinkingConfig, getPromptFile } from './config.js';
 import { SessionManager } from './utils/session.js';
 import { CallbackDisplay, DisplayMessage } from './utils/display.js';
 import { SessionDisplayImpl } from './utils/session-display.js';
 import { CommandRegistry, type CommandContext } from './cli/commands.js';
+import { loadGlobalPrompt, loadProjectPrompt } from './utils/prompts.js';
 
 // Create command registry instance
 const commandRegistry = new CommandRegistry();
@@ -72,6 +73,17 @@ for (let i = 0; i < args.length; i++) {
 const modelConfig = await getModelConfig(modelOverride ?? process.env.MODEL);
 const compressionThreshold = await getCompressionThreshold();
 const thinkingConfig = await getThinkingConfig();
+
+// Load global and project prompts
+const [globalPrompt, promptFile] = await Promise.all([
+  loadGlobalPrompt(),
+  getPromptFile()
+]);
+const projectPrompt = await loadProjectPrompt(process.cwd(), promptFile);
+const promptFiles: string[] = [];
+if (globalPrompt) promptFiles.push('~/.minicode/MINICODE.md');
+if (projectPrompt) promptFiles.push(`./${promptFile}`);
+const userPrompt = [globalPrompt, projectPrompt].filter(Boolean).join('\n\n');
 
 if (!modelConfig) {
   console.error('Error: No valid model configuration found. Please set model in config.json');
@@ -166,7 +178,8 @@ function App({ initialPrompt }: { initialPrompt?: string }) {
       compressionThresholdRatio: compressionThreshold,
       thinkingEnabled: thinkingConfig.enabled,
       thinkingTokens: thinkingConfig.tokens,
-      display: displayAdapter
+      display: displayAdapter,
+      userPrompt
     });
 
     agentRef.current = agent;
@@ -273,6 +286,12 @@ function App({ initialPrompt }: { initialPrompt?: string }) {
           <Text color="green">{modelConfig!.provider}</Text>
           <Text dimColor>:</Text>
           <Text>{modelConfig!.model}</Text>
+          {promptFiles.length > 0 && (
+            <>
+              <Text dimColor> | </Text>
+              <Text dimColor>{promptFiles.join(', ')}</Text>
+            </>
+          )}
         </Box>
         <Box>
           <Text dimColor>{currentSession}</Text>

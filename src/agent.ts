@@ -11,7 +11,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const README_PATH = path.join(__dirname, '..', '..', 'README.md');
 
-const SYSTEM_PROMPT = `You are an expert coding assistant. You help users with coding tasks by reading files, executing commands, editing code, and writing new files.
+export const SYSTEM_PROMPT = `You are an expert coding assistant. You help users with coding tasks by reading files, executing commands, editing code, and writing new files.
 
 Available tools:
 - read: Read file contents
@@ -43,6 +43,7 @@ export interface AgentConfig {
   display?: DisplayAdapter;
   tokenManager?: TokenManager;
   compressionService?: CompressionService;
+  userPrompt?: string;
 }
 
 export class Agent {
@@ -59,6 +60,7 @@ export class Agent {
   private thinkingEnabled: boolean;
   private thinkingTokens: number;
   private display: DisplayAdapter;
+  private userPrompt: string;
 
   constructor(config: AgentConfig = {}) {
     this.client = new AnthropicClient(config.apiKey, config.baseURL);
@@ -84,6 +86,7 @@ export class Agent {
       streamChunk: () => {},
       streamEnd: () => {}
     };
+    this.userPrompt = config.userPrompt || '';
   }
 
   /** Set or update the display adapter */
@@ -112,6 +115,12 @@ export class Agent {
   }
 
   async run(userMessage: string): Promise<void> {
+    // Inject user prompt as context on first run
+    if (this.messages.length === 0 && this.userPrompt) {
+      this.messages.push({ role: 'user', content: this.userPrompt });
+      this.messages.push({ role: 'assistant', content: 'Understood.' });
+    }
+
     this.messages.push({ role: 'user', content: userMessage });
 
     while (true) {

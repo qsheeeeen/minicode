@@ -27,6 +27,7 @@ export interface Config {
   compressionThreshold?: number;  // 0-1, compress at this ratio of context
   thinking?: boolean;  // enable extended thinking
   thinkingTokens?: number;  // tokens budget for thinking (default 20000)
+  promptFile?: string;  // project prompt filename (default: MINICODE.md)
 }
 
 let cachedConfig: Config | null = null;
@@ -112,4 +113,9 @@ export async function getThinkingConfig(): Promise<{ enabled: boolean; tokens: n
     enabled: config.thinking ?? false,
     tokens: config.thinkingTokens ?? 20000
   };
+}
+
+export async function getPromptFile(): Promise<string> {
+  const config = await loadConfig();
+  return config.promptFile || 'MINICODE.md';
 }
