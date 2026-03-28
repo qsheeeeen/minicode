@@ -16,7 +16,8 @@ export class TokenManagerImpl implements TokenManager {
   private lastShownThreshold = 0;
 
   addTokens(input: number, output: number): void {
-    this.totalTokens += input + output;
+    // API returns total tokens for the full context each time, not a delta
+    this.totalTokens = input + output;
   }
 
   getTotal(): number {
