@@ -179,7 +179,8 @@ function App({ initialPrompt }: { initialPrompt?: string }) {
       thinkingEnabled: thinkingConfig.enabled,
       thinkingTokens: thinkingConfig.tokens,
       display: displayAdapter,
-      userPrompt
+      userPrompt,
+      sessionName: initialSession
     });
 
     agentRef.current = agent;

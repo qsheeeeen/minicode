@@ -44,6 +44,7 @@ export interface AgentConfig {
   tokenManager?: TokenManager;
   compressionService?: CompressionService;
   userPrompt?: string;
+  sessionName?: string;
 }
 
 export class Agent {
@@ -87,6 +88,7 @@ export class Agent {
       streamEnd: () => {}
     };
     this.userPrompt = config.userPrompt || '';
+    if (config.sessionName) this.currentSession = config.sessionName;
   }
 
   /** Set or update the display adapter */
