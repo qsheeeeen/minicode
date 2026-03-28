@@ -42,6 +42,8 @@ export function App({
   const [currentSession, setCurrentSession] = useState(initialSession);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState('');
+  const [isThinking, setIsThinking] = useState(false);
+  const [thinkingContent, setThinkingContent] = useState('');
   const [status, setStatus] = useState('');
   const [tokenCount, setTokenCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
@@ -55,6 +57,7 @@ export function App({
 
   const agentRef = useRef<Agent | null>(null);
   const streamingRef = useRef<string>('');
+  const thinkingRef = useRef<string>('');
   const { exit } = useApp();
 
   const setSessionList = (sessions: Array<{ name: string }>) => {
@@ -68,6 +71,10 @@ export function App({
   useEffect(() => {
     streamingRef.current = streamingContent;
   }, [streamingContent]);
+
+  useEffect(() => {
+    thinkingRef.current = thinkingContent;
+  }, [thinkingContent]);
 
   // Initialize agent once
   useEffect(() => {
@@ -88,6 +95,22 @@ export function App({
         setIsStreaming(false);
         setStreamingContent('');
         streamingRef.current = '';
+      },
+      onStreamThinkingStart: () => { setIsThinking(true); setThinkingContent(''); thinkingRef.current = ''; },
+      onStreamThinkingChunk: (chunk) => {
+        const newContent = thinkingRef.current + chunk;
+        thinkingRef.current = newContent;
+        setThinkingContent(newContent);
+      },
+      onStreamThinkingEnd: () => {
+        setMessages(prev => [...prev, {
+          role: 'thinking',
+          content: thinkingRef.current,
+          timestamp: new Date()
+        }]);
+        setIsThinking(false);
+        setThinkingContent('');
+        thinkingRef.current = '';
       },
       onStatusUpdate: setStatus,
       onTokenUpdate: setTokenCount
@@ -247,6 +270,12 @@ export function App({
             {messages.map((msg, i) => (
               <Message key={i} role={msg.role} content={msg.content} />
             ))}
+            {isThinking && (
+              <Box marginBottom={0} paddingX={1}>
+                <Text color="gray">[Thinking] {thinkingContent}</Text>
+                <Text dimColor inverse>▋</Text>
+              </Box>
+            )}
             {isStreaming && (
               <Box marginBottom={0}>
                 <Text>{streamingContent}</Text>

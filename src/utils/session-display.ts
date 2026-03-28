@@ -1,7 +1,7 @@
 import { SessionManager, SessionData } from './session.js';
 import { DisplayAdapter } from './display.js';
 
-export type MessageRole = 'user' | 'assistant' | 'system' | 'tool' | 'error';
+export type MessageRole = 'user' | 'assistant' | 'system' | 'tool' | 'error' | 'thinking';
 
 export interface DisplayMessage {
   role: MessageRole;

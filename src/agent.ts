@@ -3,33 +3,23 @@ import { readTool, writeTool, editTool, bashTool, ToolRegistry, ToolDef } from '
 import { ConsoleDisplay, type DisplayAdapter } from './utils/display.js';
 import { TokenManager, TokenManagerImpl } from './services/token-manager.js';
 import { CompressionService, CompressionServiceImpl } from './services/compression-service.js';
-import path from 'path';
-import { fileURLToPath } from 'url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const README_PATH = path.join(__dirname, '..', '..', 'README.md');
+export const SYSTEM_PROMPT = `You are an interactive CLI tool that helps users with software engineering tasks. Use the instructions below and the tools available to you to assist the user.
 
-export const SYSTEM_PROMPT = `You are an expert coding assistant. You help users with coding tasks by reading files, executing commands, editing code, and writing new files.
-
-Available tools:
+# Available tools
 - read: Read file contents
 - bash: Execute bash commands
 - edit: Make surgical edits to files
 - write: Create or overwrite files
 
-Guidelines:
+# Guidelines:
 - Use bash for file operations like ls, grep, find
 - Use read to examine files before editing
 - Use edit for precise changes (old text must match exactly)
 - Use write only for new files or complete rewrites
 - When summarizing your actions, output plain text directly - do NOT use cat or bash to display what you did
 - Be concise in your responses
-- Show file paths clearly when working with files
-
-Documentation:
-- For minicode documentation (features, configuration, setup), read: ${README_PATH}
-- Refer to it when users ask about features, configuration, or setup, or when adding custom models/providers.`;
+- Show file paths clearly when working with files`;
 
 export interface AgentConfig {
   apiKey?: string;
@@ -118,7 +108,7 @@ export class Agent {
     this.messages.push({ role: 'user', content: userMessage });
 
     while (true) {
-      const response = await this.client.chat(
+      const stream = this.client.chatStream(
         this.messages,
         this.toolRegistry.getAll().map(t => ({
           name: t.name,
@@ -132,6 +122,66 @@ export class Agent {
           thinkingTokens: this.thinkingTokens
         }
       );
+
+      // Track streaming state
+      let isStreamingThinking = false;
+      let isStreamingText = false;
+      const toolCalls: Array<{ block: Anthropic.Messages.ToolUseBlock; tool: ToolDef }> = [];
+      let hasToolCalls = false;
+
+      // Stream thinking deltas
+      stream.on('thinking', (delta: string) => {
+        if (!isStreamingThinking) {
+          isStreamingThinking = true;
+          this.display.streamThinkingStart();
+        }
+        this.display.streamThinkingChunk(delta);
+      });
+
+      // Stream text deltas
+      stream.on('text', (delta: string) => {
+        // End thinking if still streaming
+        if (isStreamingThinking) {
+          isStreamingThinking = false;
+          this.display.streamThinkingEnd();
+        }
+        if (!isStreamingText) {
+          isStreamingText = true;
+          this.display.streamStart();
+        }
+        this.display.streamChunk(delta);
+      });
+
+      // Collect completed content blocks (tool_use blocks arrive here)
+      stream.on('contentBlock', (block: any) => {
+        if (block.type === 'thinking' && isStreamingThinking) {
+          isStreamingThinking = false;
+          this.display.streamThinkingEnd();
+        }
+        if (block.type === 'text' && isStreamingText) {
+          isStreamingText = false;
+          this.display.streamEnd();
+        }
+        if (block.type === 'tool_use') {
+          hasToolCalls = true;
+          const toolBlock = block as Anthropic.Messages.ToolUseBlock;
+          const tool = this.toolRegistry.get(toolBlock.name);
+          if (tool) {
+            toolCalls.push({ block: toolBlock, tool });
+          }
+        }
+      });
+
+      // Wait for stream to complete and get final message
+      const response = await stream.finalMessage();
+
+      // End any remaining streams
+      if (isStreamingThinking) {
+        this.display.streamThinkingEnd();
+      }
+      if (isStreamingText) {
+        this.display.streamEnd();
+      }
 
       // Track token usage
       if (response.usage) {
@@ -157,48 +207,19 @@ export class Agent {
         }
       }
 
-      // 处理响应
-      const assistantMsg: MessageParam = { role: 'assistant', content: [] };
-      let hasToolCalls = false;
+      // Build assistant message from response content blocks
+      const assistantMsg: MessageParam = { role: 'assistant', content: response.content as any };
 
-      // First pass: collect tool calls and display text
-      const toolCalls: Array<{ block: Anthropic.Messages.ToolUseBlock; tool: ToolDef }> = [];
-      let textContent = '';
-
-      for (const block of response.content) {
-        if (block.type === 'text') {
-          const text = (block as any).text;
-          textContent += text;
-          (assistantMsg.content as any).push(block);
-        } else if (block.type === 'tool_use') {
-          hasToolCalls = true;
-          const toolBlock = block as Anthropic.Messages.ToolUseBlock;
-          (assistantMsg.content as any).push(block);
-
-          const tool = this.toolRegistry.get(toolBlock.name);
-          if (tool) {
-            toolCalls.push({ block: toolBlock, tool });
-          }
-        }
-      }
-
-      // Stream text content first (before tool calls)
-      if (textContent) {
-        this.display.streamStart();
-        this.display.streamChunk(textContent);
-        this.display.streamEnd();
-      }
-
-      // Then display tool calls
+      // Display tool calls
       for (const { block, tool } of toolCalls) {
         const display = tool.format ? tool.format(block.input as any) : `${block.name} ${JSON.stringify(block.input)}`;
         this.display.toolCall(display);
       }
 
-      // Push assistant message first (contains tool_use blocks)
+      // Push assistant message
       this.messages.push(assistantMsg);
 
-      // Second pass: execute all tools in parallel
+      // Execute tool calls in parallel
       if (toolCalls.length > 0) {
         this.display.progress(`Running ${toolCalls.length} tool${toolCalls.length > 1 ? 's' : ''}... `);
         const results = await Promise.allSettled(

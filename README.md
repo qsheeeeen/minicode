@@ -2,6 +2,8 @@
 
 A minimal coding agent powered by LLMs. Simple, opinionated, hackable.
 
+**Goal:** 实现自举 — 用 minicode 开发 minicode 自身。
+
 ## Features
 
 - ink-based TUI (React for CLIs) — no readline, full terminal UI

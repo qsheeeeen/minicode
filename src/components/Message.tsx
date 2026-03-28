@@ -2,7 +2,7 @@ import React from 'react';
 import { Box, Text } from 'ink';
 
 interface MessageProps {
-  role: 'user' | 'assistant' | 'system' | 'tool' | 'error';
+  role: 'user' | 'assistant' | 'system' | 'tool' | 'error' | 'thinking';
   content: string;
   isStreaming?: boolean;
 }
@@ -25,6 +25,16 @@ export function Message({ role, content, isStreaming }: MessageProps) {
     return (
       <Box marginBottom={0} paddingX={1} flexDirection="column">
         <Text>{content}</Text>
+      </Box>
+    );
+  }
+
+  // Thinking message - dim, folded
+  if (role === 'thinking') {
+    const preview = content.length > 200 ? content.slice(0, 200) + '...' : content;
+    return (
+      <Box marginBottom={0} paddingX={1} flexDirection="column">
+        <Text color="gray">[Thinking] {preview}</Text>
       </Box>
     );
   }

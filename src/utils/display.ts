@@ -13,6 +13,9 @@ export type DisplayCallback = {
   onStreamStart?: () => void;
   onStreamChunk?: (chunk: string) => void;
   onStreamEnd?: () => void;
+  onStreamThinkingStart?: () => void;
+  onStreamThinkingChunk?: (chunk: string) => void;
+  onStreamThinkingEnd?: () => void;
   onStatusUpdate?: (status: string) => void;
   onTokenUpdate?: (tokens: number) => void;
 };
@@ -44,6 +47,15 @@ export interface DisplayAdapter {
 
   /** End streaming */
   streamEnd(): void;
+
+  /** Start streaming thinking content */
+  streamThinkingStart(): void;
+
+  /** Stream a chunk of thinking text */
+  streamThinkingChunk(chunk: string): void;
+
+  /** End streaming thinking */
+  streamThinkingEnd(): void;
 
   /** Update token count display */
   updateTokenCount?(tokens: number): void;
@@ -97,6 +109,18 @@ export class ConsoleDisplay implements DisplayAdapter {
     }
     this.buffer = '';
   }
+
+  streamThinkingStart(): void {
+    process.stdout.write('\x1b[2m');
+  }
+
+  streamThinkingChunk(chunk: string): void {
+    process.stdout.write(chunk);
+  }
+
+  streamThinkingEnd(): void {
+    process.stdout.write('\x1b[0m\n');
+  }
 }
 
 /**
@@ -142,6 +166,18 @@ export class CallbackDisplay implements DisplayAdapter {
 
   streamEnd(): void {
     this.callbacks.onStreamEnd?.();
+  }
+
+  streamThinkingStart(): void {
+    this.callbacks.onStreamThinkingStart?.();
+  }
+
+  streamThinkingChunk(chunk: string): void {
+    this.callbacks.onStreamThinkingChunk?.(chunk);
+  }
+
+  streamThinkingEnd(): void {
+    this.callbacks.onStreamThinkingEnd?.();
   }
 
   updateTokenCount(tokens: number): void {

@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import type { MessageStream } from '@anthropic-ai/sdk/lib/MessageStream.js';
 
 export type { Anthropic };
 
@@ -13,6 +14,7 @@ export interface ChatOptions {
 export type MessageParam = Anthropic.Messages.MessageParam;
 export type Tool = Anthropic.Messages.Tool;
 export type Message = Anthropic.Messages.Message;
+export type { MessageStream };
 
 export class AnthropicClient {
   private client: Anthropic;
@@ -45,5 +47,28 @@ export class AnthropicClient {
     }
 
     return await this.client.messages.create(params);
+  }
+
+  chatStream(
+    messages: MessageParam[],
+    tools: Tool[],
+    options: ChatOptions = {}
+  ): MessageStream<null> {
+    const params: any = {
+      model: options.model || 'claude-sonnet-4-5',
+      max_tokens: options.maxTokens || 8192,
+      system: options.system,
+      messages,
+      tools
+    };
+
+    if (options.thinking) {
+      params.thinking = {
+        type: 'enabled',
+        budget_tokens: options.thinkingTokens || 20000
+      };
+    }
+
+    return this.client.messages.stream(params) as unknown as MessageStream<null>;
   }
 }
