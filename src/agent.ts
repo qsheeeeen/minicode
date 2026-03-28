@@ -19,7 +19,8 @@ export const SYSTEM_PROMPT = `You are an interactive CLI tool that helps users w
 - Use write only for new files or complete rewrites
 - When summarizing your actions, output plain text directly - do NOT use cat or bash to display what you did
 - Be concise in your responses
-- Show file paths clearly when working with files`;
+- Show file paths clearly when working with files
+- Think and respond in user language`;
 
 export interface AgentConfig {
   apiKey?: string;
