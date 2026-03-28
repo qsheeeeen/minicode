@@ -22,6 +22,7 @@ export function Message({ role, content, isStreaming }: MessageProps) {
     return (
       <Box marginBottom={0} paddingX={4} flexDirection="column">
         <Text>{content}</Text>
+        {isStreaming && <Text dimColor inverse>▋</Text>}
       </Box>
     );
   }
@@ -32,6 +33,7 @@ export function Message({ role, content, isStreaming }: MessageProps) {
     return (
       <Box marginBottom={0} paddingX={4} flexDirection="column">
         <Text dimColor>{preview}</Text>
+        {isStreaming && <Text dimColor inverse>▋</Text>}
       </Box>
     );
   }

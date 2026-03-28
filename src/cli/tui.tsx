@@ -40,10 +40,6 @@ export function App({
 }: AppProps) {
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [currentSession, setCurrentSession] = useState(initialSession);
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [streamingContent, setStreamingContent] = useState('');
-  const [isThinking, setIsThinking] = useState(false);
-  const [thinkingContent, setThinkingContent] = useState('');
   const [status, setStatus] = useState('');
   const [tokenCount, setTokenCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
@@ -56,8 +52,6 @@ export function App({
   const [autoSubmitPending, setAutoSubmitPending] = useState(!!initialPrompt);
 
   const agentRef = useRef<Agent | null>(null);
-  const streamingRef = useRef<string>('');
-  const thinkingRef = useRef<string>('');
   const { exit } = useApp();
 
   const setSessionList = (sessions: Array<{ name: string }>) => {
@@ -68,50 +62,16 @@ export function App({
     setSessionListState(prev => ({ ...prev, selectedIndex: index }));
   };
 
-  useEffect(() => {
-    streamingRef.current = streamingContent;
-  }, [streamingContent]);
-
-  useEffect(() => {
-    thinkingRef.current = thinkingContent;
-  }, [thinkingContent]);
-
   // Initialize agent once
   useEffect(() => {
     const displayAdapter = new CallbackDisplay({
       onMessage: (msg) => setMessages(prev => [...prev, msg]),
-      onStreamStart: () => { setIsStreaming(true); setStreamingContent(''); streamingRef.current = ''; },
-      onStreamChunk: (chunk) => {
-        const newContent = streamingRef.current + chunk;
-        streamingRef.current = newContent;
-        setStreamingContent(newContent);
-      },
-      onStreamEnd: () => {
-        setMessages(prev => [...prev, {
-          role: 'assistant',
-          content: streamingRef.current,
-          timestamp: new Date()
-        }]);
-        setIsStreaming(false);
-        setStreamingContent('');
-        streamingRef.current = '';
-      },
-      onStreamThinkingStart: () => { setIsThinking(true); setThinkingContent(''); thinkingRef.current = ''; },
-      onStreamThinkingChunk: (chunk) => {
-        const newContent = thinkingRef.current + chunk;
-        thinkingRef.current = newContent;
-        setThinkingContent(newContent);
-      },
-      onStreamThinkingEnd: () => {
-        setMessages(prev => [...prev, {
-          role: 'thinking',
-          content: thinkingRef.current,
-          timestamp: new Date()
-        }]);
-        setIsThinking(false);
-        setThinkingContent('');
-        thinkingRef.current = '';
-      },
+      onUpdateLast: (updater) => setMessages(prev => {
+        if (prev.length === 0) return prev;
+        const copy = [...prev];
+        copy[copy.length - 1] = updater(copy[copy.length - 1]);
+        return copy;
+      }),
       onStatusUpdate: setStatus,
       onTokenUpdate: setTokenCount
     });
@@ -261,27 +221,15 @@ export function App({
 
       {/* Messages */}
       <Box flexGrow={1} flexDirection="column" paddingX={1}>
-        {messages.length === 0 && !isStreaming ? (
+        {messages.length === 0 ? (
           <Box flexGrow={1} justifyContent="center" alignItems="center">
             <Text dimColor>Type a message to start...</Text>
           </Box>
         ) : (
           <Box flexDirection="column">
             {messages.map((msg, i) => (
-              <Message key={i} role={msg.role} content={msg.content} />
+              <Message key={i} role={msg.role} content={msg.content} isStreaming={msg.isStreaming} />
             ))}
-            {isThinking && (
-              <Box marginBottom={0} paddingX={1}>
-                <Text color="gray">[Thinking] {thinkingContent}</Text>
-                <Text dimColor inverse>▋</Text>
-              </Box>
-            )}
-            {isStreaming && (
-              <Box marginBottom={0}>
-                <Text>{streamingContent}</Text>
-                <Text dimColor inverse>▋</Text>
-              </Box>
-            )}
           </Box>
         )}
       </Box>

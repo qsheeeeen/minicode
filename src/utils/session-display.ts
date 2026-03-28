@@ -7,6 +7,7 @@ export interface DisplayMessage {
   role: MessageRole;
   content: string;
   timestamp?: Date;
+  isStreaming?: boolean;
 }
 
 export interface SessionDisplay {

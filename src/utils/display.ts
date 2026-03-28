@@ -10,12 +10,7 @@ export type { MessageRole, DisplayMessage };
 
 export type DisplayCallback = {
   onMessage?: (msg: DisplayMessage) => void;
-  onStreamStart?: () => void;
-  onStreamChunk?: (chunk: string) => void;
-  onStreamEnd?: () => void;
-  onStreamThinkingStart?: () => void;
-  onStreamThinkingChunk?: (chunk: string) => void;
-  onStreamThinkingEnd?: () => void;
+  onUpdateLast?: (updater: (msg: DisplayMessage) => DisplayMessage) => void;
   onStatusUpdate?: (status: string) => void;
   onTokenUpdate?: (tokens: number) => void;
 };
@@ -157,27 +152,27 @@ export class CallbackDisplay implements DisplayAdapter {
   }
 
   streamStart(): void {
-    this.callbacks.onStreamStart?.();
+    this.callbacks.onMessage?.({ role: 'assistant', content: '', timestamp: new Date(), isStreaming: true });
   }
 
   streamChunk(chunk: string): void {
-    this.callbacks.onStreamChunk?.(chunk);
+    this.callbacks.onUpdateLast?.(msg => ({ ...msg, content: msg.content + chunk }));
   }
 
   streamEnd(): void {
-    this.callbacks.onStreamEnd?.();
+    this.callbacks.onUpdateLast?.(msg => ({ ...msg, isStreaming: false }));
   }
 
   streamThinkingStart(): void {
-    this.callbacks.onStreamThinkingStart?.();
+    this.callbacks.onMessage?.({ role: 'thinking', content: '', timestamp: new Date(), isStreaming: true });
   }
 
   streamThinkingChunk(chunk: string): void {
-    this.callbacks.onStreamThinkingChunk?.(chunk);
+    this.callbacks.onUpdateLast?.(msg => ({ ...msg, content: msg.content + chunk }));
   }
 
   streamThinkingEnd(): void {
-    this.callbacks.onStreamThinkingEnd?.();
+    this.callbacks.onUpdateLast?.(msg => ({ ...msg, isStreaming: false }));
   }
 
   updateTokenCount(tokens: number): void {
