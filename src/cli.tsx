@@ -10,11 +10,10 @@ import { getModelConfig, getCompressionThreshold, getThinkingConfig, getPromptFi
 import { SessionManager } from './utils/session.js';
 import { CallbackDisplay, DisplayMessage } from './utils/display.js';
 import { SessionDisplayImpl } from './utils/session-display.js';
-import { CommandRegistry, type CommandContext } from './cli/commands.js';
+import { commandRegistry as commandRegistryInstance, type CommandContext } from './cli/commands.js';
 import { loadGlobalPrompt, loadProjectPrompt } from './utils/prompts.js';
 
-// Create command registry instance
-const commandRegistry = new CommandRegistry();
+const commandRegistry = commandRegistryInstance;
 import { Message } from './components/Message.js';
 
 const __filename = fileURLToPath(import.meta.url);
