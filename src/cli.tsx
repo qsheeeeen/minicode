@@ -62,6 +62,7 @@ if (sessionName) {
 // Start TUI
 render(<App
   config={config}
+  version={VERSION}
   userPrompt={userPrompt}
   promptFiles={promptFiles}
   initialSession={initialSession}

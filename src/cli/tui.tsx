@@ -12,6 +12,7 @@ import type { SessionManager } from '../utils/session.js';
 
 export interface AppProps {
   config: ResolvedConfig;
+  version: string;
   userPrompt: string;
   promptFiles: string[];
   initialSession: string;
@@ -30,6 +31,7 @@ function makeBar(used: number, total: number, width: number): string {
 
 export function App({
   config,
+  version,
   userPrompt,
   promptFiles,
   initialSession,
@@ -199,6 +201,8 @@ export function App({
       <Box borderStyle="single" borderColor="gray" paddingX={1} marginBottom={1}>
         <Box flexGrow={1}>
           <Text bold color="cyan">Mini Code</Text>
+          <Text dimColor> v</Text>
+          <Text dimColor>{version}</Text>
           <Text dimColor> | </Text>
           <Text color="green">{config.model!.provider}</Text>
           <Text dimColor>:</Text>
