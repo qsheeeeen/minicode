@@ -10,5 +10,6 @@ export interface ToolDef {
   description: string;
   input_schema: Record<string, unknown>;
   format?: (args: any) => string;
+  formatResult?: (result: string) => string;
   execute: (args: any) => Promise<string>;
 }

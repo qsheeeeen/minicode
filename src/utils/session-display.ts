@@ -1,5 +1,6 @@
 import { SessionManager, SessionData } from './session.js';
 import { DisplayAdapter } from './display.js';
+import { toolRegistry } from '../tools/registry.js';
 
 export type MessageRole = 'user' | 'assistant' | 'system' | 'tool' | 'tool_result' | 'error' | 'thinking';
 
@@ -35,6 +36,8 @@ export class SessionDisplayImpl implements SessionDisplay {
 
   private convertToDisplayMessages(data: SessionData): DisplayMessage[] {
     const messages: DisplayMessage[] = [];
+    // Map tool_use_id -> tool name for result formatting
+    const toolUseMap = new Map<string, string>();
 
     for (const msg of data.messages) {
       if (msg.role === 'user') {
@@ -43,7 +46,11 @@ export class SessionDisplayImpl implements SessionDisplay {
           // Tool results - display as tool_result messages
           for (const block of content as Array<any>) {
             if (block.type === 'tool_result') {
-              messages.push({ role: 'tool_result', content: typeof block.content === 'string' ? block.content : JSON.stringify(block.content), timestamp: new Date(data.updatedAt) });
+              const toolName = toolUseMap.get(block.tool_use_id);
+              const raw = typeof block.content === 'string' ? block.content : JSON.stringify(block.content);
+              const tool = toolName ? toolRegistry.get(toolName) : undefined;
+              const display = tool?.formatResult ? tool.formatResult(raw) : raw;
+              messages.push({ role: 'tool_result', content: display, timestamp: new Date(data.updatedAt) });
             }
           }
           continue;
@@ -57,8 +64,11 @@ export class SessionDisplayImpl implements SessionDisplay {
             if (block.type === 'text') {
               messages.push({ role: 'assistant', content: (block as any).text, timestamp: new Date(data.updatedAt) });
             } else if (block.type === 'tool_use') {
-              // Tool call - display as tool message
-              messages.push({ role: 'tool', content: `${block.name}(${JSON.stringify((block as any).input)})`, timestamp: new Date(data.updatedAt) });
+              toolUseMap.set((block as any).id, block.name);
+              // Use tool's format method to match live display
+              const tool = toolRegistry.get(block.name);
+              const display = tool?.format ? tool.format((block as any).input) : `${block.name}(${JSON.stringify((block as any).input)})`;
+              messages.push({ role: 'tool', content: display, timestamp: new Date(data.updatedAt) });
             }
           }
         } else {

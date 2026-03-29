@@ -22,6 +22,11 @@ export const readTool = {
     }
     return info + ')';
   },
+  formatResult: (result: string) => {
+    const lines = result.split('\n').length;
+    const chars = result.length;
+    return `Read ${lines} lines, ${chars} chars`;
+  },
   execute: async (args: { path: string; offset?: number; limit?: number }) => {
     const content = await fs.readFile(args.path, 'utf-8');
     const lines = content.split('\n');

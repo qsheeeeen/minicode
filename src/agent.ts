@@ -238,13 +238,8 @@ export class Agent {
 
           // Display tool result
           if (result.status === 'fulfilled') {
-            if (block.name === 'read') {
-              const lines = content.split('\n').length;
-              const chars = content.length;
-              this.display.toolResult(`Read ${lines} lines, ${chars} chars`);
-            } else {
-              this.display.toolResult(content);
-            }
+            const display = _tool.formatResult ? _tool.formatResult(content) : content;
+            this.display.toolResult(display);
           } else {
             this.display.error(content);
           }
