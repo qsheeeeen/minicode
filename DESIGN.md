@@ -1,60 +1,106 @@
-# 多模型审查功能设计
+# 多 Agent 协作功能设计
 
 ## 概述
 
-通过 `/review` 命令触发多模型协作审查，让另一个模型与当前模型进行多轮辩论，发现设计中的盲点和问题。
+通过 `/delegate` 命令引入第二个 agent，与主 agent 协作完成特定任务。
 
-## 核心设计
+> **核心原则**：第二个 agent 是**同等智能的不同模型**，不是 fast-but-less-smart 的模型，也不是主 agent 的分身。
 
-### 命令格式
+**为什么需要不同模型**：
+- 不同训练数据 → 不同知识盲区
+- 不同思维模式 → 不同解题思路
+- 不同偏好 → 不同权衡选择
+
+**为什么不是分身**：同一模型的不同 context 只会得出类似结论，没有交叉验证价值。
+
+## 协作模式
+
+### 1. Review（审查辩论）
+
+第二个 agent 作为审查者，与主 agent 进行多轮辩论，发现设计中的盲点。
 
 ```bash
-/review              # 默认 1 轮审查
-/review 3            # 3 轮辩论
-/review --model glm-4.7  --rounds 2    # 指定模型和轮数
+/delegate review [-r 3]           # 3 轮辩论，使用配置的默认审查模型
+/delegate review -m glm-4.7       # 指定审查模型
 ```
 
-> **设计决策**：使用 `--model` 和 `--rounds` 显式参数，避免位置参数歧义（`/review glm-4.7 2` 无法区分模型名和轮数）。`--rounds` 可简写为 `-r`，`--model` 可简写为 `-m`。未指定时从 config 读取默认值。
-
-### 对话流程
-
+**流程**：
 ```
-[正常对话]
-User: 重构 src/services/auth.ts，添加 OAuth
-Agent (Claude): [设计方案]
-
-User: /review -r 2
+[主 Agent 方案]
     ↓
-┌─────────────────────────────────────────┐
-│ Round 1                                  │
-│ ─────────────────────────────────────── │
-│ Reviewer (智谱):                         │
-│   "我审查了这个方案，发现几个问题：        │
-│    1. 缺少 token 刷新机制                │
-│    2. 没有处理并发请求导致的 token 过期"  │
-│                                          │
-│ Designer (Claude):                       │
-│   "好建议！补充：                         │
-│    1. 添加 TokenRefresher 类             │
-│    2. 使用锁机制避免并发刷新"             │
-└─────────────────────────────────────────┘
-    ↓
-┌─────────────────────────────────────────┐
-│ Round 2                                  │
-│ ─────────────────────────────────────── │
-│ Reviewer (智谱):                         │
-│   "还是有问题：                           │
-│    1. 锁可能导致性能瓶颈                 │
-│    2. 建议用乐观锁 + 重试"               │
-│                                          │
-│ Designer (Claude):                       │
-│   "采纳！最终方案：..."                   │
-└─────────────────────────────────────────┘
-    ↓
-[回到正常对话]
-Agent (Claude): 根据审查结果，最终方案是...
-User: 好的，开始实现
+[Reviewer] → 找问题
+[主 Agent] → 回应调整
+[Reviewer] → 深入质疑
+[主 Agent] → 最终方案
 ```
+
+**适用场景**：复杂重构、架构决策、关键代码审查
+
+---
+
+### 2. Alternative（备选方案）
+
+第二个 agent 生成**不同的方案**，供用户对比选择。
+
+```bash
+/delegate alternative             # 生成一个备选方案
+/delegate alternative -n 2        # 生成 2 个备选方案（并行）
+```
+
+**流程**：
+```
+[主 Agent] 方案 A: 基于 React + Redux
+    ↓
+[Delegate Agent] 方案 B: 基于 Zustand
+    ↓
+User 选择：A 或 B 或融合
+```
+
+**适用场景**：技术选型、架构设计、实现路径不确定
+
+---
+
+### 3. Compete（竞争生成）
+
+多个 agent **并行**生成解决方案，用户选择最好的。
+
+```bash
+/delegate compete                 # 2 个模型竞争
+/delegate compete -n 3            # 3 个模型竞争
+/delegate compete -m "glm-4.7,deepseek-chat"  # 指定竞争模型
+```
+
+**流程**：
+```
+                    ┌─→ [Agent A] → 方案 A ─┐
+[当前上下文] ────────┼─→ [Agent B] → 方案 B ─┼→ 用户评审/选择
+                    └─→ [Agent C] → 方案 C ─┘
+```
+
+**适用场景**：创意方案、代码生成、问题诊断
+
+---
+
+## 命令格式
+
+```bash
+# 通用格式
+/delegate <mode> [options]
+
+# Review
+/delegate review [-r rounds] [-m model]
+
+# Alternative
+/delegate alternative [-n count] [-m model]
+
+# Compete
+/delegate compete [-n count] [-m model1,model2,...]
+```
+
+**参数说明**：
+- `-r, --rounds` - 审查轮数（仅 review）
+- `-n, --count` - Agent/方案数量（alternative/compete）
+- `-m, --model` - 指定模型，格式：`model@provider` 或逗号分隔列表
 
 ## 实现结构
 
@@ -63,230 +109,219 @@ User: 好的，开始实现
 ```typescript
 // src/cli/commands.ts
 commandRegistry.register({
-  name: 'review',
-  description: '触发多模型审查辩论 /review [-r rounds] [-m model]',
+  name: 'delegate',
+  description: '引入第二个 agent 协作 /delegate <mode> [options]',
   handler: async (ctx, args) => {
-    const parsed = parseReviewArgs(args); // { rounds: number, model?: string }
-    await startReview(ctx, parsed.rounds, parsed.model);
+    const mode = args[0]; // review | alternative | compete
+    const options = parseDelegateArgs(args.slice(1));
+    await delegateManager.execute(mode, ctx, options);
   }
 });
+```
 
-function parseReviewArgs(args: string[]): { rounds: number; model?: string } {
-  let rounds = 1;
-  let model: string | undefined;
+### 2. Delegate Manager
 
-  for (let i = 0; i < args.length; i++) {
-    if (args[i] === '-r' || args[i] === '--rounds') {
-      rounds = parseInt(args[++i]) || 1;
-    } else if (args[i] === '-m' || args[i] === '--model') {
-      model = args[++i];
-    } else if (/^\d+$/.test(args[i])) {
-      // 兼容: /review 3
-      rounds = parseInt(args[i]);
-    }
+```typescript
+// src/services/delegate-manager.ts
+
+class DelegateManager {
+  private modes: Map<string, DelegateMode>;
+
+  constructor(private config: DelegateConfig) {
+    this.modes = new Map([
+      ['review', new ReviewMode(config)],
+      ['alternative', new AlternativeMode(config)],
+      ['compete', new CompeteMode(config)],
+    ]);
   }
 
-  return { rounds: Math.min(rounds, config.review.maxRounds), model };
+  async execute(mode: string, ctx: CommandContext, options: Options): Promise<void> {
+    const handler = this.modes.get(mode);
+    if (!handler) throw new Error(`Unknown delegate mode: ${mode}`);
+    await handler.execute(ctx, options);
+  }
 }
 ```
 
-### 2. 多 Provider LLM Client
-
-当前 `Agent` 只持有一个 LLM client。审查需要调用另一个 provider，需要一个独立的轻量 client。
+### 3. 模式接口
 
 ```typescript
-// src/llm/review-client.ts
+// src/services/delegate-modes.ts
 
-interface ReviewClientConfig {
+interface DelegateMode {
+  execute(ctx: CommandContext, options: Options): Promise<void>;
+}
+
+class ReviewMode implements DelegateMode {
+  async execute(ctx: CommandContext, options: Options): Promise<void> {
+    const reviewer = ReviewClient.fromConfig(options.model ?? config.defaults.review);
+    const rounds = options.rounds ?? 1;
+
+    for (let i = 1; i <= rounds; i++) {
+      // Reviewer 审查
+      const review = await reviewer.chat(/* ... */);
+      ctx.display.add({ role: 'delegate', label: `[Review R${i}/${rounds}] ${reviewer.model}`, content: review });
+
+      // 主 agent 回应
+      const response = await ctx.agent.chat(/* ... */);
+      ctx.display.add({ role: 'assistant', content: response });
+    }
+  }
+}
+
+class AlternativeMode implements DelegateMode {
+  async execute(ctx: CommandContext, options: Options): Promise<void> {
+    const delegate = ReviewClient.fromConfig(options.model ?? config.defaults.alternative);
+    const alt = await delegate.chat(/* 生成不同方案 */);
+    ctx.display.add({ role: 'delegate', label: '[Alternative]', content: alt });
+  }
+}
+
+class CompeteMode implements DelegateMode {
+  async execute(ctx: CommandContext, options: Options): Promise<void> {
+    const models = options.models ?? [config.defaults.compete1, config.defaults.compete2];
+    const results = await Promise.all(
+      models.map(m => ReviewClient.fromConfig(m).chat(/* ... */))
+    );
+    results.forEach((r, i) => {
+      ctx.display.add({ role: 'delegate', label: `[Compete ${i + 1}] ${models[i]}`, content: r });
+    });
+  }
+}
+```
+
+### 4. 多 Provider LLM Client
+
+```typescript
+// src/llm/delegate-client.ts
+
+interface DelegateClientConfig {
   apiKey: string;
   baseURL: string;
   model: string;
 }
 
-class ReviewClient {
-  // 轻量 client，只做纯 chat（无 tool use、无 streaming）
-  async chat(system: string, messages: Message[]): Promise<string>;
+class DelegateClient {
+  private config: DelegateClientConfig;
 
-  // 根据 model@provider 从 config 解析出 provider 配置
-  static fromConfig(modelSpecifier: string): ReviewClient;
-}
-```
+  constructor(config: DelegateClientConfig) {
+    this.config = config;
+  }
 
-**为什么需要独立 client：**
-- 审查模型可能是非 Anthropic provider（如 zhipu），API 格式不同
-- 不需要 tool use、streaming、extended thinking 等能力
-- 复用现有 config 的 providers 结构，但走独立的 HTTP 调用
-
-**实现选择：**
-- 方案 A：直接用 fetch 调用 OpenAI-compatible API（zhipu 等国产模型基本兼容）
-- 方案 B：为每个 provider 写 adapter
-- **推荐方案 A**：Phase 1 只支持 OpenAI-compatible 接口，覆盖大多数 provider
-
-### 3. 审查服务
-
-```typescript
-// src/services/review-service.ts
-
-const REVIEWER_PROMPT = `
-你是审查者。你的任务是：
-1. 找出设计方案中的遗漏点
-2. 识别潜在的风险和边界情况
-3. 提出更简单的替代方案
-4. 质疑假设，但不否定整个方案
-
-风格：直接、具体、建设性。
-`;
-
-async function startReview(
-  agent: Agent,
-  rounds: number,
-  reviewerModel?: string
-): Promise<void> {
-  const modelSpecifier = reviewerModel || config.review.defaultReviewer;
-  const client = ReviewClient.fromConfig(modelSpecifier);
-
-  const conversation = agent.getConversationHistory();
-  const contextWindow = conversation.slice(-config.review.contextLimit);
-  const lastProposal = getLastAssistantMessage(conversation);
-
-  let currentProposal = lastProposal;
-
-  for (let i = 1; i <= rounds; i++) {
-    // Reviewer 审查（调用外部模型）
-    const review = await client.chat(REVIEWER_PROMPT, [
-      ...contextWindow,
-      { role: 'assistant', content: currentProposal }
-    ]);
-
-    agent.display.addMessage('reviewer', `[Round ${i}/${rounds}] ${modelSpecifier}`, review);
-
-    // 原模型回应（通过 agent 的现有 LLM client）
-    const response = await agent.chat({
-      messages: [
-        ...contextWindow,
-        { role: 'assistant', content: currentProposal },
-        { role: 'user', content: `审查意见：\n${review}\n\n请回应这些意见，必要时调整方案。` }
-      ]
+  async chat(system: string, messages: Message[]): Promise<string> {
+    // OpenAI-compatible fetch
+    const response = await fetch(`${this.config.baseURL}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${this.config.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: this.config.model,
+        messages: [{ role: 'system', content: system }, ...messages],
+      }),
     });
+    // ...
+  }
 
-    agent.display.addMessage('designer', `[Round ${i}/${rounds}]`, response);
-
-    currentProposal = response;
+  static fromConfig(modelSpecifier: string): DelegateClient {
+    const [model, provider] = parseModelSpecifier(modelSpecifier);
+    const config = loadConfig().providers[provider];
+    return new DelegateClient({
+      apiKey: config.apiKey,
+      baseURL: config.baseURL,
+      model,
+    });
   }
 }
 ```
 
-### 4. Session 持久化策略
-
-> **设计决策**：审查轮次作为独立 `role: 'review'` 消息存入 session 历史。
-
-**理由：**
-- 用户关闭再恢复 session 时，需要看到之前的审查结果
-- 审查结果对后续对话有参考价值（"你刚才审查时说锁有性能问题"）
-
-**代价与缓解：**
-- 上下文膨胀：审查消息较多时占用 token 预算 → 压缩服务自动处理（已有机制）
-- 与现有 role 类型不兼容：当前 `DisplayMessage` 只有 `user/assistant/tool/system` → 新增 `reviewer`/`designer` 角色或在 system message 中编码
-
-**Phase 1 折中方案：** 审查轮次存为 system 消息，用前缀标记：
-```
-[System] Review Round 1/2 (glm-4.7@zhipu): ...
-[System] Review Response 1/2: ...
-```
-
-### 5. TUI 展示
-
-审查消息在 Message 组件中作为 system 角色渲染，用不同前缀区分：
-- `[Review R1/3] glm-4.7@zhipu` — 审查者意见
-- `[Response R1/3]` — 原模型回应
-
-不需要特殊的框线样式，复用现有 system 消息的灰色渲染。理由：保持 TUI 实现简单，框线在终端宽度变化时容易错位。
-
-### 6. 配置
+## 配置
 
 ```json
 {
-  "review": {
-    "enabled": true,
-    "defaultReviewer": "glm-4.7@zhipu",
+  "model": "claude-sonnet-4-5@anthropic",
+  "secondaryModel": "glm-4.7@zhipu",
+  "compressionThreshold": 0.8,
+  "thinking": false,
+  "thinkingTokens": 20000,
+  "promptFile": "MINICODE.md",
+  "delegate": {
     "maxRounds": 5,
     "contextLimit": 10,
-    "reviewerSystemPrompt": "你是审查者，找出方案的问题、风险、遗漏"
+    "reviewPrompt": "你是审查者。找出方案的问题、风险、遗漏。",
+    "alternativePrompt": "生成一个与当前方案不同的替代方案。",
+    "competePrompt": "基于当前上下文，给出你的最佳解决方案。"
   }
 }
 ```
 
+- `secondaryModel` - 默认的第二个 agent（同级模型）
+- `-m` 参数可覆盖：`/delegate review -m deepseek-chat@deepseek`
+
+## Session 持久化
+
+Delegate 消息作为特殊 role 存入 session：
+
+```typescript
+{
+  role: 'delegate',
+  mode: 'review' | 'alternative' | 'compete',
+  model: string,
+  round?: number,
+  totalRounds?: number,
+  content: string
+}
+```
+
+TUI 展示时转换为 system 消息样式：
+- `[Delegate Review R1/3] glm-4.7@zhipu: ...`
+- `[Delegate Alternative] deepseek-chat: ...`
+- `[Delegate Compete 1/3] glm-4.7@zhipu: ...`
+
 ## 使用场景
 
-### 1. 复杂重构前的方案审查
+| 场景 | 模式 | 示例 |
+|------|------|------|
+| 复杂重构 | review | `/delegate review -r 3` |
+| 技术选型 | alternative | `/delegate alternative` |
+| 创意方案 | compete | `/delegate compete -n 3` |
+| 代码审查 | review | `/delegate review -m deepseek-chat` |
+| Bug 诊断 | compete | `/delegate compete` |
+| 架构设计 | review + alternative | 先 review 深化，再 alternative 对比 |
 
-```bash
-User: 重构整个数据层，切换到 PostgreSQL
-Agent: [设计方案]
-User: /review -r 3
-```
+## 与普通命令的区别
 
-### 2. 关键代码的双重确认
-
-```bash
-User: 实现支付逻辑，处理扣款和回调
-Agent: [代码实现]
-User: /review -r 2
-```
-
-### 3. 不确定时的第二意见
-
-```bash
-User: 这个 bug 原因是？
-Agent: [分析]
-User: /review -m glm-4.7
-```
-
-### 4. 架构决策
-
-```bash
-User: 设计一个实时消息系统
-Agent: [架构方案]
-User: /review -r 5  # 深度辩论
-```
-
-## 优势
-
-- **简单**：一个命令，不改变主流程
-- **灵活**：可以指定模型和轮数
-- **按需**：不需要时就不触发
-- **可见**：辩论过程透明展示
-- **互补**：不同模型有不同的盲区
-
-## 待确认问题
-
-1. **agent.chat() 接口**：当前 Agent 的 LLM 调用嵌入在 `run()` 循环中，没有独立的 `chat()` 方法。实现时需要决定：抽取一个 `agent.sendMessages(messages)` 方法，还是在 review-service 中直接访问 `agent.llm`。
-2. **流式展示**：审查过程是否需要流式输出？Phase 1 建议等待完整响应后再展示，降低实现复杂度。
-3. **中止机制**：长轮次审查时，用户可能想中止（Ctrl+C）。需要考虑如何打断进行中的审查循环。
+| | 普通命令 (`/compress`) | Delegate 命令 (`/delegate review`) |
+|---|---|---|
+| 执行者 | 主 agent | 第二个 agent (+ 主 agent) |
+| 目的 | 工具功能 | 协作产生新价值 |
+| 上下文 | 读取当前状态 | 独立分析当前状态 |
+| 输出 | 状态变更 | 新的观点/方案 |
 
 ## 实现优先级
 
-1. **Phase 1**: 基础功能
-   - `/review` 命令注册
-   - 单轮审查，固定 reviewer 模型
-   - `ReviewClient`：OpenAI-compatible fetch 调用
-   - 审查结果作为 system 消息存入 session
-   - 非流式展示
+### Phase 1：核心框架
+- `/delegate review` - 单轮审查
+- `DelegateClient` - OpenAI-compatible
+- 命令解析和模式分发
+- Session 持久化
 
-2. **Phase 2**: 增强功能
-   - 多轮辩论
-   - `--model` 参数支持任意 provider
-   - 流式输出审查过程
-   - 中止机制
+### Phase 2：多模式
+- `/delegate alternative`
+- `/delegate compete`
+- 多轮 review
+- 并行调用
 
-3. **Phase 3**: 优化
-   - 审查历史缓存（避免重复调用相同上下文）
-   - 自动上下文裁剪（基于 token 而非消息条数）
-   - 投票模式：多 reviewer 并行审查
+### Phase 3：优化
+- 流式输出
+- 中止机制
+- 成本预估提示
+- 审查历史缓存
 
 ## 注意事项
 
-1. **成本**: 每轮审查消耗额外的 token 和 API 调用
-2. **延迟**: 增加了响应时间
-3. **上下文**: 审查模型需要看到足够的上下文，但不是全部
-4. **冲突**: 两个模型可能陷入无休止的争论（需要 maxRounds 限制）
+1. **成本**：每个 delegate 额外消耗 token 和 API 调用
+2. **延迟**：增加了响应时间，尤其是 compete 模式并行等待
+3. **上下文**：delegate 需要足够上下文，但不是全部
+4. **冲突**：review 可能陷入争论（maxRounds 限制）

@@ -9,7 +9,7 @@
 
 ## 功能增强
 - [ ] 命令行工具控制（如 `/enable tool`、`/disable tool`）
-- [ ] subagent
+- [ ] Agent as tool
 - [ ] 添加一个 /review 命令调用其他模型代替用户和现在的模型对话。
 
 ## 代码质量
