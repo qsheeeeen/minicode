@@ -250,11 +250,11 @@ export function App({
 
       {/* Status bar: tokens + context progress */}
       <Box paddingX={1}>
-        <Text dimColor>{tokenCount.toLocaleString()}T</Text>
+        <Text dimColor>{tokenCount.toLocaleString()}/{(config.model?.contextLength || 200000).toLocaleString()}</Text>
         <Text dimColor> │</Text>
         <Text color={
-          tokenCount / (config.model?.contextLength || 200000) > 0.9 ? 'red' :
-          tokenCount / (config.model?.contextLength || 200000) > 0.7 ? 'yellow' : 'green'
+          tokenCount / (config.model?.contextLength || 200000) > config.compressionThreshold ? 'red' :
+          tokenCount / (config.model?.contextLength || 200000) > config.compressionThreshold * 0.875 ? 'yellow' : 'green'
         }>
           {makeBar(tokenCount, config.model?.contextLength || 200000, 20)}
         </Text>
