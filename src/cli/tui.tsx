@@ -92,6 +92,7 @@ export function App({
 
     // Load initial session
     const loadInitial = async () => {
+      agent.currentSession = initialSession;
       if (sessionName || resumeRecent) {
         const data = await sessionManager.get(initialSession);
         if (data) {
@@ -100,14 +101,12 @@ export function App({
           if (totalTokens > 0) {
             agent.setTokenCount(totalTokens);
           }
-          agent.currentSession = initialSession;
           const sessionDisplay = new SessionDisplayImpl(sessionManager);
           const displayMessages = await sessionDisplay.loadForTUI(initialSession);
           if (displayMessages.length > 0) {
             setMessages(displayMessages);
           }
         } else if (sessionName) {
-          agent.currentSession = initialSession;
           setMessages([{ role: 'system', content: `Created new session: ${sessionName}`, timestamp: new Date() }]);
         }
       }

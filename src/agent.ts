@@ -45,7 +45,7 @@ export class Agent {
   private compressionThresholdRatio: number;
   private tokenManager: TokenManager;
   private compressionService: CompressionService;
-  public currentSession: string = 'default';
+  public currentSession = `session-${Date.now()}`;
   private thinkingEnabled: boolean;
   private thinkingTokens: number;
   private display: DisplayAdapter;

@@ -49,7 +49,7 @@ const userPrompt = [globalPrompt, projectPrompt].filter(Boolean).join('\n\n');
 const sessionManager = new SessionManager();
 
 // Determine initial session
-let initialSession = 'default';
+let initialSession: string;
 if (sessionName) {
   initialSession = sessionName;
 } else if (resumeRecent) {
