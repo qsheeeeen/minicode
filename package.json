@@ -22,6 +22,7 @@
   "license": "ISC",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
+    "diff": "^8.0.4",
     "ink": "^4.4.1",
     "ink-text-input": "^5.0.1",
     "react": "^18.2.0"

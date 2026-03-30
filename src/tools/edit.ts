@@ -1,4 +1,5 @@
 import fs from 'fs/promises';
+import { encodeEditResult, tryParseEditResult, renderDiffText } from '../utils/diff.js';
 
 export const editTool = {
   name: 'edit',
@@ -18,6 +19,13 @@ export const editTool = {
     const preview = oldText.slice(0, 20).replace(/\n/g, '\\n');
     return `Edit(${path}, "${preview}${oldText.length > 20 ? '...' : ''}")`;
   },
+  formatResult: (result: string) => {
+    const parsed = tryParseEditResult(result);
+    if (parsed) {
+      return renderDiffText(parsed.path, parsed.oldText, parsed.newText);
+    }
+    return result;
+  },
   execute: async (args: Record<string, unknown>) => {
     const path = args.path as string;
     const oldText = args.oldText as string;
@@ -28,6 +36,6 @@ export const editTool = {
     }
     content = content.replace(oldText, newText);
     await fs.writeFile(path, content, 'utf-8');
-    return `Edited ${path}`;
+    return encodeEditResult(path, oldText, newText);
   }
 };
