@@ -1,6 +1,6 @@
 import { SessionManager, SessionData } from './session.js';
 import { DisplayAdapter } from './display.js';
-import { toolRegistry } from '../tools/registry.js';
+import { ToolRegistry } from '../tools/registry.js';
 
 export type MessageRole = 'user' | 'assistant' | 'system' | 'tool' | 'tool_result' | 'error' | 'thinking';
 
@@ -17,7 +17,7 @@ export interface SessionDisplay {
 }
 
 export class SessionDisplayImpl implements SessionDisplay {
-  constructor(private sessionManager: SessionManager) {}
+  constructor(private sessionManager: SessionManager, private toolRegistry: ToolRegistry) {}
 
   async loadForTUI(name: string): Promise<DisplayMessage[]> {
     const data = await this.sessionManager.get(name);
@@ -48,7 +48,7 @@ export class SessionDisplayImpl implements SessionDisplay {
             if (block.type === 'tool_result') {
               const toolName = toolUseMap.get(block.tool_use_id);
               const raw = typeof block.content === 'string' ? block.content : JSON.stringify(block.content);
-              const tool = toolName ? toolRegistry.get(toolName) : undefined;
+              const tool = toolName ? this.toolRegistry.get(toolName) : undefined;
               const display = tool?.formatResult ? tool.formatResult(raw) : raw;
               messages.push({ role: 'tool_result', content: display, timestamp: new Date(data.updatedAt) });
             }
@@ -66,7 +66,7 @@ export class SessionDisplayImpl implements SessionDisplay {
             } else if (block.type === 'tool_use') {
               toolUseMap.set((block as any).id, block.name);
               // Use tool's format method to match live display
-              const tool = toolRegistry.get(block.name);
+              const tool = this.toolRegistry.get(block.name);
               const display = tool?.format ? tool.format((block as any).input) : `${block.name}(${JSON.stringify((block as any).input)})`;
               messages.push({ role: 'tool', content: display, timestamp: new Date(data.updatedAt) });
             }

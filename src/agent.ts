@@ -329,4 +329,8 @@ export class Agent {
     this.tokenManager.reset();
     this.userPromptInjected = false;
   }
+
+  getToolRegistry(): ToolRegistry {
+    return this.toolRegistry;
+  }
 }

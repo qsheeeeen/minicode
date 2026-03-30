@@ -124,7 +124,7 @@ commandRegistry.register({
         ctx.agent.currentSession = name;
         ctx.setCurrentSession(name);
         const { SessionDisplayImpl } = await import('../utils/session-display.js');
-        const sessionDisplay = new SessionDisplayImpl(ctx.sessionManager);
+        const sessionDisplay = new SessionDisplayImpl(ctx.sessionManager, ctx.agent.getToolRegistry());
         const displayMessages = await sessionDisplay.loadForTUI(name);
         ctx.setMessages(displayMessages.length > 0 ? displayMessages: [{ role: 'system', content: `Loaded session: ${name}`, timestamp: new Date() }]);
       } else {

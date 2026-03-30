@@ -159,7 +159,7 @@ export function App({
           if (totalTokens > 0) {
             agent.setTokenCount(totalTokens);
           }
-          const sessionDisplay = new SessionDisplayImpl(sessionManager);
+          const sessionDisplay = new SessionDisplayImpl(sessionManager, agent.getToolRegistry());
           const displayMessages = await sessionDisplay.loadForTUI(initialSession);
           if (displayMessages.length > 0) {
             setMessages(displayMessages);
