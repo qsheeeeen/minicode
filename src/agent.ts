@@ -40,6 +40,12 @@ export interface AgentConfig {
   currentAgentId?: string;
 }
 
+interface StreamingResult {
+  response: Anthropic.Messages.Message;
+  toolCalls: Array<{ block: Anthropic.Messages.ToolUseBlock; tool: ToolDef }>;
+  hasToolCalls: boolean;
+}
+
 export class Agent {
   private client: AnthropicClient;
   private toolRegistry: ToolRegistry;
@@ -123,179 +129,178 @@ export class Agent {
     }
   }
 
-  async run(userMessage: string): Promise<void> {
-    // Inject user prompt as context on first run
+  /** Inject user prompt as context on first run */
+  private injectUserPrompt(): void {
     if (!this.userPromptInjected && this.userPrompt) {
       this.messages.push({ role: 'user', content: this.userPrompt });
       this.messages.push({ role: 'assistant', content: 'Understood.' });
       this.userPromptInjected = true;
     }
+  }
 
+  /** Handle streaming response: process events, collect tool calls */
+  private async handleStreamingResponse(toolDefs: Tool[]): Promise<StreamingResult> {
+    const stream = this.client.chatStream(this.messages, toolDefs, {
+      system: SYSTEM_PROMPT,
+      model: this.model,
+      thinking: this.thinkingEnabled,
+      thinkingTokens: this.thinkingTokens
+    });
+
+    let isStreamingThinking = false;
+    let isStreamingText = false;
+    const toolCalls: Array<{ block: Anthropic.Messages.ToolUseBlock; tool: ToolDef }> = [];
+    let hasToolCalls = false;
+
+    stream.on('thinking', (delta: string) => {
+      if (!isStreamingThinking) {
+        isStreamingThinking = true;
+        this.display.streamThinkingStart();
+      }
+      this.display.streamThinkingChunk(delta);
+    });
+
+    stream.on('text', (delta: string) => {
+      if (isStreamingThinking) {
+        isStreamingThinking = false;
+        this.display.streamThinkingEnd();
+      }
+      if (!isStreamingText) {
+        isStreamingText = true;
+        this.display.streamStart();
+      }
+      this.display.streamChunk(delta);
+    });
+
+    stream.on('contentBlock', (block: ContentBlock) => {
+      if (block.type === 'thinking' && isStreamingThinking) {
+        isStreamingThinking = false;
+        this.display.streamThinkingEnd();
+      }
+      if (block.type === 'text' && isStreamingText) {
+        isStreamingText = false;
+        this.display.streamEnd();
+      }
+      if (block.type === 'tool_use') {
+        hasToolCalls = true;
+        const toolBlock = block as Anthropic.Messages.ToolUseBlock;
+        const tool = this.toolRegistry.get(toolBlock.name);
+        if (tool) {
+          toolCalls.push({ block: toolBlock, tool });
+        }
+      }
+    });
+
+    const response = await stream.finalMessage();
+
+    if (isStreamingThinking) this.display.streamThinkingEnd();
+    if (isStreamingText) this.display.streamEnd();
+
+    return { response, toolCalls, hasToolCalls };
+  }
+
+  /** Track token usage and trigger auto-compression */
+  private async processTokenUsage(response: Anthropic.Messages.Message): Promise<void> {
+    if (!response.usage) return;
+
+    this.tokenManager.addTokens(response.usage.input_tokens, response.usage.output_tokens);
+    this.display.updateTokenCount?.(this.tokenManager.getTotal());
+    const ratio = this.tokenManager.getRatio(this.contextLength);
+    const percentage = Math.floor(ratio * 100);
+
+    const thresholds = [25, 50, 75, 90];
+    const lastShown = this.tokenManager.getLastShownThreshold();
+    for (const t of thresholds) {
+      if (percentage >= t && lastShown < t) {
+        this.display.system(`[${percentage}% context]`);
+        this.tokenManager.updateThreshold(t);
+        break;
+      }
+    }
+
+    if (this.tokenManager.shouldCompress(this.contextLength, this.compressionThresholdRatio)) {
+      await this.compress();
+    }
+  }
+
+  /** Execute tool calls in parallel and push results */
+  private async executeToolCalls(toolCalls: Array<{ block: Anthropic.Messages.ToolUseBlock; tool: ToolDef }>): Promise<void> {
+    if (toolCalls.length === 0) return;
+
+    this.display.progress(`Running ${toolCalls.length} tool${toolCalls.length > 1 ? 's' : ''}... `);
+
+    const context: ToolExecutionContext = {
+      registry: this.agentRegistry,
+      config: {
+        apiKey: this.apiKey,
+        baseURL: this.baseURL,
+        model: this.model,
+        contextLength: this.contextLength,
+        compressionThresholdRatio: this.compressionThresholdRatio,
+        thinkingEnabled: this.thinkingEnabled,
+        thinkingTokens: this.thinkingTokens,
+        userPrompt: this.userPrompt,
+      },
+      currentAgentId: this.currentAgentId,
+    };
+
+    const results = await Promise.allSettled(
+      toolCalls.map(({ block, tool }) => tool.execute(block.input as Record<string, unknown>, context))
+    );
+    this.display.raw('');
+
+    results.forEach((result, i) => {
+      const { block, tool } = toolCalls[i];
+      const content = result.status === 'fulfilled'
+        ? result.value
+        : `Error: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`;
+
+      if (result.status === 'fulfilled') {
+        const display = tool.formatResult ? tool.formatResult(content) : content;
+        this.display.toolResult(display);
+      } else {
+        this.display.error(content);
+      }
+
+      this.messages.push({
+        role: 'user',
+        content: [{
+          type: 'tool_result',
+          tool_use_id: block.id,
+          content
+        }]
+      });
+    });
+  }
+
+  async run(userMessage: string): Promise<void> {
+    this.injectUserPrompt();
     this.messages.push({ role: 'user', content: userMessage });
 
     while (true) {
-      const stream = this.client.chatStream(
-        this.messages,
-        this.toolRegistry.getAll().map(t => ({
-          name: t.name,
-          description: t.description,
-          input_schema: t.input_schema
-        })) as Tool[],
-        {
-          system: SYSTEM_PROMPT,
-          model: this.model,
-          thinking: this.thinkingEnabled,
-          thinkingTokens: this.thinkingTokens
-        }
-      );
+      const toolDefs = this.toolRegistry.getAll().map(t => ({
+        name: t.name,
+        description: t.description,
+        input_schema: t.input_schema
+      })) as Tool[];
 
-      // Track streaming state
-      let isStreamingThinking = false;
-      let isStreamingText = false;
-      const toolCalls: Array<{ block: Anthropic.Messages.ToolUseBlock; tool: ToolDef }> = [];
-      let hasToolCalls = false;
+      const { response, toolCalls, hasToolCalls } = await this.handleStreamingResponse(toolDefs);
 
-      // Stream thinking deltas
-      stream.on('thinking', (delta: string) => {
-        if (!isStreamingThinking) {
-          isStreamingThinking = true;
-          this.display.streamThinkingStart();
-        }
-        this.display.streamThinkingChunk(delta);
-      });
+      await this.processTokenUsage(response);
 
-      // Stream text deltas
-      stream.on('text', (delta: string) => {
-        // End thinking if still streaming
-        if (isStreamingThinking) {
-          isStreamingThinking = false;
-          this.display.streamThinkingEnd();
-        }
-        if (!isStreamingText) {
-          isStreamingText = true;
-          this.display.streamStart();
-        }
-        this.display.streamChunk(delta);
-      });
-
-      // Collect completed content blocks (tool_use blocks arrive here)
-      stream.on('contentBlock', (block: any) => {
-        if (block.type === 'thinking' && isStreamingThinking) {
-          isStreamingThinking = false;
-          this.display.streamThinkingEnd();
-        }
-        if (block.type === 'text' && isStreamingText) {
-          isStreamingText = false;
-          this.display.streamEnd();
-        }
-        if (block.type === 'tool_use') {
-          hasToolCalls = true;
-          const toolBlock = block as Anthropic.Messages.ToolUseBlock;
-          const tool = this.toolRegistry.get(toolBlock.name);
-          if (tool) {
-            toolCalls.push({ block: toolBlock, tool });
-          }
-        }
-      });
-
-      // Wait for stream to complete and get final message
-      const response = await stream.finalMessage();
-
-      // End any remaining streams
-      if (isStreamingThinking) {
-        this.display.streamThinkingEnd();
-      }
-      if (isStreamingText) {
-        this.display.streamEnd();
-      }
-
-      // Track token usage
-      if (response.usage) {
-        this.tokenManager.addTokens(response.usage.input_tokens, response.usage.output_tokens);
-        this.display.updateTokenCount?.(this.tokenManager.getTotal());
-        const ratio = this.tokenManager.getRatio(this.contextLength);
-        const percentage = Math.floor(ratio * 100);
-
-        // Show only at 25%, 50%, 75%, 90%
-        const thresholds = [25, 50, 75, 90];
-        const lastShown = this.tokenManager.getLastShownThreshold();
-        for (const t of thresholds) {
-          if (percentage >= t && lastShown < t) {
-            this.display.system(`[${percentage}% context]`);
-            this.tokenManager.updateThreshold(t);
-            break;
-          }
-        }
-
-        // Auto-compression check
-        if (this.tokenManager.shouldCompress(this.contextLength, this.compressionThresholdRatio)) {
-          await this.compress();
-        }
-      }
-
-      // Build assistant message from response content blocks
+      // Build and push assistant message
       const assistantMsg: MessageParam = { role: 'assistant', content: response.content as ContentBlock[] };
 
       // Display tool calls
       for (const { block, tool } of toolCalls) {
-        const display = tool.format ? tool.format(block.input as any) : `${block.name} ${JSON.stringify(block.input)}`;
+        const display = tool.format ? tool.format(block.input as Record<string, unknown>) : `${block.name} ${JSON.stringify(block.input)}`;
         this.display.toolCall(display);
       }
 
-      // Push assistant message
       this.messages.push(assistantMsg);
 
-      // Execute tool calls in parallel
-      if (toolCalls.length > 0) {
-        this.display.progress(`Running ${toolCalls.length} tool${toolCalls.length > 1 ? 's' : ''}... `);
-
-        // Build execution context
-        const context: ToolExecutionContext = {
-          registry: this.agentRegistry,
-          config: {
-            apiKey: this.apiKey,
-            baseURL: this.baseURL,
-            model: this.model,
-            contextLength: this.contextLength,
-            compressionThresholdRatio: this.compressionThresholdRatio,
-            thinkingEnabled: this.thinkingEnabled,
-            thinkingTokens: this.thinkingTokens,
-            userPrompt: this.userPrompt,
-          },
-          currentAgentId: this.currentAgentId,
-        };
-
-        const results = await Promise.allSettled(
-          toolCalls.map(({ block, tool }) => tool.execute(block.input as any, context))
-        );
-        // Clear progress line
-        this.display.raw('');
-
-        // Display results and push to messages
-        results.forEach((result, i) => {
-          const { block, tool: _tool } = toolCalls[i];
-          const content = result.status === 'fulfilled'
-            ? result.value
-            : `Error: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`;
-
-          // Display tool result
-          if (result.status === 'fulfilled') {
-            const display = _tool.formatResult ? _tool.formatResult(content) : content;
-            this.display.toolResult(display);
-          } else {
-            this.display.error(content);
-          }
-
-          this.messages.push({
-            role: 'user',
-            content: [{
-              type: 'tool_result',
-              tool_use_id: block.id,
-              content
-            }]
-          });
-        });
-      }
+      // Execute tools
+      await this.executeToolCalls(toolCalls);
 
       if (!hasToolCalls) break;
     }

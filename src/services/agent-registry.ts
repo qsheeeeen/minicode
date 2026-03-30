@@ -82,20 +82,26 @@ export class AgentRegistry {
     for (let i = 2; i <= 9; i++) {
       const id = String(i);
       if (!this.sessions.has(id)) {
-        // Update nextSubId to continue searching from here next time
-        this.nextSubId = i + 1;
-        if (this.nextSubId > 9) {
-          this.nextSubId = 2;
-        }
+        this.nextSubId = i + 1 > 9 ? 2 : i + 1;
         return id;
       }
     }
-    // All IDs 2-9 are in use, still return the next one (caller should handle this)
+    // All in use -- reclaim completed/error sub-agent sessions
+    for (let i = 2; i <= 9; i++) {
+      const id = String(i);
+      const session = this.sessions.get(id);
+      if (session && session.type === 'sub' &&
+          (session.status === 'completed' || session.status === 'error')) {
+        this.sessions.delete(id);
+        this.nextSubId = i + 1 > 9 ? 2 : i + 1;
+        this.notifyUpdate();
+        return id;
+      }
+    }
+    // Truly exhausted -- all running. Return next anyway.
     const id = String(this.nextSubId);
     this.nextSubId++;
-    if (this.nextSubId > 9) {
-      this.nextSubId = 2;
-    }
+    if (this.nextSubId > 9) this.nextSubId = 2;
     return id;
   }
 

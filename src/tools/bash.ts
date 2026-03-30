@@ -11,12 +11,14 @@ export const bashTool = {
     },
     required: ['command']
   },
-  format: (args: { command: string; timeout?: number }) => {
-    return `Bash(${args.command})`;
+  format: (args: Record<string, unknown>) => {
+    return `Bash(${args.command as string})`;
   },
-  execute: async (args: { command: string; timeout?: number }): Promise<string> => {
+  execute: async (args: Record<string, unknown>): Promise<string> => {
+    const command = args.command as string;
+    const timeout = args.timeout as number | undefined;
     return new Promise((resolve, reject) => {
-      const proc = spawn(args.command, [], { shell: true });
+      const proc = spawn(command, [], { shell: true });
 
       let stdout = '';
       let stderr = '';
@@ -24,8 +26,8 @@ export const bashTool = {
       proc.stdout?.on('data', (d) => stdout += d.toString());
       proc.stderr?.on('data', (d) => stderr += d.toString());
 
-      if (args.timeout) {
-        setTimeout(() => proc.kill(), args.timeout * 1000);
+      if (timeout) {
+        setTimeout(() => proc.kill(), timeout * 1000);
       }
 
       proc.on('close', (code) => {

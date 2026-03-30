@@ -15,6 +15,3 @@ export class ToolRegistry {
     return Array.from(this.tools.values());
   }
 }
-
-// Global registry instance
-export const toolRegistry = new ToolRegistry();

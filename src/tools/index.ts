@@ -3,7 +3,7 @@ export { writeTool } from './write.js';
 export { editTool } from './edit.js';
 export { bashTool } from './bash.js';
 export { agentTool } from './agent.js';
-export { ToolRegistry, toolRegistry } from './registry.js';
+export { ToolRegistry } from './registry.js';
 
 import type { AgentRegistry } from '../services/agent-registry.js';
 import type { AgentConfig } from '../agent.js';
@@ -20,7 +20,7 @@ export interface ToolDef {
   name: string;
   description: string;
   input_schema: Record<string, unknown>;
-  format?: (args: any) => string;
+  format?: (args: Record<string, unknown>) => string;
   formatResult?: (result: string) => string;
-  execute: (args: any, context?: ToolExecutionContext) => Promise<string>;
+  execute: (args: Record<string, unknown>, context?: ToolExecutionContext) => Promise<string>;
 }

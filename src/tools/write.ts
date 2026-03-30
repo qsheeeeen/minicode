@@ -12,14 +12,18 @@ export const writeTool = {
     },
     required: ['path', 'content']
   },
-  format: (args: { path: string; content: string }) => {
-    const lines = args.content.split('\n').length;
-    return `Write(${args.path}, ${lines} lines)`;
+  format: (args: Record<string, unknown>) => {
+    const filePath = args.path as string;
+    const content = args.content as string;
+    const lines = content.split('\n').length;
+    return `Write(${filePath}, ${lines} lines)`;
   },
-  execute: async (args: { path: string; content: string }) => {
-    const dir = path.dirname(args.path);
+  execute: async (args: Record<string, unknown>) => {
+    const filePath = args.path as string;
+    const content = args.content as string;
+    const dir = path.dirname(filePath);
     await fs.mkdir(dir, { recursive: true });
-    await fs.writeFile(args.path, args.content, 'utf-8');
-    return `Wrote ${args.path}`;
+    await fs.writeFile(filePath, content, 'utf-8');
+    return `Wrote ${filePath}`;
   }
 };

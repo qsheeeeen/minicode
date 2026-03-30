@@ -12,17 +12,22 @@ export const editTool = {
     },
     required: ['path', 'oldText', 'newText']
   },
-  format: (args: { path: string; oldText: string; newText: string }) => {
-    const preview = args.oldText.slice(0, 20).replace(/\n/g, '\\n');
-    return `Edit(${args.path}, "${preview}${args.oldText.length > 20 ? '...' : ''}")`;
+  format: (args: Record<string, unknown>) => {
+    const path = args.path as string;
+    const oldText = args.oldText as string;
+    const preview = oldText.slice(0, 20).replace(/\n/g, '\\n');
+    return `Edit(${path}, "${preview}${oldText.length > 20 ? '...' : ''}")`;
   },
-  execute: async (args: { path: string; oldText: string; newText: string }) => {
-    let content = await fs.readFile(args.path, 'utf-8');
-    if (!content.includes(args.oldText)) {
+  execute: async (args: Record<string, unknown>) => {
+    const path = args.path as string;
+    const oldText = args.oldText as string;
+    const newText = args.newText as string;
+    let content = await fs.readFile(path, 'utf-8');
+    if (!content.includes(oldText)) {
       throw new Error('oldText not found in file');
     }
-    content = content.replace(args.oldText, args.newText);
-    await fs.writeFile(args.path, content, 'utf-8');
-    return `Edited ${args.path}`;
+    content = content.replace(oldText, newText);
+    await fs.writeFile(path, content, 'utf-8');
+    return `Edited ${path}`;
   }
 };

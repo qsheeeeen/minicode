@@ -75,30 +75,33 @@ export async function getBaseURL(provider?: string): Promise<string | undefined>
   return providerConfig?.baseURL;
 }
 
+function parseModelSpecifier(
+  spec: string,
+  providers: Providers
+): { modelName: string; providerName: string; providerConfig: ProviderConfig } | null {
+  const parts = spec.split('@');
+  const modelName = parts[0];
+  const providerName = parts[1] || Object.keys(providers || {})[0];
+  const providerConfig = providers?.[providerName];
+  if (!providerConfig?.apiKey) return null;
+  return { modelName, providerName, providerConfig };
+}
+
 export async function getModelConfig(modelSpecifier?: string): Promise<{ provider: string; model: string; apiKey: string; baseURL?: string; contextLength?: number } | null> {
   const config = await loadConfig();
   const spec = modelSpecifier || config.model;
-
   if (!spec) return null;
 
-  // Parse "model@provider" or just "model"
-  const parts = spec.split('@');
-  const modelName = parts[0];
-  const providerName = parts[1] || Object.keys(config.providers || {})[0];
+  const parsed = parseModelSpecifier(spec, config.providers ?? {});
+  if (!parsed) return null;
 
-  const providerConfig = config.providers?.[providerName];
-  if (!providerConfig?.apiKey) return null;
-
-  // Resolve contextLength from per-model config
-  const modelConfig = providerConfig.models?.[modelName];
-  const contextLength = modelConfig?.contextLength;
-
+  const modelConfig = parsed.providerConfig.models?.[parsed.modelName];
   return {
-    provider: providerName,
-    model: modelName,
-    apiKey: providerConfig.apiKey,
-    baseURL: providerConfig.baseURL,
-    contextLength
+    provider: parsed.providerName,
+    model: parsed.modelName,
+    apiKey: parsed.providerConfig.apiKey!,
+    baseURL: parsed.providerConfig.baseURL,
+    contextLength: modelConfig?.contextLength
   };
 }
 
@@ -133,17 +136,14 @@ export async function loadAllConfig(modelSpecifier?: string): Promise<ResolvedCo
 
   let model: ResolvedConfig['model'] = null;
   if (spec) {
-    const parts = spec.split('@');
-    const modelName = parts[0];
-    const providerName = parts[1] || Object.keys(config.providers || {})[0];
-    const providerConfig = config.providers?.[providerName];
-    if (providerConfig?.apiKey) {
-      const modelConfig = providerConfig.models?.[modelName];
+    const parsed = parseModelSpecifier(spec, config.providers ?? {});
+    if (parsed) {
+      const modelConfig = parsed.providerConfig.models?.[parsed.modelName];
       model = {
-        provider: providerName,
-        model: modelName,
-        apiKey: providerConfig.apiKey,
-        baseURL: providerConfig.baseURL,
+        provider: parsed.providerName,
+        model: parsed.modelName,
+        apiKey: parsed.providerConfig.apiKey!,
+        baseURL: parsed.providerConfig.baseURL,
         contextLength: modelConfig?.contextLength
       };
     }

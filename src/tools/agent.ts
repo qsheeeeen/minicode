@@ -19,13 +19,14 @@ export const agentTool: ToolDef = {
     },
     required: ['task']
   },
-  format: (args: { task: string }) => {
-    const taskPreview = args.task.length > 30 ? args.task.slice(0, 30) + '...' : args.task;
+  format: (args: Record<string, unknown>) => {
+    const task = args.task as string;
+    const taskPreview = task.length > 30 ? task.slice(0, 30) + '...' : task;
     return `Agent(${taskPreview})`;
   },
 
-  execute: async (args: { task: string }, context?: ToolExecutionContext): Promise<string> => {
-    const { task } = args;
+  execute: async (args: Record<string, unknown>, context?: ToolExecutionContext): Promise<string> => {
+    const task = args.task as string;
     const registry = context?.registry;
     const config = context?.config;
     const parentId = context?.currentAgentId || '1';

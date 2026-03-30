@@ -4,7 +4,7 @@ import TextInput from 'ink-text-input';
 import { Agent } from '../agent.js';
 import type { MessageParam } from '../llm/anthropic.js';
 import type { ResolvedConfig } from '../config.js';
-import { CallbackDisplay, DisplayMessage } from '../utils/display.js';
+import { CallbackDisplay, type DisplayMessage } from '../utils/display.js';
 import { SessionDisplayImpl } from '../utils/session-display.js';
 import { commandRegistry, type CommandContext } from './commands.js';
 import { Message } from '../components/Message.js';
@@ -30,47 +30,40 @@ function makeBar(used: number, total: number, width: number): string {
   return '█'.repeat(filled) + '░'.repeat(width - filled);
 }
 
-export function App({
-  config,
-  version,
-  userPrompt,
-  promptFiles,
-  initialSession,
-  sessionManager,
-  initialPrompt,
-  sessionName,
-  resumeRecent
-}: AppProps) {
-  const [messages, setMessages] = useState<DisplayMessage[]>([]);
-  const [currentSession, setCurrentSession] = useState(initialSession);
-  const [status, setStatus] = useState('');
-  const [tokenCount, setTokenCount] = useState(0);
-  const [isLoading, setIsLoading] = useState(false);
-  const [mode, setMode] = useState<'chat' | 'session-list'>('chat');
-  const [sessionListState, setSessionListState] = useState<{
-    sessions: Array<{ name: string }>;
-    selectedIndex: number;
-  }>({ sessions: [], selectedIndex: 0 });
-  const [inputValue, setInputValue] = useState('');
-  const [autoSubmitPending, setAutoSubmitPending] = useState(!!initialPrompt);
-
-  // Multi-agent support
+/** Hook: multi-agent coordination and switching */
+function useMultiAgent() {
   const [activeAgentId, setActiveAgentId] = useState<string>('1');
   const [agentSessions, setAgentSessions] = useState<AgentSession[]>([]);
-
-  const agentRef = useRef<Agent | null>(null);
   const registryRef = useRef<AgentRegistry | null>(null);
-  const { exit } = useApp();
 
-  const setSessionList = (sessions: Array<{ name: string }>) => {
-    setSessionListState(prev => ({ ...prev, sessions }));
-  };
+  useEffect(() => {
+    const registry = new AgentRegistry();
+    registryRef.current = registry;
+    registry.setUpdateCallback((sessions) => {
+      setAgentSessions(sessions);
+    });
+  }, []);
 
-  const setSelectedIndex = (index: number) => {
-    setSessionListState(prev => ({ ...prev, selectedIndex: index }));
-  };
+  return { activeAgentId, setActiveAgentId, agentSessions, setAgentSessions, registryRef };
+}
 
-  // Helper: Update main agent (id='1') messages in agentSessions
+/** Hook: agent initialization, session loading, message submission */
+function useAgent(
+  config: ResolvedConfig,
+  userPrompt: string,
+  initialSession: string,
+  sessionManager: SessionManager,
+  sessionName: string | undefined,
+  resumeRecent: boolean,
+  activeAgentId: string,
+  setAgentSessions: React.Dispatch<React.SetStateAction<AgentSession[]>>,
+  registryRef: React.MutableRefObject<AgentRegistry | null>,
+) {
+  const [messages, setMessages] = useState<DisplayMessage[]>([]);
+  const [currentSession, setCurrentSession] = useState(initialSession);
+  const [tokenCount, setTokenCount] = useState(0);
+  const agentRef = useRef<Agent | null>(null);
+
   const updateMainAgentMessages = (updater: (current: DisplayMessage[]) => DisplayMessage[]) => {
     setAgentSessions(prev => {
       const main = prev.find(s => s.id === '1');
@@ -83,18 +76,11 @@ export function App({
 
   // Initialize agent once
   useEffect(() => {
-    // Create agent registry
-    const registry = new AgentRegistry();
-    registryRef.current = registry;
-
-    // Set up update callback to sync agentSessions with registry
-    registry.setUpdateCallback((sessions) => {
-      setAgentSessions(sessions);
-    });
+    const registry = registryRef.current;
+    if (!registry) return;
 
     const displayAdapter = new CallbackDisplay({
       onMessage: (msg) => {
-        // Only show main agent messages in default view
         if (activeAgentId === '1') {
           setMessages(prev => [...prev, msg]);
         }
@@ -109,7 +95,7 @@ export function App({
           });
         }
       },
-      onStatusUpdate: setStatus,
+      onStatusUpdate: () => {},
       onTokenUpdate: setTokenCount
     });
 
@@ -129,7 +115,6 @@ export function App({
 
     agentRef.current = agent;
 
-    // Register main agent session
     registry.register({
       id: '1',
       type: 'main',
@@ -175,7 +160,49 @@ export function App({
     loadInitial();
 
     return () => { agentRef.current = null; };
-  }, []); // Empty deps - run only once
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return { messages, setMessages, currentSession, setCurrentSession, tokenCount, agentRef, updateMainAgentMessages };
+}
+
+export function App({
+  config,
+  version,
+  userPrompt,
+  promptFiles,
+  initialSession,
+  sessionManager,
+  initialPrompt,
+  sessionName,
+  resumeRecent
+}: AppProps) {
+  const [status, setStatus] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [mode, setMode] = useState<'chat' | 'session-list'>('chat');
+  const [sessionListState, setSessionListState] = useState<{
+    sessions: Array<{ name: string }>;
+    selectedIndex: number;
+  }>({ sessions: [], selectedIndex: 0 });
+  const [inputValue, setInputValue] = useState('');
+  const [autoSubmitPending, setAutoSubmitPending] = useState(!!initialPrompt);
+  const { exit } = useApp();
+
+  // Multi-agent hook
+  const { activeAgentId, setActiveAgentId, agentSessions, setAgentSessions, registryRef } = useMultiAgent();
+
+  // Agent hook
+  const { messages, setMessages, currentSession, setCurrentSession, tokenCount, agentRef } = useAgent(
+    config, userPrompt, initialSession, sessionManager, sessionName, resumeRecent,
+    activeAgentId, setAgentSessions, registryRef,
+  );
+
+  const setSessionList = (sessions: Array<{ name: string }>) => {
+    setSessionListState(prev => ({ ...prev, sessions }));
+  };
+
+  const setSelectedIndex = (index: number) => {
+    setSessionListState(prev => ({ ...prev, selectedIndex: index }));
+  };
 
   const handleSubmit = useCallback(async (value: string) => {
     if (!value.trim() || !agentRef.current) return;
@@ -198,7 +225,6 @@ export function App({
     setIsLoading(true);
     try {
       await agentRef.current.run(value);
-      // Auto-save session after each exchange
       const agent = agentRef.current;
       if (agent) {
         await sessionManager.save(agent.currentSession, {
@@ -226,9 +252,9 @@ export function App({
   if (mode === 'session-list') {
     useInput((_input, key) => {
       if (key.return && sessionListState.sessions.length > 0) {
-        const sessionName = sessionListState.sessions[sessionListState.selectedIndex]?.name;
-        if (sessionName) {
-          handleSubmit(`/resume ${sessionName}`);
+        const name = sessionListState.sessions[sessionListState.selectedIndex]?.name;
+        if (name) {
+          handleSubmit(`/resume ${name}`);
         }
         setMode('chat');
       } else if (key.escape) {
@@ -263,10 +289,8 @@ export function App({
 
   useInput((input, key) => {
     if (key.ctrl && input === 'c') exit();
-    // Ctrl+1~9 for agent switching
     if (key.ctrl && input >= '1' && input <= '9') {
       setActiveAgentId(input);
-      // Update messages to show selected agent's messages
       const session = agentSessions.find(s => s.id === input);
       if (session) {
         setMessages(session.messages);
@@ -294,7 +318,6 @@ export function App({
           )}
         </Box>
         <Box>
-          {/* Agent switcher - only show if there are sub-agents */}
           {agentSessions.length > 1 && (
             <>
               {agentSessions.map(s => {
@@ -328,7 +351,6 @@ export function App({
             ))}
           </Box>
         )}
-        {/* Show hint if viewing sub-agent */}
         {activeAgentId !== '1' && (
           <Box marginTop={1}>
             <Text dimColor color="yellow">Press Ctrl+1 to return to main agent</Text>

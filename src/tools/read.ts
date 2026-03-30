@@ -12,12 +12,15 @@ export const readTool = {
     },
     required: ['path']
   },
-  format: (args: { path: string; offset?: number; limit?: number }) => {
-    let info = `Read(${args.path}`;
-    if (args.offset || args.limit) {
-      const parts = [];
-      if (args.offset) parts.push(`offset: ${args.offset}`);
-      if (args.limit) parts.push(`limit: ${args.limit}`);
+  format: (args: Record<string, unknown>) => {
+    const path = args.path as string;
+    const offset = args.offset as number | undefined;
+    const limit = args.limit as number | undefined;
+    let info = `Read(${path}`;
+    if (offset || limit) {
+      const parts: string[] = [];
+      if (offset) parts.push(`offset: ${offset}`);
+      if (limit) parts.push(`limit: ${limit}`);
       info += `, ${parts.join(', ')}`;
     }
     return info + ')';
@@ -27,11 +30,14 @@ export const readTool = {
     const chars = result.length;
     return `Read ${lines} lines, ${chars} chars`;
   },
-  execute: async (args: { path: string; offset?: number; limit?: number }) => {
-    const content = await fs.readFile(args.path, 'utf-8');
+  execute: async (args: Record<string, unknown>) => {
+    const path = args.path as string;
+    const offset = args.offset as number | undefined;
+    const limit = args.limit as number | undefined;
+    const content = await fs.readFile(path, 'utf-8');
     const lines = content.split('\n');
-    const start = (args.offset || 1) - 1;
-    const end = args.limit ? start + args.limit : lines.length;
+    const start = (offset || 1) - 1;
+    const end = limit ? start + limit : lines.length;
     return lines.slice(start, end).join('\n');
   }
 };
