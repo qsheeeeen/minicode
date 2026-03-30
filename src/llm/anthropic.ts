@@ -14,6 +14,7 @@ export interface ChatOptions {
 export type MessageParam = Anthropic.Messages.MessageParam;
 export type Tool = Anthropic.Messages.Tool;
 export type Message = Anthropic.Messages.Message;
+export type ContentBlock = Anthropic.Messages.ContentBlock;
 export type { MessageStream };
 
 export class AnthropicClient {

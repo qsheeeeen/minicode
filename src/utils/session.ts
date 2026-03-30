@@ -5,6 +5,13 @@ import os from 'os';
 
 const BASE_SESSIONS_DIR = path.join(os.homedir(), '.minicode', 'sessions');
 
+// Simple error logging (could be replaced with proper logger)
+function logError(operation: string, error: unknown): void {
+  if (process.env.DEBUG) {
+    console.error(`[SessionManager] ${operation}:`, error);
+  }
+}
+
 export interface SessionData {
   model: string;
   messages: Array<{ role: string; content: any }>;
@@ -75,9 +82,13 @@ export class SessionManager {
   async get(name: string): Promise<SessionData | null> {
     await this.ensureDir();
     const filePath = path.join(this.sessionsDir, `${name}.json`);
-    const content = await fs.readFile(filePath, 'utf-8').catch(() => null);
-    if (!content) return null;
-    return JSON.parse(content);
+    try {
+      const content = await fs.readFile(filePath, 'utf-8');
+      return JSON.parse(content);
+    } catch (error) {
+      logError(`failed to read session ${name}`, error);
+      return null;
+    }
   }
 
   async save(name: string, data: SessionData): Promise<void> {
@@ -94,13 +105,21 @@ export class SessionManager {
   async delete(name: string): Promise<void> {
     await this.ensureDir();
     const filePath = path.join(this.sessionsDir, `${name}.json`);
-    await fs.unlink(filePath).catch(() => {});
+    try {
+      await fs.unlink(filePath);
+    } catch (error) {
+      logError(`failed to delete session ${name}`, error);
+    }
   }
 
   async rename(oldName: string, newName: string): Promise<void> {
     await this.ensureDir();
     const oldPath = path.join(this.sessionsDir, `${oldName}.json`);
     const newPath = path.join(this.sessionsDir, `${newName}.json`);
-    await fs.rename(oldPath, newPath).catch(() => {});
+    try {
+      await fs.rename(oldPath, newPath);
+    } catch (error) {
+      logError(`failed to rename session ${oldName} to ${newName}`, error);
+    }
   }
 }

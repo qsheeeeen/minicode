@@ -70,6 +70,17 @@ export function App({
     setSessionListState(prev => ({ ...prev, selectedIndex: index }));
   };
 
+  // Helper: Update main agent (id='1') messages in agentSessions
+  const updateMainAgentMessages = (updater: (current: DisplayMessage[]) => DisplayMessage[]) => {
+    setAgentSessions(prev => {
+      const main = prev.find(s => s.id === '1');
+      if (main) {
+        return [{ ...main, messages: updater(main.messages) }];
+      }
+      return prev;
+    });
+  };
+
   // Initialize agent once
   useEffect(() => {
     // Create agent registry
@@ -152,24 +163,12 @@ export function App({
           const displayMessages = await sessionDisplay.loadForTUI(initialSession);
           if (displayMessages.length > 0) {
             setMessages(displayMessages);
-            setAgentSessions(prev => {
-              const main = prev.find(s => s.id === '1');
-              if (main) {
-                return [{ ...main, messages: displayMessages }];
-              }
-              return prev;
-            });
+            updateMainAgentMessages(() => displayMessages);
           }
         } else if (sessionName) {
           const sysMsg = { role: 'system' as const, content: `Created new session: ${sessionName}`, timestamp: new Date() };
           setMessages([sysMsg]);
-          setAgentSessions(prev => {
-            const main = prev.find(s => s.id === '1');
-            if (main) {
-              return [{ ...main, messages: [sysMsg] }];
-            }
-            return prev;
-          });
+          updateMainAgentMessages(() => [sysMsg]);
         }
       }
     };
@@ -226,15 +225,26 @@ export function App({
   // Session list overlay
   if (mode === 'session-list') {
     useInput((_input, key) => {
-      if (key.return) {
-        handleSubmit(`/resume ${sessionListState.sessions[sessionListState.selectedIndex]?.name}`);
+      if (key.return && sessionListState.sessions.length > 0) {
+        const sessionName = sessionListState.sessions[sessionListState.selectedIndex]?.name;
+        if (sessionName) {
+          handleSubmit(`/resume ${sessionName}`);
+        }
         setMode('chat');
       } else if (key.escape) {
         setMode('chat');
       } else if (key.upArrow) {
-        setSessionListState(prev => ({ ...prev, selectedIndex: Math.max(0, prev.selectedIndex - 1) }));
+        setSessionListState(prev => {
+          const maxIndex = Math.max(0, prev.sessions.length - 1);
+          const newIndex = Math.max(0, prev.selectedIndex - 1);
+          return { ...prev, selectedIndex: Math.min(newIndex, maxIndex) };
+        });
       } else if (key.downArrow) {
-        setSessionListState(prev => ({ ...prev, selectedIndex: Math.min(prev.sessions.length - 1, prev.selectedIndex + 1) }));
+        setSessionListState(prev => {
+          const maxIndex = Math.max(0, prev.sessions.length - 1);
+          const newIndex = prev.selectedIndex + 1;
+          return { ...prev, selectedIndex: Math.min(newIndex, maxIndex) };
+        });
       }
     });
 

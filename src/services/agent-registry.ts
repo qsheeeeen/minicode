@@ -1,5 +1,5 @@
 import type { Agent } from '../agent.js';
-import type { CallbackDisplay } from '../utils/display.js';
+import type { DisplayAdapter } from '../utils/display.js';
 import type { DisplayMessage } from '../utils/session-display.js';
 
 export type AgentStatus = 'idle' | 'running' | 'completed' | 'error';
@@ -8,7 +8,7 @@ export interface AgentSession {
   id: string;              // "1" (主 agent), "2", "3", ... (子 agent)
   type: 'main' | 'sub';
   agent: Agent;
-  display: CallbackDisplay;
+  display: DisplayAdapter;
   messages: DisplayMessage[];
   status: AgentStatus;
   task?: string;           // 子 agent 的任务描述
@@ -78,10 +78,23 @@ export class AgentRegistry {
   }
 
   allocateSubId(): string {
+    // Find the first available ID (2-9)
+    for (let i = 2; i <= 9; i++) {
+      const id = String(i);
+      if (!this.sessions.has(id)) {
+        // Update nextSubId to continue searching from here next time
+        this.nextSubId = i + 1;
+        if (this.nextSubId > 9) {
+          this.nextSubId = 2;
+        }
+        return id;
+      }
+    }
+    // All IDs 2-9 are in use, still return the next one (caller should handle this)
     const id = String(this.nextSubId);
     this.nextSubId++;
     if (this.nextSubId > 9) {
-      this.nextSubId = 2;  // 循环使用（理想情况应该检测空闲编号）
+      this.nextSubId = 2;
     }
     return id;
   }

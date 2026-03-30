@@ -1,9 +1,10 @@
 import type { ToolDef, ToolExecutionContext } from './index.js';
 import type { AgentRegistry } from '../services/agent-registry.js';
-import type { CallbackDisplay } from '../utils/display.js';
 import type { AgentConfig } from '../agent.js';
+import type { DisplayMessage } from '../utils/session-display.js';
+import type { DisplayAdapter } from '../utils/display.js';
 import { Agent } from '../agent.js';
-import { CallbackDisplay as CallbackDisplayImpl } from '../utils/display.js';
+import { CallbackDisplay } from '../utils/display.js';
 
 export const agentTool: ToolDef = {
   name: 'agent',
@@ -42,8 +43,8 @@ export const agentTool: ToolDef = {
 
     // Create CallbackDisplay for sub-agent
     // We need to create a display that pushes messages to the registry
-    const subMessages: any[] = [];
-    const subDisplay: CallbackDisplay = new CallbackDisplayImpl({
+    const subMessages: DisplayMessage[] = [];
+    const subDisplay: DisplayAdapter = new CallbackDisplay({
       onMessage: (msg) => {
         subMessages.push(msg);
         registry.addMessage(subId, msg);
@@ -114,7 +115,7 @@ export const agentTool: ToolDef = {
   }
 };
 
-function extractFinalResponse(messages: any[]): string | null {
+function extractFinalResponse(messages: DisplayMessage[]): string | null {
   // Find the last assistant message with actual text content
   // (not tool_use blocks, but the final response)
   for (let i = messages.length - 1; i >= 0; i--) {
@@ -126,7 +127,7 @@ function extractFinalResponse(messages: any[]): string | null {
   return null;
 }
 
-function generateSummary(messages: any[]): string {
+function generateSummary(messages: DisplayMessage[]): string {
   // Generate a concise summary from the agent's messages
   let toolCallCount = 0;
   let filesRead = 0;

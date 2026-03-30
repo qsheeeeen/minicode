@@ -1,4 +1,4 @@
-import { AnthropicClient, MessageParam, Tool, Anthropic } from './llm/anthropic.js';
+import { AnthropicClient, MessageParam, Tool, Anthropic, ContentBlock } from './llm/anthropic.js';
 import { readTool, writeTool, editTool, bashTool, agentTool, ToolRegistry, ToolDef, ToolExecutionContext } from './tools/index.js';
 import { ConsoleDisplay, type DisplayAdapter } from './utils/display.js';
 import { TokenManager, TokenManagerImpl } from './services/token-manager.js';
@@ -234,7 +234,7 @@ export class Agent {
       }
 
       // Build assistant message from response content blocks
-      const assistantMsg: MessageParam = { role: 'assistant', content: response.content as any };
+      const assistantMsg: MessageParam = { role: 'assistant', content: response.content as ContentBlock[] };
 
       // Display tool calls
       for (const { block, tool } of toolCalls) {
