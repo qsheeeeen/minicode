@@ -4,10 +4,18 @@
   "description": "minicode 一个minimal coding agent，方案待讨论",
   "main": "dist/cli.js",
   "type": "module",
+  "bin": {
+    "minicode": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "package.json"
+  ],
   "scripts": {
     "dev": "tsx src/cli.tsx",
     "build": "tsc",
-    "start": "node dist/cli.js"
+    "start": "node dist/cli.js",
+    "prepublishOnly": "npm run build"
   },
   "keywords": [],
   "author": "",
