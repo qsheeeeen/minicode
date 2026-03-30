@@ -6,12 +6,14 @@ A minimal coding agent powered by LLMs. Simple, opinionated, hackable.
 
 ## Features
 
-- ink-based TUI (React for CLIs) — no readline, full terminal UI
-- Tool use: read, write, edit, bash
-- Multi-provider support (Anthropic, Zhipu, any OpenAI-compatible API)
-- Session persistence with auto-save and resume
-- Conversation compression at configurable token threshold
-- Extended thinking support
+- **ink-based TUI** — React for CLIs, full terminal UI with streaming, thinking display, and token progress bar
+- **Tool use** — read, write, edit, bash, agent (sub-agent delegation)
+- **Multi-agent** — spawn parallel sub-agents, switch views with Ctrl+number
+- **Multi-provider** — Anthropic, Zhipu, or any OpenAI-compatible API via `model@provider` spec
+- **Session persistence** — auto-save, resume, rename, per-project isolation
+- **Smart compression** — LLM-based conversation summarization at configurable token threshold
+- **Extended thinking** — configurable thinking budget with dimmed streaming display
+- **Project prompts** — global (`~/.minicode/MINICODE.md`) and per-project (`./MINICODE.md`) prompt files
 
 ## Setup
 
@@ -32,11 +34,14 @@ A minimal coding agent powered by LLMs. Simple, opinionated, hackable.
      "model": "claude-sonnet-4-5@anthropic",
      "compressionThreshold": 0.8,
      "thinking": true,
-     "thinkingTokens": 20000
+     "thinkingTokens": 20000,
+     "promptFile": "MINICODE.md"
    }
    ```
 
-   Model specifier format: `model@provider`. Each provider can define multiple models with per-model overrides (e.g. `contextLength`). The old single `model` field still works.
+   Model specifier format: `model@provider`. Each provider can define multiple models with per-model overrides (e.g. `contextLength`).
+
+   Priority: CLI `--model` > `MODEL` env var > config `model` field.
 
 2. Install and run:
 
@@ -68,6 +73,15 @@ minicode --resume                 # Resume most recent session
 | `/compress` | Compress conversation history |
 | `/exit` | Quit (or Ctrl+C) |
 
+### Multi-Agent
+
+When the main agent delegates sub-tasks via the `agent` tool, sub-agents run in parallel. Switch between agent views:
+
+- **Ctrl+1** — return to main agent
+- **Ctrl+2..9** — view sub-agent output
+
+The header shows agent tabs (`[M] [2] [3]`) with the active one highlighted.
+
 ## Architecture
 
 ```
@@ -76,12 +90,15 @@ src/
 ├── agent.ts             # Agent class with tool execution loop
 ├── config.ts            # Multi-provider config loader
 ├── cli/
-│   └── commands.ts      # CommandRegistry for / commands
+│   ├── args.ts          # CLI argument parsing and help
+│   ├── commands.ts      # CommandRegistry for / commands
+│   └── tui.tsx          # Main App component with multi-agent hooks
 ├── components/
-│   └── Message.tsx      # Message display component
+│   └── Message.tsx      # Message display component (with diff coloring)
 ├── llm/
-│   └── anthropic.ts     # Anthropic SDK wrapper
+│   └── anthropic.ts     # Anthropic SDK wrapper (streaming + thinking)
 ├── services/
+│   ├── agent-registry.ts     # Multi-agent coordination and ID allocation
 │   ├── token-manager.ts      # Token tracking and compression triggers
 │   └── compression-service.ts # LLM-based conversation summarization
 ├── tools/
@@ -90,9 +107,13 @@ src/
 │   ├── read.ts          # File reading
 │   ├── write.ts         # File writing
 │   ├── edit.ts          # Surgical text replacement
-│   └── bash.ts          # Command execution
+│   ├── bash.ts          # Command execution
+│   └── agent.ts         # Sub-agent delegation tool
 └── utils/
+    ├── diff.ts               # Unified diff generation
     ├── display.ts            # DisplayAdapter (Console/Callback)
+    ├── logger.ts             # Logging utility
+    ├── prompts.ts            # Global and project prompt loading
     ├── session.ts            # SessionManager for persistence
     └── session-display.ts    # Session data → display message conversion
 ```
@@ -100,26 +121,43 @@ src/
 ### Core Flow
 
 1. User input → Agent pushes message, sends to LLM with tool definitions
-2. LLM responds with text + tool_use blocks
-3. Text streams to TUI; tools execute in parallel (`Promise.allSettled`)
+2. LLM responds with text + tool_use blocks (streamed to TUI)
+3. Text streams to TUI; thinking displayed dimmed; tools execute in parallel (`Promise.allSettled`)
 4. Tool results pushed back to LLM; loop continues until no tool calls
 5. Session auto-saved after each exchange
-6. Token usage tracked; auto-compresses when exceeding threshold
+6. Token usage tracked; progress bar in status bar; auto-compresses when exceeding threshold
+7. Sub-agents can be spawned via the `agent` tool, managed by `AgentRegistry`
 
 ### Adding a Tool
 
 Create a file in `src/tools/` implementing the `ToolDef` interface:
 
 ```typescript
-import { ToolDef } from './index.js';
+import { ToolDef, ToolExecutionContext } from './index.js';
 
 export const myTool: ToolDef = {
   name: 'my_tool',
   description: 'What it does',
   input_schema: { /* JSON Schema */ },
   format: (args) => `MyTool(${JSON.stringify(args)})`,
-  execute: async (args) => { /* return string result */ }
+  formatResult: (result) => result,  // Optional: format output for display
+  execute: async (args, context?: ToolExecutionContext) => {
+    // context.registry — AgentRegistry for sub-agent access
+    // context.config — parent AgentConfig
+    return 'result string';
+  }
 };
 ```
 
 Register in `Agent` constructor and export from `src/tools/index.ts`.
+
+### Key Patterns
+
+- **Registry pattern** — Tools and TUI commands both use `Map<string, T>` registries with `register()`/`get()`/`getAll()`
+- **Display adapter** — `DisplayAdapter` interface abstracts output; `CallbackDisplay` for TUI, `ConsoleDisplay` for fallback
+- **Service injection** — `Agent` accepts optional `TokenManager` and `CompressionService` overrides
+- **Session isolation** — Sessions stored per-project using MD5 hash of cwd (`~/.minicode/sessions/<hash>/`)
+
+## License
+
+ISC
