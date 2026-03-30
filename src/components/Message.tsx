@@ -84,10 +84,9 @@ export function Message({ role, content, isStreaming }: MessageProps) {
       return (
         <Box marginBottom={0} paddingX={8} flexDirection="column">
           {diffLines.map((line, i) => (
-            <Text key={i} color={
+            <Text key={i} dimColor color={
               line.type === 'add' ? 'green' :
-              line.type === 'remove' ? 'red' :
-              line.type === 'header' ? 'gray' : 'gray'
+              line.type === 'remove' ? 'red' : undefined
             }>{line.content}</Text>
           ))}
         </Box>
