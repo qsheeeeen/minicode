@@ -2,32 +2,30 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import { type DiffLine } from '../utils/diff.js';
 
-/** Parse unified diff text (from formatResult) back into structured lines for colored rendering */
+/** Parse compact diff summary text (from formatResult) into structured lines */
 function parseDiffContent(content: string): DiffLine[] | null {
-  // Quick check: unified diff always starts with --- or has @@ hunks
-  if (!content.startsWith('---')) return null;
-
+  // Compact format: first line is "path: -N/+N lines", rest are "  + ..." or "  - ..."
   const lines = content.split('\n');
-  const result: DiffLine[] = [];
+  if (lines.length < 2) return null;
+  if (!lines[0].includes(': -') || !lines[0].includes('/+')) return null;
 
-  for (const line of lines) {
-    if (line.startsWith('---') || line.startsWith('+++') || line.startsWith('@@')) {
-      result.push({ type: 'header', content: line });
-    } else if (line.startsWith('+')) {
+  const result: DiffLine[] = [];
+  // Header line
+  result.push({ type: 'header', content: lines[0] });
+
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.startsWith('  + ')) {
       result.push({ type: 'add', content: line });
-    } else if (line.startsWith('-')) {
+    } else if (line.startsWith('  - ')) {
       result.push({ type: 'remove', content: line });
-    } else if (line.startsWith(' ')) {
-      result.push({ type: 'context', content: line });
     } else if (line.trim() === '') {
-      // Skip trailing empty lines
+      continue;
     } else {
-      // Not a valid diff, bail out
-      return null;
+      return null; // Not a valid diff
     }
   }
 
-  // Must have at least some add/remove lines to be a real diff
   if (!result.some(l => l.type === 'add' || l.type === 'remove')) return null;
   return result;
 }
@@ -89,7 +87,7 @@ export function Message({ role, content, isStreaming }: MessageProps) {
             <Text key={i} color={
               line.type === 'add' ? 'green' :
               line.type === 'remove' ? 'red' :
-              line.type === 'header' ? 'cyan' : 'gray'
+              line.type === 'header' ? 'gray' : 'gray'
             }>{line.content}</Text>
           ))}
         </Box>

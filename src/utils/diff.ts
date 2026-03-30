@@ -1,43 +1,47 @@
 import * as Diff from 'diff';
 
 export interface DiffLine {
-  type: 'add' | 'remove' | 'context' | 'header';
+  type: 'add' | 'remove' | 'header';
   content: string;
 }
 
-/** Generate structured diff lines from old and new text */
-export function generateDiffLines(filePath: string, oldText: string, newText: string): DiffLine[] {
-  const patch = Diff.createPatch(filePath, oldText, newText, '', '');
-  const lines = patch.split('\n');
+/** Generate compact summary diff: file stats + changed lines */
+export function generateDiffSummary(filePath: string, oldText: string, newText: string): DiffLine[] {
+  const changes = Diff.diffLines(oldText, newText);
   const result: DiffLine[] = [];
+  let added = 0;
+  let removed = 0;
 
-  for (const line of lines) {
-    // Skip the === header and --- +++ headers
-    if (line.startsWith('===') || line.startsWith('---') || line.startsWith('+++')) {
-      if (line.startsWith('---') || line.startsWith('+++')) {
-        result.push({ type: 'header', content: line });
+  for (const change of changes) {
+    const lines = change.value.replace(/\n$/, '').split('\n');
+    if (change.added) {
+      added += lines.length;
+      for (const line of lines) {
+        result.push({ type: 'add', content: line });
       }
-      continue;
+    } else if (change.removed) {
+      removed += lines.length;
+      for (const line of lines) {
+        result.push({ type: 'remove', content: line });
+      }
     }
-    if (line.startsWith('@@')) {
-      result.push({ type: 'header', content: line });
-    } else if (line.startsWith('+')) {
-      result.push({ type: 'add', content: line });
-    } else if (line.startsWith('-')) {
-      result.push({ type: 'remove', content: line });
-    } else if (line.startsWith(' ')) {
-      result.push({ type: 'context', content: line });
-    }
-    // Skip empty trailing line
   }
+
+  // Prepend header with stats
+  const header = `${filePath}: -${removed}/+${added} lines`;
+  result.unshift({ type: 'header', content: header });
 
   return result;
 }
 
-/** Render diff lines as plain text with markers (for non-ink contexts) */
+/** Render compact diff summary as plain text (for non-ink contexts) */
 export function renderDiffText(filePath: string, oldText: string, newText: string): string {
-  const lines = generateDiffLines(filePath, oldText, newText);
-  return lines.map(l => l.content).join('\n');
+  const lines = generateDiffSummary(filePath, oldText, newText);
+  return lines.map(l => {
+    if (l.type === 'add') return `  + ${l.content}`;
+    if (l.type === 'remove') return `  - ${l.content}`;
+    return l.content;
+  }).join('\n');
 }
 
 /** Marker prefix for detecting diff-formatted results from edit tool */
