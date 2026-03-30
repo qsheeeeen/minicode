@@ -9,6 +9,7 @@ import { SessionDisplayImpl } from '../utils/session-display.js';
 import { commandRegistry, type CommandContext } from './commands.js';
 import { Message } from '../components/Message.js';
 import type { SessionManager } from '../utils/session.js';
+import { AgentRegistry, type AgentSession } from '../services/agent-registry.js';
 
 export interface AppProps {
   config: ResolvedConfig;
@@ -53,7 +54,12 @@ export function App({
   const [inputValue, setInputValue] = useState('');
   const [autoSubmitPending, setAutoSubmitPending] = useState(!!initialPrompt);
 
+  // Multi-agent support
+  const [activeAgentId, setActiveAgentId] = useState<string>('1');
+  const [agentSessions, setAgentSessions] = useState<AgentSession[]>([]);
+
   const agentRef = useRef<Agent | null>(null);
+  const registryRef = useRef<AgentRegistry | null>(null);
   const { exit } = useApp();
 
   const setSessionList = (sessions: Array<{ name: string }>) => {
@@ -66,14 +72,32 @@ export function App({
 
   // Initialize agent once
   useEffect(() => {
+    // Create agent registry
+    const registry = new AgentRegistry();
+    registryRef.current = registry;
+
+    // Set up update callback to sync agentSessions with registry
+    registry.setUpdateCallback((sessions) => {
+      setAgentSessions(sessions);
+    });
+
     const displayAdapter = new CallbackDisplay({
-      onMessage: (msg) => setMessages(prev => [...prev, msg]),
-      onUpdateLast: (updater) => setMessages(prev => {
-        if (prev.length === 0) return prev;
-        const copy = [...prev];
-        copy[copy.length - 1] = updater(copy[copy.length - 1]);
-        return copy;
-      }),
+      onMessage: (msg) => {
+        // Only show main agent messages in default view
+        if (activeAgentId === '1') {
+          setMessages(prev => [...prev, msg]);
+        }
+      },
+      onUpdateLast: (updater) => {
+        if (activeAgentId === '1') {
+          setMessages(prev => {
+            if (prev.length === 0) return prev;
+            const copy = [...prev];
+            copy[copy.length - 1] = updater(copy[copy.length - 1]);
+            return copy;
+          });
+        }
+      },
       onStatusUpdate: setStatus,
       onTokenUpdate: setTokenCount
     });
@@ -88,9 +112,30 @@ export function App({
       thinkingTokens: config.thinking.tokens,
       display: displayAdapter,
       userPrompt,
+      agentRegistry: registry,
+      currentAgentId: '1',
     });
 
     agentRef.current = agent;
+
+    // Register main agent session
+    registry.register({
+      id: '1',
+      type: 'main',
+      agent,
+      display: displayAdapter,
+      messages: [],
+      status: 'idle',
+    });
+
+    setAgentSessions([{
+      id: '1',
+      type: 'main',
+      agent,
+      display: displayAdapter,
+      messages: [],
+      status: 'idle',
+    }]);
 
     // Load initial session
     const loadInitial = async () => {
@@ -107,9 +152,24 @@ export function App({
           const displayMessages = await sessionDisplay.loadForTUI(initialSession);
           if (displayMessages.length > 0) {
             setMessages(displayMessages);
+            setAgentSessions(prev => {
+              const main = prev.find(s => s.id === '1');
+              if (main) {
+                return [{ ...main, messages: displayMessages }];
+              }
+              return prev;
+            });
           }
         } else if (sessionName) {
-          setMessages([{ role: 'system', content: `Created new session: ${sessionName}`, timestamp: new Date() }]);
+          const sysMsg = { role: 'system' as const, content: `Created new session: ${sessionName}`, timestamp: new Date() };
+          setMessages([sysMsg]);
+          setAgentSessions(prev => {
+            const main = prev.find(s => s.id === '1');
+            if (main) {
+              return [{ ...main, messages: [sysMsg] }];
+            }
+            return prev;
+          });
         }
       }
     };
@@ -193,6 +253,15 @@ export function App({
 
   useInput((input, key) => {
     if (key.ctrl && input === 'c') exit();
+    // Ctrl+1~9 for agent switching
+    if (key.ctrl && input >= '1' && input <= '9') {
+      setActiveAgentId(input);
+      // Update messages to show selected agent's messages
+      const session = agentSessions.find(s => s.id === input);
+      if (session) {
+        setMessages(session.messages);
+      }
+    }
   }, { isActive: mode === 'chat' });
 
   return (
@@ -215,6 +284,20 @@ export function App({
           )}
         </Box>
         <Box>
+          {/* Agent switcher - only show if there are sub-agents */}
+          {agentSessions.length > 1 && (
+            <>
+              {agentSessions.map(s => {
+                const label = s.id === '1' ? 'M' : s.id;
+                return (
+                  <Text key={s.id} color={s.id === activeAgentId ? 'cyan' : 'dimColor'} bold={s.id === activeAgentId}>
+                    [{label}]
+                  </Text>
+                );
+              })}
+              <Text dimColor> | </Text>
+            </>
+          )}
           <Text dimColor>{currentSession}</Text>
           {(isLoading || status) && <Text dimColor> | </Text>}
           {isLoading && <Text color="magenta">Running...</Text>}
@@ -233,6 +316,12 @@ export function App({
             {messages.map((msg, i) => (
               <Message key={i} role={msg.role} content={msg.content} isStreaming={msg.isStreaming} />
             ))}
+          </Box>
+        )}
+        {/* Show hint if viewing sub-agent */}
+        {activeAgentId !== '1' && (
+          <Box marginTop={1}>
+            <Text dimColor color="yellow">Press Ctrl+1 to return to main agent</Text>
           </Box>
         )}
       </Box>

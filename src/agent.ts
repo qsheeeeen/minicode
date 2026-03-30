@@ -1,8 +1,9 @@
 import { AnthropicClient, MessageParam, Tool, Anthropic } from './llm/anthropic.js';
-import { readTool, writeTool, editTool, bashTool, ToolRegistry, ToolDef } from './tools/index.js';
+import { readTool, writeTool, editTool, bashTool, agentTool, ToolRegistry, ToolDef, ToolExecutionContext } from './tools/index.js';
 import { ConsoleDisplay, type DisplayAdapter } from './utils/display.js';
 import { TokenManager, TokenManagerImpl } from './services/token-manager.js';
 import { CompressionService, CompressionServiceImpl } from './services/compression-service.js';
+import { AgentRegistry } from './services/agent-registry.js';
 
 export const SYSTEM_PROMPT = `You are an interactive CLI tool that helps users with software engineering tasks. Use the instructions below and the tools available to you to assist the user.
 
@@ -34,6 +35,9 @@ export interface AgentConfig {
   tokenManager?: TokenManager;
   compressionService?: CompressionService;
   userPrompt?: string;
+  excludeTools?: string[];
+  agentRegistry?: AgentRegistry;
+  currentAgentId?: string;
 }
 
 export class Agent {
@@ -51,9 +55,15 @@ export class Agent {
   private display: DisplayAdapter;
   private userPrompt: string;
   private userPromptInjected = false;
+  private agentRegistry?: AgentRegistry;
+  private currentAgentId: string;
+  private apiKey?: string;
+  private baseURL?: string;
 
   constructor(config: AgentConfig = {}) {
-    this.client = new AnthropicClient(config.apiKey, config.baseURL);
+    this.apiKey = config.apiKey;
+    this.baseURL = config.baseURL;
+    this.client = new AnthropicClient(this.apiKey, this.baseURL);
     this.model = config.model;
     this.contextLength = config.contextLength || 200000;
     this.compressionThresholdRatio = config.compressionThresholdRatio || 0.8;
@@ -62,12 +72,27 @@ export class Agent {
     this.tokenManager = config.tokenManager || new TokenManagerImpl();
     this.compressionService = config.compressionService || new CompressionServiceImpl();
     this.toolRegistry = new ToolRegistry();
+    this.agentRegistry = config.agentRegistry;
+    this.currentAgentId = config.currentAgentId || '1';
 
-    // Register built-in tools
-    this.toolRegistry.register(readTool as ToolDef);
-    this.toolRegistry.register(writeTool as ToolDef);
-    this.toolRegistry.register(editTool as ToolDef);
-    this.toolRegistry.register(bashTool as ToolDef);
+    // Register built-in tools (respecting excludeTools)
+    const excludeTools = config.excludeTools || [];
+    const builtInTools = [readTool, writeTool, editTool, bashTool] as ToolDef[];
+
+    for (const tool of builtInTools) {
+      if (!excludeTools.includes(tool.name)) {
+        this.toolRegistry.register(tool);
+      }
+    }
+
+    // Register agent tool only if:
+    // 1. AgentRegistry is available
+    // 2. agent tool is not excluded
+    // This ensures only the main agent can spawn sub-agents
+    if (this.agentRegistry && !excludeTools.includes('agent')) {
+      this.toolRegistry.register(agentTool);
+    }
+
     // Use provided display or create default console display
     this.display = config.display ?? new ConsoleDisplay();
     this.userPrompt = config.userPrompt || '';
@@ -223,8 +248,25 @@ export class Agent {
       // Execute tool calls in parallel
       if (toolCalls.length > 0) {
         this.display.progress(`Running ${toolCalls.length} tool${toolCalls.length > 1 ? 's' : ''}... `);
+
+        // Build execution context
+        const context: ToolExecutionContext = {
+          registry: this.agentRegistry,
+          config: {
+            apiKey: this.apiKey,
+            baseURL: this.baseURL,
+            model: this.model,
+            contextLength: this.contextLength,
+            compressionThresholdRatio: this.compressionThresholdRatio,
+            thinkingEnabled: this.thinkingEnabled,
+            thinkingTokens: this.thinkingTokens,
+            userPrompt: this.userPrompt,
+          },
+          currentAgentId: this.currentAgentId,
+        };
+
         const results = await Promise.allSettled(
-          toolCalls.map(({ block, tool }) => tool.execute(block.input as any))
+          toolCalls.map(({ block, tool }) => tool.execute(block.input as any, context))
         );
         // Clear progress line
         this.display.raw('');

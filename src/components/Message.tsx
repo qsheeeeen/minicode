@@ -56,12 +56,11 @@ export function Message({ role, content, isStreaming }: MessageProps) {
     );
   }
 
-  // System message - dim gray bracket prefix
+  // System message - dim gray, with same indent as tool call
   if (role === 'system') {
     return (
-      <Box marginBottom={0}>
-        <Text color="gray"></Text>
-        <Text dimColor> {content}</Text>
+      <Box marginBottom={0} paddingX={4}>
+        <Text dimColor>{content}</Text>
       </Box>
     );
   }
