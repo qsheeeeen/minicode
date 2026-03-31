@@ -347,7 +347,7 @@ export function App({
         ) : (
           <Box flexDirection="column">
             {messages.map((msg, i) => (
-              <Message key={i} role={msg.role} content={msg.content} isStreaming={msg.isStreaming} />
+              <Message key={i} role={msg.role} content={msg.content} isStreaming={msg.isStreaming} element={msg.element} />
             ))}
           </Box>
         )}

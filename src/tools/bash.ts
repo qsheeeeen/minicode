@@ -1,6 +1,9 @@
+import React from 'react';
+import { Text } from 'ink';
 import { spawn } from 'child_process';
+import type { ToolDef, ToolResult } from './index.js';
 
-export const bashTool = {
+export const bashTool: ToolDef = {
   name: 'bash',
   description: 'Execute a bash command in the current working directory. Returns stdout and stderr. Optionally provide a timeout in seconds.',
   input_schema: {
@@ -14,26 +17,35 @@ export const bashTool = {
   format: (args: Record<string, unknown>) => {
     return `Bash(${args.command as string})`;
   },
-  execute: async (args: Record<string, unknown>): Promise<string> => {
-    const command = args.command as string;
-    const timeout = args.timeout as number | undefined;
-    return new Promise((resolve, reject) => {
-      const proc = spawn(command, [], { shell: true });
+  execute: async (args: Record<string, unknown>): Promise<ToolResult> => {
+    try {
+      const command = args.command as string;
+      const timeout = args.timeout as number | undefined;
+      const output = await new Promise<string>((resolve, reject) => {
+        const proc = spawn(command, [], { shell: true });
 
-      let stdout = '';
-      let stderr = '';
+        let stdout = '';
+        let stderr = '';
 
-      proc.stdout?.on('data', (d) => stdout += d.toString());
-      proc.stderr?.on('data', (d) => stderr += d.toString());
+        proc.stdout?.on('data', (d) => stdout += d.toString());
+        proc.stderr?.on('data', (d) => stderr += d.toString());
 
-      if (timeout) {
-        setTimeout(() => proc.kill(), timeout * 1000);
-      }
+        if (timeout) {
+          setTimeout(() => proc.kill(), timeout * 1000);
+        }
 
-      proc.on('close', (code) => {
-        if (code === 0) resolve(stdout || stderr);
-        else reject(new Error(`Exit code ${code}: ${stderr || stdout}`));
+        proc.on('close', (code) => {
+          if (code === 0) resolve(stdout || stderr);
+          else reject(new Error(`Exit code ${code}: ${stderr || stdout}`));
+        });
       });
-    });
+      return {
+        output,
+        display: React.createElement(Text, { dimColor: true }, output)
+      };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { output: msg, display: React.createElement(Text, { color: 'red' }, msg) };
+    }
   }
 };

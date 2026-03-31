@@ -1,4 +1,6 @@
-import type { ToolDef, ToolExecutionContext } from './index.js';
+import React from 'react';
+import { Text } from 'ink';
+import type { ToolDef, ToolResult, ToolExecutionContext } from './index.js';
 import type { AgentRegistry } from '../services/agent-registry.js';
 import type { AgentConfig } from '../agent.js';
 import type { DisplayMessage } from '../utils/session-display.js';
@@ -25,18 +27,18 @@ export const agentTool: ToolDef = {
     return `Agent(${taskPreview})`;
   },
 
-  execute: async (args: Record<string, unknown>, context?: ToolExecutionContext): Promise<string> => {
+  execute: async (args: Record<string, unknown>, context?: ToolExecutionContext): Promise<ToolResult> => {
     const task = args.task as string;
     const registry = context?.registry;
     const config = context?.config;
     const parentId = context?.currentAgentId || '1';
 
     if (!registry) {
-      return 'Error: AgentRegistry not available';
+      return { output: 'Error: AgentRegistry not available', display: React.createElement(Text, { color: 'red' }, 'Error: AgentRegistry not available') };
     }
 
     if (!config) {
-      return 'Error: Agent config not available';
+      return { output: 'Error: Agent config not available', display: React.createElement(Text, { color: 'red' }, 'Error: Agent config not available') };
     }
 
     // Allocate sub-agent ID
@@ -105,13 +107,17 @@ export const agentTool: ToolDef = {
       registry.updateSummary(subId, summary);
 
       // Return the actual response from sub-agent
-      return finalResponse || `Agent #${subId} completed: ${summary}`;
+      const output = finalResponse || `Agent #${subId} completed: ${summary}`;
+      return {
+        output,
+        display: React.createElement(Text, { dimColor: true }, output)
+      };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       registry.updateStatus(subId, 'error');
       registry.updateSummary(subId, `Error: ${errorMsg}`);
 
-      return `Agent #${subId} failed: ${errorMsg}`;
+      return { output: `Agent #${subId} failed: ${errorMsg}`, display: React.createElement(Text, { color: 'red' }, `Agent #${subId} failed: ${errorMsg}`) };
     }
   }
 };
@@ -131,25 +137,15 @@ function extractFinalResponse(messages: DisplayMessage[]): string | null {
 function generateSummary(messages: DisplayMessage[]): string {
   // Generate a concise summary from the agent's messages
   let toolCallCount = 0;
-  let filesRead = 0;
-  let filesWritten = 0;
   let errors = 0;
 
   for (const msg of messages) {
-    if (msg.role === 'tool') {
-      toolCallCount++;
-      if (msg.content.includes('Read(')) filesRead++;
-      if (msg.content.includes('Write(')) filesWritten++;
-    }
-    if (msg.role === 'error') {
-      errors++;
-    }
+    if (msg.role === 'tool') toolCallCount++;
+    if (msg.role === 'error') errors++;
   }
 
   const parts: string[] = [];
   if (toolCallCount > 0) parts.push(`${toolCallCount} operations`);
-  if (filesRead > 0) parts.push(`${filesRead} files read`);
-  if (filesWritten > 0) parts.push(`${filesWritten} files written`);
   if (errors > 0) parts.push(`${errors} errors`);
 
   if (parts.length === 0) return 'Task completed';

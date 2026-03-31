@@ -1,3 +1,5 @@
+import React from 'react';
+import { Box, Text } from 'ink';
 import * as Diff from 'diff';
 
 export interface DiffLine {
@@ -34,30 +36,21 @@ export function generateDiffSummary(filePath: string, oldText: string, newText: 
   return result;
 }
 
-/** Render compact diff summary as plain text (for non-ink contexts) */
-export function renderDiffText(filePath: string, oldText: string, newText: string): string {
-  const lines = generateDiffSummary(filePath, oldText, newText);
-  return lines.map(l => {
-    if (l.type === 'add') return `  + ${l.content}`;
-    if (l.type === 'remove') return `  - ${l.content}`;
-    return l.content;
-  }).join('\n');
-}
-
-/** Marker prefix for detecting diff-formatted results from edit tool */
-export const EDIT_RESULT_PREFIX = '__DIFF__:';
-
-/** Encode edit result for transport through tool execute -> formatResult pipeline */
-export function encodeEditResult(path: string, oldText: string, newText: string): string {
-  return EDIT_RESULT_PREFIX + JSON.stringify({ path, oldText, newText });
-}
-
-/** Try to parse an edit result string; returns null if not a diff result */
-export function tryParseEditResult(result: string): { path: string; oldText: string; newText: string } | null {
-  if (!result.startsWith(EDIT_RESULT_PREFIX)) return null;
-  try {
-    return JSON.parse(result.slice(EDIT_RESULT_PREFIX.length));
-  } catch {
-    return null;
-  }
+/** Render diff lines as an ink Box */
+export function renderDiffLines(lines: DiffLine[]): React.ReactElement {
+  return React.createElement(
+    Box,
+    { marginBottom: 0, paddingX: 8, flexDirection: 'column' },
+    ...lines.map((line, i) =>
+      React.createElement(
+        Text,
+        {
+          key: i,
+          dimColor: true,
+          color: line.type === 'add' ? 'green' : line.type === 'remove' ? 'red' : undefined,
+        },
+        line.content,
+      ),
+    ),
+  );
 }

@@ -250,26 +250,23 @@ export class Agent {
     this.display.raw('');
 
     results.forEach((result, i) => {
-      const { block, tool } = toolCalls[i];
-      const content = result.status === 'fulfilled'
-        ? result.value
-        : `Error: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`;
+      const { block } = toolCalls[i];
 
       if (result.status === 'fulfilled') {
-        const display = tool.formatResult ? tool.formatResult(content) : content;
-        this.display.toolResult(display);
+        const { output, display } = result.value;
+        this.display.toolResult(output, display);
+        this.messages.push({
+          role: 'user',
+          content: [{ type: 'tool_result', tool_use_id: block.id, content: output }]
+        });
       } else {
-        this.display.error(content);
+        const error = `Error: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`;
+        this.display.error(error);
+        this.messages.push({
+          role: 'user',
+          content: [{ type: 'tool_result', tool_use_id: block.id, content: error }]
+        });
       }
-
-      this.messages.push({
-        role: 'user',
-        content: [{
-          type: 'tool_result',
-          tool_use_id: block.id,
-          content
-        }]
-      });
     });
   }
 

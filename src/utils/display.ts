@@ -3,6 +3,7 @@
  * Provides an abstraction layer for different display modes
  */
 
+import React from 'react';
 import type { MessageRole, DisplayMessage } from './session-display.js';
 
 // Re-export for convenience
@@ -23,7 +24,7 @@ export interface DisplayAdapter {
   toolCall(msg: string): void;
 
   /** Display a tool result */
-  toolResult(msg: string): void;
+  toolResult(msg: string, element?: React.ReactElement): void;
 
   /** Display an error */
   error(msg: string): void;
@@ -73,7 +74,7 @@ export class ConsoleDisplay implements DisplayAdapter {
     console.log(`[Tool] ${msg}`);
   }
 
-  toolResult(msg: string): void {
+  toolResult(msg: string, element?: React.ReactElement): void {
     console.log(`${msg}`);
   }
 
@@ -133,9 +134,9 @@ export class CallbackDisplay implements DisplayAdapter {
     this.callbacks.onMessage?.({ role: 'tool', content: msg, timestamp: new Date() });
   }
 
-  toolResult(msg: string): void {
+  toolResult(msg: string, element?: React.ReactElement): void {
     // Show tool results as output
-    this.callbacks.onMessage?.({ role: 'tool_result', content: msg, timestamp: new Date() });
+    this.callbacks.onMessage?.({ role: 'tool_result', content: msg, timestamp: new Date(), element });
   }
 
   error(msg: string): void {

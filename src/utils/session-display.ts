@@ -1,3 +1,4 @@
+import React from 'react';
 import { SessionManager, SessionData } from './session.js';
 import { DisplayAdapter } from './display.js';
 import { ToolRegistry } from '../tools/registry.js';
@@ -9,6 +10,7 @@ export interface DisplayMessage {
   content: string;
   timestamp?: Date;
   isStreaming?: boolean;
+  element?: React.ReactElement;
 }
 
 export interface SessionDisplay {
@@ -48,9 +50,7 @@ export class SessionDisplayImpl implements SessionDisplay {
             if (block.type === 'tool_result') {
               const toolName = toolUseMap.get(block.tool_use_id);
               const raw = typeof block.content === 'string' ? block.content : JSON.stringify(block.content);
-              const tool = toolName ? this.toolRegistry.get(toolName) : undefined;
-              const display = tool?.formatResult ? tool.formatResult(raw) : raw;
-              messages.push({ role: 'tool_result', content: display, timestamp: new Date(data.updatedAt) });
+              messages.push({ role: 'tool_result', content: raw, timestamp: new Date(data.updatedAt) });
             }
           }
           continue;
