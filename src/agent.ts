@@ -255,11 +255,13 @@ export class Agent {
 
     // Execute all tools in parallel, each with its own display handle
     const results = await Promise.allSettled(
-      slots.map(({ block, tool, slotId }) => {
+      slots.map(({ block, tool, slotId, callElement }) => {
         const toolContext: ToolExecutionContext = {
           ...context,
           display: {
-            update: (element: React.ReactElement) => this.display.updateSlot(slotId, element)
+            update: (element: React.ReactElement) => this.display.updateSlot(slotId,
+              React.createElement(Box, { flexDirection: 'column' }, callElement, element)
+            )
           }
         };
         return tool.execute(block.input as Record<string, unknown>, toolContext);

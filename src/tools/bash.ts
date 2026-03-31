@@ -1,7 +1,7 @@
 import React from 'react';
 import { Text } from 'ink';
 import { spawn } from 'child_process';
-import type { ToolDef, ToolResult } from './index.js';
+import type { ToolDef, ToolResult, ToolExecutionContext } from './index.js';
 
 export const bashTool: ToolDef = {
   name: 'bash',
@@ -17,7 +17,7 @@ export const bashTool: ToolDef = {
   format: (args: Record<string, unknown>) => {
     return React.createElement(Text, { color: 'yellow' }, `Bash(${args.command as string})`);
   },
-  execute: async (args: Record<string, unknown>): Promise<ToolResult> => {
+  execute: async (args: Record<string, unknown>, context?: ToolExecutionContext): Promise<ToolResult> => {
     try {
       const command = args.command as string;
       const timeout = args.timeout as number | undefined;
@@ -27,8 +27,14 @@ export const bashTool: ToolDef = {
         let stdout = '';
         let stderr = '';
 
-        proc.stdout?.on('data', (d) => stdout += d.toString());
-        proc.stderr?.on('data', (d) => stderr += d.toString());
+        proc.stdout?.on('data', (d) => {
+          stdout += d.toString();
+          context?.display?.update(React.createElement(Text, { dimColor: true }, stdout + (stderr ? '\n' + stderr : '')));
+        });
+        proc.stderr?.on('data', (d) => {
+          stderr += d.toString();
+          context?.display?.update(React.createElement(Text, { dimColor: true }, stdout + (stderr ? '\n' + stderr : '')));
+        });
 
         if (timeout) {
           setTimeout(() => proc.kill(), timeout * 1000);
