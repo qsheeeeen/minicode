@@ -95,6 +95,17 @@ function useAgent(
           });
         }
       },
+      onUpdateSlot: (slotId, updater) => {
+        if (activeAgentId === '1') {
+          setMessages(prev => {
+            const idx = prev.findIndex(m => m.slotId === slotId);
+            if (idx === -1) return prev;
+            const copy = [...prev];
+            copy[idx] = updater(copy[idx]);
+            return copy;
+          });
+        }
+      },
       onStatusUpdate: () => {},
       onTokenUpdate: setTokenCount
     });

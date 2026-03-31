@@ -10,10 +10,15 @@ import type { AgentRegistry } from '../services/agent-registry.js';
 import type { AgentConfig } from '../agent.js';
 
 // Tool execution context - passed to tool execute
+export interface ToolDisplayHandle {
+  update(element: React.ReactElement): void;
+}
+
 export interface ToolExecutionContext {
   registry?: AgentRegistry;
   config?: AgentConfig;
   currentAgentId?: string;
+  display?: ToolDisplayHandle;
 }
 
 /** Tool returns output for LLM and ink element for TUI */

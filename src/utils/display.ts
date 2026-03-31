@@ -12,6 +12,7 @@ export type { MessageRole, DisplayMessage };
 export type DisplayCallback = {
   onMessage?: (msg: DisplayMessage) => void;
   onUpdateLast?: (updater: (msg: DisplayMessage) => DisplayMessage) => void;
+  onUpdateSlot?: (slotId: string, updater: (msg: DisplayMessage) => DisplayMessage) => void;
   onStatusUpdate?: (status: string) => void;
   onTokenUpdate?: (tokens: number) => void;
 };
@@ -20,11 +21,11 @@ export interface DisplayAdapter {
   /** Display a system message */
   system(msg: string): void;
 
-  /** Display a tool call */
-  toolCall(element: React.ReactElement): void;
+  /** Create a display slot for a tool, returns slot ID */
+  createSlot(element: React.ReactElement): string;
 
-  /** Display a tool result */
-  toolResult(msg: string, element?: React.ReactElement): void;
+  /** Update a tool's display slot by ID */
+  updateSlot(slotId: string, element: React.ReactElement): void;
 
   /** Display an error */
   error(msg: string): void;
@@ -65,17 +66,20 @@ export interface DisplayAdapter {
  */
 export class ConsoleDisplay implements DisplayAdapter {
   private buffer: string = '';
+  private _slotId = 0;
 
   system(msg: string): void {
     console.log(`[System] ${msg}`);
   }
 
-  toolCall(element: React.ReactElement): void {
+  createSlot(element: React.ReactElement): string {
+    const id = `slot-${this._slotId++}`;
     console.log(`[Tool]`);
+    return id;
   }
 
-  toolResult(msg: string, element?: React.ReactElement): void {
-    console.log(`${msg}`);
+  updateSlot(slotId: string, element: React.ReactElement): void {
+    console.log(`[Tool result]`);
   }
 
   error(msg: string): void {
@@ -123,20 +127,22 @@ export class ConsoleDisplay implements DisplayAdapter {
  * Callback-based display adapter for ink TUI
  */
 export class CallbackDisplay implements DisplayAdapter {
+  private _slotId = 0;
+
   constructor(private callbacks: DisplayCallback) {}
 
   system(msg: string): void {
     this.callbacks.onMessage?.({ role: 'system', content: msg, timestamp: new Date() });
   }
 
-  toolCall(element: React.ReactElement): void {
-    // Show tool call as a message so user sees what's being executed
-    this.callbacks.onMessage?.({ role: 'tool', content: '', timestamp: new Date(), element });
+  createSlot(element: React.ReactElement): string {
+    const slotId = `slot-${this._slotId++}`;
+    this.callbacks.onMessage?.({ role: 'tool', content: '', timestamp: new Date(), element, slotId });
+    return slotId;
   }
 
-  toolResult(msg: string, element?: React.ReactElement): void {
-    // Show tool results as output
-    this.callbacks.onMessage?.({ role: 'tool_result', content: msg, timestamp: new Date(), element });
+  updateSlot(slotId: string, element: React.ReactElement): void {
+    this.callbacks.onUpdateSlot?.(slotId, msg => ({ ...msg, element }));
   }
 
   error(msg: string): void {

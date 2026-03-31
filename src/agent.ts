@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text } from 'ink';
+import { Text, Box } from 'ink';
 import { AnthropicClient, MessageParam, Tool, Anthropic, ContentBlock } from './llm/anthropic.js';
 import { readTool, writeTool, editTool, bashTool, agentTool, ToolRegistry, ToolDef, ToolExecutionContext } from './tools/index.js';
 import { ConsoleDisplay, type DisplayAdapter } from './utils/display.js';
@@ -229,7 +229,14 @@ export class Agent {
   private async executeToolCalls(toolCalls: Array<{ block: Anthropic.Messages.ToolUseBlock; tool: ToolDef }>): Promise<void> {
     if (toolCalls.length === 0) return;
 
-    this.display.progress(`Running ${toolCalls.length} tool${toolCalls.length > 1 ? 's' : ''}... `);
+    // Create a display slot for each tool (shows initial call display)
+    const slots = toolCalls.map(({ block, tool }) => {
+      const callElement = tool.format
+        ? tool.format(block.input as Record<string, unknown>)
+        : React.createElement(Text, { color: 'yellow' }, `${block.name}(${JSON.stringify(block.input)})`);
+      const slotId = this.display.createSlot(callElement);
+      return { slotId, callElement, block, tool };
+    });
 
     const context: ToolExecutionContext = {
       registry: this.agentRegistry,
@@ -246,24 +253,43 @@ export class Agent {
       currentAgentId: this.currentAgentId,
     };
 
+    // Execute all tools in parallel, each with its own display handle
     const results = await Promise.allSettled(
-      toolCalls.map(({ block, tool }) => tool.execute(block.input as Record<string, unknown>, context))
+      slots.map(({ block, tool, slotId }) => {
+        const toolContext: ToolExecutionContext = {
+          ...context,
+          display: {
+            update: (element: React.ReactElement) => this.display.updateSlot(slotId, element)
+          }
+        };
+        return tool.execute(block.input as Record<string, unknown>, toolContext);
+      })
     );
-    this.display.raw('');
 
+    // Update slots with final results (call + result combined)
     results.forEach((result, i) => {
       const { block } = toolCalls[i];
+      const { slotId, callElement } = slots[i];
 
       if (result.status === 'fulfilled') {
-        const { output, display } = result.value;
-        this.display.toolResult(output, display);
+        const { output, display: resultElement } = result.value;
+        const combined = React.createElement(Box, { flexDirection: 'column' },
+          callElement,
+          resultElement
+        );
+        this.display.updateSlot(slotId, combined);
         this.messages.push({
           role: 'user',
           content: [{ type: 'tool_result', tool_use_id: block.id, content: output }]
         });
       } else {
         const error = `Error: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`;
-        this.display.error(error);
+        const errorElement = React.createElement(Text, { color: 'red' }, error);
+        const combined = React.createElement(Box, { flexDirection: 'column' },
+          callElement,
+          errorElement
+        );
+        this.display.updateSlot(slotId, combined);
         this.messages.push({
           role: 'user',
           content: [{ type: 'tool_result', tool_use_id: block.id, content: error }]
@@ -289,14 +315,6 @@ export class Agent {
 
       // Build and push assistant message
       const assistantMsg: MessageParam = { role: 'assistant', content: response.content as ContentBlock[] };
-
-      // Display tool calls
-      for (const { block, tool } of toolCalls) {
-        const element = tool.format
-          ? tool.format(block.input as Record<string, unknown>)
-          : React.createElement(Text, { color: 'yellow' }, `${block.name}(${JSON.stringify(block.input)})`);
-        this.display.toolCall(element);
-      }
 
       this.messages.push(assistantMsg);
 

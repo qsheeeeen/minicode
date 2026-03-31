@@ -11,6 +11,7 @@ export interface DisplayMessage {
   timestamp?: Date;
   isStreaming?: boolean;
   element?: React.ReactElement;
+  slotId?: string;
 }
 
 export interface SessionDisplay {
@@ -89,10 +90,10 @@ export class SessionDisplayImpl implements SessionDisplay {
         display.raw(msg.content);
         break;
       case 'tool':
-        if (msg.element) display.toolCall(msg.element);
+        display.raw('[Tool]');
         break;
       case 'tool_result':
-        display.toolResult(msg.content);
+        display.raw(msg.content);
         break;
       case 'system':
         display.system(msg.content);
