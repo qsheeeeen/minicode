@@ -21,7 +21,7 @@ export interface DisplayAdapter {
   system(msg: string): void;
 
   /** Display a tool call */
-  toolCall(msg: string): void;
+  toolCall(element: React.ReactElement): void;
 
   /** Display a tool result */
   toolResult(msg: string, element?: React.ReactElement): void;
@@ -70,8 +70,8 @@ export class ConsoleDisplay implements DisplayAdapter {
     console.log(`[System] ${msg}`);
   }
 
-  toolCall(msg: string): void {
-    console.log(`[Tool] ${msg}`);
+  toolCall(element: React.ReactElement): void {
+    console.log(`[Tool]`);
   }
 
   toolResult(msg: string, element?: React.ReactElement): void {
@@ -129,9 +129,9 @@ export class CallbackDisplay implements DisplayAdapter {
     this.callbacks.onMessage?.({ role: 'system', content: msg, timestamp: new Date() });
   }
 
-  toolCall(msg: string): void {
+  toolCall(element: React.ReactElement): void {
     // Show tool call as a message so user sees what's being executed
-    this.callbacks.onMessage?.({ role: 'tool', content: msg, timestamp: new Date() });
+    this.callbacks.onMessage?.({ role: 'tool', content: '', timestamp: new Date(), element });
   }
 
   toolResult(msg: string, element?: React.ReactElement): void {

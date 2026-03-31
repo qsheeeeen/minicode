@@ -27,6 +27,6 @@ export interface ToolDef {
   name: string;
   description: string;
   input_schema: Record<string, unknown>;
-  format?: (args: Record<string, unknown>) => string;
+  format?: (args: Record<string, unknown>) => React.ReactElement;
   execute: (args: Record<string, unknown>, context?: ToolExecutionContext) => Promise<ToolResult>;
 }

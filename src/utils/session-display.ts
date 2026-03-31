@@ -67,8 +67,8 @@ export class SessionDisplayImpl implements SessionDisplay {
               toolUseMap.set((block as any).id, block.name);
               // Use tool's format method to match live display
               const tool = this.toolRegistry.get(block.name);
-              const display = tool?.format ? tool.format((block as any).input) : `${block.name}(${JSON.stringify((block as any).input)})`;
-              messages.push({ role: 'tool', content: display, timestamp: new Date(data.updatedAt) });
+              const element = tool?.format ? tool.format((block as any).input) : undefined;
+              messages.push({ role: 'tool', content: '', timestamp: new Date(data.updatedAt), element });
             }
           }
         } else {
@@ -89,7 +89,7 @@ export class SessionDisplayImpl implements SessionDisplay {
         display.raw(msg.content);
         break;
       case 'tool':
-        display.toolCall(msg.content);
+        if (msg.element) display.toolCall(msg.element);
         break;
       case 'tool_result':
         display.toolResult(msg.content);

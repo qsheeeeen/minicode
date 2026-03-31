@@ -39,8 +39,9 @@ export function Message({ role, content, isStreaming, element }: MessageProps) {
     );
   }
 
-  // Tool call - show in yellow
+  // Tool call - use element from tool
   if (role === 'tool') {
+    if (element) return element;
     return (
       <Box marginBottom={0} paddingX={4}>
         <Text color="yellow">{content}</Text>

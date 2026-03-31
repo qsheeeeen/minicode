@@ -26,7 +26,7 @@ export const readTool: ToolDef = {
       if (limit) parts.push(`limit: ${limit}`);
       info += `, ${parts.join(', ')}`;
     }
-    return info + ')';
+    return React.createElement(Text, { color: 'yellow' }, info + ')');
   },
   execute: async (args: Record<string, unknown>): Promise<ToolResult> => {
     try {

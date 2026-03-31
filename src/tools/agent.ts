@@ -24,7 +24,7 @@ export const agentTool: ToolDef = {
   format: (args: Record<string, unknown>) => {
     const task = args.task as string;
     const taskPreview = task.length > 30 ? task.slice(0, 30) + '...' : task;
-    return `Agent(${taskPreview})`;
+    return React.createElement(Text, { color: 'yellow' }, `Agent(${taskPreview})`);
   },
 
   execute: async (args: Record<string, unknown>, context?: ToolExecutionContext): Promise<ToolResult> => {

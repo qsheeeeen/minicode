@@ -19,7 +19,7 @@ export const writeTool: ToolDef = {
     const filePath = args.path as string;
     const content = args.content as string;
     const lines = content.split('\n').length;
-    return `Write(${filePath}, ${lines} lines)`;
+    return React.createElement(Text, { color: 'yellow' }, `Write(${filePath}, ${lines} lines)`);
   },
   execute: async (args: Record<string, unknown>): Promise<ToolResult> => {
     try {

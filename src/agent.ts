@@ -1,3 +1,5 @@
+import React from 'react';
+import { Text } from 'ink';
 import { AnthropicClient, MessageParam, Tool, Anthropic, ContentBlock } from './llm/anthropic.js';
 import { readTool, writeTool, editTool, bashTool, agentTool, ToolRegistry, ToolDef, ToolExecutionContext } from './tools/index.js';
 import { ConsoleDisplay, type DisplayAdapter } from './utils/display.js';
@@ -290,8 +292,10 @@ export class Agent {
 
       // Display tool calls
       for (const { block, tool } of toolCalls) {
-        const display = tool.format ? tool.format(block.input as Record<string, unknown>) : `${block.name} ${JSON.stringify(block.input)}`;
-        this.display.toolCall(display);
+        const element = tool.format
+          ? tool.format(block.input as Record<string, unknown>)
+          : React.createElement(Text, { color: 'yellow' }, `${block.name}(${JSON.stringify(block.input)})`);
+        this.display.toolCall(element);
       }
 
       this.messages.push(assistantMsg);
