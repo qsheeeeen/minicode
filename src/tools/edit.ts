@@ -18,9 +18,7 @@ export const editTool: ToolDef = {
   },
   format: (args: Record<string, unknown>) => {
     const path = args.path as string;
-    const oldText = args.oldText as string;
-    const preview = oldText.slice(0, 20).replace(/\n/g, '\\n');
-    return React.createElement(Text, { color: 'yellow' }, `Edit(${path}, "${preview}${oldText.length > 20 ? '...' : ''}")`);
+    return React.createElement(Text, { color: 'yellow' }, `Edit(${path})`);
   },
   execute: async (args: Record<string, unknown>): Promise<ToolResult> => {
     try {
