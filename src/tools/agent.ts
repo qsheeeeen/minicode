@@ -1,7 +1,6 @@
 import React from 'react';
 import { Text } from 'ink';
 import type { ToolDef, ToolResult, ToolExecutionContext } from './index.js';
-import type { AgentRegistry } from '../services/agent-registry.js';
 import type { AgentConfig } from '../agent.js';
 import type { DisplayMessage } from '../utils/session-display.js';
 import type { DisplayAdapter } from '../utils/display.js';
@@ -59,10 +58,10 @@ export const agentTool: ToolDef = {
           subMessages[subMessages.length - 1] = updater(last);
         }
       },
-      onStatusUpdate: (status) => {
+      onStatusUpdate: (_status) => {
         // Could be used for progress tracking
       },
-      onTokenUpdate: (tokens) => {
+      onTokenUpdate: (_tokens) => {
         // Token updates handled at session level
       }
     });
