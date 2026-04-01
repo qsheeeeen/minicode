@@ -1,7 +1,7 @@
 import React from 'react';
 import { Text, Box } from 'ink';
 import { AnthropicClient, MessageParam, Tool, Anthropic, ContentBlock } from './llm/anthropic.js';
-import { readTool, writeTool, editTool, bashTool, agentTool, ToolRegistry, ToolDef, ToolExecutionContext } from './tools/index.js';
+import { registerTools, ToolRegistry, ToolDef, ToolExecutionContext } from './tools/index.js';
 import { ConsoleDisplay, type DisplayAdapter } from './utils/display.js';
 import { TokenManager, TokenManagerImpl } from './services/token-manager.js';
 import { CompressionService, CompressionServiceImpl } from './services/compression-service.js';
@@ -83,23 +83,7 @@ export class Agent {
     this.agentRegistry = config.agentRegistry;
     this.currentAgentId = config.currentAgentId || '1';
 
-    // Register built-in tools (respecting excludeTools)
-    const excludeTools = config.excludeTools || [];
-    const builtInTools = [readTool, writeTool, editTool, bashTool] as ToolDef[];
-
-    for (const tool of builtInTools) {
-      if (!excludeTools.includes(tool.name)) {
-        this.toolRegistry.register(tool);
-      }
-    }
-
-    // Register agent tool only if:
-    // 1. AgentRegistry is available
-    // 2. agent tool is not excluded
-    // This ensures only the main agent can spawn sub-agents
-    if (this.agentRegistry && !excludeTools.includes('agent')) {
-      this.toolRegistry.register(agentTool);
-    }
+    registerTools(this.toolRegistry, { agentRegistry: this.agentRegistry }, config.excludeTools);
 
     // Use provided display or create default console display
     this.display = config.display ?? new ConsoleDisplay();

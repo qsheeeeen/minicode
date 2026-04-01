@@ -11,6 +11,7 @@ import { CallbackDisplay } from '../utils/display.js';
 export const agentTool: ToolDef = {
   name: 'agent',
   description: 'Delegate a sub-task to an independent agent. Creates a new agent session that runs in parallel. The sub-agent has access to all tools (except agent) and returns a concise summary.',
+  requires: ['agentRegistry'],
   input_schema: {
     type: 'object' as const,
     properties: {
