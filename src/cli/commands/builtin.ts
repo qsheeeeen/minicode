@@ -9,6 +9,18 @@ commandRegistry.register({
 });
 
 commandRegistry.register({
+  name: 'clear',
+  description: 'Clear all history and start a new session',
+  handler: async (_args, ctx): Promise<void> => {
+    ctx.agent.clearSession();
+    ctx.agent.setTokenCount(0);
+    ctx.agent.currentSession = `session-${Date.now()}`;
+    ctx.setCurrentSession(ctx.agent.currentSession);
+    ctx.setMessages([{ role: 'system', content: '(Cleared)', timestamp: new Date() }]);
+  }
+});
+
+commandRegistry.register({
   name: 'compress',
   description: 'Compress conversation history',
   handler: async (_args, ctx): Promise<void> => {
