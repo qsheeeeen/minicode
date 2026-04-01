@@ -6,10 +6,10 @@ A minimal coding agent powered by LLMs. Simple, opinionated, hackable.
 
 ## Features
 
-- **ink-based TUI** — React for CLIs, full terminal UI with streaming, thinking display, and token progress bar
+- **ink-based TUI** — React for CLIs, full terminal UI with streaming, thinking display, and context usage bar
 - **Tool use** — read, write, edit, bash, agent (sub-agent delegation)
 - **Multi-agent** — spawn parallel sub-agents, switch views with Ctrl+number
-- **Multi-provider** — Anthropic, Zhipu, or any OpenAI-compatible API via `model@provider` spec
+- **Multi-provider** — Anthropic, Zhipu, or any Anthropic-compatible API via `model@provider` spec
 - **Session persistence** — auto-save, resume, rename, per-project isolation
 - **Smart compression** — LLM-based conversation summarization at configurable token threshold
 - **Extended thinking** — configurable thinking budget with dimmed streaming display
@@ -94,7 +94,7 @@ src/
 │   ├── commands.ts      # CommandRegistry for / commands
 │   └── tui.tsx          # Main App component with multi-agent hooks
 ├── components/
-│   └── Message.tsx      # Message display component (with diff coloring)
+│   └── Message.tsx      # Message display component by role
 ├── llm/
 │   └── anthropic.ts     # Anthropic SDK wrapper (streaming + thinking)
 ├── services/
@@ -103,7 +103,7 @@ src/
 │   └── compression-service.ts # LLM-based conversation summarization
 ├── tools/
 │   ├── index.ts         # Tool exports and ToolDef interface
-│   ├── registry.ts      # ToolRegistry with auto-discovery
+│   ├── registry.ts      # ToolRegistry (register/get/getAll)
 │   ├── read.ts          # File reading
 │   ├── write.ts         # File writing
 │   ├── edit.ts          # Surgical text replacement
@@ -133,18 +133,20 @@ src/
 Create a file in `src/tools/` implementing the `ToolDef` interface:
 
 ```typescript
-import { ToolDef, ToolExecutionContext } from './index.js';
+import React from 'react';
+import { Text } from 'ink';
+import { ToolDef, ToolResult, ToolExecutionContext } from './index.js';
 
 export const myTool: ToolDef = {
   name: 'my_tool',
   description: 'What it does',
   input_schema: { /* JSON Schema */ },
-  format: (args) => `MyTool(${JSON.stringify(args)})`,
-  formatResult: (result) => result,  // Optional: format output for display
-  execute: async (args, context?: ToolExecutionContext) => {
+  format: (args) => <Text>MyTool({JSON.stringify(args)})</Text>,
+  execute: async (args, context?: ToolExecutionContext): Promise<ToolResult> => {
     // context.registry — AgentRegistry for sub-agent access
     // context.config — parent AgentConfig
-    return 'result string';
+    // context.display — ToolDisplayHandle for real-time slot updates
+    return { output: 'result for LLM', display: <Text dimColor>done</Text> };
   }
 };
 ```
@@ -154,8 +156,8 @@ Register in `Agent` constructor and export from `src/tools/index.ts`.
 ### Key Patterns
 
 - **Registry pattern** — Tools and TUI commands both use `Map<string, T>` registries with `register()`/`get()`/`getAll()`
-- **Display adapter** — `DisplayAdapter` interface abstracts output; `CallbackDisplay` for TUI, `ConsoleDisplay` for fallback
-- **Service injection** — `Agent` accepts optional `TokenManager` and `CompressionService` overrides
+- **Display adapter** — `DisplayAdapter` interface abstracts output with slot-based tool display (`createSlot`/`updateSlot`); `CallbackDisplay` for TUI, `ConsoleDisplay` for fallback
+- **Service injection** — `Agent` accepts optional `TokenManager`, `CompressionService`, and `AgentRegistry` overrides
 - **Session isolation** — Sessions stored per-project using MD5 hash of cwd (`~/.minicode/sessions/<hash>/`)
 
 ## License

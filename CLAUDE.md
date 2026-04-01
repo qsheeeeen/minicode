@@ -19,12 +19,13 @@ A minimal coding agent with **ink-based TUI**, tool use, and session persistence
 
 ### Source Layout
 
-- `src/cli.tsx` — ink React app entry. Parses CLI args, creates Agent with CallbackDisplay, manages TUI state (messages, streaming, sessions, input)
+- `src/cli.tsx` — CLI entry point. Parses args, loads config, renders `App` from `tui.tsx`
+- `src/cli/tui.tsx` — ink React app with `App` component, multi-agent hooks, TUI state management
 - `src/agent.ts` — Core `Agent` class. Owns the conversation loop, delegates to services
 - `src/config.ts` — Provider-based model config from `~/.minicode/config.json`. Model specifier format: `model@provider`
 - `src/llm/anthropic.ts` — Thin wrapper around `@anthropic-ai/sdk`. Handles chat with tools and optional extended thinking
-- `src/tools/` — Tool implementations + `ToolRegistry`
-- `src/services/` — Cross-cutting services (`TokenManager`, `CompressionService`)
+- `src/tools/` — Tool implementations (`read`, `write`, `edit`, `bash`, `agent`) + `ToolRegistry`
+- `src/services/` — Cross-cutting services (`TokenManager`, `CompressionService`, `AgentRegistry`)
 - `src/cli/commands.ts` — `CommandRegistry` for `/` commands (exit, compress, new, rename, resume)
 - `src/utils/` — Display adapters, session persistence, session-to-display conversion
 - `src/components/Message.tsx` — Single React component rendering messages by role
@@ -32,20 +33,21 @@ A minimal coding agent with **ink-based TUI**, tool use, and session persistence
 ### Core Loop (`Agent.run()`)
 
 1. Push user message, then loop: send messages + tool defs to LLM
-2. First pass: collect text blocks and tool_use blocks from response
-3. Display text via streaming, then show tool call names
-4. Second pass: execute all tools in parallel via `Promise.allSettled()`
-5. Push tool results as user messages, repeat until no tool calls
-6. Track tokens via `TokenManager`, auto-compress when exceeding threshold ratio
-7. Auto-save session after each complete exchange
+2. Stream response: text streams to TUI, thinking streams dimmed, tool_use blocks collected
+3. Create display slot per tool call (shows formatted call), execute all tools in parallel via `Promise.allSettled()`
+4. Update slots with combined call+result, push tool results as user messages, repeat until no tool calls
+5. Track tokens via `TokenManager`, auto-compress when exceeding threshold ratio
+6. Auto-save session after each complete exchange
 
 ### Key Patterns
 
-**Registry pattern** — Both tools and TUI commands use a `Map<string, T>` registry with `register()`/`get()`/`getAll()`. Tools are registered in `Agent` constructor; commands are registered in `commands.ts` module scope. `ToolRegistry` also supports `autoDiscover()` for directory-based loading.
+**Registry pattern** — Both tools and TUI commands use a `Map<string, T>` registry with `register()`/`get()`/`getAll()`. Tools are registered in `Agent` constructor; commands are registered in `commands.ts` module scope.
 
-**Display adapter** — `DisplayAdapter` interface abstracts output. `CallbackDisplay` fires React state callbacks for TUI. `ConsoleDisplay` writes to stdout as fallback. The agent only calls display methods — it never touches React state directly.
+**Display adapter** — `DisplayAdapter` interface abstracts output with slot-based tool display. `CallbackDisplay` fires React state callbacks for TUI. `ConsoleDisplay` writes to stdout as fallback. Tools get their own display slot via `createSlot()`/`updateSlot()` for real-time updates. The agent only calls display methods — it never touches React state directly.
 
-**Service injection** — `Agent` constructor accepts optional `TokenManager` and `CompressionService` overrides (defaults to `*Impl` classes). This enables testing without real API calls.
+**Multi-agent coordination** — `AgentRegistry` manages main + sub-agents (IDs "1"–"9"). Sub-agents are spawned via the `agent` tool, which is only registered when an `AgentRegistry` is provided and not in `excludeTools`. Each agent session tracks status, messages, and optional summary.
+
+**Service injection** — `Agent` constructor accepts optional `TokenManager`, `CompressionService`, and `AgentRegistry` overrides (defaults to `*Impl` classes). This enables testing without real API calls.
 
 **Session display bridge** — `SessionDisplay`/`SessionDisplayImpl` converts raw `SessionData` (Anthropic message format) into `DisplayMessage[]` for TUI rendering, handling the mismatch between tool_use blocks and display roles.
 
@@ -56,7 +58,7 @@ A minimal coding agent with **ink-based TUI**, tool use, and session persistence
 ```json
 {
   "providers": {
-    "anthropic": { "apiKey": "...", "baseURL": "...", "model": "claude-sonnet-4-5" },
+    "anthropic": { "apiKey": "...", "baseURL": "...", "models": { "claude-sonnet-4-5": {} } },
     "zhipu": {
       "apiKey": "...",
       "baseURL": "...",
@@ -69,9 +71,12 @@ A minimal coding agent with **ink-based TUI**, tool use, and session persistence
   "model": "glm-5.1@zhipu",
   "compressionThreshold": 0.8,
   "thinking": true,
-  "thinkingTokens": 20000
+  "thinkingTokens": 20000,
+  "promptFile": "MINICODE.md"
 }
 ```
+
+`AgentConfig.excludeTools` (string[]) prevents specific tools from being registered in an agent instance.
 
 Priority: CLI `--model` arg > `MODEL` env var > config `model` field.
 
@@ -84,13 +89,15 @@ export const myTool: ToolDef = {
   name: string,
   description: string,
   input_schema: Record<string, unknown>,
-  format?: (args) => string,    // Display string, e.g. "Bash(ls -la)"
-  execute: (args) => Promise<string>
+  format?: (args) => React.ReactElement,    // Display element, e.g. <Text>Bash(ls -la)</Text>
+  execute: (args, context?) => Promise<ToolResult>  // ToolResult = { output: string, display: React.ReactElement }
 };
 ```
 
 2. Register in `Agent` constructor: `this.toolRegistry.register(myTool)`
 3. Export from `src/tools/index.ts`
+
+The `ToolExecutionContext` provides `registry` (AgentRegistry), `config` (AgentConfig), `currentAgentId`, and `display` (ToolDisplayHandle for real-time slot updates).
 
 ### TUI Commands
 
@@ -98,7 +105,7 @@ Handled by `CommandRegistry` in `src/cli/commands.ts`. Each command gets a `Comm
 
 ### TUI Styling
 
-`Message` component renders by role: user=dim, assistant=white, tool call=yellow, tool result=dim, system=`[System]` gray, error=`[Error]` red. Tool calls are detected by matching known tool names (`Read`, `Write`, `Edit`, `Bash`) followed by `(`. No emoji.
+`Message` component renders by role: user=white on gray background, assistant=default terminal color, thinking=dim (truncated to 200 chars), tool=yellow (uses tool-provided React element if available), tool_result=dim (uses tool-provided element if available), system=dim, error=red. Streaming shows inverse cursor block. No emoji.
 
 ### Sessions
 
