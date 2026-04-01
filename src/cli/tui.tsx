@@ -229,13 +229,14 @@ export function App({
       exit
     };
 
-    const isCommand = await commandRegistry.parseAndExecute(value, commandContext);
-    if (isCommand) return;
+    const result = await commandRegistry.parseAndExecute(value, commandContext);
+    if (result.handled && !result.promptText) return;
 
-    setMessages(prev => [...prev, { role: 'user', content: value, timestamp: new Date() }]);
+    const userText = result.promptText ?? value;
+    setMessages(prev => [...prev, { role: 'user', content: userText, timestamp: new Date() }]);
     setIsLoading(true);
     try {
-      await agentRef.current.run(value);
+      await agentRef.current.run(userText);
       const agent = agentRef.current;
       if (agent) {
         await sessionManager.save(agent.currentSession, {

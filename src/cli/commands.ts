@@ -5,7 +5,10 @@ import type { DisplayMessage } from '../utils/display.js';
 export interface CommandHandler {
   name: string;
   description: string;
-  handler: (args: string[], context: CommandContext) => Promise<void>;
+  // System command: directly manipulates app state
+  handler?: (args: string[], context: CommandContext) => Promise<void>;
+  // Prompt command: returns text to inject into agent conversation
+  prompt?: (args: string[]) => string;
 }
 
 export interface CommandContext {
@@ -23,24 +26,35 @@ export class CommandRegistry {
   private commands = new Map<string, CommandHandler>();
 
   register(cmd: CommandHandler): void {
+    if (!cmd.handler && !cmd.prompt) {
+      throw new Error(`Command "${cmd.name}" must have either handler or prompt`);
+    }
+    if (cmd.handler && cmd.prompt) {
+      throw new Error(`Command "${cmd.name}" cannot have both handler and prompt`);
+    }
     this.commands.set(cmd.name, cmd);
   }
 
-  async parseAndExecute(input: string, context: CommandContext): Promise<boolean> {
+  async parseAndExecute(input: string, context: CommandContext): Promise<{ handled: boolean; promptText?: string }> {
     const trimmed = input.trim();
-    if (!trimmed.startsWith('/')) return false;
+    if (!trimmed.startsWith('/')) return { handled: false };
 
     const parts = trimmed.slice(1).split(/\s+/);
     const name = parts[0];
     const args = parts.slice(1);
 
-    const handler = this.commands.get(name);
-    if (handler) {
-      await handler.handler(args, context);
-      return true;
+    const cmd = this.commands.get(name);
+    if (cmd) {
+      if (cmd.handler) {
+        await cmd.handler(args, context);
+        return { handled: true };
+      }
+      if (cmd.prompt) {
+        return { handled: true, promptText: cmd.prompt(args) };
+      }
     }
 
-    return false;
+    return { handled: false };
   }
 
   getHelp(): string {
@@ -131,5 +145,13 @@ commandRegistry.register({
         ctx.setMessages(prev => [...prev, { role: 'error', content: `Session not found: ${name}`, timestamp: new Date() }]);
       }
     }
+  }
+});
+
+commandRegistry.register({
+  name: 'plan',
+  description: 'Turn the current discussion into an executable plan',
+  prompt: () => {
+    return 'Based on our discussion so far, produce a concrete, step-by-step executable plan. For each step, specify what to do and how to verify it works. Do NOT start implementing — only output the plan.';
   }
 });
