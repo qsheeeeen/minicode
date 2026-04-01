@@ -59,10 +59,10 @@ export function Message({ role, content, isStreaming, element }: MessageProps) {
     );
   }
 
-  // System message - dim gray, with same indent as tool call
+  // System message - dim gray, no indent
   if (role === 'system') {
     return (
-      <Box marginBottom={0} paddingX={4}>
+      <Box marginBottom={0} paddingX={0}>
         <Text dimColor>{content}</Text>
       </Box>
     );
