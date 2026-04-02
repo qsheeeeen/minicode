@@ -238,6 +238,13 @@ export function App({
     setIsLoading(true);
     try {
       await agentRef.current.run(userText);
+    } catch (e) {
+      if (e instanceof Error && e.message === 'Aborted') {
+        setMessages(prev => [...prev, { role: 'system' as const, content: '(Aborted)', timestamp: new Date() }]);
+      } else {
+        throw e;
+      }
+    } finally {
       const agent = agentRef.current;
       if (agent) {
         await sessionManager.save(agent.currentSession, {
@@ -248,7 +255,6 @@ export function App({
           updatedAt: ''
         });
       }
-    } finally {
       setIsLoading(false);
       setStatus('');
     }
@@ -302,6 +308,10 @@ export function App({
 
   useInput((input, key) => {
     if (key.ctrl && input === 'c') exit();
+    if (key.escape && isLoading) {
+      agentRef.current?.abort();
+      return;
+    }
     if (key.ctrl && input >= '1' && input <= '9') {
       setActiveAgentId(input);
       const session = agentSessions.find(s => s.id === input);
@@ -397,6 +407,8 @@ export function App({
         </Text>
         <Text dimColor>│ </Text>
         <Text dimColor>{Math.min(100, Math.floor(tokenCount / (config.model?.contextLength || 200000) * 100))}%</Text>
+        {isLoading && <Text dimColor> │ </Text>}
+        {isLoading && <Text color="magenta">esc to abort</Text>}
       </Box>
     </Box>
   );

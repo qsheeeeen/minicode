@@ -40,9 +40,23 @@ export const bashTool: ToolDef = {
           setTimeout(() => proc.kill(), timeout * 1000);
         }
 
+        if (context?.signal?.aborted) {
+          proc.kill();
+          resolve('Aborted');
+          return;
+        }
+        context?.signal?.addEventListener('abort', () => {
+          proc.kill();
+        });
+
         proc.on('close', (code) => {
-          if (code === 0) resolve(stdout || stderr);
-          else reject(new Error(`Exit code ${code}: ${stderr || stdout}`));
+          if (context?.signal?.aborted) {
+            resolve('Aborted');
+          } else if (code === 0) {
+            resolve(stdout || stderr);
+          } else {
+            reject(new Error(`Exit code ${code}: ${stderr || stdout}`));
+          }
         });
       });
       return {

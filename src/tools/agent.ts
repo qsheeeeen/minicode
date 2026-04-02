@@ -78,6 +78,11 @@ export const agentTool: ToolDef = {
     // Create sub-agent
     const subAgent = new Agent(subConfig);
 
+    // Forward abort signal to sub-agent
+    context?.signal?.addEventListener('abort', () => {
+      subAgent.abort();
+    });
+
     // Register session
     registry.register({
       id: subId,

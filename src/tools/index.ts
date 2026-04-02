@@ -20,6 +20,7 @@ export interface ToolExecutionContext {
   config?: AgentConfig;
   currentAgentId?: string;
   display?: ToolDisplayHandle;
+  signal?: AbortSignal;
 }
 
 /** Tool returns output for LLM and ink element for TUI */

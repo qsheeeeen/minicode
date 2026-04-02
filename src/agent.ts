@@ -67,6 +67,8 @@ export class Agent {
   private currentAgentId: string;
   private apiKey?: string;
   private baseURL?: string;
+  private abortController: AbortController | null = null;
+  private currentStream: import('@anthropic-ai/sdk/lib/MessageStream.js').MessageStream<null> | null = null;
 
   constructor(config: AgentConfig = {}) {
     this.apiKey = config.apiKey;
@@ -93,6 +95,18 @@ export class Agent {
   /** Set or update the display adapter */
   setDisplay(display: DisplayAdapter): void {
     this.display = display;
+  }
+
+  /** Abort the current run() loop */
+  abort(): void {
+    this.abortController?.abort();
+    this.currentStream?.abort();
+  }
+
+  private throwIfAborted(): void {
+    if (this.abortController?.signal.aborted) {
+      throw new Error('Aborted');
+    }
   }
 
   async compress(): Promise<void> {
@@ -132,6 +146,7 @@ export class Agent {
       thinking: this.thinkingEnabled,
       thinkingTokens: this.thinkingTokens
     });
+    this.currentStream = stream;
 
     let isStreamingThinking = false;
     let isStreamingText = false;
@@ -177,7 +192,15 @@ export class Agent {
       }
     });
 
-    const response = await stream.finalMessage();
+    let response: Anthropic.Messages.Message;
+    try {
+      response = await stream.finalMessage();
+    } catch (e) {
+      this.currentStream = null;
+      if (this.abortController?.signal.aborted) throw new Error('Aborted');
+      throw e;
+    }
+    this.currentStream = null;
 
     if (isStreamingThinking) this.display.streamThinkingEnd();
     if (isStreamingText) this.display.streamEnd();
@@ -224,6 +247,7 @@ export class Agent {
 
     const context: ToolExecutionContext = {
       registry: this.agentRegistry,
+      signal: this.abortController?.signal,
       config: {
         apiKey: this.apiKey,
         baseURL: this.baseURL,
@@ -287,27 +311,37 @@ export class Agent {
   async run(userMessage: string): Promise<void> {
     this.injectUserPrompt();
     this.messages.push({ role: 'user', content: userMessage });
+    this.abortController = new AbortController();
 
-    while (true) {
-      const toolDefs = this.toolRegistry.getAll().map(t => ({
-        name: t.name,
-        description: t.description,
-        input_schema: t.input_schema
-      })) as Tool[];
+    try {
+      while (true) {
+        this.throwIfAborted();
 
-      const { response, toolCalls, hasToolCalls } = await this.handleStreamingResponse(toolDefs);
+        const toolDefs = this.toolRegistry.getAll().map(t => ({
+          name: t.name,
+          description: t.description,
+          input_schema: t.input_schema
+        })) as Tool[];
 
-      await this.processTokenUsage(response);
+        const { response, toolCalls, hasToolCalls } = await this.handleStreamingResponse(toolDefs);
 
-      // Build and push assistant message
-      const assistantMsg: MessageParam = { role: 'assistant', content: response.content as ContentBlock[] };
+        await this.processTokenUsage(response);
 
-      this.messages.push(assistantMsg);
+        // Build and push assistant message
+        const assistantMsg: MessageParam = { role: 'assistant', content: response.content as ContentBlock[] };
 
-      // Execute tools
-      await this.executeToolCalls(toolCalls);
+        this.messages.push(assistantMsg);
 
-      if (!hasToolCalls) break;
+        this.throwIfAborted();
+
+        // Execute tools
+        await this.executeToolCalls(toolCalls);
+
+        if (!hasToolCalls) break;
+      }
+    } finally {
+      this.abortController = null;
+      this.currentStream = null;
     }
 
     // Auto-save is handled by TUI layer
