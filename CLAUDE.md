@@ -110,3 +110,28 @@ Handled by `CommandRegistry` in `src/cli/commands/`. Each command gets a `Comman
 ### Sessions
 
 Stored as JSON in `~/.minicode/sessions/<project-hash>/` (MD5 of cwd, 12 chars). Include messages + token count. Auto-saved after each exchange.
+
+### Feature Coupling Matrix
+
+Adding a new feature? Check which existing features it must integrate with. Each `×` marks a direct dependency — changes in either side affect the other.
+
+| Feature | Agent Loop | Tool System | ESC Abort | Multi-Agent | Session | Compression | TUI Display | Commands | Config |
+|---------|:----------:|:-----------:|:---------:|:-----------:|:-------:|:-----------:|:-----------:|:--------:|:------:|
+| Agent Loop | — | × | × | × | × | × | × | | × |
+| Tool System | × | — | × | × | × | | × | | × |
+| ESC Abort | × | × | — | × | × | | × | | |
+| Multi-Agent | × | × | × | — | | | × | | × |
+| Session | × | × | × | | — | × | × | × | |
+| Compression | × | | | | × | — | × | × | × |
+| TUI Display | × | × | × | × | × | × | — | × | × |
+| Commands | × | × | | × | × | × | × | — | |
+| Config | × | × | | × | | × | × | | — |
+
+**Key integration points (what to touch when adding a feature):**
+
+- **Tool System** — `ToolExecutionContext` in `src/tools/index.ts`: add new fields here if the feature needs to pass data to tools. Every tool receives this context.
+- **Agent Loop** — `Agent.run()` in `src/agent.ts`: the central `while` loop. New lifecycle hooks (pre-stream, post-tool, etc.) go here.
+- **TUI Display** — `DisplayAdapter` in `src/utils/display.ts`: add methods for new UI events. `CallbackDisplay` in `tui.tsx` implements them as React state updates.
+- **Session** — `SessionData` format in `src/utils/session.ts`: new persistent state needs serialization here + conversion in `SessionDisplayImpl`.
+- **Commands** — register in `src/cli/commands/builtin.ts`. `CommandContext` in `index.ts` may need new fields for features that commands must orchestrate.
+- **Abort** — `Agent.abort()` in `src/agent.ts`: new blocking operations need `AbortSignal` awareness. Pass signal through `ToolExecutionContext.signal` for tools, or check `throwIfAborted()` at loop boundaries.
