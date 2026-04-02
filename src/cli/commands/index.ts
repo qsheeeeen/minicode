@@ -22,7 +22,7 @@ export interface CommandContext {
   exit: () => void;
 }
 
-export class CommandRegistry {
+class CommandRegistry {
   private commands = new Map<string, CommandHandler>();
 
   register(cmd: CommandHandler): void {
