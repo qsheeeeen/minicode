@@ -17,6 +17,10 @@ No test framework or linter is configured.
 
 A minimal coding agent with **ink-based TUI**, tool use, and session persistence. All interaction happens through the TUI — there is no separate console mode.
 
+**Project goal:** Self-bootstrapping — use minicode to develop minicode itself.
+
+**Module system:** ESM (`"type": "module"`) with Node16 module resolution. All imports use `.js` extensions (e.g. `import { foo } from './bar.js'` for `bar.ts`).
+
 ### Source Layout
 
 - `src/cli.tsx` — CLI entry point. Parses args, loads config, renders `App` from `tui.tsx`
@@ -86,18 +90,18 @@ Priority: CLI `--model` arg > `MODEL` env var > config `model` field.
 
 ```typescript
 export const myTool: ToolDef = {
-  name: string,
-  description: string,
-  input_schema: Record<string, unknown>,
+  name: 'my_tool',
+  description: 'What it does',
+  input_schema: { /* JSON Schema */ },
   format?: (args) => React.ReactElement,    // Display element, e.g. <Text>Bash(ls -la)</Text>
   execute: (args, context?) => Promise<ToolResult>  // ToolResult = { output: string, display: React.ReactElement }
+  requires?: ['agentRegistry']  // Optional: only register when AgentRegistry available
 };
 ```
 
-2. Register in `Agent` constructor: `this.toolRegistry.register(myTool)`
-3. Export from `src/tools/index.ts`
+2. Add to `allTools` array in `src/tools/index.ts` — this is the only registration point. The `registerTools()` function iterates `allTools` and conditionally registers based on `excludeTools` and `requires`.
 
-The `ToolExecutionContext` provides `registry` (AgentRegistry), `config` (AgentConfig), `currentAgentId`, and `display` (ToolDisplayHandle for real-time slot updates).
+The `ToolExecutionContext` provides `registry` (AgentRegistry), `config` (AgentConfig), `currentAgentId`, `display` (ToolDisplayHandle for real-time slot updates), and `signal` (AbortSignal).
 
 ### TUI Commands
 
