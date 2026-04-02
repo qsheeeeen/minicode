@@ -96,3 +96,11 @@ commandRegistry.register({
     return 'Based on our discussion so far, produce a concrete, step-by-step executable plan. For each step, specify what to do and how to verify it works. Do NOT start implementing — only output the plan.';
   }
 });
+
+commandRegistry.register({
+  name: 'test',
+  description: 'Run a simple test across all available tools',
+  prompt: () => {
+    return '简单测试所有tools';
+  }
+});
