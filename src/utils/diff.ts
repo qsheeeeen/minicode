@@ -2,7 +2,7 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import * as Diff from 'diff';
 
-export interface DiffLine {
+interface DiffLine {
   type: 'add' | 'remove' | 'header';
   content: string;
 }

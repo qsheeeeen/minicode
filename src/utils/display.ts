@@ -4,12 +4,12 @@
  */
 
 import React from 'react';
-import type { MessageRole, DisplayMessage } from './session-display.js';
+import type { DisplayMessage } from './session-display.js';
 
 // Re-export for convenience
-export type { MessageRole, DisplayMessage };
+export type { DisplayMessage };
 
-export type DisplayCallback = {
+type DisplayCallback = {
   onMessage?: (msg: DisplayMessage) => void;
   onUpdateLast?: (updater: (msg: DisplayMessage) => DisplayMessage) => void;
   onUpdateSlot?: (slotId: string, updater: (msg: DisplayMessage) => DisplayMessage) => void;

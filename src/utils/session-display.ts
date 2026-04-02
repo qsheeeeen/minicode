@@ -14,12 +14,7 @@ export interface DisplayMessage {
   slotId?: string;
 }
 
-export interface SessionDisplay {
-  loadForTUI(name: string): Promise<DisplayMessage[]>;
-  loadForConsole(name: string, display: DisplayAdapter): Promise<void>;
-}
-
-export class SessionDisplayImpl implements SessionDisplay {
+export class SessionDisplayImpl {
   constructor(private sessionManager: SessionManager, private toolRegistry: ToolRegistry) {}
 
   async loadForTUI(name: string): Promise<DisplayMessage[]> {

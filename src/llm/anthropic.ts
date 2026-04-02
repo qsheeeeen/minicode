@@ -3,7 +3,7 @@ import type { MessageStream } from '@anthropic-ai/sdk/lib/MessageStream.js';
 
 export type { Anthropic };
 
-export interface ChatOptions {
+interface ChatOptions {
   model?: string;
   maxTokens?: number;
   system?: string;
@@ -15,8 +15,6 @@ export type MessageParam = Anthropic.Messages.MessageParam;
 export type Tool = Anthropic.Messages.Tool;
 export type Message = Anthropic.Messages.Message;
 export type ContentBlock = Anthropic.Messages.ContentBlock;
-export type { MessageStream };
-
 export class AnthropicClient {
   private client: Anthropic;
 
