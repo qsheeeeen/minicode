@@ -340,6 +340,12 @@ export class Agent {
         if (!hasToolCalls) break;
       }
     } finally {
+      if (this.abortController?.signal.aborted) {
+        const last = this.messages[this.messages.length - 1];
+        if (last?.role === 'user' && typeof last.content === 'string') {
+          this.messages.pop();
+        }
+      }
       this.abortController = null;
       this.currentStream = null;
     }
