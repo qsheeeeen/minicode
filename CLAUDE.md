@@ -26,7 +26,7 @@ A minimal coding agent with **ink-based TUI**, tool use, and session persistence
 - `src/llm/anthropic.ts` — Thin wrapper around `@anthropic-ai/sdk`. Handles chat with tools and optional extended thinking
 - `src/tools/` — Tool implementations (`read`, `write`, `edit`, `bash`, `agent`) + `ToolRegistry`
 - `src/services/` — Cross-cutting services (`TokenManager`, `CompressionService`, `AgentRegistry`)
-- `src/cli/commands.ts` — `CommandRegistry` for `/` commands (exit, compress, new, rename, resume)
+- `src/cli/commands/` — `CommandRegistry` (`index.ts`) and builtin command registrations (`builtin.ts`)
 - `src/utils/` — Display adapters, session persistence, session-to-display conversion
 - `src/components/Message.tsx` — Single React component rendering messages by role
 
@@ -41,7 +41,7 @@ A minimal coding agent with **ink-based TUI**, tool use, and session persistence
 
 ### Key Patterns
 
-**Registry pattern** — Both tools and TUI commands use a `Map<string, T>` registry with `register()`/`get()`/`getAll()`. Tools are registered in `Agent` constructor; commands are registered in `commands.ts` module scope.
+**Registry pattern** — Both tools and TUI commands use a `Map<string, T>` registry with `register()`/`get()`/`getAll()`. Tools are registered in `Agent` constructor; commands are registered in `commands/builtin.ts` module scope.
 
 **Display adapter** — `DisplayAdapter` interface abstracts output with slot-based tool display. `CallbackDisplay` fires React state callbacks for TUI. `ConsoleDisplay` writes to stdout as fallback. Tools get their own display slot via `createSlot()`/`updateSlot()` for real-time updates. The agent only calls display methods — it never touches React state directly.
 
@@ -49,7 +49,7 @@ A minimal coding agent with **ink-based TUI**, tool use, and session persistence
 
 **Service injection** — `Agent` constructor accepts optional `TokenManager`, `CompressionService`, and `AgentRegistry` overrides (defaults to `*Impl` classes). This enables testing without real API calls.
 
-**Session display bridge** — `SessionDisplay`/`SessionDisplayImpl` converts raw `SessionData` (Anthropic message format) into `DisplayMessage[]` for TUI rendering, handling the mismatch between tool_use blocks and display roles.
+**Session display bridge** — `SessionDisplayImpl` converts raw `SessionData` (Anthropic message format) into `DisplayMessage[]` for TUI rendering, handling the mismatch between tool_use blocks and display roles.
 
 ### Config Format
 
@@ -101,7 +101,7 @@ The `ToolExecutionContext` provides `registry` (AgentRegistry), `config` (AgentC
 
 ### TUI Commands
 
-Handled by `CommandRegistry` in `src/cli/commands.ts`. Each command gets a `CommandContext` with agent, session manager, and React state setters. To add a command: call `commandRegistry.register({ name, description, handler })` in that file.
+Handled by `CommandRegistry` in `src/cli/commands/`. Each command gets a `CommandContext` with agent, session manager, and React state setters. Two command types: `handler` (manipulates app state directly) or `prompt` (returns text injected into conversation). To add a command: call `commandRegistry.register({ name, description, handler | prompt })` in `builtin.ts`.
 
 ### TUI Styling
 

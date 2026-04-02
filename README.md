@@ -71,6 +71,9 @@ minicode --resume                 # Resume most recent session
 | `/resume <name>` | Load specific session |
 | `/rename <name>` | Rename current session |
 | `/compress` | Compress conversation history |
+| `/clear` | Clear history and start fresh |
+| `/plan` | Generate executable plan from discussion |
+| `/test` | Run a simple test across all tools |
 | `/exit` | Quit (or Ctrl+C) |
 
 ### Multi-Agent
@@ -91,7 +94,9 @@ src/
 ├── config.ts            # Multi-provider config loader
 ├── cli/
 │   ├── args.ts          # CLI argument parsing and help
-│   ├── commands.ts      # CommandRegistry for / commands
+│   ├── commands/        # CommandRegistry + builtin / commands
+│   │   ├── index.ts     # CommandRegistry class
+│   │   └── builtin.ts   # Command registrations
 │   └── tui.tsx          # Main App component with multi-agent hooks
 ├── components/
 │   └── Message.tsx      # Message display component by role
@@ -112,7 +117,6 @@ src/
 └── utils/
     ├── diff.ts               # Unified diff generation
     ├── display.ts            # DisplayAdapter (Console/Callback)
-    ├── logger.ts             # Logging utility
     ├── prompts.ts            # Global and project prompt loading
     ├── session.ts            # SessionManager for persistence
     └── session-display.ts    # Session data → display message conversion
