@@ -77,6 +77,7 @@ export class AgentRegistry {
 
   remove(id: string): void {
     this.sessions.delete(id);
+    this.notifyUpdate();
   }
 
   clear(): void {

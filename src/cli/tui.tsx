@@ -36,16 +36,22 @@ function useMultiAgent() {
   const [activeAgentId, setActiveAgentId] = useState<string>('1');
   const [agentSessions, setAgentSessions] = useState<AgentSession[]>([]);
   const registryRef = useRef<AgentRegistry | null>(null);
+  const activeAgentIdRef = useRef('1');
 
   useEffect(() => {
     const registry = new AgentRegistry();
     registryRef.current = registry;
     registry.setUpdateCallback((sessions) => {
       setAgentSessions(sessions);
+      // Auto-switch to main if current agent was removed
+      if (activeAgentIdRef.current !== '1' && !sessions.find(s => s.id === activeAgentIdRef.current)) {
+        activeAgentIdRef.current = '1';
+        setActiveAgentId('1');
+      }
     });
   }, []);
 
-  return { activeAgentId, setActiveAgentId, agentSessions, setAgentSessions, registryRef };
+  return { activeAgentId, activeAgentIdRef, setActiveAgentId, agentSessions, setAgentSessions, registryRef };
 }
 
 /** Hook: agent initialization, session loading, message submission */
@@ -56,7 +62,6 @@ function useAgent(
   sessionManager: SessionManager,
   sessionName: string | undefined,
   resumeRecent: boolean,
-  activeAgentId: string,
   setAgentSessions: React.Dispatch<React.SetStateAction<AgentSession[]>>,
   registryRef: React.MutableRefObject<AgentRegistry | null>,
 ) {
@@ -92,9 +97,7 @@ function useAgent(
 
     // Subscribe to store changes for tool/status/error messages
     agent.getStore().onChange(() => {
-      if (activeAgentId === '1') {
-        setMessages(agent.getStore().toDisplayMessages());
-      }
+      setMessages(agent.getStore().toDisplayMessages());
     });
 
     registry.register({
@@ -164,12 +167,12 @@ export function App({
   const { exit } = useApp();
 
   // Multi-agent hook
-  const { activeAgentId, setActiveAgentId, agentSessions, setAgentSessions, registryRef } = useMultiAgent();
+  const { activeAgentId, activeAgentIdRef, setActiveAgentId, agentSessions, setAgentSessions, registryRef } = useMultiAgent();
 
   // Agent hook
   const { messages, setMessages, currentSession, setCurrentSession, tokenCount, agentRef } = useAgent(
     config, userPrompt, initialSession, sessionManager, sessionName, resumeRecent,
-    activeAgentId, setAgentSessions, registryRef,
+    setAgentSessions, registryRef,
   );
 
   const setSessionList = (sessions: Array<{ name: string }>) => {
@@ -276,12 +279,15 @@ export function App({
       agentRef.current?.abort();
       return;
     }
-    if (key.ctrl && input >= '1' && input <= '9') {
-      setActiveAgentId(input);
-      const session = agentSessions.find(s => s.id === input);
-      if (session) {
-        setMessages(session.agent.getStore().toDisplayMessages());
-      }
+    if (key.ctrl && input === 'o') {
+      const sessions = registryRef.current?.getAll() || [];
+      if (sessions.length <= 1) return;
+      const currentIndex = sessions.findIndex(s => s.id === activeAgentIdRef.current);
+      const nextIndex = (currentIndex + 1) % sessions.length;
+      const nextSession = sessions[nextIndex];
+      activeAgentIdRef.current = nextSession.id;
+      setActiveAgentId(nextSession.id);
+      setMessages(nextSession.agent.getStore().toDisplayMessages());
     }
   }, { isActive: mode === 'chat' });
 
@@ -307,14 +313,7 @@ export function App({
         <Box>
           {agentSessions.length > 1 && (
             <>
-              {agentSessions.map(s => {
-                const label = s.id === '1' ? 'M' : s.id;
-                return (
-                  <Text key={s.id} color={s.id === activeAgentId ? 'cyan' : 'dimColor'} bold={s.id === activeAgentId}>
-                    [{label}]
-                  </Text>
-                );
-              })}
+              <Text bold color="cyan">[{activeAgentId === '1' ? 'M' : activeAgentId}]</Text>
               <Text dimColor> | </Text>
             </>
           )}
@@ -338,9 +337,9 @@ export function App({
             ))}
           </Box>
         )}
-        {activeAgentId !== '1' && (
+        {agentSessions.length > 1 && (
           <Box marginTop={1}>
-            <Text dimColor color="yellow">Press Ctrl+1 to return to main agent</Text>
+            <Text dimColor color="yellow">Ctrl+O: switch agent</Text>
           </Box>
         )}
       </Box>

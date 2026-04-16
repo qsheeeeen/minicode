@@ -71,7 +71,7 @@ export const agentTool: ToolDef = {
       const taskPreview = task.length > 40 ? task.slice(0, 40) + '...' : task;
       parentSession.agent.getStore().add({
         role: 'status',
-        content: `[Agent #${subId} started: ${taskPreview} - Press Ctrl+${subId} to view]`,
+        content: `[Agent #${subId} started: ${taskPreview}]`,
         timestamp: new Date(),
         inContext: false,
       });
@@ -84,6 +84,7 @@ export const agentTool: ToolDef = {
       const summary = generateSummary(storeMessages);
       registry.updateStatus(subId, 'completed');
       registry.updateSummary(subId, summary);
+      registry.remove(subId);
 
       const output = finalResponse || `Agent #${subId} completed: ${summary}`;
       return {
@@ -94,6 +95,7 @@ export const agentTool: ToolDef = {
       const errorMsg = error instanceof Error ? error.message : String(error);
       registry.updateStatus(subId, 'error');
       registry.updateSummary(subId, `Error: ${errorMsg}`);
+      registry.remove(subId);
 
       return { output: `Agent #${subId} failed: ${errorMsg}`, display: React.createElement(Text, { color: 'red' }, `Agent #${subId} failed: ${errorMsg}`) };
     }
