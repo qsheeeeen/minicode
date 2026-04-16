@@ -81,7 +81,7 @@ commandRegistry.register({
         const { SessionDisplayImpl } = await import('../../utils/session-display.js');
         const sessionDisplay = new SessionDisplayImpl(ctx.sessionManager, ctx.agent.getToolRegistry());
         const displayMessages = await sessionDisplay.loadForTUI(name);
-        ctx.setMessages(displayMessages.length > 0 ? displayMessages: [{ role: 'system', content: `Loaded session: ${name}`, timestamp: new Date() }]);
+        ctx.setMessages(displayMessages.length > 0 ? displayMessages : [{ role: 'system', content: `Loaded session: ${name}`, timestamp: new Date() }]);
       } else {
         ctx.setMessages(prev => [...prev, { role: 'error', content: `Session not found: ${name}`, timestamp: new Date() }]);
       }

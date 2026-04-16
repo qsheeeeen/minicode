@@ -1,38 +1,45 @@
-# 已完成 ✅
-- [x] config 控制一个 provider 多个 model（model@provider 格式）
-- [x] config 挪到 ~/.minicode/
-- [x] 全局提示词（~/.minicode/MINICODE.md）
-- [x] 项目提示词（项目根目录 MINICODE.md）
-- [x] 提示词加载机制（src/utils/prompts.ts）
+# Completed
+- [x] Multi-model config per provider (model@provider format)
+- [x] Config moved to ~/.minicode/
+- [x] Global prompt (~/.minicode/MINICODE.md)
+- [x] Per-project prompt (./MINICODE.md in project root)
+- [x] Prompt loading mechanism (src/utils/prompts.ts)
+- [x] Agent as tool — sub-agent delegation via `agent` tool + AgentRegistry
 
-# 待办事项 📋
+# Roadmap
 
-## 功能增强
-- [ ] 命令行工具控制（如 `/enable tool`、`/disable tool`）
-- [ ] Agent as tool
-- [ ] 添加一个 /review 命令调用其他模型代替用户和现在的模型对话。
+## Autonomous Agent
+- [ ] Headless mode — run without TUI, accept task from CLI arg or stdin
+- [ ] Task decomposition — break high-level goals into actionable steps
+- [ ] Self-validation loop — auto-run tests/lint, fix errors, iterate until green
+- [ ] Progress reporting — structured output for external monitoring
+- [ ] Retry and recovery — handle API errors, rate limits, and tool failures gracefully
 
-## 代码质量
-- [ ] 添加单元测试框架
-- [ ] 添加 ESLint/Prettier 配置
-- [ ] 类型检查严格模式
+## Feature Enhancements
+- [ ] Tool control commands (`/enable tool`, `/disable tool`)
+- [ ] `/review` command — invoke another model to review/discuss with current model
 
-## 文档
-- [ ] 完善使用文档
-- [ ] 添加工具开发指南
-- [ ] 编写自举开发日志
+## Code Quality
+- [ ] Add unit test framework
+- [ ] Add ESLint/Prettier config
+- [ ] Strict TypeScript mode
 
-## 实验性功能
-- [ ] Skill 系统？（可复用的代码模式/技能包）
-- [ ] 多模型并行调用（同时使用多个模型投票或分工）
-- [ ] Web 搜索工具集成
-- [ ] 代码执行沙箱
+## Documentation
+- [ ] Improve usage docs
+- [ ] Add tool development guide
+- [ ] Write self-bootstrapping dev log
 
-# Bug 追踪
-- 暂无
+## Experimental
+- [ ] Skill system — reusable code patterns / skill packs
+- [ ] Multi-model parallel calls (voting or task division)
+- [ ] Web search tool integration
+- [ ] Code execution sandbox
 
-# 想法 💡
-- 添加 `/diff` 命令查看对话变更历史
-- 支持会话导出为 Markdown
-- 添加 `/teach` 模式，让用户教 agent 新技能
-- 实现会话分支（类似 git branch）
+# Bug Tracking
+- None currently
+
+# Ideas
+- `/diff` command to view conversation change history
+- Export sessions as Markdown
+- `/teach` mode for users to teach agent new skills
+- Session branching (like git branches)

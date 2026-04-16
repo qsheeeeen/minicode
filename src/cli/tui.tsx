@@ -82,30 +82,13 @@ function useAgent(
 
     const displayAdapter = new CallbackDisplay({
       onMessage: (msg) => {
+        // status/error from sub-agent notifications
         if (activeAgentId === '1') {
           setMessages(prev => [...prev, msg]);
         }
       },
-      onUpdateLast: (updater) => {
-        if (activeAgentId === '1') {
-          setMessages(prev => {
-            if (prev.length === 0) return prev;
-            const copy = [...prev];
-            copy[copy.length - 1] = updater(copy[copy.length - 1]);
-            return copy;
-          });
-        }
-      },
-      onUpdateSlot: (slotId, updater) => {
-        if (activeAgentId === '1') {
-          setMessages(prev => {
-            const idx = prev.findIndex(m => m.slotId === slotId);
-            if (idx === -1) return prev;
-            const copy = [...prev];
-            copy[idx] = updater(copy[idx]);
-            return copy;
-          });
-        }
+      onMessageUpdate: () => {
+        // Handled by store.onChange
       },
       onStatusUpdate: () => {},
       onTokenUpdate: setTokenCount
@@ -126,6 +109,13 @@ function useAgent(
     });
 
     agentRef.current = agent;
+
+    // Subscribe to store changes for tool/status/error messages
+    agent.getStore().onChange(() => {
+      if (activeAgentId === '1') {
+        setMessages(agent.getStore().toDisplayMessages());
+      }
+    });
 
     registry.register({
       id: '1',

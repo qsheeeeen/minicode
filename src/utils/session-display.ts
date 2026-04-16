@@ -91,7 +91,7 @@ export class SessionDisplayImpl {
         display.raw(msg.content);
         break;
       case 'system':
-        display.system(msg.content);
+        display.status(msg.content);
         break;
       case 'error':
         display.error(msg.content);

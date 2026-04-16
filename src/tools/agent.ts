@@ -52,10 +52,15 @@ export const agentTool: ToolDef = {
         subMessages.push(msg);
         registry.addMessage(subId, msg);
       },
-      onUpdateLast: (updater) => {
-        const last = subMessages[subMessages.length - 1];
-        if (last) {
-          subMessages[subMessages.length - 1] = updater(last);
+      onMessageUpdate: (id, updater) => {
+        const idx = subMessages.findIndex(m => m.slotId === id);
+        if (idx !== -1) {
+          subMessages[idx] = updater(subMessages[idx]);
+        } else {
+          const last = subMessages[subMessages.length - 1];
+          if (last) {
+            subMessages[subMessages.length - 1] = updater(last);
+          }
         }
       },
       onStatusUpdate: (_status) => {
@@ -99,7 +104,7 @@ export const agentTool: ToolDef = {
     const parentSession = registry.get(parentId);
     if (parentSession?.display) {
       const taskPreview = task.length > 40 ? task.slice(0, 40) + '...' : task;
-      parentSession.display.system(`[Agent #${subId} started: ${taskPreview} - Press Ctrl+${subId} to view]`);
+      parentSession.display.status(`[Agent #${subId} started: ${taskPreview} - Press Ctrl+${subId} to view]`);
     }
 
     // Run task and wait for completion

@@ -91,6 +91,7 @@ The header shows agent tabs (`[M] [2] [3]`) with the active one highlighted.
 src/
 ├── cli.tsx              # TUI entry point, CLI args, React app
 ├── agent.ts             # Agent class with tool execution loop
+├── messages.ts          # Unified AgentMessage model + MessageStore
 ├── config.ts            # Multi-provider config loader
 ├── cli/
 │   ├── args.ts          # CLI argument parsing and help
@@ -116,19 +117,19 @@ src/
 │   └── agent.ts         # Sub-agent delegation tool
 └── utils/
     ├── diff.ts               # Unified diff generation
-    ├── display.ts            # DisplayAdapter (Console/Callback)
+    ├── display.ts            # StreamDisplay + NotificationDisplay + StateDisplay
     ├── prompts.ts            # Global and project prompt loading
-    ├── session.ts            # SessionManager for persistence
-    └── session-display.ts    # Session data → display message conversion
+    ├── session.ts            # SessionManager for persistence (v1/v2)
+    └── session-display.ts    # Legacy v1 session → display message conversion
 ```
 
 ### Core Flow
 
-1. User input → Agent pushes message, sends to LLM with tool definitions
-2. LLM responds with text + tool_use blocks (streamed to TUI)
-3. Text streams to TUI; thinking displayed dimmed; tools execute in parallel (`Promise.allSettled`)
-4. Tool results pushed back to LLM; loop continues until no tool calls
-5. Session auto-saved after each exchange
+1. User input → Agent adds message to `MessageStore`, sends `store.toLLMMessages()` to LLM
+2. LLM responds with text + tool_use blocks (streamed to TUI via `DisplayAdapter`)
+3. Text/thinking streams to TUI; tool_call added to store; tools execute in parallel (`Promise.allSettled`)
+4. Store updates fire `onChange` → TUI re-renders from `store.toDisplayMessages()`
+5. Session auto-saved (v2 format with `agentMessages`) after each exchange
 6. Token usage tracked; progress bar in status bar; auto-compresses when exceeding threshold
 7. Sub-agents can be spawned via the `agent` tool, managed by `AgentRegistry`
 
