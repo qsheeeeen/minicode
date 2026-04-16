@@ -3,7 +3,7 @@ import { SessionManager, SessionData } from './session.js';
 import { DisplayAdapter } from './display.js';
 import { ToolRegistry } from '../tools/registry.js';
 
-export type MessageRole = 'user' | 'assistant' | 'system' | 'tool' | 'tool_result' | 'error' | 'thinking';
+export type MessageRole = 'user' | 'assistant' | 'status' | 'tool' | 'tool_result' | 'error' | 'thinking';
 
 export interface DisplayMessage {
   role: MessageRole;
@@ -90,7 +90,7 @@ export class SessionDisplayImpl {
       case 'tool_result':
         display.raw(msg.content);
         break;
-      case 'system':
+      case 'status':
         display.status(msg.content);
         break;
       case 'error':

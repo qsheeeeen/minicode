@@ -66,7 +66,7 @@ export class CallbackDisplay implements DisplayAdapter {
   constructor(private callbacks: DisplayCallback) {}
 
   status(msg: string): void {
-    this.callbacks.onMessage?.({ role: 'system', content: msg, timestamp: new Date() });
+    this.callbacks.onMessage?.({ role: 'status', content: msg, timestamp: new Date() });
   }
 
   error(msg: string): void {

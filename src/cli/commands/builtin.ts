@@ -16,7 +16,7 @@ commandRegistry.register({
     ctx.agent.setTokenCount(0);
     ctx.agent.currentSession = `session-${Date.now()}`;
     ctx.setCurrentSession(ctx.agent.currentSession);
-    ctx.setMessages([{ role: 'system', content: '(Cleared)', timestamp: new Date() }]);
+    ctx.setMessages([{ role: 'status', content: '(Cleared)', timestamp: new Date() }]);
   }
 });
 
@@ -25,7 +25,7 @@ commandRegistry.register({
   description: 'Compress conversation history',
   handler: async (_args, ctx): Promise<void> => {
     await ctx.agent.compress();
-    ctx.setMessages([{ role: 'system', content: '(Compression complete)', timestamp: new Date() }]);
+    ctx.setMessages([{ role: 'status', content: '(Compression complete)', timestamp: new Date() }]);
   }
 });
 
@@ -38,7 +38,7 @@ commandRegistry.register({
       ctx.agent.clearSession();
       ctx.agent.currentSession = name;
       ctx.setCurrentSession(name);
-      ctx.setMessages([{ role: 'system', content: `Created session: ${name}`, timestamp: new Date() }]);
+      ctx.setMessages([{ role: 'status', content: `Created session: ${name}`, timestamp: new Date() }]);
     }
   }
 });
@@ -53,7 +53,7 @@ commandRegistry.register({
       await ctx.sessionManager.rename(oldName, newName);
       ctx.agent.currentSession = newName;
       ctx.setCurrentSession(newName);
-      ctx.setMessages(prev => [...prev, { role: 'system', content: `Renamed: ${oldName} -> ${newName}`, timestamp: new Date() }]);
+      ctx.setMessages(prev => [...prev, { role: 'status', content: `Renamed: ${oldName} -> ${newName}`, timestamp: new Date() }]);
     }
   }
 });
@@ -81,7 +81,7 @@ commandRegistry.register({
         const { SessionDisplayImpl } = await import('../../utils/session-display.js');
         const sessionDisplay = new SessionDisplayImpl(ctx.sessionManager, ctx.agent.getToolRegistry());
         const displayMessages = await sessionDisplay.loadForTUI(name);
-        ctx.setMessages(displayMessages.length > 0 ? displayMessages : [{ role: 'system', content: `Loaded session: ${name}`, timestamp: new Date() }]);
+        ctx.setMessages(displayMessages.length > 0 ? displayMessages : [{ role: 'status', content: `Loaded session: ${name}`, timestamp: new Date() }]);
       } else {
         ctx.setMessages(prev => [...prev, { role: 'error', content: `Session not found: ${name}`, timestamp: new Date() }]);
       }

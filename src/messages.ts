@@ -31,7 +31,7 @@ export interface AgentMessage {
 function toDisplayRole(role: AgentMessageRole): DisplayMessageRole {
   switch (role) {
     case 'tool_call': return 'tool';
-    case 'status': return 'system';
+    case 'status': return 'status';
     default: return role;
   }
 }

@@ -2,7 +2,7 @@ import React from 'react';
 import { Box, Text } from 'ink';
 
 interface MessageProps {
-  role: 'user' | 'assistant' | 'system' | 'tool' | 'tool_result' | 'error' | 'thinking';
+  role: 'user' | 'assistant' | 'status' | 'tool' | 'tool_result' | 'error' | 'thinking';
   content: string;
   isStreaming?: boolean;
   element?: React.ReactElement;
@@ -55,7 +55,7 @@ export function Message({ role, content, isStreaming, element }: MessageProps) {
   }
 
   // System message - dim gray, no indent
-  if (role === 'system') {
+  if (role === 'status') {
     return (
       <Box marginBottom={0} paddingX={0}>
         <Text dimColor>{content}</Text>

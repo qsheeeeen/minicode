@@ -153,7 +153,7 @@ function useAgent(
             updateMainAgentMessages(() => displayMessages);
           }
         } else if (sessionName) {
-          const sysMsg = { role: 'system' as const, content: `Created new session: ${sessionName}`, timestamp: new Date() };
+          const sysMsg = { role: 'status' as const, content: `Created new session: ${sessionName}`, timestamp: new Date() };
           setMessages([sysMsg]);
           updateMainAgentMessages(() => [sysMsg]);
         }
@@ -230,7 +230,7 @@ export function App({
       await agentRef.current.run(userText);
     } catch (e) {
       if (e instanceof Error && e.message === 'Aborted') {
-        setMessages(prev => [...prev, { role: 'system' as const, content: '(Aborted)', timestamp: new Date() }]);
+        setMessages(prev => [...prev, { role: 'status' as const, content: '(Aborted)', timestamp: new Date() }]);
       } else {
         throw e;
       }
