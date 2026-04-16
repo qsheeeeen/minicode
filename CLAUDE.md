@@ -9,9 +9,8 @@ npm run dev          # Development mode via tsx (TUI)
 npm run build        # TypeScript compile to dist/
 npm run start        # Run built TUI from dist/
 npm run start "prompt"  # Run with initial prompt
+npm run start -- --headless "prompt"  # Headless mode (no TUI, stdout output)
 ```
-
-No test framework or linter is configured.
 
 ## Conventions
 
@@ -29,6 +28,7 @@ src/
 ├── config.ts            # Multi-provider config loader (model@provider)
 ├── cli/
 │   ├── args.ts          # CLI argument parsing
+│   ├── headless.ts      # Headless runner (non-interactive, stdout output)
 │   ├── commands/        # CommandRegistry + builtin / commands
 │   └── tui.tsx          # Main App component, multi-agent hooks, input handling
 ├── components/
@@ -46,7 +46,7 @@ src/
 │   └── agent.ts         # Sub-agent delegation tool
 └── utils/
     ├── diff.ts          # Unified diff generation
-    ├── display.ts       # DisplayAdapter interface + CallbackDisplay/ConsoleDisplay
+    ├── display.ts       # DisplayAdapter interface + CallbackDisplay/ConsoleDisplay/RecordDisplay
     ├── prompts.ts       # Global + project prompt loading (MINICODE.md)
     ├── session.ts       # SessionManager (v1/v2 format, per-project isolation)
     └── session-display.ts # Legacy v1 session conversion
@@ -64,7 +64,8 @@ src/
 
 - **Unified Message Model:** `AgentMessage` has an `inContext` flag — `toLLMMessages()` only sends flagged messages, `toDisplayMessages()` shows all. This lets the UI display compressed/hidden context while keeping the LLM view clean.
 - **Registry Pattern:** Both tools (`ToolRegistry`) and commands (`CommandRegistry`) use `Map<string, T>` with `register()`/`get()`/`getAll()`. Tools registered in `Agent` constructor; commands in `commands/builtin.ts`.
-- **Display Adapter:** `DisplayAdapter` abstracts output (`status()`, `error()`, `updateTokenCount()`). `CallbackDisplay` bridges to React state; `ConsoleDisplay` for fallback. Tools get a `ToolDisplayHandle` via `context.display` for real-time slot updates.
+- **Display Adapter:** `DisplayAdapter` abstracts output (`status()`, `error()`, `updateTokenCount()`). `CallbackDisplay` bridges to React state; `ConsoleDisplay` for fallback; `RecordDisplay` captures events for testing. Tools get a `ToolDisplayHandle` via `context.display` for real-time slot updates.
+- **Headless Mode:** `--headless` flag runs agent without TUI. Output matches TUI content (user, assistant, thinking, tool calls+results, status, error) but as plain text. Uses `elementToText()` to extract text from React elements.
 - **Context Injection:** User/project prompts (from `MINICODE.md`) merged into system prompt via `getSystemPrompt()`. Never injected as fake conversation turns.
 - **Session Isolation:** Sessions stored per-project using MD5 hash of cwd in `~/.minicode/sessions/<hash>/`.
 
