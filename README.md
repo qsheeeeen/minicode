@@ -2,7 +2,7 @@
 
 A minimal coding agent powered by LLMs. Simple, opinionated, hackable.
 
-**Goal:** 实现自举 — 用 minicode 开发 minicode 自身。
+**Goal:** Achieve self-bootstrapping — use minicode to develop minicode itself.
 
 ## Features
 
