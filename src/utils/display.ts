@@ -20,6 +20,28 @@ export class ConsoleDisplay implements DisplayAdapter {
   updateTokenCount(_tokens: number): void {}
 }
 
+export interface DisplayEvent {
+  type: 'status' | 'error' | 'tokenCount';
+  data: string | number;
+  timestamp: Date;
+}
+
+export class RecordDisplay implements DisplayAdapter {
+  events: DisplayEvent[] = [];
+
+  status(msg: string): void {
+    this.events.push({ type: 'status', data: msg, timestamp: new Date() });
+  }
+
+  error(msg: string): void {
+    this.events.push({ type: 'error', data: msg, timestamp: new Date() });
+  }
+
+  updateTokenCount(tokens: number): void {
+    this.events.push({ type: 'tokenCount', data: tokens, timestamp: new Date() });
+  }
+}
+
 export class CallbackDisplay implements DisplayAdapter {
   constructor(private callbacks: DisplayCallback) {}
 

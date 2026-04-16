@@ -48,9 +48,11 @@ export function toLLMMessages(messages: AgentMessage[]): MessageParam[] {
     if (msg.role === 'user') {
       result.push({ role: 'user', content: msg.content });
       i++;
-    } else if (msg.role === 'assistant') {
+    } else if (msg.role === 'assistant' || msg.role === 'tool_call') {
+      // Assistant turn: may start with an assistant text message, or directly with tool_call
+      // (LLM can respond with tool_use only, no text — that's normal)
       const contentBlocks: any[] = [];
-      if (msg.content) {
+      if (msg.role === 'assistant' && msg.content) {
         contentBlocks.push({ type: 'text', text: msg.content });
       }
       i++;

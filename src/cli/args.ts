@@ -3,6 +3,7 @@ export interface CliArgs {
   initialPrompt?: string;
   sessionName?: string;
   resumeRecent: boolean;
+  headless: boolean;
 }
 
 export function parseArgs(argv: string[]): CliArgs {
@@ -11,6 +12,7 @@ export function parseArgs(argv: string[]): CliArgs {
   let initialPrompt: string | undefined;
   let sessionName: string | undefined;
   let resumeRecent = false;
+  let headless = false;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -20,12 +22,14 @@ export function parseArgs(argv: string[]): CliArgs {
       sessionName = args[++i];
     } else if (arg === '--resume') {
       resumeRecent = true;
+    } else if (arg === '--headless') {
+      headless = true;
     } else if (!arg.startsWith('--')) {
       initialPrompt = arg;
     }
   }
 
-  return { modelOverride, initialPrompt, sessionName, resumeRecent };
+  return { modelOverride, initialPrompt, sessionName, resumeRecent, headless };
 }
 
 export function printHelp(): void {
@@ -36,6 +40,7 @@ export function printHelp(): void {
   console.log('  --session <name>  Session name (creates new or resumes existing)');
   console.log('  --resume          Resume most recent session');
   console.log('  --version, -v     Show version');
+  console.log('  --headless        Run without TUI, output to stdout (requires prompt)');
   console.log('  --help, -h        Show this help');
   console.log('\nExamples:');
   console.log('  minicode                    # Start TUI');
