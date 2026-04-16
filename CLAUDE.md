@@ -17,6 +17,7 @@ npm run start -- --headless "prompt"  # Headless mode (no TUI, stdout output)
 - **Module system:** ESM (`"type": "module"`) with Node16 module resolution. All imports use `.js` extensions (e.g. `import { foo } from './bar.js'` for `bar.ts`).
 - **Project goal:** Self-bootstrapping — use minicode to develop minicode itself.
 - **Config format:** `model@provider` specifier (e.g. `claude-sonnet-4-5@anthropic`). Priority: CLI `--model` > `MODEL` env var > config `model` field.
+- **Verification:** All features and fixes must be self-tested in headless mode (`npm run start -- --headless "prompt"`) before reporting complete.
 
 ## Architecture
 
