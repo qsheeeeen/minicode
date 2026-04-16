@@ -321,7 +321,6 @@ export class Agent {
           timestamp: new Date(),
           inContext: true,
           toolUseId: block.id,
-          element: resultElement,
         });
       } else {
         const error = `Error: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`;
@@ -337,7 +336,6 @@ export class Agent {
           timestamp: new Date(),
           inContext: true,
           toolUseId: block.id,
-          element: errorElement,
         });
       }
     });

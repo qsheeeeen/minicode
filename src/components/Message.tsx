@@ -49,14 +49,9 @@ export function Message({ role, content, isStreaming, element }: MessageProps) {
     );
   }
 
-  // Tool result - use element from tool if available, otherwise dim text
+  // Tool result - already shown combined with tool_call, skip display
   if (role === 'tool_result') {
-    if (element) return element;
-    return (
-      <Box marginBottom={0} paddingX={8}>
-        <Text dimColor>{content}</Text>
-      </Box>
-    );
+    return null;
   }
 
   // System message - dim gray, no indent
