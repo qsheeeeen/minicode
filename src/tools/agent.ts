@@ -2,6 +2,7 @@ import React from 'react';
 import { Text } from 'ink';
 import type { ToolDef, ToolResult, ToolExecutionContext } from './index.js';
 import type { AgentConfig } from '../agent.js';
+import type { AgentMessage } from '../messages.js';
 import type { DisplayMessage } from '../utils/session-display.js';
 import type { DisplayAdapter } from '../utils/display.js';
 import { Agent } from '../agent.js';
@@ -110,13 +111,13 @@ export const agentTool: ToolDef = {
     // Run task and wait for completion
     try {
       await subAgent.run(task);
-      // Extract final assistant response (the actual answer, not tool calls)
-      const finalResponse = extractFinalResponse(subMessages);
-      const summary = generateSummary(subMessages);
+      // Extract from sub-agent's store instead of display messages
+      const storeMessages = subAgent.getStore().getAll();
+      const finalResponse = extractFinalResponse(storeMessages);
+      const summary = generateSummary(storeMessages);
       registry.updateStatus(subId, 'completed');
       registry.updateSummary(subId, summary);
 
-      // Return the actual response from sub-agent
       const output = finalResponse || `Agent #${subId} completed: ${summary}`;
       return {
         output,
@@ -132,25 +133,22 @@ export const agentTool: ToolDef = {
   }
 };
 
-function extractFinalResponse(messages: DisplayMessage[]): string | null {
-  // Find the last assistant message with actual text content
-  // (not tool_use blocks, but the final response)
+function extractFinalResponse(messages: AgentMessage[]): string | null {
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i];
-    if (msg.role === 'assistant' && msg.content && typeof msg.content === 'string' && msg.content.trim()) {
+    if (msg.role === 'assistant' && msg.content.trim()) {
       return msg.content.trim();
     }
   }
   return null;
 }
 
-function generateSummary(messages: DisplayMessage[]): string {
-  // Generate a concise summary from the agent's messages
+function generateSummary(messages: AgentMessage[]): string {
   let toolCallCount = 0;
   let errors = 0;
 
   for (const msg of messages) {
-    if (msg.role === 'tool') toolCallCount++;
+    if (msg.role === 'tool_call') toolCallCount++;
     if (msg.role === 'error') errors++;
   }
 
