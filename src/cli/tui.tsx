@@ -65,32 +65,12 @@ function useAgent(
   const [tokenCount, setTokenCount] = useState(0);
   const agentRef = useRef<Agent | null>(null);
 
-  const updateMainAgentMessages = (updater: (current: DisplayMessage[]) => DisplayMessage[]) => {
-    setAgentSessions(prev => {
-      const main = prev.find(s => s.id === '1');
-      if (main) {
-        return [{ ...main, messages: updater(main.messages) }];
-      }
-      return prev;
-    });
-  };
-
   // Initialize agent once
   useEffect(() => {
     const registry = registryRef.current;
     if (!registry) return;
 
     const displayAdapter = new CallbackDisplay({
-      onMessage: (msg) => {
-        // status/error from sub-agent notifications
-        if (activeAgentId === '1') {
-          setMessages(prev => [...prev, msg]);
-        }
-      },
-      onMessageUpdate: () => {
-        // Handled by store.onChange
-      },
-      onStatusUpdate: () => {},
       onTokenUpdate: setTokenCount
     });
 
@@ -121,8 +101,6 @@ function useAgent(
       id: '1',
       type: 'main',
       agent,
-      display: displayAdapter,
-      messages: [],
       status: 'idle',
     });
 
@@ -130,8 +108,6 @@ function useAgent(
       id: '1',
       type: 'main',
       agent,
-      display: displayAdapter,
-      messages: [],
       status: 'idle',
     }]);
 
@@ -150,12 +126,10 @@ function useAgent(
           const displayMessages = await sessionDisplay.loadForTUI(initialSession);
           if (displayMessages.length > 0) {
             setMessages(displayMessages);
-            updateMainAgentMessages(() => displayMessages);
           }
         } else if (sessionName) {
           const sysMsg = { role: 'status' as const, content: `Created new session: ${sessionName}`, timestamp: new Date() };
           setMessages([sysMsg]);
-          updateMainAgentMessages(() => [sysMsg]);
         }
       }
     };
@@ -164,7 +138,7 @@ function useAgent(
     return () => { agentRef.current = null; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return { messages, setMessages, currentSession, setCurrentSession, tokenCount, agentRef, updateMainAgentMessages };
+  return { messages, setMessages, currentSession, setCurrentSession, tokenCount, agentRef };
 }
 
 export function App({
@@ -306,7 +280,7 @@ export function App({
       setActiveAgentId(input);
       const session = agentSessions.find(s => s.id === input);
       if (session) {
-        setMessages(session.messages);
+        setMessages(session.agent.getStore().toDisplayMessages());
       }
     }
   }, { isActive: mode === 'chat' });

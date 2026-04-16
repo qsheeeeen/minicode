@@ -3,10 +3,8 @@ import { Text } from 'ink';
 import type { ToolDef, ToolResult, ToolExecutionContext } from './index.js';
 import type { AgentConfig } from '../agent.js';
 import type { AgentMessage } from '../messages.js';
-import type { DisplayMessage } from '../utils/session-display.js';
-import type { DisplayAdapter } from '../utils/display.js';
 import { Agent } from '../agent.js';
-import { CallbackDisplay } from '../utils/display.js';
+import { ConsoleDisplay } from '../utils/display.js';
 
 export const agentTool: ToolDef = {
   name: 'agent',
@@ -42,76 +40,45 @@ export const agentTool: ToolDef = {
       return { output: 'Error: Agent config not available', display: React.createElement(Text, { color: 'red' }, 'Error: Agent config not available') };
     }
 
-    // Allocate sub-agent ID
     const subId = registry.allocateSubId();
 
-    // Create CallbackDisplay for sub-agent
-    // We need to create a display that pushes messages to the registry
-    const subMessages: DisplayMessage[] = [];
-    const subDisplay: DisplayAdapter = new CallbackDisplay({
-      onMessage: (msg) => {
-        subMessages.push(msg);
-        registry.addMessage(subId, msg);
-      },
-      onMessageUpdate: (id, updater) => {
-        const idx = subMessages.findIndex(m => m.slotId === id);
-        if (idx !== -1) {
-          subMessages[idx] = updater(subMessages[idx]);
-        } else {
-          const last = subMessages[subMessages.length - 1];
-          if (last) {
-            subMessages[subMessages.length - 1] = updater(last);
-          }
-        }
-      },
-      onStatusUpdate: (_status) => {
-        // Could be used for progress tracking
-      },
-      onTokenUpdate: (_tokens) => {
-        // Token updates handled at session level
-      }
-    });
-
-    // Create sub-agent config
     const subConfig: AgentConfig = {
       ...config,
-      display: subDisplay,
-      excludeTools: ['agent'],  // Prevent recursion
+      display: new ConsoleDisplay(),
+      excludeTools: ['agent'],
       agentRegistry: registry,
       currentAgentId: subId,
     };
 
-    // Create sub-agent
     const subAgent = new Agent(subConfig);
 
-    // Forward abort signal to sub-agent
     context?.signal?.addEventListener('abort', () => {
       subAgent.abort();
     });
 
-    // Register session
     registry.register({
       id: subId,
       type: 'sub',
       agent: subAgent,
-      display: subDisplay,
-      messages: subMessages,
       status: 'running',
       task,
       parentId,
     });
 
-    // Notify parent agent that sub-agent has started
+    // Notify via parent agent's store
     const parentSession = registry.get(parentId);
-    if (parentSession?.display) {
+    if (parentSession) {
       const taskPreview = task.length > 40 ? task.slice(0, 40) + '...' : task;
-      parentSession.display.status(`[Agent #${subId} started: ${taskPreview} - Press Ctrl+${subId} to view]`);
+      parentSession.agent.getStore().add({
+        role: 'status',
+        content: `[Agent #${subId} started: ${taskPreview} - Press Ctrl+${subId} to view]`,
+        timestamp: new Date(),
+        inContext: false,
+      });
     }
 
-    // Run task and wait for completion
     try {
       await subAgent.run(task);
-      // Extract from sub-agent's store instead of display messages
       const storeMessages = subAgent.getStore().getAll();
       const finalResponse = extractFinalResponse(storeMessages);
       const summary = generateSummary(storeMessages);
@@ -156,7 +123,5 @@ function generateSummary(messages: AgentMessage[]): string {
   if (toolCallCount > 0) parts.push(`${toolCallCount} operations`);
   if (errors > 0) parts.push(`${errors} errors`);
 
-  if (parts.length === 0) return 'Task completed';
-
-  return parts.join(', ');
+  return parts.length === 0 ? 'Task completed' : parts.join(', ');
 }
