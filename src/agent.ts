@@ -164,7 +164,7 @@ export class Agent {
     stream.on('thinking', (delta: string) => {
       if (!isStreamingThinking) {
         isStreamingThinking = true;
-        const msg = this.store.add({ role: 'thinking', content: '', timestamp: new Date(), inContext: false, isStreaming: true });
+        const msg = this.store.add({ role: 'thinking', content: delta, timestamp: new Date(), inContext: false, isStreaming: true });
         thinkingMsgId = msg.id;
       } else {
         const existing = this.store.get(thinkingMsgId);
@@ -181,7 +181,7 @@ export class Agent {
       }
       if (!isStreamingText) {
         isStreamingText = true;
-        const msg = this.store.add({ role: 'assistant', content: '', timestamp: new Date(), inContext: true, isStreaming: true });
+        const msg = this.store.add({ role: 'assistant', content: delta, timestamp: new Date(), inContext: true, isStreaming: true });
         textMsgId = msg.id;
       } else {
         const existing = this.store.get(textMsgId);
