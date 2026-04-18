@@ -15,9 +15,11 @@ export class TokenManagerImpl implements TokenManager {
   private totalTokens = 0;
   private lastShownThreshold = 0;
 
-  addTokens(input: number, output: number): void {
-    // API returns total tokens for the full context each time, not a delta
-    this.totalTokens = input + output;
+  addTokens(input: number, _output: number): void {
+    // input_tokens already represents the full context (system + tools + all messages).
+    // output_tokens includes thinking which is not kept in context (inContext: false),
+    // so adding it overestimates the actual context size.
+    this.totalTokens = input;
   }
 
   getTotal(): number {
