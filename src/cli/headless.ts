@@ -13,7 +13,7 @@ export interface HeadlessOptions {
   userPrompt: string;
   initialPrompt: string;
   sessionManager: SessionManager;
-  permissionMode?: PermissionMode;
+  permissionMode: PermissionMode;
 }
 
 /** Headless permission gate: manual mode denies all, auto mode uses LLM */
@@ -25,16 +25,15 @@ class HeadlessPermissionGate implements PermissionGate {
 }
 
 export async function runHeadless({ config, userPrompt, initialPrompt, sessionManager, permissionMode }: HeadlessOptions): Promise<void> {
-  const mode = permissionMode || 'yolo';
   const display = new RecordDisplay();
 
   // Create PermissionService if not yolo (yolo = no service needed, all allowed)
   let permissionService: PermissionService | undefined;
-  if (mode !== 'yolo') {
+  if (permissionMode !== 'yolo') {
     const client = config.model ? new AnthropicClient(config.model.apiKey, config.model.baseURL) : undefined;
-    const gate = mode === 'manual' ? new HeadlessPermissionGate() : undefined;
+    const gate = permissionMode === 'manual' ? new HeadlessPermissionGate() : undefined;
     permissionService = new PermissionService({
-      initialMode: mode,
+      initialMode: permissionMode,
       gate,
       client,
       model: config.model?.model,

@@ -24,7 +24,7 @@ export interface AppProps {
   initialPrompt?: string;
   sessionName?: string;
   resumeRecent: boolean;
-  permissionMode?: PermissionMode;
+  permissionMode: PermissionMode;
 }
 
 // Context progress bar
@@ -205,7 +205,7 @@ export function App({
   }>({ sessions: [], selectedIndex: 0 });
   const [inputValue, setInputValue] = useState('');
   const [autoSubmitPending, setAutoSubmitPending] = useState(!!initialPrompt);
-  const [permissionMode, setPermissionMode] = useState<PermissionMode>(initialPermissionMode || 'manual');
+  const [permissionMode, setPermissionMode] = useState<PermissionMode>(initialPermissionMode);
   const [approvalRequest, setApprovalRequest] = useState<PermissionRequest | null>(null);
   const { exit } = useApp();
 
@@ -217,7 +217,7 @@ export function App({
   if (!permissionRef.current) {
     const client = config.model ? new AnthropicClient(config.model.apiKey, config.model.baseURL) : undefined;
     permissionRef.current = new PermissionService({
-      initialMode: initialPermissionMode || 'manual',
+      initialMode: initialPermissionMode,
       gate: undefined as any, // set below after gate is created
       client,
       model: config.model?.model,
@@ -230,7 +230,7 @@ export function App({
       },
     );
     permissionRef.current = new PermissionService({
-      initialMode: initialPermissionMode || 'manual',
+      initialMode: initialPermissionMode,
       gate: gateRef.current,
       client,
       model: config.model?.model,
