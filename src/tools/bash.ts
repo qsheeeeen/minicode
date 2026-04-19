@@ -6,6 +6,7 @@ import type { ToolDef, ToolResult, ToolExecutionContext } from './index.js';
 export const bashTool: ToolDef = {
   name: 'bash',
   description: 'Execute a bash command in the current working directory. Returns stdout and stderr. Optionally provide a timeout in seconds.',
+  requiresPermission: true,
   input_schema: {
     type: 'object' as const,
     properties: {

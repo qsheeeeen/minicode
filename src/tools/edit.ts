@@ -7,6 +7,7 @@ import type { ToolDef, ToolResult } from './index.js';
 export const editTool: ToolDef = {
   name: 'edit',
   description: 'Edit a file by replacing exact text. The oldText must match exactly (including whitespace). Use this for precise, surgical edits.',
+  requiresPermission: true,
   input_schema: {
     type: 'object' as const,
     properties: {

@@ -3,6 +3,7 @@ import { Box, Text, useInput, useApp } from 'ink';
 import TextInput from 'ink-text-input';
 import { Agent } from '../agent.js';
 import type { MessageParam } from '../llm/anthropic.js';
+import { AnthropicClient } from '../llm/anthropic.js';
 import type { ResolvedConfig } from '../config.js';
 import { CallbackDisplay, type DisplayMessage } from '../utils/display.js';
 import { SessionDisplayImpl } from '../utils/session-display.js';
@@ -11,6 +12,7 @@ import './commands/builtin.js';
 import { Message } from '../components/Message.js';
 import type { SessionManager } from '../utils/session.js';
 import { AgentRegistry, type AgentSession } from '../services/agent-registry.js';
+import { PermissionService, type PermissionMode, type PermissionGate, type PermissionRequest } from '../services/permission.js';
 
 export interface AppProps {
   config: ResolvedConfig;
@@ -22,6 +24,7 @@ export interface AppProps {
   initialPrompt?: string;
   sessionName?: string;
   resumeRecent: boolean;
+  permissionMode?: PermissionMode;
 }
 
 // Context progress bar
@@ -29,6 +32,41 @@ function makeBar(used: number, total: number, width: number): string {
   const ratio = Math.min(1, used / total);
   const filled = Math.round(ratio * width);
   return '█'.repeat(filled) + '░'.repeat(width - filled);
+}
+
+/** TUI-based permission gate: shows approval prompt, resolves on keypress */
+class TUIPermissionGate implements PermissionGate {
+  private pendingResolve: ((decision: boolean) => void) | null = null;
+  private _setApprovalRequest: React.Dispatch<React.SetStateAction<PermissionRequest | null>>;
+  private onSwitchToYolo: (() => void) | null = null;
+
+  constructor(
+    setApprovalRequest: React.Dispatch<React.SetStateAction<PermissionRequest | null>>,
+    onSwitchToYolo?: (() => void) | null,
+  ) {
+    this._setApprovalRequest = setApprovalRequest;
+    this.onSwitchToYolo = onSwitchToYolo ?? null;
+  }
+
+  async requestApproval(req: PermissionRequest): Promise<boolean> {
+    return new Promise((resolve) => {
+      this.pendingResolve = resolve;
+      this._setApprovalRequest(req);
+    });
+  }
+
+  resolve(decision: boolean): void {
+    this._setApprovalRequest(null);
+    this.pendingResolve?.(decision);
+    this.pendingResolve = null;
+  }
+
+  resolveApproveAll(): void {
+    this._setApprovalRequest(null);
+    this.pendingResolve?.(true);
+    this.pendingResolve = null;
+    this.onSwitchToYolo?.();
+  }
 }
 
 /** Hook: multi-agent coordination and switching */
@@ -64,6 +102,7 @@ function useAgent(
   resumeRecent: boolean,
   setAgentSessions: React.Dispatch<React.SetStateAction<AgentSession[]>>,
   registryRef: React.MutableRefObject<AgentRegistry | null>,
+  permissionService: PermissionService | undefined,
 ) {
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [currentSession, setCurrentSession] = useState(initialSession);
@@ -91,6 +130,7 @@ function useAgent(
       userPrompt,
       agentRegistry: registry,
       currentAgentId: '1',
+      permissionService,
     });
 
     agentRef.current = agent;
@@ -153,7 +193,8 @@ export function App({
   sessionManager,
   initialPrompt,
   sessionName,
-  resumeRecent
+  resumeRecent,
+  permissionMode: initialPermissionMode,
 }: AppProps) {
   const [status, setStatus] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -164,7 +205,38 @@ export function App({
   }>({ sessions: [], selectedIndex: 0 });
   const [inputValue, setInputValue] = useState('');
   const [autoSubmitPending, setAutoSubmitPending] = useState(!!initialPrompt);
+  const [permissionMode, setPermissionMode] = useState<PermissionMode>(initialPermissionMode || 'manual');
+  const [approvalRequest, setApprovalRequest] = useState<PermissionRequest | null>(null);
   const { exit } = useApp();
+
+  // Permission gate ref — persists across renders
+  const gateRef = useRef<TUIPermissionGate | null>(null);
+
+  // Create PermissionService and gate once
+  const permissionRef = useRef<PermissionService | null>(null);
+  if (!permissionRef.current) {
+    const client = config.model ? new AnthropicClient(config.model.apiKey, config.model.baseURL) : undefined;
+    permissionRef.current = new PermissionService({
+      initialMode: initialPermissionMode || 'manual',
+      gate: undefined as any, // set below after gate is created
+      client,
+      model: config.model?.model,
+    });
+    gateRef.current = new TUIPermissionGate(
+      setApprovalRequest,
+      () => {
+        setPermissionMode('yolo');
+        permissionRef.current?.setMode('yolo');
+      },
+    );
+    permissionRef.current = new PermissionService({
+      initialMode: initialPermissionMode || 'manual',
+      gate: gateRef.current,
+      client,
+      model: config.model?.model,
+    });
+  }
+  const permissionService = permissionRef.current;
 
   // Multi-agent hook
   const { activeAgentId, activeAgentIdRef, setActiveAgentId, agentSessions, setAgentSessions, registryRef } = useMultiAgent();
@@ -173,6 +245,7 @@ export function App({
   const { messages, setMessages, currentSession, setCurrentSession, tokenCount, agentRef } = useAgent(
     config, userPrompt, initialSession, sessionManager, sessionName, resumeRecent,
     setAgentSessions, registryRef,
+    permissionService,
   );
 
   const setSessionList = (sessions: Array<{ name: string }>) => {
@@ -194,7 +267,7 @@ export function App({
       setMode,
       setSessionList,
       setSelectedIndex,
-      exit
+      exit,
     };
 
     const result = await commandRegistry.parseAndExecute(value, commandContext);
@@ -273,10 +346,32 @@ export function App({
     );
   }
 
+  // Approval prompt input handler — active when an approval request is pending
+  useInput((_input, key) => {
+    if (!approvalRequest || !gateRef.current) return;
+    if (_input === 'y' || key.return) {
+      gateRef.current.resolve(true);
+    } else if (_input === 'n' || key.escape) {
+      gateRef.current.resolve(false);
+    } else if (_input === 'a') {
+      gateRef.current.resolveApproveAll();
+    }
+  }, { isActive: approvalRequest !== null });
+
+  // Main input handler
   useInput((input, key) => {
     if (key.ctrl && input === 'c') exit();
+    if (key.shift && key.tab) {
+      const next = permissionService.cycleMode();
+      setPermissionMode(next);
+      return;
+    }
     if (key.escape && isLoading) {
       agentRef.current?.abort();
+      // Also deny any pending approval
+      if (approvalRequest && gateRef.current) {
+        gateRef.current.resolve(false);
+      }
       return;
     }
     if (key.ctrl && input === 'o') {
@@ -289,7 +384,11 @@ export function App({
       setActiveAgentId(nextSession.id);
       setMessages(nextSession.agent.getStore().toDisplayMessages());
     }
-  }, { isActive: mode === 'chat' });
+  }, { isActive: mode === 'chat' && approvalRequest === null });
+
+  // Permission mode display helpers
+  const modeLabel = permissionMode;
+  const modeColor = permissionMode === 'manual' ? 'yellow' : permissionMode === 'yolo' ? 'red' : 'cyan';
 
   return (
     <Box flexDirection="column" height="100%">
@@ -344,21 +443,36 @@ export function App({
         )}
       </Box>
 
+      {/* Approval prompt */}
+      {approvalRequest && (
+        <Box borderStyle="round" borderColor="yellow" paddingX={1}>
+          <Box flexDirection="column">
+            <Text bold color="yellow">Allow tool execution?</Text>
+            <Text>{approvalRequest.displayText}</Text>
+            <Text dimColor>[y] Yes  [n] No  [a] Yes to all</Text>
+          </Box>
+        </Box>
+      )}
+
       {/* Input */}
       <Box borderStyle="single" borderColor="gray" paddingX={1}>
-        <Text color="blue" bold>{isLoading ? '...' : '> '}</Text>
-        <TextInput
-          value={inputValue}
-          onChange={setInputValue}
-          onSubmit={async (value) => {
-            setInputValue('');
-            await handleSubmit(value);
-          }}
-          placeholder="Type a message or /command..."
-        />
+        <Text color="blue" bold>{isLoading || approvalRequest ? '...' : '> '}</Text>
+        {approvalRequest ? (
+          <Text dimColor>Waiting for approval...</Text>
+        ) : (
+          <TextInput
+            value={inputValue}
+            onChange={setInputValue}
+            onSubmit={async (value) => {
+              setInputValue('');
+              await handleSubmit(value);
+            }}
+            placeholder="Type a message or /command..."
+          />
+        )}
       </Box>
 
-      {/* Status bar: tokens + context progress */}
+      {/* Status bar: tokens + context progress + permission mode */}
       <Box paddingX={1}>
         <Text dimColor>{tokenCount.toLocaleString()}/{(config.model?.contextLength || 200000).toLocaleString()}</Text>
         <Text dimColor> │</Text>
@@ -370,6 +484,9 @@ export function App({
         </Text>
         <Text dimColor>│ </Text>
         <Text dimColor>{Math.min(100, Math.floor(tokenCount / (config.model?.contextLength || 200000) * 100))}%</Text>
+        <Text dimColor> │ </Text>
+        <Text color={modeColor}>{modeLabel}</Text>
+        <Text dimColor> (Shift+Tab)</Text>
         {isLoading && <Text dimColor> │ </Text>}
         {isLoading && <Text color="magenta">esc to abort</Text>}
       </Box>

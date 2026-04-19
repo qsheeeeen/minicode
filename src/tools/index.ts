@@ -3,6 +3,7 @@ export { ToolRegistry } from './registry.js';
 import React from 'react';
 import type { AgentRegistry } from '../services/agent-registry.js';
 import type { AgentConfig } from '../agent.js';
+import type { PermissionService } from '../services/permission.js';
 import { readTool } from './read.js';
 import { writeTool } from './write.js';
 import { editTool } from './edit.js';
@@ -21,6 +22,7 @@ export interface ToolExecutionContext {
   currentAgentId?: string;
   display?: ToolDisplayHandle;
   signal?: AbortSignal;
+  permissionService?: PermissionService;
 }
 
 /** Tool returns output for LLM and ink element for TUI */
@@ -39,6 +41,7 @@ export interface ToolDef {
   format?: (args: Record<string, unknown>) => React.ReactElement;
   execute: (args: Record<string, unknown>, context?: ToolExecutionContext) => Promise<ToolResult>;
   requires?: ToolRequirement[];
+  requiresPermission?: boolean;
 }
 
 export interface ToolAvailability {

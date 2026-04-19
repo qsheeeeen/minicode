@@ -28,6 +28,7 @@ export interface Config {
   thinking?: boolean;  // enable extended thinking
   thinkingTokens?: number;  // tokens budget for thinking (default 20000)
   promptFile?: string;  // project prompt filename (default: MINICODE.md)
+  permissionMode?: 'manual' | 'yolo' | 'auto';  // default permission mode
 }
 
 let cachedConfig: Config | null = null;
@@ -128,6 +129,7 @@ export interface ResolvedConfig {
   compressionThreshold: number;
   thinking: { enabled: boolean; tokens: number };
   promptFile: string;
+  permissionMode?: 'manual' | 'yolo' | 'auto';
 }
 
 export async function loadAllConfig(modelSpecifier?: string): Promise<ResolvedConfig> {
@@ -156,6 +158,7 @@ export async function loadAllConfig(modelSpecifier?: string): Promise<ResolvedCo
       enabled: config.thinking ?? false,
       tokens: config.thinkingTokens ?? 20000
     },
-    promptFile: config.promptFile || 'MINICODE.md'
+    promptFile: config.promptFile || 'MINICODE.md',
+    permissionMode: config.permissionMode
   };
 }

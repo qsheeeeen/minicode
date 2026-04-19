@@ -7,6 +7,8 @@ import { TokenManager, TokenManagerImpl } from './services/token-manager.js';
 import { CompressionService, CompressionServiceImpl } from './services/compression-service.js';
 import { AgentRegistry } from './services/agent-registry.js';
 import { MessageStore } from './messages.js';
+import { PermissionService } from './services/permission.js';
+import { elementToText } from './utils/react.js';
 
 export const SYSTEM_PROMPT = `You are an interactive CLI tool that helps users with software engineering tasks. Use the instructions below and the tools available to you to assist the user.
 
@@ -41,6 +43,7 @@ export interface AgentConfig {
   excludeTools?: string[];
   agentRegistry?: AgentRegistry;
   currentAgentId?: string;
+  permissionService?: PermissionService;
 }
 
 interface StreamingResult {
@@ -67,6 +70,7 @@ export class Agent {
   private currentAgentId: string;
   private apiKey?: string;
   private baseURL?: string;
+  private permissionService?: PermissionService;
   private abortController: AbortController | null = null;
   private currentStream: import('@anthropic-ai/sdk/lib/MessageStream.js').MessageStream<null> | null = null;
 
@@ -84,6 +88,7 @@ export class Agent {
     this.toolRegistry = new ToolRegistry();
     this.agentRegistry = config.agentRegistry;
     this.currentAgentId = config.currentAgentId || '1';
+    this.permissionService = config.permissionService;
 
     registerTools(this.toolRegistry, { agentRegistry: this.agentRegistry }, config.excludeTools);
 
@@ -250,11 +255,26 @@ export class Agent {
     }
   }
 
+  /** Run a single tool with permission check as part of the execution flow */
+  private async runTool(tool: ToolDef, args: Record<string, unknown>, context: ToolExecutionContext): Promise<import('./tools/index.js').ToolResult> {
+    // Permission check is part of the tool execution flow
+    if (tool.requiresPermission && this.permissionService) {
+      const displayText = tool.format
+        ? elementToText(tool.format(args))
+        : `${tool.name}(${JSON.stringify(args)})`;
+      const allowed = await this.permissionService.check(tool.name, args, displayText);
+      if (!allowed) {
+        return { output: 'User rejected', display: React.createElement(Text, { color: 'yellow' }, 'User rejected') };
+      }
+    }
+    return tool.execute(args, context);
+  }
+
   /** Execute tool calls in parallel and push results */
   private async executeToolCalls(toolCalls: Array<{ block: Anthropic.Messages.ToolUseBlock; tool: ToolDef }>): Promise<void> {
     if (toolCalls.length === 0) return;
 
-    // Add tool_call messages to store (replaces display.createSlot)
+    // Add tool_call messages to store
     const slots = toolCalls.map(({ block, tool }) => {
       const callElement = tool.format
         ? tool.format(block.input as Record<string, unknown>)
@@ -286,9 +306,11 @@ export class Agent {
         userPrompt: this.userPrompt,
       },
       currentAgentId: this.currentAgentId,
+      permissionService: this.permissionService,
     };
 
-    // Execute all tools in parallel, each with its own display handle
+    // Execute all tools in parallel, each with its own display handle.
+    // Permission check happens inside runTool() — part of the execution flow.
     const results = await Promise.allSettled(
       slots.map(({ block, tool, msgId, callElement }) => {
         const toolContext: ToolExecutionContext = {
@@ -299,7 +321,7 @@ export class Agent {
             )
           }
         };
-        return tool.execute(block.input as Record<string, unknown>, toolContext);
+        return this.runTool(tool, block.input as Record<string, unknown>, toolContext);
       })
     );
 
@@ -420,5 +442,9 @@ export class Agent {
 
   getToolRegistry(): ToolRegistry {
     return this.toolRegistry;
+  }
+
+  getPermissionService(): PermissionService | undefined {
+    return this.permissionService;
   }
 }

@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url';
 import { render } from 'ink';
 import { loadAllConfig } from './config.js';
 import { SessionManager } from './utils/session.js';
-import { parseArgs, printHelp } from './cli/args.js';
+import { parseArgs, printHelp, type PermissionMode } from './cli/args.js';
 import { loadGlobalPrompt, loadProjectPrompt } from './utils/prompts.js';
 import { App } from './cli/tui.js';
 
@@ -26,7 +26,7 @@ if (argv.includes('--help') || argv.includes('-h')) {
   printHelp();
   process.exit(0);
 }
-const { modelOverride, initialPrompt, sessionName, resumeRecent, headless } = parseArgs(process.argv);
+const { modelOverride, initialPrompt, sessionName, resumeRecent, headless, permissionMode: cliPermissionMode } = parseArgs(process.argv);
 
 // Get configuration
 const config = await loadAllConfig(modelOverride ?? process.env.MODEL);
@@ -35,6 +35,9 @@ if (!config.model) {
   console.error('Error: No valid model configuration found. Please set model in config.json');
   process.exit(1);
 }
+
+// Resolve permission mode: CLI flag > config > default
+const permissionMode: PermissionMode = cliPermissionMode || config.permissionMode || (headless ? 'yolo' : 'manual');
 
 // Load global and project prompts
 const [globalPrompt, projectPrompt] = await Promise.all([
@@ -66,7 +69,7 @@ if (headless) {
     process.exit(1);
   }
   const { runHeadless } = await import('./cli/headless.js');
-  await runHeadless({ config, userPrompt, initialPrompt, sessionManager });
+  await runHeadless({ config, userPrompt, initialPrompt, sessionManager, permissionMode });
   process.exit(0);
 }
 
@@ -81,4 +84,5 @@ render(<App
   initialPrompt={initialPrompt}
   sessionName={sessionName}
   resumeRecent={resumeRecent}
+  permissionMode={permissionMode}
 />);

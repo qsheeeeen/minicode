@@ -37,6 +37,24 @@ function toDisplayRole(role: AgentMessageRole): DisplayMessageRole {
 }
 
 // Derive Anthropic MessageParam[] from AgentMessage[]
+//
+// The Anthropic API expects grouped turns:
+//   assistant: [text_block, tool_use_block, ...]  → one turn
+//   user:      [tool_result_block, ...]            → one turn
+//
+// The store keeps a flat list where assistant text, tool_call, and tool_result
+// are separate AgentMessage entries.  This function groups them correctly.
+//
+// Algorithm: iterate inContext messages. For each group:
+//   1. If 'user' string → emit directly.
+//   2. If 'assistant' → consume it (text), then collect consecutive 'tool_call'.
+//      If the first message is already 'tool_call' (LLM returned tool_use with
+//      no text), skip the assistant-text step — the while-loop picks it up.
+//   3. Collect consecutive 'tool_result' into one user turn.
+//
+// The critical detail: when the group starts with 'tool_call' (not 'assistant'),
+// we do NOT advance i before the tool_call while-loop, so no message is skipped.
+
 export function toLLMMessages(messages: AgentMessage[]): MessageParam[] {
   const result: MessageParam[] = [];
   const inContext = messages.filter(m => m.inContext);
@@ -45,37 +63,46 @@ export function toLLMMessages(messages: AgentMessage[]): MessageParam[] {
   while (i < inContext.length) {
     const msg = inContext[i];
 
+    // 1. Plain user text message
     if (msg.role === 'user') {
       result.push({ role: 'user', content: msg.content });
       i++;
-    } else if (msg.role === 'assistant' || msg.role === 'tool_call') {
-      // Assistant turn: may start with an assistant text message, or directly with tool_call
-      // (LLM can respond with tool_use only, no text — that's normal)
-      const contentBlocks: any[] = [];
-      if (msg.role === 'assistant' && msg.content) {
-        contentBlocks.push({ type: 'text', text: msg.content });
-      }
-      i++;
-      // Gather tool_calls into this assistant turn
-      while (i < inContext.length && inContext[i].role === 'tool_call') {
-        const tc = inContext[i];
-        contentBlocks.push({ type: 'tool_use', id: tc.toolUseId, name: tc.toolName, input: tc.toolInput ?? {} });
-        i++;
-      }
-      result.push({ role: 'assistant', content: contentBlocks });
+      continue;
+    }
 
-      // Gather tool_results into one user message
-      const toolResults: any[] = [];
-      while (i < inContext.length && inContext[i].role === 'tool_result') {
-        const tr = inContext[i];
-        toolResults.push({ type: 'tool_result', tool_use_id: tr.toolUseId, content: tr.content });
-        i++;
-      }
-      if (toolResults.length > 0) {
-        result.push({ role: 'user', content: toolResults });
-      }
-    } else {
+    // 2. Assistant turn: optional text + tool_use blocks
+    const contentBlocks: any[] = [];
+
+    // Consume assistant text if present (may be absent when LLM returns
+    // only tool_use blocks — in that case msg is 'tool_call' and we skip this)
+    if (msg.role === 'assistant') {
+      if (msg.content) contentBlocks.push({ type: 'text', text: msg.content });
       i++;
+      // fall through to collect tool_calls from new position
+    }
+
+    // Collect consecutive tool_calls.
+    // If group started with tool_call (no assistant text), i still points
+    // to it, so the loop naturally picks up the first one — no special case.
+    while (i < inContext.length && inContext[i].role === 'tool_call') {
+      const tc = inContext[i];
+      contentBlocks.push({ type: 'tool_use', id: tc.toolUseId, name: tc.toolName, input: tc.toolInput ?? {} });
+      i++;
+    }
+
+    if (contentBlocks.length > 0) {
+      result.push({ role: 'assistant', content: contentBlocks });
+    }
+
+    // 3. Tool results → one user turn
+    const toolResults: any[] = [];
+    while (i < inContext.length && inContext[i].role === 'tool_result') {
+      const tr = inContext[i];
+      toolResults.push({ type: 'tool_result', tool_use_id: tr.toolUseId, content: tr.content });
+      i++;
+    }
+    if (toolResults.length > 0) {
+      result.push({ role: 'user', content: toolResults });
     }
   }
 

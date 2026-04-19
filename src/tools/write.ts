@@ -7,6 +7,7 @@ import type { ToolDef, ToolResult } from './index.js';
 export const writeTool: ToolDef = {
   name: 'write',
   description: 'Write content to a file. Creates the file if it doesn\'t exist, overwrites if it does. Automatically creates parent directories.',
+  requiresPermission: true,
   input_schema: {
     type: 'object' as const,
     properties: {

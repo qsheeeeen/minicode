@@ -4,28 +4,43 @@ import { RecordDisplay } from '../utils/display.js';
 import type { ResolvedConfig } from '../config.js';
 import type { AgentMessage } from '../messages.js';
 import type { SessionManager } from '../utils/session.js';
+import { elementToText } from '../utils/react.js';
+import { PermissionService, type PermissionMode, type PermissionGate, type PermissionRequest } from '../services/permission.js';
+import { AnthropicClient } from '../llm/anthropic.js';
 
 export interface HeadlessOptions {
   config: ResolvedConfig;
   userPrompt: string;
   initialPrompt: string;
   sessionManager: SessionManager;
+  permissionMode?: PermissionMode;
 }
 
-/** Extract plain text from a React element tree (Ink Text/Box) */
-function elementToText(el: React.ReactNode): string {
-  if (el == null) return '';
-  if (typeof el === 'string') return el;
-  if (typeof el === 'number') return String(el);
-  if (Array.isArray(el)) return el.map(elementToText).filter(Boolean).join('\n');
-  if (React.isValidElement(el) && (el.props as any)?.children) {
-    return elementToText((el.props as any).children as React.ReactNode);
+/** Headless permission gate: manual mode denies all, auto mode uses LLM */
+class HeadlessPermissionGate implements PermissionGate {
+  async requestApproval(req: PermissionRequest): Promise<boolean> {
+    console.log(`[Permission denied: ${req.displayText}] -- use --permission yolo or auto in headless mode`);
+    return false;
   }
-  return '';
 }
 
-export async function runHeadless({ config, userPrompt, initialPrompt, sessionManager }: HeadlessOptions): Promise<void> {
+export async function runHeadless({ config, userPrompt, initialPrompt, sessionManager, permissionMode }: HeadlessOptions): Promise<void> {
+  const mode = permissionMode || 'yolo';
   const display = new RecordDisplay();
+
+  // Create PermissionService if not yolo (yolo = no service needed, all allowed)
+  let permissionService: PermissionService | undefined;
+  if (mode !== 'yolo') {
+    const client = config.model ? new AnthropicClient(config.model.apiKey, config.model.baseURL) : undefined;
+    const gate = mode === 'manual' ? new HeadlessPermissionGate() : undefined;
+    permissionService = new PermissionService({
+      initialMode: mode,
+      gate,
+      client,
+      model: config.model?.model,
+    });
+  }
+
   const agent = new Agent({
     apiKey: config.model!.apiKey,
     baseURL: config.model!.baseURL,
@@ -36,6 +51,7 @@ export async function runHeadless({ config, userPrompt, initialPrompt, sessionMa
     thinkingTokens: config.thinking.tokens,
     display,
     userPrompt,
+    permissionService,
   });
 
   let lastPrintedIndex = 0;
