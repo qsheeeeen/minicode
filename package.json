@@ -1,7 +1,7 @@
 {
   "name": "minicode",
   "version": "1.0.0",
-  "description": "minicode 一个minimal coding agent，方案待讨论",
+  "description": "A minimal coding agent powered by LLMs with TUI",
   "main": "dist/cli.js",
   "type": "module",
   "bin": {
