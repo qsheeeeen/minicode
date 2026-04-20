@@ -235,7 +235,12 @@ export class Agent {
   private async processTokenUsage(response: Anthropic.Messages.Message): Promise<void> {
     if (!response.usage) return;
 
-    this.tokenManager.addTokens(response.usage.input_tokens, response.usage.output_tokens);
+    this.tokenManager.addTokens(
+      response.usage.input_tokens,
+      response.usage.output_tokens,
+      response.usage.cache_creation_input_tokens ?? 0,
+      response.usage.cache_read_input_tokens ?? 0,
+    );
     this.display.updateTokenCount(this.tokenManager.getTotal());
     const ratio = this.tokenManager.getRatio(this.contextLength);
     const percentage = Math.floor(ratio * 100);

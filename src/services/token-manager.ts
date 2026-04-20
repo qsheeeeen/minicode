@@ -2,7 +2,7 @@
  * Token management service for tracking LLM usage
  */
 export interface TokenManager {
-  addTokens(input: number, output: number): void;
+  addTokens(input: number, output: number, cacheCreation?: number, cacheRead?: number): void;
   getTotal(): number;
   getRatio(contextLength: number): number;
   shouldCompress(contextLength: number, thresholdRatio: number): boolean;
@@ -15,11 +15,10 @@ export class TokenManagerImpl implements TokenManager {
   private totalTokens = 0;
   private lastShownThreshold = 0;
 
-  addTokens(input: number, _output: number): void {
-    // input_tokens already represents the full context (system + tools + all messages).
-    // output_tokens includes thinking which is not kept in context (inContext: false),
-    // so adding it overestimates the actual context size.
-    this.totalTokens = input;
+  addTokens(input: number, _output: number, cacheCreation = 0, cacheRead = 0): void {
+    // input_tokens alone does NOT include cache tokens. The actual context size is:
+    // input_tokens + cache_creation_input_tokens + cache_read_input_tokens
+    this.totalTokens = input + cacheCreation + cacheRead;
   }
 
   getTotal(): number {
