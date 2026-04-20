@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { Box, Text, useInput, useApp } from 'ink';
+import { Spinner } from '@inkjs/ui';
 import TextInput from 'ink-text-input';
 import { Agent } from '../agent.js';
 import type { MessageParam } from '../llm/anthropic.js';
@@ -417,8 +418,7 @@ export function App({
             </>
           )}
           <Text dimColor>{currentSession}</Text>
-          {(isLoading || status) && <Text dimColor> | </Text>}
-          {isLoading && <Text color="magenta">Running...</Text>}
+          {status && !isLoading && <Text dimColor> | </Text>}
           {status && !isLoading && <Text color="magenta">{status}</Text>}
         </Box>
       </Box>
@@ -456,7 +456,13 @@ export function App({
 
       {/* Input */}
       <Box borderStyle="single" borderColor="gray" paddingX={1}>
-        <Text color="blue" bold>{isLoading || approvalRequest ? '...' : '> '}</Text>
+        {isLoading ? (
+          <Spinner label=" " />
+        ) : approvalRequest ? (
+          <Text color="yellow" bold>! </Text>
+        ) : (
+          <Text color="blue" bold>{'> '}</Text>
+        )}
         {approvalRequest ? (
           <Text dimColor>Waiting for approval...</Text>
         ) : (
