@@ -85,4 +85,4 @@ render(<App
   sessionName={sessionName}
   resumeRecent={resumeRecent}
   permissionMode={permissionMode}
-/>);
+/>, { exitOnCtrlC: false });

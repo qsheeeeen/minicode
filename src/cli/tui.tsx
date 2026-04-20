@@ -356,7 +356,17 @@ export function App({
 
   // Main input handler
   useInput((input, key) => {
-    if (key.ctrl && input === 'c') exit();
+    if (key.ctrl && input === 'c') {
+      if (isLoading) {
+        agentRef.current?.abort();
+        if (approvalRequest && gateRef.current) {
+          gateRef.current.resolve(false);
+        }
+      } else {
+        exit();
+      }
+      return;
+    }
     if (key.shift && key.tab) {
       const next = permissionService.cycleMode();
       setPermissionMode(next);
@@ -364,7 +374,6 @@ export function App({
     }
     if (key.escape && isLoading) {
       agentRef.current?.abort();
-      // Also deny any pending approval
       if (approvalRequest && gateRef.current) {
         gateRef.current.resolve(false);
       }
