@@ -77,8 +77,12 @@ export async function runHeadless({ config, userPrompt, initialPrompt, sessionMa
         const text = elementToText(msg.element);
         const lines = text.split('\n');
         const printedCount = toolCallLines.get(msg.id) || 0;
+        // Add separator + prefix before first tool call output
+        if (printedCount === 0 && lines.length > 0) {
+          process.stdout.write('\n[tool] ');
+        }
         for (let j = printedCount; j < lines.length; j++) {
-          if (lines[j]) console.log(lines[j]);
+          if (lines[j]) console.log(j === 0 ? lines[j] : `       ${lines[j]}`);
         }
         if (lines.length > printedCount) {
           toolCallLines.set(msg.id, lines.length);
@@ -91,6 +95,10 @@ export async function runHeadless({ config, userPrompt, initialPrompt, sessionMa
       if (msg.role === 'assistant' && msg.content) {
         const printed = streamed.get(msg.id) || 0;
         if (msg.content.length > printed) {
+          // Add prefix before first chunk of assistant text
+          if (printed === 0) {
+            process.stdout.write('\n[assistant] ');
+          }
           process.stdout.write(msg.content.slice(printed));
           streamed.set(msg.id, msg.content.length);
         }
@@ -105,7 +113,7 @@ export async function runHeadless({ config, userPrompt, initialPrompt, sessionMa
         const preview = msg.content.length > 200
           ? msg.content.slice(0, 200) + '...'
           : msg.content;
-        console.log(preview);
+        console.log(`\n[thinking] ${preview}`);
         finalized.add(msg.id);
       }
     }
@@ -135,15 +143,15 @@ export async function runHeadless({ config, userPrompt, initialPrompt, sessionMa
 function printMessage(msg: AgentMessage): void {
   switch (msg.role) {
     case 'user':
-      process.stdout.write(`> ${msg.content}\n\n`);
+      process.stdout.write(`[user] ${msg.content}\n\n`);
       break;
 
     case 'status':
-      console.log(msg.content);
+      console.log(`[status] ${msg.content}`);
       break;
 
     case 'error':
-      console.error(msg.content);
+      console.error(`[error] ${msg.content}`);
       break;
   }
 }
