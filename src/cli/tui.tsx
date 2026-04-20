@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { Box, Text, useInput, useApp } from 'ink';
 import { Spinner, ProgressBar } from '@inkjs/ui';
 import TextInput from 'ink-text-input';
@@ -199,6 +199,7 @@ export function App({
     selectedIndex: number;
   }>({ sessions: [], selectedIndex: 0 });
   const [inputValue, setInputValue] = useState('');
+  const [inputKey, setInputKey] = useState(0);
   const [autoSubmitPending, setAutoSubmitPending] = useState(!!initialPrompt);
   const [permissionMode, setPermissionMode] = useState<PermissionMode>(initialPermissionMode);
   const [approvalRequest, setApprovalRequest] = useState<PermissionRequest | null>(null);
@@ -381,6 +382,36 @@ export function App({
     }
   }, { isActive: mode === 'chat' && approvalRequest === null });
 
+  // Command autocomplete
+  const commandList = useMemo(
+    () => commandRegistry.getCommandList().sort((a, b) => a.name.localeCompare(b.name)),
+    [],
+  );
+  const matchingCommands = useMemo(() => {
+    if (!inputValue.startsWith('/')) return [];
+    const partial = inputValue.slice(1).toLowerCase();
+    if (partial === '') return commandList;
+    return commandList.filter(cmd => cmd.name.toLowerCase().startsWith(partial));
+  }, [inputValue, commandList]);
+  const [selectedSuggestion, setSelectedSuggestion] = useState(0);
+
+  // Reset selection when matches change
+  useEffect(() => {
+    setSelectedSuggestion(0);
+  }, [matchingCommands.length]);
+
+  useInput((_input, key) => {
+    if (mode !== 'chat' || approvalRequest !== null || matchingCommands.length === 0) return;
+    if (key.upArrow) {
+      setSelectedSuggestion(prev => (prev - 1 + matchingCommands.length) % matchingCommands.length);
+    } else if (key.downArrow) {
+      setSelectedSuggestion(prev => (prev + 1) % matchingCommands.length);
+    } else if (key.tab) {
+      setInputValue(`/${matchingCommands[selectedSuggestion].name} `);
+      setInputKey(prev => prev + 1);
+    }
+  }, { isActive: mode === 'chat' && approvalRequest === null && matchingCommands.length > 0 });
+
   // Permission mode display helpers
   const modeLabel = permissionMode;
   const modeColor = permissionMode === 'manual' ? 'yellow' : permissionMode === 'yolo' ? 'red' : 'cyan';
@@ -461,6 +492,7 @@ export function App({
           <Text dimColor>Waiting for approval...</Text>
         ) : (
           <TextInput
+            key={inputKey}
             value={inputValue}
             onChange={setInputValue}
             onSubmit={async (value) => {
@@ -471,6 +503,22 @@ export function App({
           />
         )}
       </Box>
+
+      {/* Command autocomplete suggestions */}
+      {matchingCommands.length > 0 && !approvalRequest && !isLoading && (
+        <Box flexDirection="column" paddingX={2} borderStyle="single" borderColor="gray">
+          {matchingCommands.map((cmd, i) => (
+            <Box key={cmd.name}>
+              <Text>{i === selectedSuggestion ? <Text color="cyan">{'> '}</Text> : '  '}</Text>
+              <Text color={i === selectedSuggestion ? 'cyan' : 'white'} bold={i === selectedSuggestion}>
+                /{cmd.name}
+              </Text>
+              <Text dimColor>{'  '}{cmd.description}</Text>
+            </Box>
+          ))}
+          <Text dimColor> ↑↓ navigate  Tab accept</Text>
+        </Box>
+      )}
 
       {/* Status bar: tokens + context progress + permission mode */}
       <Box paddingX={1} gap={1}>

@@ -57,6 +57,17 @@ class CommandRegistry {
     return { handled: false };
   }
 
+  getCommandNames(): string[] {
+    return Array.from(this.commands.keys());
+  }
+
+  getCommandList(): Array<{ name: string; description: string }> {
+    return Array.from(this.commands.values()).map(cmd => ({
+      name: cmd.name,
+      description: cmd.description,
+    }));
+  }
+
   getHelp(): string {
     const lines = ['Available commands:'];
     for (const cmd of this.commands.values()) {
