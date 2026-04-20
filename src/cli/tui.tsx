@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { Box, Text, useInput, useApp } from 'ink';
-import { Spinner } from '@inkjs/ui';
+import { Spinner, ProgressBar } from '@inkjs/ui';
 import TextInput from 'ink-text-input';
 import { Agent } from '../agent.js';
 import type { MessageParam } from '../llm/anthropic.js';
@@ -28,12 +28,6 @@ export interface AppProps {
   permissionMode: PermissionMode;
 }
 
-// Context progress bar
-function makeBar(used: number, total: number, width: number): string {
-  const ratio = Math.min(1, used / total);
-  const filled = Math.round(ratio * width);
-  return '█'.repeat(filled) + '░'.repeat(width - filled);
-}
 
 /** TUI-based permission gate: shows approval prompt, resolves on keypress */
 class TUIPermissionGate implements PermissionGate {
@@ -479,16 +473,9 @@ export function App({
       </Box>
 
       {/* Status bar: tokens + context progress + permission mode */}
-      <Box paddingX={1}>
+      <Box paddingX={1} gap={1}>
         <Text dimColor>{tokenCount.toLocaleString()}/{(config.model?.contextLength || 200000).toLocaleString()}</Text>
-        <Text dimColor> │</Text>
-        <Text color={
-          tokenCount / (config.model?.contextLength || 200000) > config.compressionThreshold ? 'red' :
-          tokenCount / (config.model?.contextLength || 200000) > config.compressionThreshold * 0.875 ? 'yellow' : 'green'
-        }>
-          {makeBar(tokenCount, config.model?.contextLength || 200000, 20)}
-        </Text>
-        <Text dimColor>│ </Text>
+        <Box width={20}><ProgressBar value={Math.min(100, tokenCount / (config.model?.contextLength || 200000) * 100)} /></Box>
         <Text dimColor>{Math.min(100, Math.floor(tokenCount / (config.model?.contextLength || 200000) * 100))}%</Text>
         <Text dimColor> │ </Text>
         <Text color={modeColor}>{modeLabel}</Text>
