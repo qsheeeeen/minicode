@@ -114,6 +114,34 @@ export class Agent {
     }
   }
 
+  /** Race a promise against the abort controller signal + timeout, so abort always resolves even if SDK stream.abort() is a no-op */
+  private raceWithAbort<T>(promise: Promise<T>, timeoutMs = 300_000): Promise<T> {
+    const ac = this.abortController;
+    if (ac?.signal.aborted) return Promise.reject(new Error('Aborted'));
+
+    return new Promise<T>((resolve, reject) => {
+      let settled = false;
+      const done = (fn: () => void) => { if (!settled) { settled = true; fn(); } };
+
+      const onAbort = () => {
+        ac?.signal.removeEventListener('abort', onAbort);
+        clearTimeout(timer);
+        done(() => reject(new Error('Aborted')));
+      };
+      ac?.signal.addEventListener('abort', onAbort);
+
+      const timer = setTimeout(() => {
+        ac?.signal.removeEventListener('abort', onAbort);
+        done(() => reject(new Error('LLM request timed out')));
+      }, timeoutMs);
+
+      promise.then(
+        (val) => { ac?.signal.removeEventListener('abort', onAbort); clearTimeout(timer); done(() => resolve(val)); },
+        (err) => { ac?.signal.removeEventListener('abort', onAbort); clearTimeout(timer); done(() => reject(err)); },
+      );
+    });
+  }
+
   async compress(): Promise<void> {
     const recentCount = 10;
     const contextMsgs = this.store.getInContext();
@@ -217,7 +245,7 @@ export class Agent {
 
     let response: Anthropic.Messages.Message;
     try {
-      response = await stream.finalMessage();
+      response = await this.raceWithAbort(stream.finalMessage());
     } catch (e) {
       this.currentStream = null;
       if (this.abortController?.signal.aborted) throw new Error('Aborted');

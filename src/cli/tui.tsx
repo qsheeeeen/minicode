@@ -130,9 +130,27 @@ function useAgent(
 
     agentRef.current = agent;
 
-    // Subscribe to store changes for tool/status/error messages
+    // Debounced session save — saves on every change, batched at 500ms
+    let saveTimer: ReturnType<typeof setTimeout> | null = null;
+
+    // Subscribe to store changes for display updates + incremental session save
     agent.getStore().onChange(() => {
       setMessages(agent.getStore().toDisplayMessages());
+
+      // Debounced save: persists session incrementally so crashes don't lose data
+      if (saveTimer) clearTimeout(saveTimer);
+      saveTimer = setTimeout(async () => {
+        const a = agentRef.current;
+        if (a) {
+          await sessionManager.save(a.currentSession, {
+            model: config.model?.model || 'unknown',
+            messages: a.getMessages() as any,
+            totalTokens: a.getTokenCount(),
+            createdAt: '',
+            updatedAt: ''
+          });
+        }
+      }, 500);
     });
 
     registry.register({
@@ -277,6 +295,8 @@ export function App({
     } catch (e) {
       if (e instanceof Error && e.message === 'Aborted') {
         setMessages(prev => [...prev, { role: 'status' as const, content: '(Aborted)', timestamp: new Date() }]);
+      } else if (e instanceof Error) {
+        setMessages(prev => [...prev, { role: 'error' as const, content: `(Error: ${e.message})`, timestamp: new Date() }]);
       } else {
         throw e;
       }
