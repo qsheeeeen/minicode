@@ -490,13 +490,15 @@ export function App({
 
       {/* Input */}
       <Box borderStyle="single" borderColor="gray" paddingX={1}>
-        {isLoading ? (
-          <Spinner label=" " />
-        ) : approvalRequest ? (
-          <Text color="yellow" bold>! </Text>
-        ) : (
-          <Text color="blue" bold>{'> '}</Text>
-        )}
+        <Box width={3}>
+          {isLoading ? (
+            <Spinner label="" />
+          ) : approvalRequest ? (
+            <Text color="yellow" bold>!</Text>
+          ) : (
+            <Text color="blue" bold>{'>'}</Text>
+          )}
+        </Box>
         {approvalRequest ? (
           <Text dimColor>Waiting for approval...</Text>
         ) : (
