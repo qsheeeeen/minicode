@@ -28,12 +28,11 @@ export function Message({ role, content, isStreaming, element }: MessageProps) {
     );
   }
 
-  // Thinking message - dim, folded
+  // Thinking message - dim, full content
   if (role === 'thinking') {
-    const preview = content.length > 200 ? content.slice(0, 200) + '...' : content;
     return (
       <Box marginBottom={0} paddingX={0} flexDirection="column">
-        <Text dimColor>{preview}</Text>
+        <Text dimColor>{content}</Text>
         {isStreaming && <Text dimColor inverse>▋</Text>}
       </Box>
     );

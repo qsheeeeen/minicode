@@ -108,12 +108,9 @@ export async function runHeadless({ config, userPrompt, initialPrompt, sessionMa
         }
       }
 
-      // 4. Thinking: print when finalized, truncated to 200 chars (matches TUI)
+      // 4. Thinking: print when finalized, full content
       if (msg.role === 'thinking' && !msg.isStreaming && msg.content && !finalized.has(msg.id)) {
-        const preview = msg.content.length > 200
-          ? msg.content.slice(0, 200) + '...'
-          : msg.content;
-        console.log(`\n[thinking] ${preview}`);
+        console.log(`\n[thinking] ${msg.content}`);
         finalized.add(msg.id);
       }
     }
