@@ -7,7 +7,7 @@ import { TokenManager, TokenManagerImpl } from './services/token-manager.js';
 import { CompressionService, CompressionServiceImpl } from './services/compression-service.js';
 import { AgentRegistry } from './services/agent-registry.js';
 import { MessageStore } from './messages.js';
-import { PermissionService } from './services/permission.js';
+import { PermissionService, type PermissionMode } from './services/permission.js';
 import { elementToText } from './utils/react.js';
 import type { SessionManager } from './utils/session.js';
 
@@ -44,7 +44,7 @@ export interface AgentConfig {
   excludeTools?: string[];
   agentRegistry?: AgentRegistry;
   currentAgentId?: string;
-  permissionService?: PermissionService;
+  permissionMode?: PermissionMode;
   sessionManager?: SessionManager;
 }
 
@@ -91,8 +91,12 @@ export class Agent {
     this.toolRegistry = new ToolRegistry();
     this.agentRegistry = config.agentRegistry;
     this.currentAgentId = config.currentAgentId || '1';
-    this.permissionService = config.permissionService;
     this.sessionManager = config.sessionManager;
+    this.permissionService = new PermissionService({
+      initialMode: config.permissionMode ?? 'manual',
+      client: this.apiKey ? this.client : undefined,
+      model: this.model,
+    });
 
     registerTools(this.toolRegistry, { agentRegistry: this.agentRegistry }, config.excludeTools);
 
@@ -315,7 +319,7 @@ export class Agent {
       const displayText = tool.format
         ? elementToText(tool.format(args))
         : `${tool.name}(${JSON.stringify(args)})`;
-      const allowed = await this.permissionService.check(tool.name, args, displayText);
+      const allowed = await this.permissionService.check(tool.name, args, displayText, this.display);
       if (!allowed) {
         return { output: 'User rejected', display: React.createElement(Text, { color: 'yellow' }, 'User rejected') };
       }

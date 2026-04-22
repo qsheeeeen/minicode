@@ -6,12 +6,19 @@ export type { DisplayMessage };
 type DisplayCallback = {
   onMessage?: (msg: DisplayMessage) => void;
   onTokenUpdate?: (tokens: number) => void;
+  onConfirm?: (req: ConfirmationRequest) => Promise<boolean>;
 };
+
+export interface ConfirmationRequest {
+  title: string;
+  message: string;
+}
 
 export interface DisplayAdapter {
   status(msg: string): void;
   error(msg: string): void;
   updateTokenCount(tokens: number): void;
+  confirm?(req: ConfirmationRequest): Promise<boolean>;
 }
 
 export class ConsoleDisplay implements DisplayAdapter {
@@ -55,5 +62,9 @@ export class CallbackDisplay implements DisplayAdapter {
 
   updateTokenCount(tokens: number): void {
     this.callbacks.onTokenUpdate?.(tokens);
+  }
+
+  confirm(req: ConfirmationRequest): Promise<boolean> {
+    return this.callbacks.onConfirm?.(req) ?? Promise.resolve(true);
   }
 }

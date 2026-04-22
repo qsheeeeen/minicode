@@ -1,57 +1,17 @@
-import React from 'react';
-import { Agent } from '../agent.js';
-import { RecordDisplay } from '../utils/display.js';
-import type { ResolvedConfig } from '../config.js';
+import type { Agent } from '../agent.js';
 import type { AgentMessage } from '../messages.js';
-import type { SessionManager } from '../utils/session.js';
 import { elementToText } from '../utils/react.js';
-import { PermissionService, type PermissionMode, type PermissionGate, type PermissionRequest } from '../services/permission.js';
-import { AnthropicClient } from '../llm/anthropic.js';
 
-export interface HeadlessOptions {
-  config: ResolvedConfig;
-  userPrompt: string;
-  initialPrompt: string;
-  sessionManager: SessionManager;
-  permissionMode: PermissionMode;
-}
-
-/** Headless permission gate: manual mode denies all, auto mode uses LLM */
-class HeadlessPermissionGate implements PermissionGate {
-  async requestApproval(req: PermissionRequest): Promise<boolean> {
-    console.log(`[Permission denied: ${req.displayText}] -- use --permission yolo or auto in headless mode`);
-    return false;
-  }
-}
-
-export async function runHeadless({ config, userPrompt, initialPrompt, sessionManager, permissionMode }: HeadlessOptions): Promise<void> {
-  const display = new RecordDisplay();
-
-  // Create PermissionService if not yolo (yolo = no service needed, all allowed)
-  let permissionService: PermissionService | undefined;
-  if (permissionMode !== 'yolo') {
-    const client = config.model ? new AnthropicClient(config.model.apiKey, config.model.baseURL) : undefined;
-    const gate = permissionMode === 'manual' ? new HeadlessPermissionGate() : undefined;
-    permissionService = new PermissionService({
-      initialMode: permissionMode,
-      gate,
-      client,
-      model: config.model?.model,
-    });
-  }
-
-  const agent = new Agent({
-    apiKey: config.model!.apiKey,
-    baseURL: config.model!.baseURL,
-    model: config.model!.model,
-    contextLength: config.model!.contextLength,
-    compressionThresholdRatio: config.compressionThreshold,
-    thinkingEnabled: config.thinking.enabled,
-    thinkingTokens: config.thinking.tokens,
-    display,
-    userPrompt,
-    permissionService,
-    sessionManager,
+export async function runHeadless(agent: Agent, initialPrompt: string): Promise<void> {
+  // Set headless display: confirm always denies
+  agent.setDisplay({
+    status: () => {},
+    error: (msg) => console.error(`[error] ${msg}`),
+    updateTokenCount: () => {},
+    confirm: async (req) => {
+      console.log(`[Permission denied: ${req.message}] -- use --permission yolo or auto in headless mode`);
+      return false;
+    },
   });
 
   let lastPrintedIndex = 0;

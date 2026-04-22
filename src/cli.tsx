@@ -3,6 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { render } from 'ink';
 import { loadAllConfig } from './config.js';
+import { Agent } from './agent.js';
 import { SessionManager } from './utils/session.js';
 import { parseArgs, printHelp, type PermissionMode } from './cli/args.js';
 import { loadGlobalPrompt, loadProjectPrompt } from './utils/prompts.js';
@@ -62,27 +63,40 @@ if (sessionName) {
   initialSession = `session-${Date.now()}`;
 }
 
-// Headless mode: run agent without TUI
+// Create Agent (composition root — single creation point)
+const agent = new Agent({
+  apiKey: config.model!.apiKey,
+  baseURL: config.model!.baseURL,
+  model: config.model!.model,
+  contextLength: config.model!.contextLength,
+  compressionThresholdRatio: config.compressionThreshold,
+  thinkingEnabled: config.thinking.enabled,
+  thinkingTokens: config.thinking.tokens,
+  userPrompt,
+  sessionManager,
+  permissionMode,
+});
+
+// Branch: display layer only
 if (headless) {
   if (!initialPrompt) {
     console.error('Error: --headless requires a prompt argument');
     process.exit(1);
   }
   const { runHeadless } = await import('./cli/headless.js');
-  await runHeadless({ config, userPrompt, initialPrompt, sessionManager, permissionMode });
+  await runHeadless(agent, initialPrompt);
   process.exit(0);
 }
 
 // Start TUI
 render(<App
+  agent={agent}
   config={config}
   version={VERSION}
-  userPrompt={userPrompt}
   promptFiles={promptFiles}
   initialSession={initialSession}
   sessionManager={sessionManager}
   initialPrompt={initialPrompt}
   sessionName={sessionName}
   resumeRecent={resumeRecent}
-  permissionMode={permissionMode}
 />, { exitOnCtrlC: false });

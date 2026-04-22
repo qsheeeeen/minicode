@@ -1,33 +1,21 @@
 import type { AnthropicClient } from '../llm/anthropic.js';
+import type { DisplayAdapter } from '../utils/display.js';
 
 export type PermissionMode = 'manual' | 'yolo' | 'auto';
-
-export interface PermissionRequest {
-  toolName: string;
-  toolInput: Record<string, unknown>;
-  displayText: string;
-}
-
-export interface PermissionGate {
-  requestApproval(req: PermissionRequest): Promise<boolean>;
-}
 
 const MODES: PermissionMode[] = ['manual', 'yolo', 'auto'];
 
 export class PermissionService {
   private mode: PermissionMode;
-  private gate: PermissionGate | null;
   private client?: AnthropicClient;
   private model?: string;
 
   constructor(options: {
     initialMode: PermissionMode;
-    gate?: PermissionGate;
     client?: AnthropicClient;
     model?: string;
   }) {
     this.mode = options.initialMode;
-    this.gate = options.gate ?? null;
     this.client = options.client;
     this.model = options.model;
   }
@@ -46,26 +34,25 @@ export class PermissionService {
     return this.mode;
   }
 
-  async check(toolName: string, toolInput: Record<string, unknown>, displayText: string): Promise<boolean> {
+  async check(toolName: string, toolInput: Record<string, unknown>, displayText: string, display?: DisplayAdapter): Promise<boolean> {
     switch (this.mode) {
       case 'yolo':
         return true;
       case 'manual':
-        if (!this.gate) return true;
-        return this.gate.requestApproval({ toolName, toolInput, displayText });
+        return display?.confirm?.({ title: 'Allow tool execution?', message: displayText }) ?? true;
       case 'auto':
-        return this.autoDecide({ toolName, toolInput, displayText });
+        return this.autoDecide(toolName, toolInput);
     }
   }
 
-  private async autoDecide(req: PermissionRequest): Promise<boolean> {
+  private async autoDecide(toolName: string, toolInput: Record<string, unknown>): Promise<boolean> {
     if (!this.client) return false;
 
     try {
       const prompt = `You are a permission gate for a coding agent. Decide if this tool execution should be allowed.
 
-Tool: ${req.toolName}
-Arguments: ${JSON.stringify(req.toolInput, null, 2)}
+Tool: ${toolName}
+Arguments: ${JSON.stringify(toolInput, null, 2)}
 
 Guidelines:
 - Read operations are always safe.

@@ -4,65 +4,28 @@ import { Spinner, ProgressBar } from '@inkjs/ui';
 import TextInput from 'ink-text-input';
 import { Agent } from '../agent.js';
 import type { MessageParam } from '../llm/anthropic.js';
-import { AnthropicClient } from '../llm/anthropic.js';
 import type { ResolvedConfig } from '../config.js';
-import { CallbackDisplay, type DisplayMessage } from '../utils/display.js';
+import { CallbackDisplay, type DisplayMessage, type ConfirmationRequest } from '../utils/display.js';
 import { SessionDisplayImpl } from '../utils/session-display.js';
 import { commandRegistry, type CommandContext } from './commands/index.js';
 import './commands/builtin.js';
 import { Message } from '../components/Message.js';
 import type { SessionManager } from '../utils/session.js';
 import { AgentRegistry, type AgentSession } from '../services/agent-registry.js';
-import { PermissionService, type PermissionMode, type PermissionGate, type PermissionRequest } from '../services/permission.js';
+import type { PermissionMode } from '../services/permission.js';
 
 export interface AppProps {
+  agent: Agent;
   config: ResolvedConfig;
   version: string;
-  userPrompt: string;
   promptFiles: string[];
   initialSession: string;
   sessionManager: SessionManager;
   initialPrompt?: string;
   sessionName?: string;
   resumeRecent: boolean;
-  permissionMode: PermissionMode;
 }
 
-
-/** TUI-based permission gate: shows approval prompt, resolves on keypress */
-class TUIPermissionGate implements PermissionGate {
-  private pendingResolve: ((decision: boolean) => void) | null = null;
-  private _setApprovalRequest: React.Dispatch<React.SetStateAction<PermissionRequest | null>>;
-  private onSwitchToYolo: (() => void) | null = null;
-
-  constructor(
-    setApprovalRequest: React.Dispatch<React.SetStateAction<PermissionRequest | null>>,
-    onSwitchToYolo?: (() => void) | null,
-  ) {
-    this._setApprovalRequest = setApprovalRequest;
-    this.onSwitchToYolo = onSwitchToYolo ?? null;
-  }
-
-  async requestApproval(req: PermissionRequest): Promise<boolean> {
-    return new Promise((resolve) => {
-      this.pendingResolve = resolve;
-      this._setApprovalRequest(req);
-    });
-  }
-
-  resolve(decision: boolean): void {
-    this._setApprovalRequest(null);
-    this.pendingResolve?.(decision);
-    this.pendingResolve = null;
-  }
-
-  resolveApproveAll(): void {
-    this._setApprovalRequest(null);
-    this.pendingResolve?.(true);
-    this.pendingResolve = null;
-    this.onSwitchToYolo?.();
-  }
-}
 
 /** Hook: multi-agent coordination and switching */
 function useMultiAgent() {
@@ -87,49 +50,39 @@ function useMultiAgent() {
   return { activeAgentId, activeAgentIdRef, setActiveAgentId, agentSessions, setAgentSessions, registryRef };
 }
 
-/** Hook: agent initialization, session loading, message submission */
-function useAgent(
-  config: ResolvedConfig,
-  userPrompt: string,
+/** Hook: attach display to agent, load initial session */
+function useDisplay(
+  agent: Agent,
   initialSession: string,
   sessionManager: SessionManager,
   sessionName: string | undefined,
   resumeRecent: boolean,
   setAgentSessions: React.Dispatch<React.SetStateAction<AgentSession[]>>,
   registryRef: React.MutableRefObject<AgentRegistry | null>,
-  permissionService: PermissionService | undefined,
+  setApprovalRequest: (req: (ConfirmationRequest & { resolve: (v: boolean) => void }) | null) => void,
 ) {
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [currentSession, setCurrentSession] = useState(initialSession);
   const [tokenCount, setTokenCount] = useState(0);
-  const agentRef = useRef<Agent | null>(null);
 
-  // Initialize agent once
   useEffect(() => {
     const registry = registryRef.current;
     if (!registry) return;
 
-    const displayAdapter = new CallbackDisplay({
-      onTokenUpdate: setTokenCount
-    });
+    // Confirm resolver ref — used by key handlers to resolve pending confirms
+    const confirmResolvers: Array<(v: boolean) => void> = [];
 
-    const agent = new Agent({
-      apiKey: config.model!.apiKey,
-      baseURL: config.model!.baseURL,
-      model: config.model!.model,
-      contextLength: config.model!.contextLength,
-      compressionThresholdRatio: config.compressionThreshold,
-      thinkingEnabled: config.thinking.enabled,
-      thinkingTokens: config.thinking.tokens,
-      display: displayAdapter,
-      userPrompt,
-      agentRegistry: registry,
-      currentAgentId: '1',
-      permissionService,
-      sessionManager,
-    });
+    // Set up TUI display adapter with confirm via React state
+    agent.setDisplay(new CallbackDisplay({
+      onTokenUpdate: setTokenCount,
+      onConfirm: (req: ConfirmationRequest) => new Promise<boolean>((resolve) => {
+        confirmResolvers.push(resolve);
+        setApprovalRequest({ ...req, resolve });
+      }),
+    }));
 
-    agentRef.current = agent;
+    // Expose resolvers so key handlers can resolve them
+    (agent as any).__confirmResolvers = confirmResolvers;
 
     // Subscribe to store changes for display updates
     agent.getStore().onChange(() => {
@@ -174,23 +127,22 @@ function useAgent(
     };
     loadInitial();
 
-    return () => { agentRef.current = null; };
+    return () => { (agent as any).__confirmResolvers = []; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return { messages, setMessages, currentSession, setCurrentSession, tokenCount, agentRef };
+  return { messages, setMessages, currentSession, setCurrentSession, tokenCount };
 }
 
 export function App({
+  agent,
   config,
   version,
-  userPrompt,
   promptFiles,
   initialSession,
   sessionManager,
   initialPrompt,
   sessionName,
   resumeRecent,
-  permissionMode: initialPermissionMode,
 }: AppProps) {
   const [status, setStatus] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -202,47 +154,19 @@ export function App({
   const [inputValue, setInputValue] = useState('');
   const [inputKey, setInputKey] = useState(0);
   const [autoSubmitPending, setAutoSubmitPending] = useState(!!initialPrompt);
-  const [permissionMode, setPermissionMode] = useState<PermissionMode>(initialPermissionMode);
-  const [approvalRequest, setApprovalRequest] = useState<PermissionRequest | null>(null);
+  const [permissionMode, setPermissionMode] = useState<PermissionMode>(agent.getPermissionService()?.getMode() ?? 'manual');
+  const [approvalRequest, setApprovalRequest] = useState<(ConfirmationRequest & { resolve: (v: boolean) => void }) | null>(null);
+  const agentRef = useRef<Agent>(agent);
   const { exit } = useApp();
-
-  // Permission gate ref — persists across renders
-  const gateRef = useRef<TUIPermissionGate | null>(null);
-
-  // Create PermissionService and gate once
-  const permissionRef = useRef<PermissionService | null>(null);
-  if (!permissionRef.current) {
-    const client = config.model ? new AnthropicClient(config.model.apiKey, config.model.baseURL) : undefined;
-    permissionRef.current = new PermissionService({
-      initialMode: initialPermissionMode,
-      gate: undefined as any, // set below after gate is created
-      client,
-      model: config.model?.model,
-    });
-    gateRef.current = new TUIPermissionGate(
-      setApprovalRequest,
-      () => {
-        setPermissionMode('yolo');
-        permissionRef.current?.setMode('yolo');
-      },
-    );
-    permissionRef.current = new PermissionService({
-      initialMode: initialPermissionMode,
-      gate: gateRef.current,
-      client,
-      model: config.model?.model,
-    });
-  }
-  const permissionService = permissionRef.current;
 
   // Multi-agent hook
   const { activeAgentId, activeAgentIdRef, setActiveAgentId, agentSessions, setAgentSessions, registryRef } = useMultiAgent();
 
-  // Agent hook
-  const { messages, setMessages, currentSession, setCurrentSession, tokenCount, agentRef } = useAgent(
-    config, userPrompt, initialSession, sessionManager, sessionName, resumeRecent,
+  // Display hook: attach TUI display to agent, load initial session
+  const { messages, setMessages, currentSession, setCurrentSession, tokenCount } = useDisplay(
+    agent, initialSession, sessionManager, sessionName, resumeRecent,
     setAgentSessions, registryRef,
-    permissionService,
+    setApprovalRequest,
   );
 
   const setSessionList = (sessions: Array<{ name: string }>) => {
@@ -335,15 +259,20 @@ export function App({
     );
   }
 
-  // Approval prompt input handler — active when an approval request is pending
+  // Approval prompt input handler — resolves pending confirm promise
   useInput((_input, key) => {
-    if (!approvalRequest || !gateRef.current) return;
+    if (!approvalRequest) return;
     if (_input === 'y' || key.return) {
-      gateRef.current.resolve(true);
+      approvalRequest.resolve(true);
+      setApprovalRequest(null);
     } else if (_input === 'n' || key.escape) {
-      gateRef.current.resolve(false);
+      approvalRequest.resolve(false);
+      setApprovalRequest(null);
     } else if (_input === 'a') {
-      gateRef.current.resolveApproveAll();
+      approvalRequest.resolve(true);
+      setApprovalRequest(null);
+      agent.getPermissionService()?.setMode('yolo');
+      setPermissionMode('yolo');
     }
   }, { isActive: approvalRequest !== null });
 
@@ -352,8 +281,9 @@ export function App({
     if (key.ctrl && input === 'c') {
       if (isLoading) {
         agentRef.current?.abort();
-        if (approvalRequest && gateRef.current) {
-          gateRef.current.resolve(false);
+        if (approvalRequest) {
+          approvalRequest.resolve(false);
+          setApprovalRequest(null);
         }
       } else {
         exit();
@@ -361,14 +291,15 @@ export function App({
       return;
     }
     if (key.shift && key.tab) {
-      const next = permissionService.cycleMode();
+      const next = agent.getPermissionService()?.cycleMode() ?? 'manual';
       setPermissionMode(next);
       return;
     }
     if (key.escape && isLoading) {
       agentRef.current?.abort();
-      if (approvalRequest && gateRef.current) {
-        gateRef.current.resolve(false);
+      if (approvalRequest) {
+        approvalRequest.resolve(false);
+        setApprovalRequest(null);
       }
       return;
     }
@@ -474,8 +405,8 @@ export function App({
       {approvalRequest && (
         <Box borderStyle="round" borderColor="yellow" paddingX={1}>
           <Box flexDirection="column">
-            <Text bold color="yellow">Allow tool execution?</Text>
-            <Text>{approvalRequest.displayText}</Text>
+            <Text bold color="yellow">{approvalRequest.title}</Text>
+            <Text>{approvalRequest.message}</Text>
             <Text dimColor>[y] Yes  [n] No  [a] Yes to all</Text>
           </Box>
         </Box>
