@@ -21,54 +21,43 @@ npm run start -- --headless "prompt"  # Headless mode (no TUI, stdout output)
 
 ## Architecture
 
+### Composition Root
+
+`src/cli.tsx` is the single assembly point. It creates the `Agent` from `ResolvedConfig` and branches to the display layer:
+
 ```
-src/
-├── cli.tsx              # Entry point: CLI args, config loading, React app bootstrap
-├── agent.ts             # Agent class with streaming tool-execution loop
-├── messages.ts          # AgentMessage model + MessageStore (single source of truth)
-├── config.ts            # Multi-provider config loader (model@provider)
-├── cli/
-│   ├── args.ts          # CLI argument parsing
-│   ├── headless.ts      # Headless runner (non-interactive, stdout output)
-│   ├── commands/        # CommandRegistry + builtin / commands
-│   └── tui.tsx          # Main App component, multi-agent hooks, input handling
-├── components/
-│   └── Message.tsx      # Message display by role
-├── llm/
-│   └── anthropic.ts     # Anthropic SDK wrapper (streaming + thinking)
-├── services/
-│   ├── agent-registry.ts     # Multi-agent coordination (IDs "1"-"9")
-│   ├── token-manager.ts      # Token tracking, triggers compression
-│   └── compression-service.ts # LLM-based conversation summarization
-├── tools/
-│   ├── index.ts         # ToolDef interface + exports
-│   ├── registry.ts      # ToolRegistry (Map<string, ToolDef>)
-│   ├── read.ts / write.ts / edit.ts / bash.ts  # Core tools
-│   └── agent.ts         # Sub-agent delegation tool
-└── utils/
-    ├── diff.ts          # Unified diff generation
-    ├── display.ts       # DisplayAdapter interface + CallbackDisplay/ConsoleDisplay/RecordDisplay
-    ├── prompts.ts       # Global + project prompt loading (MINICODE.md)
-    ├── session.ts       # SessionManager (v1/v2 format, per-project isolation)
-    └── session-display.ts # Legacy v1 session conversion
+cli.tsx → new Agent(config) → headless: agent.setDisplay(stdoutAdapter) + agent.run()
+                             → TUI:      render(<App agent={agent}>)
 ```
+
+TUI and headless only set the display adapter — they never construct or configure the Agent.
 
 ### Core Flow
 
 1. User input → Agent adds `AgentMessage` to `MessageStore`, sends `store.toLLMMessages()` to LLM
-2. LLM responds with text + tool_use blocks (streamed to TUI via `DisplayAdapter`)
+2. LLM responds with text + tool_use blocks (streamed via `DisplayAdapter`)
 3. Tool calls execute in parallel (`Promise.allSettled`); results written back to store
-4. Store mutations fire `onChange` → TUI re-renders from `store.toDisplayMessages()`
-5. Session auto-saved after each exchange; token usage tracked with threshold-based compression
+4. Store mutations fire `onChange` → display layer renders
+5. Session saved at checkpoints: thinking complete, tool_use received, tool results complete, run finished
+
+### DisplayAdapter — Service→User Interaction
+
+`DisplayAdapter` is the interface between services and the user. It has a generic `confirm(req): Promise<boolean>` method that any service can use to ask yes/no questions. Currently used by `PermissionService` for tool execution approval:
+
+- **TUI**: `CallbackDisplay.confirm()` sets React state, returns promise resolved by keypress
+- **Headless**: `confirm()` always returns false
+- **Sub-agents**: Use `ConsoleDisplay` with no `confirm()` — defaults to allow
+
+This pattern is extensible: future services that need user input (e.g. "overwrite existing file?") use the same `display.confirm()`.
 
 ### Key Design Decisions
 
-- **Unified Message Model:** `AgentMessage` has an `inContext` flag — `toLLMMessages()` only sends flagged messages, `toDisplayMessages()` shows all. This lets the UI display compressed/hidden context while keeping the LLM view clean.
-- **Registry Pattern:** Both tools (`ToolRegistry`) and commands (`CommandRegistry`) use `Map<string, T>` with `register()`/`get()`/`getAll()`. Tools registered in `Agent` constructor; commands in `commands/builtin.ts`.
-- **Display Adapter:** `DisplayAdapter` abstracts output (`status()`, `error()`, `updateTokenCount()`). `CallbackDisplay` bridges to React state; `ConsoleDisplay` for fallback; `RecordDisplay` captures events for testing. Tools get a `ToolDisplayHandle` via `context.display` for real-time slot updates.
-- **Headless Mode:** `--headless` flag runs agent without TUI. Output matches TUI content (user, assistant, thinking, tool calls+results, status, error) but as plain text. Uses `elementToText()` to extract text from React elements.
+- **Unified Message Model:** `AgentMessage` has an `inContext` flag — `toLLMMessages()` only sends flagged messages, `toDisplayMessages()` shows all. Lets UI display compressed/hidden context while keeping the LLM view clean.
+- **Registry Pattern:** Both tools (`ToolRegistry`) and commands (`CommandRegistry`) use `Map<string, T>` with `register()`/`get()`/`getAll()`.
+- **PermissionService:** Built inside Agent from `permissionMode` config. Three modes: `yolo` (allow all), `manual` (via `display.confirm()`), `auto` (LLM decides). No UI dependency — uses the display adapter for interaction.
 - **Context Injection:** User/project prompts (from `MINICODE.md`) merged into system prompt via `getSystemPrompt()`. Never injected as fake conversation turns.
 - **Session Isolation:** Sessions stored per-project using MD5 hash of cwd in `~/.minicode/sessions/<hash>/`.
+- **Sub-agents:** Created by the `agent` tool as isolated headless agents with `ConsoleDisplay`. Registered with `AgentRegistry`, auto-removed after completion.
 
 ## Adding a Tool
 
