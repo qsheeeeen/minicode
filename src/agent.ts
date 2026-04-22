@@ -73,6 +73,7 @@ export class Agent {
   private permissionService?: PermissionService;
   private abortController: AbortController | null = null;
   private currentStream: import('@anthropic-ai/sdk/lib/MessageStream.js').MessageStream<null> | null = null;
+  private checkpointCallback?: () => Promise<void>;
 
   constructor(config: AgentConfig = {}) {
     this.apiKey = config.apiKey;
@@ -100,6 +101,11 @@ export class Agent {
   /** Set or update the display adapter */
   setDisplay(display: DisplayAdapter): void {
     this.display = display;
+  }
+
+  /** Register callback fired at checkpoints (thinking done, tool_call received, tool results done) */
+  onCheckpoint(callback: () => Promise<void>): void {
+    this.checkpointCallback = callback;
   }
 
   /** Abort the current run() loop */
@@ -228,6 +234,8 @@ export class Agent {
       if (block.type === 'thinking' && isStreamingThinking) {
         isStreamingThinking = false;
         this.store.update(thinkingMsgId, { isStreaming: false });
+        // Checkpoint: thinking block complete
+        this.checkpointCallback?.().catch(() => {});
       }
       if (block.type === 'text' && isStreamingText) {
         isStreamingText = false;
@@ -240,6 +248,8 @@ export class Agent {
         if (tool) {
           toolCalls.push({ block: toolBlock, tool });
         }
+        // Checkpoint: tool_use block fully received
+        this.checkpointCallback?.().catch(() => {});
       }
     });
 
@@ -420,6 +430,11 @@ export class Agent {
 
         // Execute tools
         await this.executeToolCalls(toolCalls);
+
+        // Checkpoint: tool results complete
+        if (hasToolCalls && this.checkpointCallback) {
+          await this.checkpointCallback();
+        }
 
         if (!hasToolCalls) break;
       }

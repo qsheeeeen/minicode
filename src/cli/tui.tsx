@@ -130,28 +130,25 @@ function useAgent(
 
     agentRef.current = agent;
 
-    // Debounced session save — saves on every change, batched at 500ms
-    let saveTimer: ReturnType<typeof setTimeout> | null = null;
-
-    // Subscribe to store changes for display updates + incremental session save
+    // Subscribe to store changes for display updates
     agent.getStore().onChange(() => {
       setMessages(agent.getStore().toDisplayMessages());
-
-      // Debounced save: persists session incrementally so crashes don't lose data
-      if (saveTimer) clearTimeout(saveTimer);
-      saveTimer = setTimeout(async () => {
-        const a = agentRef.current;
-        if (a) {
-          await sessionManager.save(a.currentSession, {
-            model: config.model?.model || 'unknown',
-            messages: a.getMessages() as any,
-            totalTokens: a.getTokenCount(),
-            createdAt: '',
-            updatedAt: ''
-          });
-        }
-      }, 500);
     });
+
+    // Save session at checkpoints: thinking done, tool_call received, tool results done
+    const saveSession = async () => {
+      const a = agentRef.current;
+      if (a) {
+        await sessionManager.save(a.currentSession, {
+          model: config.model?.model || 'unknown',
+          messages: a.getMessages() as any,
+          totalTokens: a.getTokenCount(),
+          createdAt: '',
+          updatedAt: ''
+        });
+      }
+    };
+    agent.onCheckpoint(saveSession);
 
     registry.register({
       id: '1',

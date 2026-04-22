@@ -58,20 +58,17 @@ export async function runHeadless({ config, userPrompt, initialPrompt, sessionMa
   const finalized = new Set<string>();               // msgIds with newline written
   const toolCallLines = new Map<string, number>();   // tool_call msgId → lines printed
 
-  // Debounced session save — persists incrementally so crashes don't lose data
-  let saveTimer: ReturnType<typeof setTimeout> | null = null;
-  const debouncedSave = () => {
-    if (saveTimer) clearTimeout(saveTimer);
-    saveTimer = setTimeout(async () => {
-      await sessionManager.save(agent.currentSession, {
-        model: config.model?.model || 'unknown',
-        messages: agent.getMessages() as any,
-        totalTokens: agent.getTokenCount(),
-        createdAt: '',
-        updatedAt: ''
-      });
-    }, 500);
+  // Save session at checkpoints: thinking done, tool_call received, tool results done
+  const saveSession = async () => {
+    await sessionManager.save(agent.currentSession, {
+      model: config.model?.model || 'unknown',
+      messages: agent.getMessages() as any,
+      totalTokens: agent.getTokenCount(),
+      createdAt: '',
+      updatedAt: ''
+    });
   };
+  agent.onCheckpoint(saveSession);
 
   agent.getStore().onChange(() => {
     const raw = agent.getStore().getAll();
@@ -129,9 +126,6 @@ export async function runHeadless({ config, userPrompt, initialPrompt, sessionMa
         finalized.add(msg.id);
       }
     }
-
-    // Incremental session save
-    debouncedSave();
   });
 
   try {
