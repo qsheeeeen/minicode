@@ -2,91 +2,64 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Development
+## Build & Run Commands
 
 ```bash
-npm run dev          # Development mode via tsx (TUI)
-npm run build        # TypeScript compile to dist/
-npm run start        # Run built TUI from dist/
-npm run start "prompt"  # Run with initial prompt
-npm run start -- --headless "prompt"  # Headless mode (no TUI, stdout output)
-npm run start -- --headless --perm yolo "prompt"  # Headless with auto-approve tools
+npm run dev           # Run in dev mode via tsx (no build needed)
+npm run build         # Compile TypeScript to dist/
+npm run start         # Run compiled version from dist/
 ```
 
-### TUI Controls
-
-- **Shift+Tab** — cycle permission mode (manual → yolo → auto)
-- **Ctrl+1..9** — switch between main agent (1) and sub-agents (2-9)
-
-## Conventions
-
-- **Module system:** ESM (`"type": "module"`) with Node16 module resolution. All imports use `.js` extensions (e.g. `import { foo } from './bar.js'` for `bar.ts`).
-- **Project goal:** Self-bootstrapping — use minicode to develop minicode itself.
-- **Config format:** `model@provider` specifier (e.g. `claude-sonnet-4-5@anthropic`). Priority: CLI `--model` > `MODEL` env var > config `model` field.
-- **Verification:** All features and fixes must be self-tested in headless mode (`npm run start -- --headless "prompt"`) before reporting complete.
+No test framework, linter, or formatter is configured. There are no tests to run.
 
 ## Architecture
 
-### Composition Root
+minicode is a minimal coding agent with an ink-based TUI. The codebase is pure TypeScript with React JSX for the terminal UI.
 
-`src/cli.tsx` is the single assembly point. It creates the `Agent` from `ResolvedConfig` and branches to the display layer:
+### Entry Point & Composition Root
 
-```
-cli.tsx → new Agent(config) → headless: agent.setDisplay(stdoutAdapter) + agent.run()
-                             → TUI:      render(<App agent={agent}>)
-```
+`src/cli.tsx` is the single entry point. It parses CLI args, loads config, creates one `Agent` instance, then branches into TUI mode (`src/cli/tui.tsx`) or headless mode (`src/cli/headless.ts`).
 
-TUI and headless only set the display adapter — they never construct or configure the Agent.
+### Core Loop
 
-### Core Flow
+The `Agent` class (`src/agent.ts`) drives the conversation loop:
+1. User message → `MessageStore.add()` → `store.toLLMMessages()` sent to LLM
+2. LLM streams response (text + tool_use blocks) via `DisplayAdapter`
+3. Tool calls execute in parallel with `Promise.allSettled`
+4. `MessageStore.onChange` triggers TUI re-render from `store.toDisplayMessages()`
+5. Session auto-saved after each exchange via `SessionManager`
 
-1. User input → Agent adds `AgentMessage` to `MessageStore`, sends `store.toLLMMessages()` to LLM
-2. LLM responds with text + tool_use blocks (streamed via `DisplayAdapter`)
-3. Tool calls execute in parallel (`Promise.allSettled`); results written back to store
-4. Store mutations fire `onChange` → display layer renders
-5. Session saved at checkpoints: thinking complete, tool_use received, tool results complete, run finished
+### Key Abstractions
 
-### DisplayAdapter — Service→User Interaction
+- **`MessageStore`** (`src/messages.ts`) — Unified message model (`AgentMessage`) with conversion methods for LLM API format and TUI display format
+- **`ToolRegistry`** (`src/tools/registry.ts`) — `Map<string, ToolDef>` registry pattern. All tools implement `ToolDef` interface (`name`, `description`, `input_schema`, `execute`, optional `format`, `requires`, `requiresPermission`)
+- **`DisplayAdapter`** (`src/utils/display.ts`) — Abstract output interface. `ConsoleDisplay` for headless, `CallbackDisplay` for TUI. Includes slot-based tool display (`createSlot`/`updateSlot`)
+- **`AgentRegistry`** (`src/services/agent-registry.ts`) — Multi-agent coordination: ID allocation, parent-child lookup, parallel sub-agent spawning via the `agent` tool
+- **`CommandRegistry`** (`src/cli/commands/index.ts`) — Same `Map<string, T>` registry pattern for TUI `/` commands, registered in `src/cli/commands/builtin.ts`
 
-`DisplayAdapter` is the interface between services and the user. It has a generic `confirm(req): Promise<boolean>` method that any service can use to ask yes/no questions. Currently used by `PermissionService` for tool execution approval:
+### Adding a New Tool
 
-- **TUI**: `CallbackDisplay.confirm()` sets React state, returns promise resolved by keypress
-- **Headless**: `confirm()` returns false and prints a hint suggesting `--permission yolo` or `auto`
-- **Sub-agents**: Use `ConsoleDisplay` with no `confirm()` — defaults to allow
+1. Create file in `src/tools/` implementing `ToolDef` (import from `./index.js`)
+2. Add to `allTools` array in `src/tools/index.ts`
+3. Register in `Agent` constructor (already handled by `registerTools()` if tool has no special requirements)
 
-This pattern is extensible: future services that need user input (e.g. "overwrite existing file?") use the same `display.confirm()`.
+Tool execute receives a `ToolExecutionContext` with `registry` (AgentRegistry), `config` (AgentConfig), `display` (ToolDisplayHandle for real-time updates), `signal` (AbortSignal), and `permissionService`.
 
-### Key Design Decisions
+### Config System
 
-- **Unified Message Model:** `AgentMessage` has an `inContext` flag — `toLLMMessages()` only sends flagged messages, `toDisplayMessages()` shows all. Lets UI display compressed/hidden context while keeping the LLM view clean.
-- **Registry Pattern:** Both tools (`ToolRegistry`) and commands (`CommandRegistry`) use `Map<string, T>` with `register()`/`get()`/`getAll()`.
-- **PermissionService:** Built inside Agent from `permissionMode` config. Three modes: `yolo` (allow all), `manual` (via `display.confirm()`), `auto` (LLM decides). No UI dependency — uses the display adapter for interaction.
-- **Context Injection:** User/project prompts (from `MINICODE.md`) merged into system prompt via `getSystemPrompt()`. Never injected as fake conversation turns.
-- **Session Isolation:** Sessions stored per-project using MD5 hash of cwd in `~/.minicode/sessions/<hash>/`.
-- **Sub-agents:** Created by the `agent` tool as isolated headless agents with `ConsoleDisplay`. Registered with `AgentRegistry`, auto-removed after completion.
+`src/config.ts` — Multi-provider config loaded from `~/.minicode/config.json`. Model specifier format: `model@provider`. Priority: CLI `--model` > `MODEL` env var > config file. Each provider defines `apiKey`, `baseURL`, and per-model overrides (e.g., `contextLength`).
 
-## Adding a Tool
+### Session Persistence
 
-1. Create file in `src/tools/` implementing `ToolDef` (interface in `src/tools/index.ts`):
-   ```typescript
-   import { ToolDef, ToolResult, ToolExecutionContext } from './index.js';
+`src/utils/session.ts` — Sessions stored per-project at `~/.minicode/sessions/<md5-of-cwd>/` in v2 format (`agentMessages` array). Supports auto-save, resume, rename, list.
 
-   export const myTool: ToolDef = {
-     name: 'my_tool',
-     description: 'What it does',
-     input_schema: { /* JSON Schema */ },
-     requiresPermission: false,       // set true to gate behind PermissionService
-     requires: [],                     // e.g. ['agentRegistry'] if tool needs AgentRegistry
-     format: (args) => <Text>MyTool({JSON.stringify(args)})</Text>,  // optional TUI display
-     execute: async (args, context?: ToolExecutionContext): Promise<ToolResult> => {
-       // context.registry     — AgentRegistry for sub-agent access
-       // context.config       — parent AgentConfig
-       // context.display      — ToolDisplayHandle for real-time slot updates
-       // context.signal       — AbortSignal for cancellation
-       // context.permissionService — PermissionService instance
-       return { output: 'result for LLM', display: <Text dimColor>done</Text> };
-     }
-   };
-   ```
-2. Export from `src/tools/index.ts` and add to the `allTools` array
-3. `registerTools()` (called in Agent constructor) handles registration — it checks `requires` availability and respects `excludeTools` config
+### LLM Layer
+
+`src/llm/anthropic.ts` — Thin wrapper around `@anthropic-ai/sdk` with streaming support and extended thinking (configurable token budget).
+
+## TypeScript Conventions
+
+- ES2022 target, Node16 module resolution, strict mode
+- All imports use `.js` extensions (Node16 ESM convention)
+- JSX: `react-jsx` (no explicit React imports needed in component files)
+- Build output: `dist/`
