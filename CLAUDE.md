@@ -10,7 +10,13 @@ npm run build        # TypeScript compile to dist/
 npm run start        # Run built TUI from dist/
 npm run start "prompt"  # Run with initial prompt
 npm run start -- --headless "prompt"  # Headless mode (no TUI, stdout output)
+npm run start -- --headless --perm yolo "prompt"  # Headless with auto-approve tools
 ```
+
+### TUI Controls
+
+- **Shift+Tab** — cycle permission mode (manual → yolo → auto)
+- **Ctrl+1..9** — switch between main agent (1) and sub-agents (2-9)
 
 ## Conventions
 
@@ -45,7 +51,7 @@ TUI and headless only set the display adapter — they never construct or config
 `DisplayAdapter` is the interface between services and the user. It has a generic `confirm(req): Promise<boolean>` method that any service can use to ask yes/no questions. Currently used by `PermissionService` for tool execution approval:
 
 - **TUI**: `CallbackDisplay.confirm()` sets React state, returns promise resolved by keypress
-- **Headless**: `confirm()` always returns false
+- **Headless**: `confirm()` returns false and prints a hint suggesting `--permission yolo` or `auto`
 - **Sub-agents**: Use `ConsoleDisplay` with no `confirm()` — defaults to allow
 
 This pattern is extensible: future services that need user input (e.g. "overwrite existing file?") use the same `display.confirm()`.
@@ -69,11 +75,18 @@ This pattern is extensible: future services that need user input (e.g. "overwrit
      name: 'my_tool',
      description: 'What it does',
      input_schema: { /* JSON Schema */ },
+     requiresPermission: false,       // set true to gate behind PermissionService
+     requires: [],                     // e.g. ['agentRegistry'] if tool needs AgentRegistry
      format: (args) => <Text>MyTool({JSON.stringify(args)})</Text>,  // optional TUI display
      execute: async (args, context?: ToolExecutionContext): Promise<ToolResult> => {
+       // context.registry     — AgentRegistry for sub-agent access
+       // context.config       — parent AgentConfig
+       // context.display      — ToolDisplayHandle for real-time slot updates
+       // context.signal       — AbortSignal for cancellation
+       // context.permissionService — PermissionService instance
        return { output: 'result for LLM', display: <Text dimColor>done</Text> };
      }
    };
    ```
-2. Export from `src/tools/index.ts`
-3. Register in `Agent` constructor tool list
+2. Export from `src/tools/index.ts` and add to the `allTools` array
+3. `registerTools()` (called in Agent constructor) handles registration — it checks `requires` availability and respects `excludeTools` config
