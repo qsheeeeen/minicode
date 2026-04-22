@@ -126,6 +126,7 @@ function useAgent(
       agentRegistry: registry,
       currentAgentId: '1',
       permissionService,
+      sessionManager,
     });
 
     agentRef.current = agent;
@@ -134,21 +135,6 @@ function useAgent(
     agent.getStore().onChange(() => {
       setMessages(agent.getStore().toDisplayMessages());
     });
-
-    // Save session at checkpoints: thinking done, tool_call received, tool results done
-    const saveSession = async () => {
-      const a = agentRef.current;
-      if (a) {
-        await sessionManager.save(a.currentSession, {
-          model: config.model?.model || 'unknown',
-          messages: a.getMessages() as any,
-          totalTokens: a.getTokenCount(),
-          createdAt: '',
-          updatedAt: ''
-        });
-      }
-    };
-    agent.onCheckpoint(saveSession);
 
     registry.register({
       id: '1',
@@ -298,16 +284,6 @@ export function App({
         throw e;
       }
     } finally {
-      const agent = agentRef.current;
-      if (agent) {
-        await sessionManager.save(agent.currentSession, {
-          model: config.model?.model || 'unknown',
-          messages: agent.getMessages() as any,
-          totalTokens: agent.getTokenCount(),
-          createdAt: '',
-          updatedAt: ''
-        });
-      }
       setIsLoading(false);
       setStatus('');
     }

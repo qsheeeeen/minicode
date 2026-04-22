@@ -9,6 +9,7 @@ import { AgentRegistry } from './services/agent-registry.js';
 import { MessageStore } from './messages.js';
 import { PermissionService } from './services/permission.js';
 import { elementToText } from './utils/react.js';
+import type { SessionManager } from './utils/session.js';
 
 export const SYSTEM_PROMPT = `You are an interactive CLI tool that helps users with software engineering tasks. Use the instructions below and the tools available to you to assist the user.
 
@@ -44,6 +45,7 @@ export interface AgentConfig {
   agentRegistry?: AgentRegistry;
   currentAgentId?: string;
   permissionService?: PermissionService;
+  sessionManager?: SessionManager;
 }
 
 interface StreamingResult {
@@ -73,7 +75,7 @@ export class Agent {
   private permissionService?: PermissionService;
   private abortController: AbortController | null = null;
   private currentStream: import('@anthropic-ai/sdk/lib/MessageStream.js').MessageStream<null> | null = null;
-  private checkpointCallback?: () => Promise<void>;
+  private sessionManager?: SessionManager;
 
   constructor(config: AgentConfig = {}) {
     this.apiKey = config.apiKey;
@@ -90,6 +92,7 @@ export class Agent {
     this.agentRegistry = config.agentRegistry;
     this.currentAgentId = config.currentAgentId || '1';
     this.permissionService = config.permissionService;
+    this.sessionManager = config.sessionManager;
 
     registerTools(this.toolRegistry, { agentRegistry: this.agentRegistry }, config.excludeTools);
 
@@ -103,9 +106,16 @@ export class Agent {
     this.display = display;
   }
 
-  /** Register callback fired at checkpoints (thinking done, tool_call received, tool results done) */
-  onCheckpoint(callback: () => Promise<void>): void {
-    this.checkpointCallback = callback;
+  /** Save current session state to disk */
+  private async saveSession(): Promise<void> {
+    if (!this.sessionManager) return;
+    await this.sessionManager.save(this.currentSession, {
+      model: this.model || 'unknown',
+      messages: this.store.toLLMMessages() as any,
+      totalTokens: this.tokenManager.getTotal(),
+      createdAt: '',
+      updatedAt: '',
+    });
   }
 
   /** Abort the current run() loop */
@@ -235,7 +245,7 @@ export class Agent {
         isStreamingThinking = false;
         this.store.update(thinkingMsgId, { isStreaming: false });
         // Checkpoint: thinking block complete
-        this.checkpointCallback?.().catch(() => {});
+        this.saveSession().catch(() => {});
       }
       if (block.type === 'text' && isStreamingText) {
         isStreamingText = false;
@@ -249,7 +259,7 @@ export class Agent {
           toolCalls.push({ block: toolBlock, tool });
         }
         // Checkpoint: tool_use block fully received
-        this.checkpointCallback?.().catch(() => {});
+        this.saveSession().catch(() => {});
       }
     });
 
@@ -432,8 +442,8 @@ export class Agent {
         await this.executeToolCalls(toolCalls);
 
         // Checkpoint: tool results complete
-        if (hasToolCalls && this.checkpointCallback) {
-          await this.checkpointCallback();
+        if (hasToolCalls) {
+          await this.saveSession();
         }
 
         if (!hasToolCalls) break;
@@ -449,9 +459,9 @@ export class Agent {
       }
       this.abortController = null;
       this.currentStream = null;
+      // Final checkpoint: ensure session is persisted after run completes
+      await this.saveSession();
     }
-
-    // Auto-save is handled by TUI layer
   }
 
   // Public accessors for session management (externalized)

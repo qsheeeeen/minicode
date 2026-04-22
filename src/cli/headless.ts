@@ -51,24 +51,13 @@ export async function runHeadless({ config, userPrompt, initialPrompt, sessionMa
     display,
     userPrompt,
     permissionService,
+    sessionManager,
   });
 
   let lastPrintedIndex = 0;
   const streamed = new Map<string, number>();       // assistant msgId → chars printed
   const finalized = new Set<string>();               // msgIds with newline written
   const toolCallLines = new Map<string, number>();   // tool_call msgId → lines printed
-
-  // Save session at checkpoints: thinking done, tool_call received, tool results done
-  const saveSession = async () => {
-    await sessionManager.save(agent.currentSession, {
-      model: config.model?.model || 'unknown',
-      messages: agent.getMessages() as any,
-      totalTokens: agent.getTokenCount(),
-      createdAt: '',
-      updatedAt: ''
-    });
-  };
-  agent.onCheckpoint(saveSession);
 
   agent.getStore().onChange(() => {
     const raw = agent.getStore().getAll();
@@ -139,16 +128,6 @@ export async function runHeadless({ config, userPrompt, initialPrompt, sessionMa
       throw e;
     }
   }
-
-  // Auto-save session
-  const sessionName = `headless-${Date.now()}`;
-  await sessionManager.save(sessionName, {
-    model: config.model?.model || 'unknown',
-    messages: agent.getMessages() as any,
-    totalTokens: agent.getTokenCount(),
-    createdAt: '',
-    updatedAt: '',
-  });
 }
 
 function printMessage(msg: AgentMessage): void {
