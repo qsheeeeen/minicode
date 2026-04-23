@@ -81,6 +81,13 @@ export class Agent {
   private sessionManager?: SessionManager;
   private logger?: pino.Logger;
 
+  public setSession(sessionName: string, logger?: pino.Logger): void {
+    this.currentSession = sessionName;
+    if (logger) {
+      this.logger = logger;
+    }
+  }
+
   constructor(config: AgentConfig = {}) {
     this.apiKey = config.apiKey;
     this.baseURL = config.baseURL;

@@ -14,8 +14,11 @@ commandRegistry.register({
   handler: async (_args, ctx): Promise<void> => {
     ctx.agent.clearSession();
     ctx.agent.setTokenCount(0);
-    ctx.agent.currentSession = `session-${Date.now()}`;
-    ctx.setCurrentSession(ctx.agent.currentSession);
+    const newSession = `session-${Date.now()}`;
+    const { createLogger } = await import('../../utils/logger.js');
+    const newLogger = await createLogger(ctx.sessionManager.getProjectHash(), newSession);
+    ctx.agent.setSession(newSession, newLogger);
+    ctx.setCurrentSession(newSession);
     ctx.setMessages([{ role: 'status', content: '(Cleared)', timestamp: new Date() }]);
   }
 });
@@ -36,7 +39,9 @@ commandRegistry.register({
     const name = args.join(' ');
     if (name) {
       ctx.agent.clearSession();
-      ctx.agent.currentSession = name;
+      const { createLogger } = await import('../../utils/logger.js');
+      const newLogger = await createLogger(ctx.sessionManager.getProjectHash(), name);
+      ctx.agent.setSession(name, newLogger);
       ctx.setCurrentSession(name);
       ctx.setMessages([{ role: 'status', content: `Created session: ${name}`, timestamp: new Date() }]);
     }
@@ -51,7 +56,9 @@ commandRegistry.register({
     if (newName) {
       const oldName = ctx.agent.currentSession;
       await ctx.sessionManager.rename(oldName, newName);
-      ctx.agent.currentSession = newName;
+      const { createLogger } = await import('../../utils/logger.js');
+      const newLogger = await createLogger(ctx.sessionManager.getProjectHash(), newName);
+      ctx.agent.setSession(newName, newLogger);
       ctx.setCurrentSession(newName);
       ctx.setMessages(prev => [...prev, { role: 'status', content: `Renamed: ${oldName} -> ${newName}`, timestamp: new Date() }]);
     }
@@ -76,7 +83,9 @@ commandRegistry.register({
         if (totalTokens > 0) {
           ctx.agent.setTokenCount(totalTokens);
         }
-        ctx.agent.currentSession = name;
+        const { createLogger } = await import('../../utils/logger.js');
+        const newLogger = await createLogger(ctx.sessionManager.getProjectHash(), name);
+        ctx.agent.setSession(name, newLogger);
         ctx.setCurrentSession(name);
         const { SessionDisplayImpl } = await import('../../utils/session-display.js');
         const sessionDisplay = new SessionDisplayImpl(ctx.sessionManager, ctx.agent.getToolRegistry());
