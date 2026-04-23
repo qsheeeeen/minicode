@@ -5,6 +5,7 @@ import { render } from 'ink';
 import { loadAllConfig } from './config.js';
 import { Agent } from './agent.js';
 import { SessionManager } from './utils/session.js';
+import { createLogger } from './utils/logger.js';
 import { parseArgs, printHelp, type PermissionMode } from './cli/args.js';
 import { loadGlobalPrompt, loadProjectPrompt } from './utils/prompts.js';
 import { App } from './cli/tui.js';
@@ -63,6 +64,8 @@ if (sessionName) {
   initialSession = `session-${Date.now()}`;
 }
 
+const logger = await createLogger(sessionManager.getProjectHash(), initialSession);
+
 // Create Agent (composition root — single creation point)
 const agent = new Agent({
   apiKey: config.model!.apiKey,
@@ -75,6 +78,8 @@ const agent = new Agent({
   userPrompt,
   sessionManager,
   permissionMode,
+  currentSession: initialSession,
+  logger,
 });
 
 // Branch: display layer only

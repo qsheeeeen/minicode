@@ -10,6 +10,7 @@ import { MessageStore } from './messages.js';
 import { PermissionService, type PermissionMode } from './services/permission.js';
 import { elementToText } from './utils/react.js';
 import type { SessionManager } from './utils/session.js';
+import type pino from 'pino';
 
 export const SYSTEM_PROMPT = `You are an interactive CLI tool that helps users with software engineering tasks. Use the instructions below and the tools available to you to assist the user.
 
@@ -46,6 +47,8 @@ export interface AgentConfig {
   currentAgentId?: string;
   permissionMode?: PermissionMode;
   sessionManager?: SessionManager;
+  currentSession?: string;
+  logger?: pino.Logger;
 }
 
 interface StreamingResult {
@@ -76,6 +79,7 @@ export class Agent {
   private abortController: AbortController | null = null;
   private currentStream: import('@anthropic-ai/sdk/lib/MessageStream.js').MessageStream<null> | null = null;
   private sessionManager?: SessionManager;
+  private logger?: pino.Logger;
 
   constructor(config: AgentConfig = {}) {
     this.apiKey = config.apiKey;
@@ -92,6 +96,8 @@ export class Agent {
     this.agentRegistry = config.agentRegistry;
     this.currentAgentId = config.currentAgentId || '1';
     this.sessionManager = config.sessionManager;
+    if (config.currentSession) this.currentSession = config.currentSession;
+    this.logger = config.logger;
     this.permissionService = new PermissionService({
       initialMode: config.permissionMode ?? 'manual',
       client: this.apiKey ? this.client : undefined,
@@ -368,6 +374,7 @@ export class Agent {
 
     // Execute all tools in parallel, each with its own display handle.
     // Permission check happens inside runTool() — part of the execution flow.
+    this.logger?.info({ session: this.currentSession, toolCount: toolCalls.length, tools: toolCalls.map(t => t.block.name) }, 'Executing tools');
     const results = await Promise.allSettled(
       slots.map(({ block, tool, msgId, callElement }) => {
         const toolContext: ToolExecutionContext = {
@@ -418,11 +425,22 @@ export class Agent {
         });
       }
     });
+
+    // Log tool results
+    results.forEach((result, i) => {
+      const { block, tool } = toolCalls[i];
+      if (result.status === 'fulfilled') {
+        this.logger?.info({ session: this.currentSession, toolName: tool.name, toolInput: block.input }, 'Tool result');
+      } else {
+        this.logger?.error({ session: this.currentSession, toolName: tool.name, error: String(result.reason) }, 'Tool error');
+      }
+    });
   }
 
   async run(userMessage: string): Promise<void> {
     this.store.add({ role: 'user', content: userMessage, timestamp: new Date(), inContext: true });
     this.abortController = new AbortController();
+    this.logger?.info({ session: this.currentSession, userMessage }, 'Session started');
 
     try {
       while (true) {
@@ -437,6 +455,14 @@ export class Agent {
         const { response, toolCalls, hasToolCalls } = await this.handleStreamingResponse(toolDefs);
 
         await this.processTokenUsage(response);
+        this.logger?.info({
+          session: this.currentSession,
+          inputTokens: response.usage?.input_tokens,
+          outputTokens: response.usage?.output_tokens,
+          cacheCreation: response.usage?.cache_creation_input_tokens ?? 0,
+          cacheRead: response.usage?.cache_read_input_tokens ?? 0,
+          stopReason: response.stop_reason,
+        }, 'LLM response');
 
         // Assistant text was already added during streaming.
         // Mark it as finalized (not streaming) if it hasn't been already.
@@ -464,6 +490,7 @@ export class Agent {
       this.abortController = null;
       this.currentStream = null;
       // Final checkpoint: ensure session is persisted after run completes
+      this.logger?.info({ session: this.currentSession, totalTokens: this.tokenManager.getTotal() }, 'Session ended');
       await this.saveSession();
     }
   }
