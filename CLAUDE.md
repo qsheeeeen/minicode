@@ -10,7 +10,14 @@ npm run build         # Compile TypeScript to dist/
 npm run start         # Run compiled version from dist/
 ```
 
-No test framework, linter, or formatter is configured. There are no tests to run.
+## Testing
+
+```bash
+npm test          # Run Vitest in watch mode
+npm run test:run  # Run tests once (also used for CI)
+```
+
+Test files are co-located with source: `src/**/*.test.ts`. Coverage is output to `coverage/`.
 
 ## Architecture
 
