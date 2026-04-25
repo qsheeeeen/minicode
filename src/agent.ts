@@ -284,14 +284,13 @@ export class Agent {
     try {
       response = await this.raceWithAbort(stream.finalMessage());
     } catch (e) {
-      this.currentStream = null;
       if (this.abortController?.signal.aborted) throw new Error('Aborted');
       throw e;
+    } finally {
+      this.currentStream = null;
+      if (isStreamingThinking) this.store.update(thinkingMsgId, { isStreaming: false });
+      if (isStreamingText) this.store.update(textMsgId, { isStreaming: false });
     }
-    this.currentStream = null;
-
-    if (isStreamingThinking) this.store.update(thinkingMsgId, { isStreaming: false });
-    if (isStreamingText) this.store.update(textMsgId, { isStreaming: false });
 
     return { response, toolCalls, hasToolCalls };
   }
