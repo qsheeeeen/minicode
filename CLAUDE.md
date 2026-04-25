@@ -44,17 +44,9 @@ The `Agent` class (`src/agent.ts`) drives the conversation loop:
 - **`AgentRegistry`** (`src/services/agent-registry.ts`) — Multi-agent coordination: ID allocation, parent-child lookup, parallel sub-agent spawning via the `agent` tool
 - **`CommandRegistry`** (`src/cli/commands/index.ts`) — Same `Map<string, T>` registry pattern for TUI `/` commands, registered in `src/cli/commands/builtin.ts`
 
-### Adding a New Tool
-
-1. Create file in `src/tools/` implementing `ToolDef` (import from `./index.js`)
-2. Add to `allTools` array in `src/tools/index.ts`
-3. Register in `Agent` constructor (already handled by `registerTools()` if tool has no special requirements)
-
-Tool execute receives a `ToolExecutionContext` with `registry` (AgentRegistry), `config` (AgentConfig), `display` (ToolDisplayHandle for real-time updates), `signal` (AbortSignal), and `permissionService`.
-
 ### Config System
 
-`src/config.ts` — Multi-provider config loaded from `~/.minicode/config.json`. Model specifier format: `model@provider`. Priority: CLI `--model` > `MODEL` env var > config file. Each provider defines `apiKey`, `baseURL`, and per-model overrides (e.g., `contextLength`).
+`src/config.ts` — Multi-provider config loaded from `~/.minicode/config.json`. Model specifier format: `model@provider`. Priority: CLI `--model` > `MODEL` env var > config file. Each provider defines `apiKey`, `baseURL`, and per-model overrides (e.g., `contextLength`). Config options include `thinking` (boolean) and `effort` (`low` | `medium` | `high` | `xhigh` | `max`) for reasoning control.
 
 ### Session Persistence
 
@@ -62,7 +54,7 @@ Tool execute receives a `ToolExecutionContext` with `registry` (AgentRegistry), 
 
 ### LLM Layer
 
-`src/llm/anthropic.ts` — Thin wrapper around `@anthropic-ai/sdk` with streaming support and extended thinking (configurable token budget).
+`src/llm/anthropic.ts` — Thin wrapper around `@anthropic-ai/sdk` with streaming support, extended thinking, and output_config effort control. API docs: https://platform.claude.com/docs/en/api/messages
 
 ## TypeScript Conventions
 
