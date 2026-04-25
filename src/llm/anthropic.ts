@@ -8,7 +8,6 @@ interface ChatOptions {
   maxTokens?: number;
   system?: string;
   thinking?: boolean;
-  thinkingTokens?: number;
 }
 
 export type MessageParam = Anthropic.Messages.MessageParam;
@@ -40,8 +39,7 @@ export class AnthropicClient {
 
     if (options.thinking) {
       params.thinking = {
-        type: 'enabled',
-        budget_tokens: options.thinkingTokens || 20000
+        type: 'enabled'
       };
     }
 
@@ -63,8 +61,7 @@ export class AnthropicClient {
 
     if (options.thinking) {
       params.thinking = {
-        type: 'enabled',
-        budget_tokens: options.thinkingTokens || 20000
+        type: 'enabled'
       };
     }
 

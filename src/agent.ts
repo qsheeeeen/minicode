@@ -37,7 +37,6 @@ export interface AgentConfig {
   contextLength?: number;
   compressionThresholdRatio?: number;
   thinkingEnabled?: boolean;
-  thinkingTokens?: number;
   display?: DisplayAdapter;
   tokenManager?: TokenManager;
   compressionService?: CompressionService;
@@ -68,7 +67,6 @@ export class Agent {
   private compressionService: CompressionService;
   public currentSession = `session-${Date.now()}`;
   private thinkingEnabled: boolean;
-  private thinkingTokens: number;
   private display: DisplayAdapter;
   private userPrompt: string;
   private agentRegistry?: AgentRegistry;
@@ -96,7 +94,6 @@ export class Agent {
     this.contextLength = config.contextLength || 200000;
     this.compressionThresholdRatio = config.compressionThresholdRatio || 0.8;
     this.thinkingEnabled = config.thinkingEnabled || false;
-    this.thinkingTokens = config.thinkingTokens || 20000;
     this.tokenManager = config.tokenManager || new TokenManagerImpl();
     this.compressionService = config.compressionService || new CompressionServiceImpl();
     this.toolRegistry = new ToolRegistry();
@@ -215,8 +212,7 @@ export class Agent {
     const stream = this.client.chatStream(this.store.toLLMMessages(), toolDefs, {
       system: this.getSystemPrompt(),
       model: this.model,
-      thinking: this.thinkingEnabled,
-      thinkingTokens: this.thinkingTokens
+      thinking: this.thinkingEnabled
     });
     this.currentStream = stream;
 
@@ -372,7 +368,6 @@ export class Agent {
         contextLength: this.contextLength,
         compressionThresholdRatio: this.compressionThresholdRatio,
         thinkingEnabled: this.thinkingEnabled,
-        thinkingTokens: this.thinkingTokens,
         userPrompt: this.userPrompt,
       },
       currentAgentId: this.currentAgentId,
