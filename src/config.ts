@@ -26,6 +26,7 @@ export interface Config {
   model?: string;  // format: model@provider, e.g. "glm-4.7@zhipu"
   compressionThreshold?: number;  // 0-1, compress at this ratio of context
   thinking?: boolean;  // enable extended thinking
+  effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max';  // reasoning effort level
   promptFile?: string;  // project prompt filename (default: MINICODE.md)
   permissionMode?: 'manual' | 'yolo' | 'auto';  // default permission mode
 }
@@ -110,10 +111,11 @@ export async function getCompressionThreshold(): Promise<number> {
   return config.compressionThreshold ?? 0.8;
 }
 
-export async function getThinkingConfig(): Promise<{ enabled: boolean }> {
+export async function getThinkingConfig(): Promise<{ enabled: boolean; effort?: string }> {
   const config = await loadConfig();
   return {
-    enabled: config.thinking ?? false
+    enabled: config.thinking ?? false,
+    effort: config.effort
   };
 }
 
@@ -125,7 +127,7 @@ export async function getPromptFile(): Promise<string> {
 export interface ResolvedConfig {
   model: { provider: string; model: string; apiKey: string; baseURL?: string; contextLength?: number } | null;
   compressionThreshold: number;
-  thinking: { enabled: boolean };
+  thinking: { enabled: boolean; effort?: string };
   promptFile: string;
   permissionMode?: 'manual' | 'yolo' | 'auto';
 }
@@ -153,7 +155,8 @@ export async function loadAllConfig(modelSpecifier?: string): Promise<ResolvedCo
     model,
     compressionThreshold: config.compressionThreshold ?? 0.8,
     thinking: {
-      enabled: config.thinking ?? false
+      enabled: config.thinking ?? false,
+      effort: config.effort
     },
     promptFile: config.promptFile || 'MINICODE.md',
     permissionMode: config.permissionMode

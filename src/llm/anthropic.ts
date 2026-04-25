@@ -8,6 +8,7 @@ interface ChatOptions {
   maxTokens?: number;
   system?: string;
   thinking?: boolean;
+  effort?: string;
 }
 
 export type MessageParam = Anthropic.Messages.MessageParam;
@@ -43,6 +44,12 @@ export class AnthropicClient {
       };
     }
 
+    if (options.effort) {
+      params.output_config = {
+        effort: options.effort
+      };
+    }
+
     return await this.client.messages.create(params);
   }
 
@@ -62,6 +69,12 @@ export class AnthropicClient {
     if (options.thinking) {
       params.thinking = {
         type: 'enabled'
+      };
+    }
+
+    if (options.effort) {
+      params.output_config = {
+        effort: options.effort
       };
     }
 

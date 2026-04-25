@@ -74,6 +74,7 @@ const agent = new Agent({
   contextLength: config.model!.contextLength,
   compressionThresholdRatio: config.compressionThreshold,
   thinkingEnabled: config.thinking.enabled,
+  effort: config.thinking.effort,
   userPrompt,
   sessionManager,
   permissionMode,
