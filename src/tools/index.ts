@@ -9,7 +9,9 @@ import { writeTool } from './write.js';
 import { editTool } from './edit.js';
 import { bashTool } from './bash.js';
 import { agentTool } from './agent.js';
+import { activateSkillTool } from './activate_skill.js';
 import { ToolRegistry } from './registry.js';
+import type { SkillRegistry } from '../services/skill-registry.js';
 
 // Tool execution context - passed to tool execute
 export interface ToolDisplayHandle {
@@ -23,6 +25,7 @@ export interface ToolExecutionContext {
   display?: ToolDisplayHandle;
   signal?: AbortSignal;
   permissionService?: PermissionService;
+  skillRegistry?: SkillRegistry;
 }
 
 /** Tool returns output for LLM and ink element for TUI */
@@ -32,7 +35,7 @@ export interface ToolResult {
 }
 
 // ToolDef interface defined here for consistent imports
-export type ToolRequirement = 'agentRegistry';
+export type ToolRequirement = 'agentRegistry' | 'skillRegistry';
 
 export interface ToolDef {
   name: string;
@@ -46,9 +49,10 @@ export interface ToolDef {
 
 export interface ToolAvailability {
   agentRegistry?: AgentRegistry;
+  skillRegistry?: SkillRegistry;
 }
 
-export const allTools: ToolDef[] = [readTool, writeTool, editTool, bashTool, agentTool];
+export const allTools: ToolDef[] = [readTool, writeTool, editTool, bashTool, agentTool, activateSkillTool];
 
 export function registerTools(
   registry: ToolRegistry,

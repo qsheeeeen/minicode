@@ -8,6 +8,7 @@ import { SessionManager } from './utils/session.js';
 import { createLogger } from './utils/logger.js';
 import { parseArgs, printHelp, type PermissionMode } from './cli/args.js';
 import { loadGlobalPrompt, loadProjectPrompt } from './utils/prompts.js';
+import { SkillRegistry } from './services/skill-registry.js';
 import { App } from './cli/tui.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -66,6 +67,9 @@ if (sessionName) {
 
 const logger = await createLogger(sessionManager.getProjectHash(), initialSession);
 
+const skillRegistry = new SkillRegistry();
+await skillRegistry.loadSkills(path.join(__dirname, '../builtin-skills'));
+
 // Create Agent (composition root — single creation point)
 const agent = new Agent({
   apiKey: config.model!.apiKey,
@@ -80,6 +84,7 @@ const agent = new Agent({
   permissionMode,
   currentSession: initialSession,
   logger,
+  skillRegistry,
 });
 
 // Branch: display layer only

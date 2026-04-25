@@ -8,6 +8,7 @@ import { CompressionService, CompressionServiceImpl } from './services/compressi
 import { AgentRegistry } from './services/agent-registry.js';
 import { MessageStore } from './messages.js';
 import { PermissionService, type PermissionMode } from './services/permission.js';
+import type { SkillRegistry } from './services/skill-registry.js';
 import { elementToText } from './utils/react.js';
 import type { SessionManager } from './utils/session.js';
 import type pino from 'pino';
@@ -49,6 +50,7 @@ export interface AgentConfig {
   sessionManager?: SessionManager;
   currentSession?: string;
   logger?: pino.Logger;
+  skillRegistry?: SkillRegistry;
 }
 
 interface StreamingResult {
@@ -72,6 +74,7 @@ export class Agent {
   private display: DisplayAdapter;
   private userPrompt: string;
   private agentRegistry?: AgentRegistry;
+  private skillRegistry?: SkillRegistry;
   private currentAgentId: string;
   private apiKey?: string;
   private baseURL?: string;
@@ -101,6 +104,7 @@ export class Agent {
     this.compressionService = config.compressionService || new CompressionServiceImpl();
     this.toolRegistry = new ToolRegistry();
     this.agentRegistry = config.agentRegistry;
+    this.skillRegistry = config.skillRegistry;
     this.currentAgentId = config.currentAgentId || '1';
     this.sessionManager = config.sessionManager;
     if (config.currentSession) this.currentSession = config.currentSession;
@@ -111,7 +115,7 @@ export class Agent {
       model: this.model,
     });
 
-    registerTools(this.toolRegistry, { agentRegistry: this.agentRegistry }, config.excludeTools);
+    registerTools(this.toolRegistry, { agentRegistry: this.agentRegistry, skillRegistry: this.skillRegistry }, config.excludeTools);
 
     // Use provided display or create default console display
     this.display = config.display ?? new ConsoleDisplay();
@@ -207,6 +211,19 @@ export class Agent {
     if (this.userPrompt) {
       prompt += `\n\n# Project Context\n${this.userPrompt}`;
     }
+
+    if (this.skillRegistry) {
+      const availableSkills = this.skillRegistry.getAvailableSkills();
+      if (availableSkills.length > 0) {
+        prompt += `\n\n<available_skills>\n`;
+        availableSkills.forEach(skill => {
+          prompt += `  <skill>\n    <name>${skill.name}</name>\n    <description>${skill.description}</description>\n  </skill>\n`;
+        });
+        prompt += `</available_skills>\n`;
+        prompt += `\nTo activate a skill and receive its detailed instructions, use the activate_skill tool with the skill's name.\n`;
+      }
+    }
+
     return prompt;
   }
   /** Handle streaming response: process events, collect tool calls */
@@ -363,6 +380,7 @@ export class Agent {
 
     const context: ToolExecutionContext = {
       registry: this.agentRegistry,
+      skillRegistry: this.skillRegistry,
       signal: this.abortController?.signal,
       config: {
         apiKey: this.apiKey,
