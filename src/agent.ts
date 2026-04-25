@@ -209,13 +209,13 @@ export class Agent {
     }
     return prompt;
   }
-
   /** Handle streaming response: process events, collect tool calls */
   private async handleStreamingResponse(toolDefs: Tool[]): Promise<StreamingResult> {
     const stream = this.client.chatStream(this.store.toLLMMessages(), toolDefs, {
       system: this.getSystemPrompt(),
       model: this.model,
       thinking: this.thinkingEnabled,
+      signal: this.abortController?.signal,
       effort: this.effort
     });
     this.currentStream = stream;

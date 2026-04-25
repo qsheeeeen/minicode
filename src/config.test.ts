@@ -188,18 +188,18 @@ describe('getThinkingConfig', () => {
 
   it('returns configured thinking settings', async () => {
     const fs = await import('fs/promises');
-    (fs.default.readFile as ReturnType<typeof vi.fn>).mockResolvedValue('{"thinking": true, "thinkingTokens": 15000}');
+    (fs.default.readFile as ReturnType<typeof vi.fn>).mockResolvedValue('{"thinking": true, "effort": "low"}');
     const config = await getThinkingConfig();
     expect(config.enabled).toBe(true);
-    expect(config.tokens).toBe(15000);
+    expect(config.effort).toBe("low");
   });
 
-  it('defaults thinking to disabled with 20000 tokens', async () => {
+  it('defaults thinking to disabled', async () => {
     const fs = await import('fs/promises');
     (fs.default.readFile as ReturnType<typeof vi.fn>).mockResolvedValue('{}');
     const config = await getThinkingConfig();
     expect(config.enabled).toBe(false);
-    expect(config.tokens).toBe(20000);
+    expect(config.effort).toBeUndefined();
   });
 });
 

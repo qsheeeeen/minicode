@@ -43,6 +43,9 @@ describe('AnthropicClient', () => {
           system: 'test system',
           messages: [{ role: 'user', content: 'hello' }],
           tools: [],
+        }),
+        expect.objectContaining({
+          signal: undefined
         })
       );
     });
@@ -57,9 +60,11 @@ describe('AnthropicClient', () => {
       expect(mockCreate).toHaveBeenCalledWith(
         expect.objectContaining({
           thinking: {
-            type: 'enabled',
-            budget_tokens: 15000,
-          },
+            type: 'enabled'
+          }
+        }),
+        expect.objectContaining({
+          signal: undefined
         })
       );
     });
@@ -69,16 +74,18 @@ describe('AnthropicClient', () => {
     it('sends correct parameters to client.messages.stream', () => {
       const client = new AnthropicClient();
       client.chatStream([{ role: 'user', content: 'hi' }], [], {
-        thinking: true,
+        thinking: true
       });
 
       expect(mockStream).toHaveBeenCalledWith(
         expect.objectContaining({
           messages: [{ role: 'user', content: 'hi' }],
           thinking: {
-            type: 'enabled',
-            budget_tokens: 20000, // default
-          },
+            type: 'enabled'
+          }
+        }),
+        expect.objectContaining({
+          signal: undefined
         })
       );
     });

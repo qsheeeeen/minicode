@@ -9,6 +9,7 @@ interface ChatOptions {
   system?: string;
   thinking?: boolean;
   effort?: string;
+  signal?: AbortSignal;
 }
 
 export type MessageParam = Anthropic.Messages.MessageParam;
@@ -50,7 +51,9 @@ export class AnthropicClient {
       };
     }
 
-    return await this.client.messages.create(params);
+    return await this.client.messages.create(params, {
+      signal: options.signal
+    });
   }
 
   chatStream(
@@ -78,6 +81,8 @@ export class AnthropicClient {
       };
     }
 
-    return this.client.messages.stream(params) as unknown as MessageStream<null>;
+    return this.client.messages.stream(params, {
+      signal: options.signal
+    }) as unknown as MessageStream<null>;
   }
 }
