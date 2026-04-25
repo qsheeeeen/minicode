@@ -13,7 +13,7 @@
   ],
   "scripts": {
     "dev": "tsx src/cli.tsx",
-    "build": "tsc && cp -r src/builtin-skills dist/builtin-skills 2>/dev/null || true",
+    "build": "tsc",
     "start": "node dist/cli.js",
     "prepublishOnly": "npm run build",
     "test": "vitest",

@@ -5,11 +5,15 @@ export interface SkillMeta {
   name: string;
   description: string;
   body: string;
-  dirPath: string;
+  dirPath?: string;
 }
 
 export class SkillRegistry {
   private skills = new Map<string, SkillMeta>();
+
+  public register(meta: SkillMeta): void {
+    this.skills.set(meta.name, meta);
+  }
 
   /**
    * Parse a SKILL.md file to extract YAML frontmatter (name, description) and body.

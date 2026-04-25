@@ -1,8 +1,9 @@
----
-name: skill-creator
-description: Guide for creating effective skills. This skill should be used when users want to create a new skill (or update an existing skill) that extends minicode's capabilities with specialized knowledge, workflows, or tool integrations.
----
-# Skill Creator
+import type { SkillMeta } from '../services/skill-registry.js';
+
+export const skillCreator: SkillMeta = {
+  name: 'skill-creator',
+  description: "Guide for creating effective skills. This skill should be used when users want to create a new skill (or update an existing skill) that extends minicode's capabilities with specialized knowledge, workflows, or tool integrations.",
+  body: `# Skill Creator
 
 This skill provides guidance for creating effective skills in minicode using the agentskills.io format.
 
@@ -18,4 +19,5 @@ Every skill consists of a required \`SKILL.md\` file:
 1. Create a directory for the skill (e.g., \`~/.minicode/skills/my-skill\`).
 2. Add a \`SKILL.md\` file in that directory.
 3. Write the frontmatter with \`name\` and \`description\`.
-4. Write the body with clear, concise instructions for the agent to follow.
+4. Write the body with clear, concise instructions for the agent to follow.`
+};
