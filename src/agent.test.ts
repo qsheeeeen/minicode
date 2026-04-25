@@ -271,6 +271,34 @@ describe('Agent', () => {
       
       await expect(runPromise).rejects.toThrow('Aborted');
     });
+
+    it('clears isStreaming flags when aborted', async () => {
+      const stream = new MockStream();
+      mockChatStream.mockReturnValueOnce(stream);
+      
+      const agent = new Agent();
+      const runPromise = agent.run('Hello');
+      
+      // Wait for agent to start streaming
+      await new Promise(resolve => setTimeout(resolve, 0));
+      
+      // Simulate streaming events to set isStreaming to true
+      stream.emit('text', 'hello');
+      
+      // Verify flags are set
+      const messages = agent.getStore().getAll();
+      const textMsg = messages.find(m => m.role === 'assistant');
+      expect(textMsg?.isStreaming).toBe(true);
+      
+      agent.abort();
+      
+      await expect(runPromise).rejects.toThrow('Aborted');
+      
+      // Verify flags are cleared after abort
+      const updatedMessages = agent.getStore().getAll();
+      const updatedTextMsg = updatedMessages.find(m => m.role === 'assistant');
+      expect(updatedTextMsg?.isStreaming).toBe(false);
+    });
   });
 });
 });
