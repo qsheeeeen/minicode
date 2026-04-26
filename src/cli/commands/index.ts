@@ -35,7 +35,7 @@ class CommandRegistry {
     this.commands.set(cmd.name, cmd);
   }
 
-  async parseAndExecute(input: string, context: CommandContext): Promise<{ handled: boolean; promptText?: string }> {
+  async parseAndExecute(input: string, context: CommandContext): Promise<{ handled: boolean; promptText?: string; displayContent?: string }> {
     const trimmed = input.trim();
     if (!trimmed.startsWith('/')) return { handled: false };
 
@@ -50,7 +50,7 @@ class CommandRegistry {
         return { handled: true };
       }
       if (cmd.prompt) {
-        return { handled: true, promptText: cmd.prompt(args) };
+        return { handled: true, promptText: cmd.prompt(args), displayContent: `/${name}` };
       }
     }
 

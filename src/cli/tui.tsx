@@ -194,7 +194,7 @@ export function App({
     const result = await commandRegistry.parseAndExecute(value, commandContext);
     if (result.handled && !result.promptText) return;
 
-    const userText = result.promptText ?? value;
+    const userText = result.displayContent ?? result.promptText ?? value;
     setMessages(prev => [...prev, { role: 'user', content: userText, timestamp: new Date() }]);
     setIsLoading(true);
     try {
