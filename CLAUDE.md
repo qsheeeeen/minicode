@@ -46,7 +46,9 @@ The `Agent` class (`src/agent.ts`) drives the conversation loop:
 
 ### Config System
 
-`src/config.ts` — Multi-provider config loaded from `~/.minicode/config.json`. Model specifier format: `model@provider`. Priority: CLI `--model` > `MODEL` env var > config file. Each provider defines `apiKey`, `baseURL`, and per-model overrides (e.g., `contextLength`). Config options include `thinking` (boolean) and `effort` (`low` | `medium` | `high` | `xhigh` | `max`) for reasoning control.
+`src/config.ts` — Multi-provider config loaded from `~/.minicode/config.json`. Model specifier format: `model@provider`. Priority: CLI `--model` > `MODEL` env var > config file. Each provider defines `apiKey`, `baseURL`, and per-model overrides (e.g., `contextLength`). Config options include `thinking` (boolean), `effort` (`low` | `medium` | `high` | `xhigh` | `max`) for reasoning control, and `skillsDir` for project skills directory (default: `.minicode/skills`). Skills are loaded from both `~/.minicode/skills/` (global) and `skillsDir` (project).
+
+**Note:** When adding or modifying config options, always update `config.example.json` with the corresponding example.
 
 ### Session Persistence
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import path from 'path';
+import os from 'os';
 import { fileURLToPath } from 'url';
 import { render } from 'ink';
 import { loadAllConfig } from './config.js';
@@ -72,6 +73,13 @@ const skillRegistry = new SkillRegistry();
 for (const skill of builtinSkills) {
   skillRegistry.register(skill);
 }
+
+// Load global skills from ~/.minicode/skills/
+await skillRegistry.loadSkills(path.join(os.homedir(), '.minicode', 'skills'));
+
+// Load project skills from configured directory (default: .minicode/skills)
+const projectSkillsDir = config.skillsDir ?? '.minicode/skills';
+await skillRegistry.loadSkills(path.resolve(process.cwd(), projectSkillsDir));
 
 // Create Agent (composition root — single creation point)
 const agent = new Agent({

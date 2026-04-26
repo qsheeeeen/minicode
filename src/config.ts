@@ -28,7 +28,8 @@ export interface Config {
   thinking?: boolean;  // enable extended thinking
   effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max';  // reasoning effort level
   promptFile?: string;  // project prompt filename (default: MINICODE.md)
-  permissionMode?: 'manual' | 'yolo' | 'auto';  // default permission mode
+  permissionMode?: 'manual' | 'yolo' | 'auto';
+  skillsDir?: string;  // project skills directory (default: .minicode/skills)  // default permission mode
 }
 
 let cachedConfig: Config | null = null;
@@ -124,12 +125,18 @@ export async function getPromptFile(): Promise<string> {
   return config.promptFile || 'MINICODE.md';
 }
 
+export async function getSkillsDir(): Promise<string | undefined> {
+  const config = await loadConfig();
+  return config.skillsDir;
+}
+
 export interface ResolvedConfig {
   model: { provider: string; model: string; apiKey: string; baseURL?: string; contextLength?: number } | null;
   compressionThreshold: number;
   thinking: { enabled: boolean; effort?: string };
   promptFile: string;
   permissionMode?: 'manual' | 'yolo' | 'auto';
+  skillsDir?: string;
 }
 
 export async function loadAllConfig(modelSpecifier?: string): Promise<ResolvedConfig> {
@@ -159,6 +166,7 @@ export async function loadAllConfig(modelSpecifier?: string): Promise<ResolvedCo
       effort: config.effort
     },
     promptFile: config.promptFile || 'MINICODE.md',
-    permissionMode: config.permissionMode
+    permissionMode: config.permissionMode,
+    skillsDir: config.skillsDir
   };
 }
