@@ -414,7 +414,7 @@ export function App({
 
       {/* Input */}
       <Box borderStyle="single" borderColor="gray" paddingX={1}>
-        <Box width={3}>
+        <Box flexBasis={3} flexShrink={0}>
           {isLoading ? (
             <Spinner label="" />
           ) : approvalRequest ? (
@@ -444,10 +444,10 @@ export function App({
         <Box flexDirection="column" paddingX={2} borderStyle="single" borderColor="gray">
           {matchingCommands.map((cmd, i) => (
             <Box key={cmd.name} flexDirection="row">
-              <Box width={2} flexShrink={0}>
+              <Box flexBasis={2} flexShrink={0}>
                 <Text>{i === selectedSuggestion ? <Text color="cyan">{'>'}</Text> : ' '}</Text>
               </Box>
-              <Box width={20} flexShrink={0}>
+              <Box flexBasis={20} flexShrink={0}>
                 <Text color={i === selectedSuggestion ? 'cyan' : 'white'} bold={i === selectedSuggestion}>
                   /{cmd.name}
                 </Text>
@@ -464,7 +464,7 @@ export function App({
       {/* Status bar: tokens + context progress + permission mode */}
       <Box paddingX={1} gap={1}>
         <Text dimColor>{tokenCount.toLocaleString()}/{(config.model?.contextLength || 200000).toLocaleString()}</Text>
-        <Box width={20}><ProgressBar value={Math.min(100, tokenCount / (config.model?.contextLength || 200000) * 100)} /></Box>
+        <Box flexBasis={20}><ProgressBar value={Math.min(100, tokenCount / (config.model?.contextLength || 200000) * 100)} /></Box>
         <Text dimColor>{Math.min(100, Math.floor(tokenCount / (config.model?.contextLength || 200000) * 100))}%</Text>
         <Text dimColor> │ </Text>
         <Text color={modeColor}>{modeLabel}</Text>
