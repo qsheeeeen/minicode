@@ -194,11 +194,12 @@ export function App({
     const result = await commandRegistry.parseAndExecute(value, commandContext);
     if (result.handled && !result.promptText) return;
 
-    const userText = result.displayContent ?? result.promptText ?? value;
-    setMessages(prev => [...prev, { role: 'user', content: userText, timestamp: new Date() }]);
+    const llmText = result.promptText ?? value;
+    const displayText = result.displayContent ?? result.promptText ?? value;
+    
     setIsLoading(true);
     try {
-      await agentRef.current.run(userText);
+      await agentRef.current.run(llmText, { displayContent: displayText !== llmText ? displayText : undefined });
     } catch (e) {
       if (e instanceof Error && e.message === 'Aborted') {
         setMessages(prev => [...prev, { role: 'status' as const, content: '(Aborted)', timestamp: new Date() }]);

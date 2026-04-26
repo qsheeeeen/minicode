@@ -18,6 +18,7 @@ export interface AgentMessage {
   id: string;
   role: AgentMessageRole;
   content: string;
+  displayContent?: string;
   timestamp: Date;
   inContext: boolean;       // Whether sent to LLM
   toolUseId?: string;       // Links tool_call ↔ tool_result
@@ -112,7 +113,7 @@ export function toLLMMessages(messages: AgentMessage[]): MessageParam[] {
 export function toDisplayMessages(messages: AgentMessage[]): import('./utils/session-display.js').DisplayMessage[] {
   return messages.map(msg => ({
     role: toDisplayRole(msg.role),
-    content: msg.content,
+    content: msg.displayContent ?? msg.content,
     timestamp: msg.timestamp,
     isStreaming: msg.isStreaming,
     element: msg.element,

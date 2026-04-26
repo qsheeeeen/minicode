@@ -461,8 +461,14 @@ export class Agent {
     }
   }
 
-  async run(userMessage: string): Promise<void> {
-    this.store.add({ role: 'user', content: userMessage, timestamp: new Date(), inContext: true });
+  async run(userMessage: string, opts?: { displayContent?: string }): Promise<void> {
+    this.store.add({ 
+      role: 'user', 
+      content: userMessage, 
+      displayContent: opts?.displayContent,
+      timestamp: new Date(), 
+      inContext: true 
+    });
     this.abortController = new AbortController();
     this.logger?.info({ session: this.currentSession, userMessage }, 'Session started');
 
