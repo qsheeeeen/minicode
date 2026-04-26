@@ -19,7 +19,7 @@ commandRegistry.register({
     const newLogger = await createLogger(ctx.sessionManager.getProjectHash(), newSession);
     ctx.agent.setSession(newSession, newLogger);
     ctx.setCurrentSession(newSession);
-    ctx.setMessages([{ role: 'status', content: '(Cleared)', timestamp: new Date() }]);
+    ctx.setMessages(prev => [...prev, { role: 'status', content: '(Cleared)', timestamp: new Date() }]);
   }
 });
 
@@ -28,7 +28,7 @@ commandRegistry.register({
   description: 'Compress conversation history',
   handler: async (_args, ctx): Promise<void> => {
     await ctx.agent.compress();
-    ctx.setMessages([{ role: 'status', content: '(Compression complete)', timestamp: new Date() }]);
+    ctx.setMessages(prev => [...prev, { role: 'status', content: '(Compression complete)', timestamp: new Date() }]);
   }
 });
 
@@ -43,7 +43,7 @@ commandRegistry.register({
       const newLogger = await createLogger(ctx.sessionManager.getProjectHash(), name);
       ctx.agent.setSession(name, newLogger);
       ctx.setCurrentSession(name);
-      ctx.setMessages([{ role: 'status', content: `Created session: ${name}`, timestamp: new Date() }]);
+      ctx.setMessages(prev => [...prev, { role: 'status', content: `Created session: ${name}`, timestamp: new Date() }]);
     }
   }
 });
@@ -90,7 +90,7 @@ commandRegistry.register({
         const { SessionDisplayImpl } = await import('../../utils/session-display.js');
         const sessionDisplay = new SessionDisplayImpl(ctx.sessionManager, ctx.agent.getToolRegistry());
         const displayMessages = await sessionDisplay.loadForTUI(name);
-        ctx.setMessages(displayMessages.length > 0 ? displayMessages : [{ role: 'status', content: `Loaded session: ${name}`, timestamp: new Date() }]);
+        ctx.setMessages(prev => displayMessages.length > 0 ? displayMessages : [...prev, { role: 'status', content: `Loaded session: ${name}`, timestamp: new Date() }]);
       } else {
         ctx.setMessages(prev => [...prev, { role: 'error', content: `Session not found: ${name}`, timestamp: new Date() }]);
       }
@@ -110,6 +110,6 @@ commandRegistry.register({
   name: 'test',
   description: 'Run a simple test across all available tools',
   prompt: () => {
-    return '简单测试所有tools';
+    return 'Run a simple test of all available tools';
   }
 });

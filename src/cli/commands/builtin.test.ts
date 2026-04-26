@@ -51,18 +51,18 @@ describe('Builtin commands', () => {
 
     it('/compress calls ctx.agent.compress() and sets messages', async () => {
       const agentMock = { compress: vi.fn().mockResolvedValue(undefined) };
-      const ctx: Partial<CommandContext> = { 
+      const ctx: Partial<CommandContext> = {
         agent: agentMock as any,
         setMessages: vi.fn()
       };
-      
+
       await handlers['compress']([], ctx as CommandContext);
       expect(agentMock.compress).toHaveBeenCalled();
-      expect(ctx.setMessages).toHaveBeenCalledWith([{ role: 'status', content: '(Compression complete)', timestamp: expect.any(Date) }]);
+      expect(ctx.setMessages).toHaveBeenCalledWith(expect.any(Function));
     });
 
     it('/clear clears session and sets new session', async () => {
-      const agentMock = { 
+      const agentMock = {
         clearSession: vi.fn(),
         setTokenCount: vi.fn(),
         setSession: vi.fn(),
@@ -70,18 +70,18 @@ describe('Builtin commands', () => {
       const sessionManagerMock = {
         getProjectHash: vi.fn().mockReturnValue('testhash'),
       };
-      const ctx: Partial<CommandContext> = { 
+      const ctx: Partial<CommandContext> = {
         agent: agentMock as any,
         sessionManager: sessionManagerMock as any,
         setCurrentSession: vi.fn(),
         setMessages: vi.fn(),
       };
-      
+
       await handlers['clear']([], ctx as CommandContext);
       expect(agentMock.clearSession).toHaveBeenCalled();
       expect(agentMock.setTokenCount).toHaveBeenCalledWith(0);
       expect(ctx.setCurrentSession).toHaveBeenCalledWith(expect.stringMatching(/^session-/));
-      expect(ctx.setMessages).toHaveBeenCalledWith([{ role: 'status', content: '(Cleared)', timestamp: expect.any(Date) }]);
+      expect(ctx.setMessages).toHaveBeenCalledWith(expect.any(Function));
     });
 
     it('/new creates new session', async () => {
@@ -200,7 +200,7 @@ describe('Builtin commands', () => {
     it('/test returns prompt text', () => {
       const result = handlers['test']();
       expect(typeof result).toBe('string');
-      expect(result).toContain('简单测试所有tools');
+      expect(result).toContain('Run a simple test of all available tools');
     });
   });
 });

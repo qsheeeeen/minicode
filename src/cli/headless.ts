@@ -1,8 +1,40 @@
 import type { Agent } from '../agent.js';
 import type { AgentMessage } from '../messages.js';
 import { elementToText } from '../utils/react.js';
+import type { SessionManager } from '../utils/session.js';
 
-export async function runHeadless(agent: Agent, initialPrompt: string): Promise<void> {
+export async function runHeadless(
+  agent: Agent,
+  initialPrompt: string,
+  sessionManager: SessionManager,
+  sessionName?: string,
+  resumeRecent?: boolean,
+): Promise<void> {
+  // Load session if requested
+  if (sessionName || resumeRecent) {
+    const targetName = sessionName || (async () => {
+      const recent = await sessionManager.getMostRecent();
+      return recent || `session-${Date.now()}`;
+    })();
+
+    const name = await (async () => {
+      if (sessionName) return sessionName;
+      const recent = await sessionManager.getMostRecent();
+      return recent || `session-${Date.now()}`;
+    })();
+
+    const data = await sessionManager.get(name);
+    if (data) {
+      agent.setMessages(data.messages as any);
+      const totalTokens = data.totalTokens || 0;
+      if (totalTokens > 0) {
+        agent.setTokenCount(totalTokens);
+      }
+      const { createLogger } = await import('../utils/logger.js');
+      const newLogger = await createLogger(sessionManager.getProjectHash(), name);
+      agent.setSession(name, newLogger);
+    }
+  }
   // Set headless display: confirm always denies
   agent.setDisplay({
     status: () => {},
