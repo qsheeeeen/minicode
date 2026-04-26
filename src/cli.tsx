@@ -12,6 +12,7 @@ import { loadGlobalPrompt, loadProjectPrompt } from './utils/prompts.js';
 import { SkillRegistry } from './services/skill-registry.js';
 import { builtinSkills } from './builtin-skills/index.js';
 import { App } from './cli/tui.js';
+import { commandRegistry } from './cli/commands/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -80,6 +81,25 @@ await skillRegistry.loadSkills(path.join(os.homedir(), '.minicode', 'skills'));
 // Load project skills from configured directory (default: .minicode/skills)
 const projectSkillsDir = config.skillsDir ?? '.minicode/skills';
 await skillRegistry.loadSkills(path.resolve(process.cwd(), projectSkillsDir));
+
+// Register skills as slash commands (e.g. /skill-creator)
+for (const skill of skillRegistry.getAvailableSkills()) {
+  if (commandRegistry.getCommandNames().includes(skill.name)) {
+    console.warn(`Skill "${skill.name}" skipped: a builtin command with the same name already exists.`);
+    continue;
+  }
+  const body = skillRegistry.getSkillBody(skill.name);
+  if (!body) continue;
+
+  commandRegistry.register({
+    name: skill.name,
+    description: skill.description,
+    prompt: (args: string[]) => {
+      const userInput = args.length > 0 ? `\n\n${args.join(' ')}` : '';
+      return `<activated_skill name="${skill.name}">\n<instructions>\n${body}\n</instructions>\n</activated_skill>${userInput}`;
+    },
+  });
+}
 
 // Create Agent (composition root — single creation point)
 const agent = new Agent({

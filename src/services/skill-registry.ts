@@ -1,5 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
+import { parse as parseYaml } from 'yaml';
 
 export interface SkillMeta {
   name: string;
@@ -18,29 +19,30 @@ export class SkillRegistry {
   /**
    * Parse a SKILL.md file to extract YAML frontmatter (name, description) and body.
    */
-  public parseSkillFile(content: string, dirPath: string): SkillMeta | null {
-    // Regex to match YAML frontmatter enclosed in ---
-    // ^---\n([\s\S]+?)\n---\n([\s\S]*)
+  private parseSkillFile(content: string, dirPath: string): SkillMeta | null {
     const match = content.match(/^---\r?\n([\s\S]+?)\r?\n---\r?\n([\s\S]*)/);
     if (!match) return null;
 
-    const frontmatter = match[1];
-    const body = match[2];
+    let frontmatter: unknown;
+    try {
+      frontmatter = parseYaml(match[1]);
+    } catch {
+      return null;
+    }
 
-    const nameMatch = frontmatter.match(/^name:\s*(.+)$/m);
-    const descMatch = frontmatter.match(/^description:\s*(.+)$/m);
+    if (typeof frontmatter !== 'object' || frontmatter === null) return null;
 
-    if (!nameMatch || !descMatch) return null;
+    const fm = frontmatter as Record<string, unknown>;
+    const name = typeof fm.name === 'string' ? fm.name.trim() : undefined;
+    const description = typeof fm.description === 'string' ? fm.description.trim() : undefined;
 
-    // Remove quotes if present
-    const name = nameMatch[1].replace(/^["'](.*)["']$/, '$1').trim();
-    const description = descMatch[1].replace(/^["'](.*)["']$/, '$1').trim();
+    if (!name || !description) return null;
 
     return {
       name,
       description,
-      body: body.trim(),
-      dirPath
+      body: match[2].trim(),
+      dirPath,
     };
   }
 
