@@ -49,9 +49,8 @@ describe('parseArgs', () => {
     expect(result.permissionMode).toBe('auto');
   });
 
-  it('ignores invalid permission mode', () => {
-    const result = parseArgs(['node', 'minicode', '--permission', 'invalid']);
-    expect(result.permissionMode).toBeUndefined();
+  it('throws on invalid permission mode', () => {
+    expect(() => parseArgs(['node', 'minicode', '--permission', 'invalid'])).toThrow();
   });
 
   it('parses positional argument as initialPrompt', () => {
@@ -67,10 +66,10 @@ describe('parseArgs', () => {
   });
 
   it('ignores unknown flags', () => {
-    // Unknown flags followed by a value get skipped along with their value
-    // because they don't match any known flag
     const result = parseArgs(['node', 'minicode', '--unknown', 'value']);
-    // --unknown isn't recognized, so 'value' becomes initialPrompt
-    expect(result.initialPrompt).toBe('value');
+    // yargs parses --unknown as a boolean or string, 'value' might be its value or a positional.
+    // In default yargs, if --unknown is not defined, it treats 'value' as the value of --unknown.
+    // So initialPrompt is undefined.
+    expect(result.initialPrompt).toBeUndefined();
   });
 });

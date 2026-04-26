@@ -78,7 +78,14 @@ commandRegistry.register({
       const name = args[0];
       const data = await ctx.sessionManager.get(name);
       if (data) {
-        ctx.agent.setMessages(data.messages as any);
+        // Sanitize legacy message data to ensure required fields exist
+        const sanitizedMessages = (data.messages || []).map((msg: any) => ({
+          ...msg,
+          inContext: msg.inContext ?? true,
+          isStreaming: msg.isStreaming ?? false,
+          timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date(),
+        }));
+        ctx.agent.setMessages(sanitizedMessages);
         const totalTokens = data.totalTokens || 0;
         if (totalTokens > 0) {
           ctx.agent.setTokenCount(totalTokens);

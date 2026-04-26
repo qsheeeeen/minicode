@@ -43,7 +43,7 @@ if (!config.model) {
 }
 
 // Resolve permission mode: CLI flag > config > default
-const permissionMode: PermissionMode = cliPermissionMode || config.permissionMode || (headless ? 'yolo' : 'manual');
+const permissionMode: PermissionMode = cliPermissionMode || config.permissionMode || 'manual';
 
 // Load global and project prompts
 const [globalPrompt, projectPrompt] = await Promise.all([

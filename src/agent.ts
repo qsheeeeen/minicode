@@ -83,6 +83,8 @@ export class Agent {
   private currentStream: import('@anthropic-ai/sdk/lib/MessageStream.js').MessageStream<null> | null = null;
   private sessionManager?: SessionManager;
   private logger?: pino.Logger;
+  private saveSessionLock: Promise<void> = Promise.resolve();
+  private isCompressing: boolean = false;
 
   public setSession(sessionName: string, logger?: pino.Logger): void {
     this.currentSession = sessionName;
@@ -128,15 +130,23 @@ export class Agent {
   }
 
   /** Save current session state to disk */
-  private async saveSession(): Promise<void> {
-    if (!this.sessionManager) return;
-    await this.sessionManager.save(this.currentSession, {
-      model: this.model || 'unknown',
-      messages: this.store.toLLMMessages() as any,
-      totalTokens: this.tokenManager.getTotal(),
-      createdAt: '',
-      updatedAt: '',
+  private saveSession(): Promise<void> {
+    if (!this.sessionManager) return Promise.resolve();
+    
+    // Add to promise chain to ensure sequential writes
+    this.saveSessionLock = this.saveSessionLock.then(async () => {
+      await this.sessionManager!.save(this.currentSession, {
+        model: this.model || 'unknown',
+        messages: this.store.toLLMMessages() as any,
+        totalTokens: this.tokenManager.getTotal(),
+        createdAt: '',
+        updatedAt: '',
+      });
+    }).catch(e => {
+      this.logger?.error({ error: String(e) }, 'Failed to save session');
     });
+
+    return this.saveSessionLock;
   }
 
   /** Abort the current run() loop */
@@ -180,6 +190,8 @@ export class Agent {
   }
 
   async compress(): Promise<void> {
+    if (this.isCompressing) return;
+
     const recentCount = 10;
     const contextMsgs = this.store.getInContext();
     if (contextMsgs.length <= recentCount + 2) {
@@ -187,6 +199,7 @@ export class Agent {
       return;
     }
 
+    this.isCompressing = true;
     const totalTokens = this.tokenManager.getTotal();
     this.store.add({ role: 'status', content: `(Compressing ${contextMsgs.length - recentCount} messages, ${totalTokens.toLocaleString()} tokens...)`, timestamp: new Date(), inContext: false });
 
@@ -202,6 +215,8 @@ export class Agent {
       this.store.add({ role: 'status', content: `(Compressed to ${this.store.getInContext().length} messages)`, timestamp: new Date(), inContext: false });
     } catch (e) {
       this.store.add({ role: 'error', content: `(Compression failed: ${(e as Error).message})`, timestamp: new Date(), inContext: false });
+    } finally {
+      this.isCompressing = false;
     }
   }
 
@@ -396,30 +411,23 @@ export class Agent {
       permissionService: this.permissionService,
     };
 
-    // Execute all tools in parallel, each with its own display handle.
-    // Permission check happens inside runTool() — part of the execution flow.
-    this.logger?.info({ session: this.currentSession, toolCount: toolCalls.length, tools: toolCalls.map(t => t.block.name) }, 'Executing tools');
-    const results = await Promise.allSettled(
-      slots.map(({ block, tool, msgId, callElement }) => {
-        const toolContext: ToolExecutionContext = {
-          ...context,
-          display: {
-            update: (element: React.ReactElement) => this.store.update(msgId,
-              { element: React.createElement(Box, { flexDirection: 'column' }, callElement, element) }
-            )
-          }
-        };
-        return this.runTool(tool, block.input as Record<string, unknown>, toolContext);
-      })
-    );
+    // Execute all tools sequentially to avoid file conflicts.
+    this.logger?.info({ session: this.currentSession, toolCount: toolCalls.length, tools: toolCalls.map(t => t.block.name) }, 'Executing tools sequentially');
+    
+    for (let i = 0; i < slots.length; i++) {
+      const { block, tool, msgId, callElement } = slots[i];
+      const toolContext: ToolExecutionContext = {
+        ...context,
+        display: {
+          update: (element: React.ReactElement) => this.store.update(msgId,
+            { element: React.createElement(Box, { flexDirection: 'column' }, callElement, element) }
+          )
+        }
+      };
 
-    // Update store with final results (replaces display.updateSlot)
-    results.forEach((result, i) => {
-      const { block } = toolCalls[i];
-      const { callElement, msgId } = slots[i];
-
-      if (result.status === 'fulfilled') {
-        const { output, display: resultElement } = result.value;
+      try {
+        const result = await this.runTool(tool, block.input as Record<string, unknown>, toolContext);
+        const { output, display: resultElement } = result;
         const combined = React.createElement(Box, { flexDirection: 'column' },
           callElement,
           resultElement
@@ -432,8 +440,9 @@ export class Agent {
           inContext: true,
           toolUseId: block.id,
         });
-      } else {
-        const error = `Error: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`;
+        this.logger?.info({ session: this.currentSession, toolName: tool.name, toolInput: block.input }, 'Tool result');
+      } catch (reason) {
+        const error = `Error: ${reason instanceof Error ? reason.message : String(reason)}`;
         const errorElement = React.createElement(Text, { color: 'red' }, error);
         const combined = React.createElement(Box, { flexDirection: 'column' },
           callElement,
@@ -447,18 +456,9 @@ export class Agent {
           inContext: true,
           toolUseId: block.id,
         });
+        this.logger?.error({ session: this.currentSession, toolName: tool.name, error: String(reason) }, 'Tool error');
       }
-    });
-
-    // Log tool results
-    results.forEach((result, i) => {
-      const { block, tool } = toolCalls[i];
-      if (result.status === 'fulfilled') {
-        this.logger?.info({ session: this.currentSession, toolName: tool.name, toolInput: block.input }, 'Tool result');
-      } else {
-        this.logger?.error({ session: this.currentSession, toolName: tool.name, error: String(result.reason) }, 'Tool error');
-      }
-    });
+    }
   }
 
   async run(userMessage: string): Promise<void> {

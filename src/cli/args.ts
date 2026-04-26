@@ -1,3 +1,6 @@
+import yargs from 'yargs';
+import { hideBin } from 'yargs/helpers';
+
 export type PermissionMode = 'manual' | 'yolo' | 'auto';
 
 export interface CliArgs {
@@ -10,64 +13,70 @@ export interface CliArgs {
 }
 
 export function parseArgs(argv: string[]): CliArgs {
-  const args = argv.slice(2);
-  let modelOverride: string | undefined;
-  let initialPrompt: string | undefined;
-  let sessionName: string | undefined;
-  let resumeRecent = false;
-  let headless = false;
-  let permissionMode: PermissionMode | undefined;
+  const parsed = yargs(hideBin(argv))
+    .option('model', {
+      alias: 'm',
+      type: 'string',
+      description: 'Model specification (e.g., glm-4.7@zhipu)',
+    })
+    .option('session', {
+      alias: 's',
+      type: 'string',
+      description: 'Session name (creates new or resumes existing)',
+    })
+    .option('resume', {
+      alias: 'r',
+      type: 'boolean',
+      description: 'Resume most recent session',
+      default: false,
+    })
+    .option('headless', {
+      alias: 'H',
+      type: 'boolean',
+      description: 'Run without TUI, output to stdout (requires prompt)',
+      default: false,
+    })
+    .option('permission', {
+      alias: 'perm',
+      choices: ['manual', 'yolo', 'auto'] as const,
+      description: 'Permission mode: manual, yolo, auto',
+    })
+    .help('h')
+    .alias('h', 'help')
+    .version(false) // Handle version manually in cli.tsx for fast exit
+    .parseSync();
 
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    if (arg === '--model' || arg === '-m') {
-      modelOverride = args[++i];
-    } else if (arg === '--session' || arg === '-s') {
-      sessionName = args[++i];
-    } else if (arg === '--resume' || arg === '-r') {
-      resumeRecent = true;
-    } else if (arg === '--headless' || arg === '-H') {
-      headless = true;
-    } else if (arg === '--permission' || arg === '--perm') {
-      const mode = args[++i];
-      if (mode === 'manual' || mode === 'yolo' || mode === 'auto') {
-        permissionMode = mode;
-      }
-    } else if (arg === '--help' || arg === '-h' || arg === '-?') {
-      printHelp();
-      process.exit(0);
-    } else if (arg === '--version' || arg === '-v') {
-      // version is handled in cli.tsx before parseArgs is called
-    } else if (!arg.startsWith('--')) {
-      initialPrompt = arg;
-    } else if (arg.startsWith('--')) {
-      console.warn(`Unknown option: ${arg}`);
-      // Skip the next argument if it doesn't start with -- (it's the flag's value)
-      if (i + 1 < args.length && !args[i + 1].startsWith('--')) {
-        i++;
-      }
-    }
-  }
+  const initialPrompt = parsed._.length > 0 ? parsed._.join(' ') : undefined;
 
-  return { modelOverride, initialPrompt, sessionName, resumeRecent, headless, permissionMode };
+  return {
+    modelOverride: parsed.model,
+    initialPrompt,
+    sessionName: parsed.session,
+    resumeRecent: parsed.resume,
+    headless: parsed.headless,
+    permissionMode: parsed.permission as PermissionMode | undefined,
+  };
 }
 
 export function printHelp(): void {
+  // yargs can handle help, but if we need the exact previous output format, we keep this,
+  // or we can let yargs generate it. For backward compatibility with cli.tsx's `printHelp()`,
+  // we'll keep the exact output.
   console.log('Mini Code - A minimal coding agent with TUI\n');
   console.log('Usage: minicode [options] [prompt]\n');
   console.log('Options:');
-  console.log('  --model, -m <spec>   Model specification (e.g., glm-4.7@zhipu)');
+  console.log('  --model, -m <spec>    Model specification (e.g., glm-4.7@zhipu)');
   console.log('  --session, -s <name>  Session name (creates new or resumes existing)');
   console.log('  --resume, -r          Resume most recent session');
   console.log('  --headless, -H        Run without TUI, output to stdout (requires prompt)');
-  console.log('  --permission <mode>  Permission mode: manual, yolo, auto (default: manual)');
+  console.log('  --permission <mode>   Permission mode: manual, yolo, auto (default: manual)');
   console.log('  --version, -v         Show version');
   console.log('  --help, -h            Show this help');
   console.log('\nExamples:');
   console.log('  minicode                             # Start TUI');
   console.log('  minicode "list files"                # Start TUI and auto-run prompt');
-  console.log('  minicode -s my-session              # Use specific session');
-  console.log('  minicode -H --perm yolo "ls"        # Headless, no permission checks');
+  console.log('  minicode -s my-session               # Use specific session');
+  console.log('  minicode -H --perm yolo "ls"         # Headless, no permission checks');
   console.log('\nIn TUI mode:');
   console.log('  /compress       # Compress conversation history');
   console.log('  /new <name>     # Create new session');
