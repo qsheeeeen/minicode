@@ -444,11 +444,17 @@ export function App({
         <Box flexDirection="column" paddingX={2} borderStyle="single" borderColor="gray">
           {matchingCommands.map((cmd, i) => (
             <Box key={cmd.name}>
-              <Text>{i === selectedSuggestion ? <Text color="cyan">{'> '}</Text> : '  '}</Text>
-              <Text color={i === selectedSuggestion ? 'cyan' : 'white'} bold={i === selectedSuggestion}>
-                /{cmd.name}
-              </Text>
-              <Text dimColor>{'  '}{cmd.description}</Text>
+              <Box width={3}>
+                <Text>{i === selectedSuggestion ? <Text color="cyan">{'> '}</Text> : '  '}</Text>
+              </Box>
+              <Box width={20}>
+                <Text color={i === selectedSuggestion ? 'cyan' : 'white'} bold={i === selectedSuggestion}>
+                  /{cmd.name}
+                </Text>
+              </Box>
+              <Box flexGrow={1} flexShrink={1}>
+                <Text dimColor wrap="truncate">{cmd.description.split('\n')[0].trim()}</Text>
+              </Box>
             </Box>
           ))}
           <Text dimColor> ↑↓ navigate  Tab accept</Text>
