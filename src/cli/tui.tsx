@@ -443,11 +443,11 @@ export function App({
       {matchingCommands.length > 0 && !approvalRequest && !isLoading && (
         <Box flexDirection="column" paddingX={2} borderStyle="single" borderColor="gray">
           {matchingCommands.map((cmd, i) => (
-            <Box key={cmd.name}>
-              <Box width={3}>
-                <Text>{i === selectedSuggestion ? <Text color="cyan">{'> '}</Text> : '  '}</Text>
+            <Box key={cmd.name} flexDirection="row">
+              <Box width={2} flexShrink={0}>
+                <Text>{i === selectedSuggestion ? <Text color="cyan">{'>'}</Text> : ' '}</Text>
               </Box>
-              <Box width={20}>
+              <Box width={20} flexShrink={0}>
                 <Text color={i === selectedSuggestion ? 'cyan' : 'white'} bold={i === selectedSuggestion}>
                   /{cmd.name}
                 </Text>
