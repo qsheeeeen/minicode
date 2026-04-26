@@ -55,6 +55,7 @@ export function Message({ role, content, isStreaming, element }: MessageProps) {
 
   // System message - dim gray, no indent
   if (role === 'status') {
+    if (element) return element;
     return (
       <Box marginBottom={0} paddingX={0}>
         <Text dimColor>{content}</Text>
