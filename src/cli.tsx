@@ -7,7 +7,7 @@ import { loadAllConfig } from './config.js';
 import { Agent } from './agent.js';
 import { SessionManager } from './utils/session.js';
 import { createLogger } from './utils/logger.js';
-import { parseArgs, printHelp, type PermissionMode } from './cli/args.js';
+import { parseArgs, type PermissionMode } from './cli/args.js';
 import { loadGlobalPrompt, loadProjectPrompt } from './utils/prompts.js';
 import { SkillRegistry } from './services/skill-registry.js';
 import { builtinSkills } from './builtin-skills/index.js';
@@ -26,10 +26,6 @@ const VERSION = packageJson.version;
 const argv = process.argv.slice(2);
 if (argv.includes('--version') || argv.includes('-v')) {
   console.log(`Mini Code v${VERSION}`);
-  process.exit(0);
-}
-if (argv.includes('--help') || argv.includes('-h')) {
-  printHelp();
   process.exit(0);
 }
 const { modelOverride, initialPrompt, sessionName, resumeRecent, headless, permissionMode: cliPermissionMode } = parseArgs(process.argv);
