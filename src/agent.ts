@@ -557,6 +557,10 @@ export class Agent {
     return this.toolRegistry;
   }
 
+  getSkillRegistry(): SkillRegistry | undefined {
+    return this.skillRegistry;
+  }
+
   getPermissionService(): PermissionService | undefined {
     return this.permissionService;
   }

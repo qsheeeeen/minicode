@@ -120,3 +120,25 @@ commandRegistry.register({
     return 'Run a simple test of all available tools';
   }
 });
+
+commandRegistry.register({
+  name: 'skills',
+  description: 'List available skills',
+  handler: async (_args, ctx): Promise<void> => {
+    const skillRegistry = ctx.agent.getSkillRegistry();
+    if (!skillRegistry) {
+      ctx.setMessages(prev => [...prev, { role: 'status', content: '(No skill registry available)', timestamp: new Date() }]);
+      return;
+    }
+    const skills = skillRegistry.getAvailableSkills();
+    if (skills.length === 0) {
+      ctx.setMessages(prev => [...prev, { role: 'status', content: '(No skills available)', timestamp: new Date() }]);
+      return;
+    }
+    const lines = ['Available skills:'];
+    for (const skill of skills) {
+      lines.push(`  /${skill.name} - ${skill.description}`);
+    }
+    ctx.setMessages(prev => [...prev, { role: 'status', content: lines.join('\n'), timestamp: new Date() }]);
+  }
+});
