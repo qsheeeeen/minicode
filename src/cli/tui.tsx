@@ -4,6 +4,7 @@ import { Spinner, ProgressBar } from '@inkjs/ui';
 import TextInput from 'ink-text-input';
 import { Agent } from '../agent.js';
 import type { MessageParam } from '../llm/anthropic.js';
+import { setEffort } from '../config.js';
 import type { ResolvedConfig } from '../config.js';
 import { CallbackDisplay, type DisplayMessage, type ConfirmationRequest } from '../utils/display.js';
 import { SessionDisplayImpl } from '../utils/session-display.js';
@@ -146,11 +147,13 @@ export function App({
 }: AppProps) {
   const [status, setStatus] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [mode, setMode] = useState<'chat' | 'session-list'>('chat');
+  const [mode, setMode] = useState<'chat' | 'session-list' | 'effort-select'>('chat');
   const [sessionListState, setSessionListState] = useState<{
     sessions: Array<{ name: string }>;
     selectedIndex: number;
   }>({ sessions: [], selectedIndex: 0 });
+  const effortOptions = ['low', 'medium', 'high', 'xhigh', 'max'];
+  const [effortIndex, setEffortIndex] = useState(0);
   const [inputValue, setInputValue] = useState('');
   const [inputKey, setInputKey] = useState(0);
   const [autoSubmitPending, setAutoSubmitPending] = useState(!!initialPrompt);
@@ -221,45 +224,6 @@ export function App({
     }
   }, [autoSubmitPending, initialPrompt, handleSubmit]);
 
-  // Session list overlay
-  if (mode === 'session-list') {
-    useInput((_input, key) => {
-      if (key.return && sessionListState.sessions.length > 0) {
-        const name = sessionListState.sessions[sessionListState.selectedIndex]?.name;
-        if (name) {
-          handleSubmit(`/resume ${name}`);
-        }
-        setMode('chat');
-      } else if (key.escape) {
-        setMode('chat');
-      } else if (key.upArrow) {
-        setSessionListState(prev => {
-          const maxIndex = Math.max(0, prev.sessions.length - 1);
-          const newIndex = Math.max(0, prev.selectedIndex - 1);
-          return { ...prev, selectedIndex: Math.min(newIndex, maxIndex) };
-        });
-      } else if (key.downArrow) {
-        setSessionListState(prev => {
-          const maxIndex = Math.max(0, prev.sessions.length - 1);
-          const newIndex = prev.selectedIndex + 1;
-          return { ...prev, selectedIndex: Math.min(newIndex, maxIndex) };
-        });
-      }
-    });
-
-    return (
-      <Box flexDirection="column" paddingX={1} paddingY={1} borderStyle="double" borderColor="blue">
-        <Text bold color="blue" underline>Sessions</Text>
-        <Text dimColor> ↑↓ navigate, Enter select, Esc cancel</Text>
-        {sessionListState.sessions.map((s, i) => (
-          <Text key={s.name} color={i === sessionListState.selectedIndex ? 'blue' : 'white'} bold={i === sessionListState.selectedIndex}>
-            {i === sessionListState.selectedIndex ? '> ' : '  '}{s.name}
-          </Text>
-        ))}
-      </Box>
-    );
-  }
-
   // Approval prompt input handler — resolves pending confirm promise
   useInput((_input, key) => {
     if (!approvalRequest) return;
@@ -276,6 +240,52 @@ export function App({
       setPermissionMode('yolo');
     }
   }, { isActive: approvalRequest !== null });
+
+  // Session list navigation handler
+  useInput((_input, key) => {
+    if (key.return && sessionListState.sessions.length > 0) {
+      const name = sessionListState.sessions[sessionListState.selectedIndex]?.name;
+      if (name) {
+        handleSubmit(`/resume ${name}`);
+      }
+      setMode('chat');
+    } else if (key.escape) {
+      setMode('chat');
+    } else if (key.upArrow) {
+      setSessionListState(prev => {
+        const maxIndex = Math.max(0, prev.sessions.length - 1);
+        const newIndex = Math.max(0, prev.selectedIndex - 1);
+        return { ...prev, selectedIndex: Math.min(newIndex, maxIndex) };
+      });
+    } else if (key.downArrow) {
+      setSessionListState(prev => {
+        const maxIndex = Math.max(0, prev.sessions.length - 1);
+        const newIndex = prev.selectedIndex + 1;
+        return { ...prev, selectedIndex: Math.min(newIndex, maxIndex) };
+      });
+    }
+  }, { isActive: (mode as string) === 'session-list' });
+
+  // Effort selection handler
+  useInput((_input, key) => {
+    if (key.return) {
+      const selected = effortOptions[effortIndex];
+      agent.setEffort(selected);
+      setEffort(selected); // persist to config
+      setMessages(prev => [...prev, {
+        role: 'status',
+        content: `(Effort set to: ${selected})`,
+        timestamp: new Date()
+      }]);
+      setMode('chat');
+    } else if (key.escape) {
+      setMode('chat');
+    } else if (key.upArrow) {
+      setEffortIndex(prev => Math.max(0, prev - 1));
+    } else if (key.downArrow) {
+      setEffortIndex(prev => Math.min(effortOptions.length - 1, prev + 1));
+    }
+  }, { isActive: (mode as string) === 'effort-select' });
 
   // Main input handler
   useInput((input, key) => {
@@ -349,6 +359,36 @@ export function App({
   // Permission mode display helpers
   const modeLabel = permissionMode;
   const modeColor = permissionMode === 'manual' ? 'yellow' : permissionMode === 'yolo' ? 'red' : 'cyan';
+
+  // Session list overlay
+  if (mode === 'session-list') {
+    return (
+      <Box flexDirection="column" paddingX={1} paddingY={1} borderStyle="double" borderColor="blue">
+        <Text bold color="blue" underline>Sessions</Text>
+        <Text dimColor> ↑↓ navigate, Enter select, Esc cancel</Text>
+        {sessionListState.sessions.map((s, i) => (
+          <Text key={s.name} color={i === sessionListState.selectedIndex ? 'blue' : 'white'} bold={i === sessionListState.selectedIndex}>
+            {i === sessionListState.selectedIndex ? '> ' : '  '}{s.name}
+          </Text>
+        ))}
+      </Box>
+    );
+  }
+
+  // Effort selection overlay
+  if (mode === 'effort-select') {
+    return (
+      <Box flexDirection="column" paddingX={1} paddingY={1} borderStyle="double" borderColor="cyan">
+        <Text bold color="cyan" underline>Select Thinking Effort</Text>
+        <Text dimColor> ↑↓ navigate, Enter select, Esc cancel</Text>
+        {effortOptions.map((opt, i) => (
+          <Text key={opt} color={i === effortIndex ? 'cyan' : 'white'} bold={i === effortIndex}>
+            {i === effortIndex ? '> ' : '  '}{opt}
+          </Text>
+        ))}
+      </Box>
+    );
+  }
 
   return (
     <Box flexDirection="column" height="100%">

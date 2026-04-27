@@ -93,6 +93,10 @@ export class Agent {
     }
   }
 
+  public setEffort(effort: string): void {
+    this.effort = effort;
+  }
+
   constructor(config: AgentConfig = {}) {
     this.apiKey = config.apiKey;
     this.baseURL = config.baseURL;

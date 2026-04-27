@@ -170,3 +170,10 @@ export async function loadAllConfig(modelSpecifier?: string): Promise<ResolvedCo
     skillsDir: config.skillsDir
   };
 }
+
+export async function setEffort(effort: string): Promise<void> {
+  const config = await loadConfig();
+  config.effort = effort as Config['effort'];
+  cachedConfig = config;
+  await fs.writeFile(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf-8');
+}

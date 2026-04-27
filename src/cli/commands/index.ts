@@ -16,7 +16,7 @@ export interface CommandContext {
   sessionManager: SessionManager;
   setMessages: (msg: DisplayMessage[] | ((prev: DisplayMessage[]) => DisplayMessage[])) => void;
   setCurrentSession: (name: string) => void;
-  setMode: (mode: 'chat' | 'session-list') => void;
+  setMode: (mode: 'chat' | 'session-list' | 'effort-select') => void;
   setSessionList: (sessions: Array<{ name: string }>) => void;
   setSelectedIndex: (index: number) => void;
   exit: () => void;

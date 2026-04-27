@@ -33,6 +33,28 @@ commandRegistry.register({
 });
 
 commandRegistry.register({
+  name: 'effort',
+  description: 'Set thinking effort (low|medium|high|xhigh|max)',
+  handler: async (args, ctx): Promise<void> => {
+    const value = args[0]?.toLowerCase();
+    const valid = ['low', 'medium', 'high', 'xhigh', 'max'];
+    if (!value || !valid.includes(value)) {
+      // Show effort selection UI
+      ctx.setMode('effort-select');
+      return;
+    }
+    ctx.agent.setEffort(value);
+    const { setEffort } = await import('../../config.js');
+    await setEffort(value);
+    ctx.setMessages(prev => [...prev, {
+      role: 'status',
+      content: `(Effort set to: ${value})`,
+      timestamp: new Date()
+    }]);
+  }
+});
+
+commandRegistry.register({
   name: 'new',
   description: 'Create a new session',
   handler: async (args, ctx): Promise<void> => {
