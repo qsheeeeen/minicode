@@ -71,13 +71,17 @@ export function toLLMMessages(messages: AgentMessage[]): MessageParam[] {
       continue;
     }
 
-    // 2. Assistant turn: optional text + tool_use blocks
+    // 2. Assistant turn: optional text + tool_use blocks + thinking blocks
     const contentBlocks: any[] = [];
 
-    // Consume assistant text if present (may be absent when LLM returns
+    // Consume assistant text or thinking if present (may be absent when LLM returns
     // only tool_use blocks — in that case msg is 'tool_call' and we skip this)
     if (msg.role === 'assistant') {
       if (msg.content) contentBlocks.push({ type: 'text', text: msg.content });
+      i++;
+      // fall through to collect tool_calls from new position
+    } else if (msg.role === 'thinking') {
+      contentBlocks.push({ type: 'thinking', thinking: msg.content });
       i++;
       // fall through to collect tool_calls from new position
     }

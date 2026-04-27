@@ -262,7 +262,7 @@ export class Agent {
     stream.on('thinking', (delta: string) => {
       if (!isStreamingThinking) {
         isStreamingThinking = true;
-        const msg = this.store.add({ role: 'thinking', content: delta, timestamp: new Date(), inContext: false, isStreaming: true });
+        const msg = this.store.add({ role: 'thinking', content: delta, timestamp: new Date(), inContext: true, isStreaming: true });
         thinkingMsgId = msg.id;
       } else {
         const existing = this.store.get(thinkingMsgId);
