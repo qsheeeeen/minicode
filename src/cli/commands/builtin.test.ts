@@ -134,18 +134,14 @@ describe('Builtin commands', () => {
       const sessionManagerMock = {
         list: vi.fn().mockResolvedValue([{ name: 'session-1' }, { name: 'session-2' }]),
       };
-      const ctx: Partial<CommandContext> = { 
+      const ctx: Partial<CommandContext> = {
         sessionManager: sessionManagerMock as any,
-        setSessionList: vi.fn(),
-        setSelectedIndex: vi.fn(),
-        setMode: vi.fn(),
+        setInputMode: vi.fn(),
       };
-      
+
       await handlers['resume']([], ctx as CommandContext);
       expect(sessionManagerMock.list).toHaveBeenCalled();
-      expect(ctx.setSessionList).toHaveBeenCalledWith([{ name: 'session-1' }, { name: 'session-2' }]);
-      expect(ctx.setSelectedIndex).toHaveBeenCalledWith(0);
-      expect(ctx.setMode).toHaveBeenCalledWith('session-list');
+      expect(ctx.setInputMode).toHaveBeenCalledWith('session-list', { sessions: [{ name: 'session-1' }, { name: 'session-2' }] });
     });
 
     it('/resume with args loads session', async () => {

@@ -40,7 +40,7 @@ commandRegistry.register({
     const valid = ['low', 'medium', 'high', 'xhigh', 'max'];
     if (!value || !valid.includes(value)) {
       // Show effort selection UI
-      ctx.setMode('effort-select');
+      ctx.setInputMode('effort-select');
       return;
     }
     ctx.agent.setEffort(value);
@@ -93,9 +93,7 @@ commandRegistry.register({
   handler: async (args, ctx): Promise<void> => {
     if (args.length === 0) {
       const sessions = await ctx.sessionManager.list();
-      ctx.setSessionList(sessions.map(s => ({ name: s.name })));
-      ctx.setSelectedIndex(0);
-      ctx.setMode('session-list');
+      ctx.setInputMode('session-list', { sessions });
     } else {
       const name = args[0];
       const data = await ctx.sessionManager.get(name);

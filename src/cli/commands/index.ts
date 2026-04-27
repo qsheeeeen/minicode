@@ -17,6 +17,7 @@ export interface CommandContext {
   setMessages: (msg: DisplayMessage[] | ((prev: DisplayMessage[]) => DisplayMessage[])) => void;
   setCurrentSession: (name: string) => void;
   setMode: (mode: 'chat' | 'session-list' | 'effort-select') => void;
+  setInputMode: (mode: string, props?: Record<string, unknown>) => void;
   setSessionList: (sessions: Array<{ name: string }>) => void;
   setSelectedIndex: (index: number) => void;
   exit: () => void;
