@@ -265,6 +265,22 @@ describe('MessageStore.fromMessageParams', () => {
     expect(msgs[1].toolName).toBe('bash');
   });
 
+  it('restores thinking blocks from assistant messages', () => {
+    const params = [{
+      role: 'assistant' as const,
+      content: [
+        { type: 'thinking' as const, thinking: 'let me think...' },
+        { type: 'tool_use' as const, id: 't1', name: 'bash', input: { cmd: 'ls' } },
+      ],
+    }];
+    const store = MessageStore.fromMessageParams(params);
+    const msgs = store.getAll();
+    expect(msgs[0].role).toBe('thinking');
+    expect(msgs[0].content).toBe('let me think...');
+    expect(msgs[0].inContext).toBe(true);
+    expect(msgs[1].role).toBe('tool_call');
+  });
+
   it('restores tool_result blocks from user messages', () => {
     const params = [{
       role: 'user' as const,
