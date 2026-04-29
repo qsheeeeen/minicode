@@ -40,21 +40,13 @@ function toDisplayRole(role: AgentMessageRole): DisplayMessageRole {
 // Derive Anthropic MessageParam[] from AgentMessage[]
 //
 // The Anthropic API expects grouped turns:
-//   assistant: [text_block, tool_use_block, ...]  → one turn
-//   user:      [tool_result_block, ...]            → one turn
+//   assistant: [text_block, thinking_block, tool_use_block, ...] → one turn
+//   user:      [tool_result_block, ...]                           → one turn
 //
-// The store keeps a flat list where assistant text, tool_use, and tool_result
-// are separate AgentMessage entries.  This function groups them correctly.
-//
-// Algorithm: iterate inContext messages. For each group:
-//   1. If 'user' string → emit directly.
-//   2. If 'assistant' → consume it (text), then collect consecutive 'tool_use'.
-//      If the first message is already 'tool_use' (LLM returned tool_use with
-//      no text), skip the assistant-text step — the while-loop picks it up.
-//   3. Collect consecutive 'tool_result' into one user turn.
-//
-// The critical detail: when the group starts with 'tool_use' (not 'assistant'),
-// we do NOT advance i before the tool_use while-loop, so no message is skipped.
+// The store keeps a flat list of AgentMessage entries. This function groups
+// consecutive thinking, assistant text, and tool_use blocks into one assistant
+// turn; consecutive tool_result blocks into one user turn; and emits plain
+// user messages directly.
 
 export function toLLMMessages(messages: AgentMessage[]): MessageParam[] {
   const result: MessageParam[] = [];
@@ -71,28 +63,23 @@ export function toLLMMessages(messages: AgentMessage[]): MessageParam[] {
       continue;
     }
 
-    // 2. Assistant turn: optional text + tool_use blocks + thinking blocks
+    // 2. Assistant turn: collect ALL consecutive thinking, text, and tool_use blocks.
+    // The LLM may interleave thinking with text and tool_use within a single response.
     const contentBlocks: any[] = [];
-
-    // Consume assistant text or thinking if present (may be absent when LLM returns
-    // only tool_use blocks — in that case msg is 'tool_use' and we skip this)
-    if (msg.role === 'assistant') {
-      if (msg.content) contentBlocks.push({ type: 'text', text: msg.content });
-      i++;
-      // fall through to collect tool_uses from new position
-    } else if (msg.role === 'thinking') {
-      contentBlocks.push({ type: 'thinking', thinking: msg.content });
-      i++;
-      // fall through to collect tool_uses from new position
-    }
-
-    // Collect consecutive tool_uses.
-    // If group started with tool_use (no assistant text), i still points
-    // to it, so the loop naturally picks up the first one — no special case.
-    while (i < inContext.length && inContext[i].role === 'tool_use') {
-      const tc = inContext[i];
-      contentBlocks.push({ type: 'tool_use', id: tc.toolUseId, name: tc.toolName, input: tc.toolInput ?? {} });
-      i++;
+    while (i < inContext.length) {
+      const cur = inContext[i];
+      if (cur.role === 'thinking') {
+        contentBlocks.push({ type: 'thinking', thinking: cur.content });
+        i++;
+      } else if (cur.role === 'assistant') {
+        if (cur.content) contentBlocks.push({ type: 'text', text: cur.content });
+        i++;
+      } else if (cur.role === 'tool_use') {
+        contentBlocks.push({ type: 'tool_use', id: cur.toolUseId, name: cur.toolName, input: cur.toolInput ?? {} });
+        i++;
+      } else {
+        break;
+      }
     }
 
     if (contentBlocks.length > 0) {
@@ -190,6 +177,14 @@ export class MessageStore {
       if (param.role === 'user') {
         if (typeof param.content === 'string') {
           store.add({ role: 'user', content: param.content, timestamp: new Date(), inContext: true });
+        } else if (Array.isArray(param.content)) {
+          // tool_result blocks — add inline to preserve chronological order
+          for (const block of param.content as any[]) {
+            if (block.type === 'tool_result') {
+              const raw = typeof block.content === 'string' ? block.content : JSON.stringify(block.content);
+              store.add({ role: 'tool_result', content: raw, timestamp: new Date(), inContext: true, toolUseId: block.tool_use_id });
+            }
+          }
         }
       } else if (param.role === 'assistant') {
         if (typeof param.content === 'string') {
@@ -203,17 +198,6 @@ export class MessageStore {
             } else if (block.type === 'tool_use') {
               store.add({ role: 'tool_use', content: '', timestamp: new Date(), inContext: true, toolUseId: block.id, toolName: block.name, toolInput: block.input });
             }
-          }
-        }
-      }
-    }
-    // tool_result blocks from user messages with array content
-    for (const param of params) {
-      if (param.role === 'user' && Array.isArray(param.content)) {
-        for (const block of param.content as any[]) {
-          if (block.type === 'tool_result') {
-            const raw = typeof block.content === 'string' ? block.content : JSON.stringify(block.content);
-            store.add({ role: 'tool_result', content: raw, timestamp: new Date(), inContext: true, toolUseId: block.tool_use_id });
           }
         }
       }
