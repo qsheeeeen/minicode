@@ -15,7 +15,7 @@ export const readTool: ToolDef = {
     },
     required: ['path']
   },
-  format(args: Record<string, unknown>) {
+  formatCall(args: Record<string, unknown>) {
     const path = args.path as string;
     const offset = args.offset as number | undefined;
     const limit = args.limit as number | undefined;

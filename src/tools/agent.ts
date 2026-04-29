@@ -20,7 +20,7 @@ export const agentTool: ToolDef = {
     },
     required: ['task']
   },
-  format(args: Record<string, unknown>) {
+  formatCall(args: Record<string, unknown>) {
     const task = args.task as string;
     const taskPreview = task.length > 30 ? task.slice(0, 30) + '...' : task;
     return React.createElement(Text, { color: 'yellow' }, `${this.name}(${taskPreview})`);

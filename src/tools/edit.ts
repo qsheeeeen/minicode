@@ -17,7 +17,7 @@ export const editTool: ToolDef = {
     },
     required: ['path', 'oldText', 'newText']
   },
-  format(args: Record<string, unknown>) {
+  formatCall(args: Record<string, unknown>) {
     const path = args.path as string;
     return React.createElement(Text, { color: 'yellow' }, `${this.name}(${path})`);
   },

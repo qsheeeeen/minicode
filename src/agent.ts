@@ -360,8 +360,8 @@ export class Agent {
   private async runTool(tool: ToolDef, args: Record<string, unknown>, context: ToolExecutionContext): Promise<import('./tools/index.js').ToolResult> {
     // Permission check is part of the tool execution flow
     if (tool.requiresPermission && this.permissionService) {
-      const displayText = tool.format
-        ? elementToText(tool.format(args))
+      const displayText = tool.formatCall
+        ? elementToText(tool.formatCall(args))
         : `${tool.name}(${JSON.stringify(args)})`;
       const allowed = await this.permissionService.check(tool.name, args, displayText, this.display);
       if (!allowed) {
@@ -377,8 +377,8 @@ export class Agent {
 
     // Add tool_use messages to store
     const slots = toolCalls.map(({ block, tool }) => {
-      const callElement = tool.format
-        ? tool.format(block.input as Record<string, unknown>)
+      const callElement = tool.formatCall
+        ? tool.formatCall(block.input as Record<string, unknown>)
         : React.createElement(Text, { color: 'yellow' }, `${block.name}(${JSON.stringify(block.input)})`);
       const msg = this.store.add({
         role: 'tool_use',
@@ -542,7 +542,7 @@ export class Agent {
     for (const msg of agentMessages) {
       if (msg.role === 'tool_use' && msg.toolUseId && msg.toolName) {
         const tool = this.toolRegistry.get(msg.toolName);
-        if (tool?.format) msg.element = tool.format(msg.toolInput ?? {});
+        if (tool?.formatCall) msg.element = tool.formatCall(msg.toolInput ?? {});
         toolUseMap.set(msg.toolUseId, msg);
       }
     }

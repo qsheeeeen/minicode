@@ -4,26 +4,26 @@ import { agentTool } from './agent.js';
 describe('agentTool', () => {
   describe('format', () => {
     it('formats short task', () => {
-      const formatted = agentTool.format({ task: 'simple task' });
+      const formatted = agentTool.formatCall({ task: 'simple task' });
       expect(formatted.props.children).toContain('simple task');
     });
 
     it('truncates long task', () => {
       const longTask = 'a'.repeat(50);
-      const formatted = agentTool.format({ task: longTask });
+      const formatted = agentTool.formatCall({ task: longTask });
       expect(formatted.props.children).not.toContain(longTask);
       expect(formatted.props.children).toContain('...');
     });
 
     it('shows full task when exactly 30 chars', () => {
       const task = 'a'.repeat(30);
-      const formatted = agentTool.format({ task });
+      const formatted = agentTool.formatCall({ task });
       expect(formatted.props.children).toBe('Agent(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)');
     });
 
     it('truncates at 30 chars', () => {
       const task = 'a'.repeat(35);
-      const formatted = agentTool.format({ task });
+      const formatted = agentTool.formatCall({ task });
       expect(formatted.props.children).toContain('...');
     });
   });

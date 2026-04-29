@@ -12,7 +12,7 @@ export const activateSkillTool: ToolDef = {
     },
     required: ['name']
   },
-  format(args: Record<string, unknown>) {
+  formatCall(args: Record<string, unknown>) {
     return React.createElement(Text, { color: 'yellow' }, `${this.name}(${args.name as string})`);
   },
   formatResult(_output: string, input: Record<string, unknown>) {

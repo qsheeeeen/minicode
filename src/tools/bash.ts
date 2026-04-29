@@ -15,7 +15,7 @@ export const bashTool: ToolDef = {
     },
     required: ['command']
   },
-  format(args: Record<string, unknown>) {
+  formatCall(args: Record<string, unknown>) {
     return React.createElement(Text, { color: 'yellow' }, `${this.name}(${args.command as string})`);
   },
   formatResult(output: string, _input: Record<string, unknown>) {

@@ -41,7 +41,7 @@ export interface ToolDef {
   name: string;
   description: string;
   input_schema: Record<string, unknown>;
-  format?: (args: Record<string, unknown>) => React.ReactElement;
+  formatCall?: (args: Record<string, unknown>) => React.ReactElement;
   formatResult?: (output: string, input: Record<string, unknown>) => React.ReactElement;
   execute: (args: Record<string, unknown>, context?: ToolExecutionContext) => Promise<ToolResult>;
   requires?: ToolRequirement[];

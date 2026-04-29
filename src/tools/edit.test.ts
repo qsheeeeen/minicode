@@ -47,7 +47,7 @@ describe('editTool', () => {
 
   describe('format', () => {
     it('formats with file path', () => {
-      const formatted = editTool.format({ path: 'test.txt', oldText: 'a', newText: 'b' });
+      const formatted = editTool.formatCall({ path: 'test.txt', oldText: 'a', newText: 'b' });
       expect(formatted.props.children).toContain('test.txt');
     });
   });

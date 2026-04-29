@@ -16,7 +16,7 @@ export const writeTool: ToolDef = {
     },
     required: ['path', 'content']
   },
-  format(args: Record<string, unknown>) {
+  formatCall(args: Record<string, unknown>) {
     const filePath = args.path as string;
     const content = args.content as string;
     const lines = content.split('\n').length;
