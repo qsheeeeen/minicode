@@ -60,9 +60,10 @@ export const bashTool: ToolDef = {
           }
         });
       });
+      const trimmed = output.trim();
       return {
-        output,
-        display: React.createElement(Text, { dimColor: true }, output)
+        output: trimmed,
+        display: React.createElement(Text, { dimColor: true }, trimmed)
       };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
