@@ -26,6 +26,9 @@ export const agentTool: ToolDef = {
     return React.createElement(Text, { color: 'yellow' }, `${this.name}(${taskPreview})`);
   },
 
+  formatResult(output: string, _input: Record<string, unknown>) {
+    return React.createElement(Text, { dimColor: true }, output);
+  },
   execute: async (args: Record<string, unknown>, context?: ToolExecutionContext): Promise<ToolResult> => {
     const task = args.task as string;
     const registry = context?.registry;

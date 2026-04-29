@@ -18,6 +18,9 @@ export const bashTool: ToolDef = {
   format(args: Record<string, unknown>) {
     return React.createElement(Text, { color: 'yellow' }, `${this.name}(${args.command as string})`);
   },
+  formatResult(output: string, _input: Record<string, unknown>) {
+    return React.createElement(Text, { dimColor: true }, output);
+  },
   execute: async (args: Record<string, unknown>, context?: ToolExecutionContext): Promise<ToolResult> => {
     try {
       const command = args.command as string;

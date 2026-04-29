@@ -21,6 +21,9 @@ export const editTool: ToolDef = {
     const path = args.path as string;
     return React.createElement(Text, { color: 'yellow' }, `${this.name}(${path})`);
   },
+  formatResult(output: string, _input: Record<string, unknown>) {
+    return React.createElement(Text, { dimColor: true }, output);
+  },
   execute: async (args: Record<string, unknown>): Promise<ToolResult> => {
     try {
       const path = args.path as string;
