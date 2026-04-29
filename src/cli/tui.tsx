@@ -6,7 +6,6 @@ import { Agent } from '../agent.js';
 import type { MessageParam, EffortLevel } from '../llm/anthropic.js';
 import type { ResolvedConfig } from '../config.js';
 import { CallbackDisplay, type DisplayMessage, type ConfirmationRequest } from '../utils/display.js';
-import { SessionDisplayImpl } from '../utils/session-display.js';
 import { commandRegistry, type CommandContext } from './commands/index.js';
 import './commands/builtin.js';
 import { Message } from '../components/Message.js';
@@ -115,14 +114,10 @@ function useDisplay(
           if (totalTokens > 0) {
             agent.setTokenCount(totalTokens);
           }
-          const sessionDisplay = new SessionDisplayImpl(sessionManager, agent.getToolRegistry());
-          const displayMessages = await sessionDisplay.loadForTUI(initialSession);
-          if (displayMessages.length > 0) {
-            setMessages(displayMessages);
-          }
+          // Display is driven by store.onChange → toDisplayMessages(),
+          // triggered by store.replace() inside setMessages().
         } else if (sessionName) {
-          const sysMsg = { role: 'status' as const, content: `Created new session: ${sessionName}`, timestamp: new Date() };
-          setMessages([sysMsg]);
+          agent.getStore().add({ role: 'status', content: `Created new session: ${sessionName}`, timestamp: new Date(), inContext: false });
         }
       }
     };

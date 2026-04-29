@@ -6,7 +6,7 @@ import { ConsoleDisplay, type DisplayAdapter } from './utils/display.js';
 import { TokenManager, TokenManagerImpl } from './services/token-manager.js';
 import { CompressionService, CompressionServiceImpl } from './services/compression-service.js';
 import { AgentRegistry } from './services/agent-registry.js';
-import { MessageStore } from './messages.js';
+import { MessageStore, type AgentMessage } from './messages.js';
 import { PermissionService, type PermissionMode } from './services/permission.js';
 import type { SkillRegistry } from './services/skill-registry.js';
 import { elementToText } from './utils/react.js';
@@ -532,9 +532,35 @@ export class Agent {
     return this.store.toLLMMessages();
   }
 
-  /** Restore messages from session (backward compat) */
+  /** Restore messages from session. Hydrates tool_use elements and attaches
+   *  tool_result content so toDisplayMessages() matches live-session output. */
   setMessages(messages: MessageParam[]): void {
-    this.store = MessageStore.fromMessageParams(messages);
+    const agentMessages = MessageStore.fromMessageParams(messages).getAll();
+
+    // Hydrate tool_use elements — same logic as executeToolCalls
+    const toolUseMap = new Map<string, AgentMessage>();
+    for (const msg of agentMessages) {
+      if (msg.role === 'tool_use' && msg.toolUseId && msg.toolName) {
+        const tool = this.toolRegistry.get(msg.toolName);
+        if (tool?.format) msg.element = tool.format(msg.toolInput ?? {});
+        toolUseMap.set(msg.toolUseId, msg);
+      }
+    }
+
+    // Attach tool_result content to matching tool_use elements
+    for (const msg of agentMessages) {
+      if (msg.role === 'tool_result' && msg.toolUseId) {
+        const toolMsg = toolUseMap.get(msg.toolUseId);
+        if (toolMsg) {
+          const resultEl = React.createElement(Text, { dimColor: true }, msg.content);
+          toolMsg.element = toolMsg.element
+            ? React.createElement(Box, { flexDirection: 'column' }, toolMsg.element, resultEl)
+            : resultEl;
+        }
+      }
+    }
+
+    this.store.replace(agentMessages);
   }
 
   /** Get the underlying MessageStore */

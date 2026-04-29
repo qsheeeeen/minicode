@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { EventEmitter } from 'events';
+import React from 'react';
 
 // Mocks
 class MockStream extends EventEmitter {
@@ -116,11 +117,71 @@ describe('Agent', () => {
       const agent = new Agent();
       const messages: any[] = [{ role: 'user', content: 'hello' }];
       agent.setMessages(messages);
-      
+
       const retrieved = agent.getMessages();
       expect(retrieved).toHaveLength(1);
       expect(retrieved[0].role).toBe('user');
       expect(retrieved[0].content).toBe('hello');
+    });
+
+    it('preserves onChange callback after setMessages replaces store contents', () => {
+      const agent = new Agent();
+      let changeCount = 0;
+      agent.getStore().onChange(() => { changeCount++; });
+
+      // setMessages uses store.replace() which fires notifyChange
+      agent.setMessages([{ role: 'user', content: 'hello' }]);
+      expect(changeCount).toBe(1);
+
+      // Subsequent adds should still fire onChange
+      agent.getStore().add({ role: 'user', content: 'world', timestamp: new Date(), inContext: true });
+      expect(changeCount).toBe(2);
+    });
+
+    it('hydrates tool_use elements via ToolRegistry', () => {
+      const agent = new Agent();
+      const formatResult = React.createElement('div', {}, 'Read /a.txt');
+      agent.getToolRegistry().register({
+        name: 'Read',
+        description: 'Read file',
+        input_schema: {},
+        execute: vi.fn(),
+        format: vi.fn().mockReturnValue(formatResult),
+      });
+
+      agent.setMessages([
+        { role: 'assistant', content: [{ type: 'tool_use', id: 'tool-1', name: 'Read', input: { path: '/a.txt' } }] },
+        { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'tool-1', content: 'file contents' }] },
+      ]);
+
+      const msgs = agent.getStore().getAll();
+      const toolMsg = msgs.find(m => m.role === 'tool_use');
+      expect(toolMsg?.element).toBeDefined();
+      // Element should be a Box wrapping format result + result text (not the raw format output)
+      expect(toolMsg?.element).not.toBe(formatResult);
+    });
+
+    it('preserves store state for toDisplayMessages after hydration', () => {
+      const agent = new Agent();
+      agent.getToolRegistry().register({
+        name: 'Read',
+        description: 'Read file',
+        input_schema: {},
+        execute: vi.fn(),
+        format: vi.fn().mockReturnValue(React.createElement('div', {}, 'Read /a.txt')),
+      });
+
+      agent.setMessages([
+        { role: 'user', content: 'hello' },
+        { role: 'assistant', content: 'hi' },
+      ]);
+
+      const displayMsgs = agent.getStore().toDisplayMessages();
+      expect(displayMsgs).toHaveLength(2);
+      expect(displayMsgs[0].role).toBe('user');
+      expect(displayMsgs[0].content).toBe('hello');
+      expect(displayMsgs[1].role).toBe('assistant');
+      expect(displayMsgs[1].content).toBe('hi');
     });
   });
 

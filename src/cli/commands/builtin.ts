@@ -115,12 +115,9 @@ commandRegistry.register({
         const newLogger = await createLogger(ctx.sessionManager.getProjectHash(), name);
         ctx.agent.setSession(name, newLogger);
         ctx.setCurrentSession(name);
-        const { SessionDisplayImpl } = await import('../../utils/session-display.js');
-        const sessionDisplay = new SessionDisplayImpl(ctx.sessionManager, ctx.agent.getToolRegistry());
-        const displayMessages = await sessionDisplay.loadForTUI(name);
-        ctx.setMessages(prev => displayMessages.length > 0 ? displayMessages : [...prev, { role: 'status', content: `Loaded session: ${name}`, timestamp: new Date() }]);
+        ctx.agent.getStore().add({ role: 'status', content: `Loaded session: ${name}`, timestamp: new Date(), inContext: false });
       } else {
-        ctx.setMessages(prev => [...prev, { role: 'error', content: `Session not found: ${name}`, timestamp: new Date() }]);
+        ctx.agent.getStore().add({ role: 'error', content: `Session not found: ${name}`, timestamp: new Date(), inContext: false });
       }
     }
   }

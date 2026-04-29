@@ -145,11 +145,13 @@ describe('Builtin commands', () => {
     });
 
     it('/resume with args loads session', async () => {
-      const agentMock = { 
+      const storeMock = { add: vi.fn() };
+      const agentMock = {
         setMessages: vi.fn(),
         setTokenCount: vi.fn(),
         setSession: vi.fn(),
         getToolRegistry: vi.fn(),
+        getStore: vi.fn().mockReturnValue(storeMock),
       };
       const sessionManagerMock = {
         getProjectHash: vi.fn().mockReturnValue('testhash'),
@@ -158,33 +160,34 @@ describe('Builtin commands', () => {
           totalTokens: 100,
         }),
       };
-      const ctx: Partial<CommandContext> = { 
+      const ctx: Partial<CommandContext> = {
         agent: agentMock as any,
         sessionManager: sessionManagerMock as any,
         setCurrentSession: vi.fn(),
         setMessages: vi.fn(),
       };
-      
+
       await handlers['resume'](['session-1'], ctx as CommandContext);
       expect(sessionManagerMock.get).toHaveBeenCalledWith('session-1');
       expect(agentMock.setMessages).toHaveBeenCalled();
       expect(agentMock.setTokenCount).toHaveBeenCalledWith(100);
       expect(ctx.setCurrentSession).toHaveBeenCalledWith('session-1');
+      expect(storeMock.add).toHaveBeenCalledWith(expect.objectContaining({ role: 'status' }));
     });
 
     it('/resume with unknown session shows error', async () => {
+      const storeMock = { add: vi.fn() };
       const sessionManagerMock = {
         get: vi.fn().mockResolvedValue(null),
       };
-      const ctx: Partial<CommandContext> = { 
+      const ctx: Partial<CommandContext> = {
+        agent: { getStore: vi.fn().mockReturnValue(storeMock) } as any,
         sessionManager: sessionManagerMock as any,
         setMessages: vi.fn(),
       };
-      
-      (ctx.setMessages as any).mockImplementation((cb: any) => cb([]));
-      
+
       await handlers['resume'](['unknown'], ctx as CommandContext);
-      expect(ctx.setMessages).toHaveBeenCalled();
+      expect(storeMock.add).toHaveBeenCalledWith(expect.objectContaining({ role: 'error' }));
     });
 
     it('/plan returns prompt text', () => {
