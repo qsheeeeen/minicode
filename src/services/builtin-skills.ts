@@ -1,6 +1,6 @@
-import type { SkillMeta } from '../services/skill-registry.js';
+import type { SkillMeta } from './skill-registry.js';
 
-export const skillCreator: SkillMeta = {
+const skillCreator: SkillMeta = {
   name: 'skill-creator',
   description: "Guide for creating effective skills. This skill should be used when users want to create a new skill (or update an existing skill) that extends minicode's capabilities with specialized knowledge, workflows, or tool integrations.",
   body: `# Skill Creator
@@ -21,3 +21,7 @@ Every skill consists of a required \`SKILL.md\` file:
 3. Write the frontmatter with \`name\` and \`description\`.
 4. Write the body with clear, concise instructions for the agent to follow.`
 };
+
+export const builtinSkills: SkillMeta[] = [
+  skillCreator
+];

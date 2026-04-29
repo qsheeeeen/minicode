@@ -10,7 +10,7 @@ import { createLogger } from './utils/logger.js';
 import { parseArgs, type PermissionMode } from './cli/args.js';
 import { loadGlobalPrompt, loadProjectPrompt } from './utils/prompts.js';
 import { SkillRegistry } from './services/skill-registry.js';
-import { builtinSkills } from './builtin-skills/index.js';
+import { builtinSkills } from './services/builtin-skills.js';
 import { App } from './cli/tui.js';
 import { commandRegistry } from './cli/commands/index.js';
 
