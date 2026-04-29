@@ -196,7 +196,9 @@ export class MessageStore {
           store.add({ role: 'assistant', content: param.content, timestamp: new Date(), inContext: true });
         } else if (Array.isArray(param.content)) {
           for (const block of param.content as any[]) {
-            if (block.type === 'text') {
+            if (block.type === 'thinking') {
+              store.add({ role: 'thinking', content: block.thinking, timestamp: new Date(), inContext: true });
+            } else if (block.type === 'text') {
               store.add({ role: 'assistant', content: block.text, timestamp: new Date(), inContext: true });
             } else if (block.type === 'tool_use') {
               store.add({ role: 'tool_call', content: '', timestamp: new Date(), inContext: true, toolUseId: block.id, toolName: block.name, toolInput: block.input });
