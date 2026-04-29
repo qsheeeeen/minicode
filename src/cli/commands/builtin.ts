@@ -1,4 +1,5 @@
 import { commandRegistry } from './index.js';
+import type { EffortLevel } from '../../llm/anthropic.js';
 
 commandRegistry.register({
   name: 'exit',
@@ -37,13 +38,13 @@ commandRegistry.register({
   description: 'Set thinking effort (low|medium|high|xhigh|max)',
   handler: async (args, ctx): Promise<void> => {
     const value = args[0]?.toLowerCase();
-    const valid = ['low', 'medium', 'high', 'xhigh', 'max'];
-    if (!value || !valid.includes(value)) {
+    const valid = ['low', 'medium', 'high', 'xhigh', 'max'] as const;
+    if (!value || !(valid as readonly string[]).includes(value)) {
       // Show effort selection UI
       ctx.setInputMode('effort-select');
       return;
     }
-    ctx.agent.setEffort(value);
+    ctx.agent.setEffort(value as EffortLevel);
     const { setEffort } = await import('../../config.js');
     await setEffort(value);
     ctx.setMessages(prev => [...prev, {

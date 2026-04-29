@@ -1,14 +1,15 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { MessageStream } from '@anthropic-ai/sdk/lib/MessageStream.js';
+import type { MessageCreateParamsBase, MessageCreateParamsNonStreaming, OutputConfig } from '@anthropic-ai/sdk/resources/messages.js';
 
 export type { Anthropic };
+export type EffortLevel = NonNullable<OutputConfig['effort']>;
 
 interface ChatOptions {
   model?: string;
   maxTokens?: number;
   system?: string;
-  thinking?: boolean;
-  effort?: string;
+  effort?: EffortLevel;
   signal?: AbortSignal;
 }
 
@@ -31,19 +32,14 @@ export class AnthropicClient {
     tools: Tool[],
     options: ChatOptions = {}
   ): Promise<Message> {
-    const params: any = {
+    const params: MessageCreateParamsNonStreaming = {
       model: options.model || 'claude-sonnet-4-5',
       max_tokens: options.maxTokens || 8192,
       system: options.system,
       messages,
-      tools
+      tools,
+      thinking: { type: 'adaptive' }
     };
-
-    if (options.thinking) {
-      params.thinking = {
-        type: 'enabled'
-      };
-    }
 
     if (options.effort) {
       params.output_config = {
@@ -61,19 +57,14 @@ export class AnthropicClient {
     tools: Tool[],
     options: ChatOptions = {}
   ): MessageStream<null> {
-    const params: any = {
+    const params: MessageCreateParamsBase = {
       model: options.model || 'claude-sonnet-4-5',
       max_tokens: options.maxTokens || 8192,
       system: options.system,
       messages,
-      tools
+      tools,
+      thinking: { type: 'adaptive' }
     };
-
-    if (options.thinking) {
-      params.thinking = {
-        type: 'enabled'
-      };
-    }
 
     if (options.effort) {
       params.output_config = {

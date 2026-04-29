@@ -3,7 +3,7 @@ import { Box, Text, useInput, useApp } from 'ink';
 import { Spinner, ProgressBar } from '@inkjs/ui';
 import TextInput from 'ink-text-input';
 import { Agent } from '../agent.js';
-import type { MessageParam } from '../llm/anthropic.js';
+import type { MessageParam, EffortLevel } from '../llm/anthropic.js';
 import type { ResolvedConfig } from '../config.js';
 import { CallbackDisplay, type DisplayMessage, type ConfirmationRequest } from '../utils/display.js';
 import { SessionDisplayImpl } from '../utils/session-display.js';
@@ -408,7 +408,7 @@ export function App({
             const handleSubmitValue = async (value: string) => {
               if (inputMode === 'effort-select') {
                 // Directly set effort without going through command handler
-                agent.setEffort(value);
+                agent.setEffort(value as EffortLevel);
                 import('../config.js').then(m => m.setEffort(value));
                 setMessages(prev => [...prev, { role: 'status', content: `(Effort set to: ${value})`, timestamp: new Date() }]);
                 setInputMode('chat');

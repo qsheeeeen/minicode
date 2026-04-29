@@ -23,7 +23,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.80.0",
+    "@anthropic-ai/sdk": "^0.91.1",
     "@inkjs/ui": "^2.0.0",
     "@types/react": "^19.2.14",
     "diff": "^8.0.4",

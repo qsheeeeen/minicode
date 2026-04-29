@@ -1,6 +1,6 @@
 import React from 'react';
 import { Text, Box } from 'ink';
-import { AnthropicClient, MessageParam, Tool, Anthropic, ContentBlock } from './llm/anthropic.js';
+import { AnthropicClient, MessageParam, Tool, Anthropic, ContentBlock, type EffortLevel } from './llm/anthropic.js';
 import { registerTools, ToolRegistry, ToolDef, ToolExecutionContext } from './tools/index.js';
 import { ConsoleDisplay, type DisplayAdapter } from './utils/display.js';
 import { TokenManager, TokenManagerImpl } from './services/token-manager.js';
@@ -38,7 +38,7 @@ export interface AgentConfig {
   contextLength?: number;
   compressionThresholdRatio?: number;
   thinkingEnabled?: boolean;
-  effort?: string;
+  effort?: EffortLevel;
   display?: DisplayAdapter;
   tokenManager?: TokenManager;
   compressionService?: CompressionService;
@@ -70,7 +70,7 @@ export class Agent {
   private compressionService: CompressionService;
   public currentSession = `session-${Date.now()}`;
   private thinkingEnabled: boolean;
-  private effort?: string;
+  private effort?: EffortLevel;
   private display: DisplayAdapter;
   private userPrompt: string;
   private agentRegistry?: AgentRegistry;
@@ -93,7 +93,7 @@ export class Agent {
     }
   }
 
-  public setEffort(effort: string): void {
+  public setEffort(effort: EffortLevel): void {
     this.effort = effort;
   }
 
@@ -250,7 +250,6 @@ export class Agent {
     const stream = this.client.chatStream(this.store.toLLMMessages(), toolDefs, {
       system: this.getSystemPrompt(),
       model: this.model,
-      thinking: this.thinkingEnabled,
       signal: this.abortController?.signal,
       effort: this.effort
     });

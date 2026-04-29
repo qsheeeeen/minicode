@@ -1,6 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
+import type { EffortLevel } from './llm/anthropic.js';
 
 const CONFIG_DIR = path.join(os.homedir(), '.minicode');
 const CONFIG_PATH = path.join(CONFIG_DIR, 'config.json');
@@ -26,7 +27,7 @@ export interface Config {
   model?: string;  // format: model@provider, e.g. "glm-4.7@zhipu"
   compressionThreshold?: number;  // 0-1, compress at this ratio of context
   thinking?: boolean;  // enable extended thinking
-  effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max';  // reasoning effort level
+  effort?: EffortLevel;  // reasoning effort level
   promptFile?: string;  // project prompt filename (default: MINICODE.md)
   permissionMode?: 'manual' | 'yolo' | 'auto';
   skillsDir?: string;  // project skills directory (default: .minicode/skills)  // default permission mode
@@ -112,7 +113,7 @@ export async function getCompressionThreshold(): Promise<number> {
   return config.compressionThreshold ?? 0.8;
 }
 
-export async function getThinkingConfig(): Promise<{ enabled: boolean; effort?: string }> {
+export async function getThinkingConfig(): Promise<{ enabled: boolean; effort?: EffortLevel }> {
   const config = await loadConfig();
   return {
     enabled: config.thinking ?? false,
@@ -133,7 +134,7 @@ export async function getSkillsDir(): Promise<string | undefined> {
 export interface ResolvedConfig {
   model: { provider: string; model: string; apiKey: string; baseURL?: string; contextLength?: number } | null;
   compressionThreshold: number;
-  thinking: { enabled: boolean; effort?: string };
+  thinking: { enabled: boolean; effort?: EffortLevel };
   promptFile: string;
   permissionMode?: 'manual' | 'yolo' | 'auto';
   skillsDir?: string;

@@ -43,6 +43,7 @@ describe('AnthropicClient', () => {
           system: 'test system',
           messages: [{ role: 'user', content: 'hello' }],
           tools: [],
+          thinking: { type: 'adaptive' }
         }),
         expect.objectContaining({
           signal: undefined
@@ -50,18 +51,16 @@ describe('AnthropicClient', () => {
       );
     });
 
-    it('adds thinking block when thinking is enabled', async () => {
+    it('includes effort in output_config when provided', async () => {
       const client = new AnthropicClient();
       await client.chat([], [], {
-        thinking: true,
-        thinkingTokens: 15000,
+        effort: 'xhigh'
       });
 
       expect(mockCreate).toHaveBeenCalledWith(
         expect.objectContaining({
-          thinking: {
-            type: 'enabled'
-          }
+          thinking: { type: 'adaptive' },
+          output_config: { effort: 'xhigh' }
         }),
         expect.objectContaining({
           signal: undefined
@@ -73,16 +72,12 @@ describe('AnthropicClient', () => {
   describe('chatStream', () => {
     it('sends correct parameters to client.messages.stream', () => {
       const client = new AnthropicClient();
-      client.chatStream([{ role: 'user', content: 'hi' }], [], {
-        thinking: true
-      });
+      client.chatStream([{ role: 'user', content: 'hi' }], [], {});
 
       expect(mockStream).toHaveBeenCalledWith(
         expect.objectContaining({
           messages: [{ role: 'user', content: 'hi' }],
-          thinking: {
-            type: 'enabled'
-          }
+          thinking: { type: 'adaptive' }
         }),
         expect.objectContaining({
           signal: undefined
