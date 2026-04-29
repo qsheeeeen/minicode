@@ -375,13 +375,13 @@ export class Agent {
   private async executeToolCalls(toolCalls: Array<{ block: Anthropic.Messages.ToolUseBlock; tool: ToolDef }>): Promise<void> {
     if (toolCalls.length === 0) return;
 
-    // Add tool_call messages to store
+    // Add tool_use messages to store
     const slots = toolCalls.map(({ block, tool }) => {
       const callElement = tool.format
         ? tool.format(block.input as Record<string, unknown>)
         : React.createElement(Text, { color: 'yellow' }, `${block.name}(${JSON.stringify(block.input)})`);
       const msg = this.store.add({
-        role: 'tool_call',
+        role: 'tool_use',
         content: '',
         timestamp: new Date(),
         inContext: true,

@@ -117,7 +117,7 @@ function generateSummary(messages: AgentMessage[]): string {
   let errors = 0;
 
   for (const msg of messages) {
-    if (msg.role === 'tool_call') toolCallCount++;
+    if (msg.role === 'tool_use') toolCallCount++;
     if (msg.role === 'error') errors++;
   }
 

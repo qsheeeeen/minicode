@@ -141,9 +141,9 @@ describe('runHeadless', () => {
       expect(console.error).toHaveBeenCalledWith('[error] system error');
     });
 
-    it('prints tool_call elements', () => {
+    it('prints tool_use elements', () => {
       mockGetAll.mockReturnValue([
-        { id: 'msg1', role: 'tool_call', element: { type: 'div', props: { children: 'tool line 1\ntool line 2' } } }
+        { id: 'msg1', role: 'tool_use', element: { type: 'div', props: { children: 'tool line 1\ntool line 2' } } }
       ]);
       onChangeCb();
 

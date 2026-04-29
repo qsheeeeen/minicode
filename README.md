@@ -127,7 +127,7 @@ src/
 
 1. User input → Agent adds message to `MessageStore`, sends `store.toLLMMessages()` to LLM
 2. LLM responds with text + tool_use blocks (streamed to TUI via `DisplayAdapter`)
-3. Text/thinking streams to TUI; tool_call added to store; tools execute in parallel (`Promise.allSettled`)
+3. Text/thinking streams to TUI; tool_use added to store; tools execute in parallel (`Promise.allSettled`)
 4. Store updates fire `onChange` → TUI re-renders from `store.toDisplayMessages()`
 5. Session auto-saved (v2 format with `agentMessages`) after each exchange
 6. Token usage tracked; progress bar in status bar; auto-compresses when exceeding threshold

@@ -248,7 +248,7 @@ describe('Agent', () => {
       
       const msgs = agent.getStore().getAll();
       console.log("MESSAGES:", JSON.stringify(msgs, null, 2));
-      const toolCall = msgs.find(m => m.role === 'tool_call');
+      const toolCall = msgs.find(m => m.role === 'tool_use');
       expect(toolCall).toBeDefined();
       expect(toolCall?.toolName).toBe('testTool');
       

@@ -11,7 +11,7 @@ import type { MessageRole as DisplayMessageRole } from './utils/session-display.
 
 export type AgentMessageRole =
   | 'user' | 'assistant' | 'thinking'
-  | 'tool_call' | 'tool_result'
+  | 'tool_use' | 'tool_result'
   | 'status' | 'error';
 
 export interface AgentMessage {
@@ -21,7 +21,7 @@ export interface AgentMessage {
   displayContent?: string;
   timestamp: Date;
   inContext: boolean;       // Whether sent to LLM
-  toolUseId?: string;       // Links tool_call ↔ tool_result
+  toolUseId?: string;       // Links tool_use ↔ tool_result
   toolName?: string;
   toolInput?: Record<string, unknown>;
   element?: React.ReactElement;
@@ -31,7 +31,7 @@ export interface AgentMessage {
 // Map AgentMessageRole to DisplayMessageRole for TUI
 function toDisplayRole(role: AgentMessageRole): DisplayMessageRole {
   switch (role) {
-    case 'tool_call': return 'tool';
+    case 'tool_use': return 'tool';
     case 'status': return 'status';
     default: return role;
   }
@@ -43,18 +43,18 @@ function toDisplayRole(role: AgentMessageRole): DisplayMessageRole {
 //   assistant: [text_block, tool_use_block, ...]  → one turn
 //   user:      [tool_result_block, ...]            → one turn
 //
-// The store keeps a flat list where assistant text, tool_call, and tool_result
+// The store keeps a flat list where assistant text, tool_use, and tool_result
 // are separate AgentMessage entries.  This function groups them correctly.
 //
 // Algorithm: iterate inContext messages. For each group:
 //   1. If 'user' string → emit directly.
-//   2. If 'assistant' → consume it (text), then collect consecutive 'tool_call'.
-//      If the first message is already 'tool_call' (LLM returned tool_use with
+//   2. If 'assistant' → consume it (text), then collect consecutive 'tool_use'.
+//      If the first message is already 'tool_use' (LLM returned tool_use with
 //      no text), skip the assistant-text step — the while-loop picks it up.
 //   3. Collect consecutive 'tool_result' into one user turn.
 //
-// The critical detail: when the group starts with 'tool_call' (not 'assistant'),
-// we do NOT advance i before the tool_call while-loop, so no message is skipped.
+// The critical detail: when the group starts with 'tool_use' (not 'assistant'),
+// we do NOT advance i before the tool_use while-loop, so no message is skipped.
 
 export function toLLMMessages(messages: AgentMessage[]): MessageParam[] {
   const result: MessageParam[] = [];
@@ -75,21 +75,21 @@ export function toLLMMessages(messages: AgentMessage[]): MessageParam[] {
     const contentBlocks: any[] = [];
 
     // Consume assistant text or thinking if present (may be absent when LLM returns
-    // only tool_use blocks — in that case msg is 'tool_call' and we skip this)
+    // only tool_use blocks — in that case msg is 'tool_use' and we skip this)
     if (msg.role === 'assistant') {
       if (msg.content) contentBlocks.push({ type: 'text', text: msg.content });
       i++;
-      // fall through to collect tool_calls from new position
+      // fall through to collect tool_uses from new position
     } else if (msg.role === 'thinking') {
       contentBlocks.push({ type: 'thinking', thinking: msg.content });
       i++;
-      // fall through to collect tool_calls from new position
+      // fall through to collect tool_uses from new position
     }
 
-    // Collect consecutive tool_calls.
-    // If group started with tool_call (no assistant text), i still points
+    // Collect consecutive tool_uses.
+    // If group started with tool_use (no assistant text), i still points
     // to it, so the loop naturally picks up the first one — no special case.
-    while (i < inContext.length && inContext[i].role === 'tool_call') {
+    while (i < inContext.length && inContext[i].role === 'tool_use') {
       const tc = inContext[i];
       contentBlocks.push({ type: 'tool_use', id: tc.toolUseId, name: tc.toolName, input: tc.toolInput ?? {} });
       i++;
@@ -121,7 +121,7 @@ export function toDisplayMessages(messages: AgentMessage[]): import('./utils/ses
     timestamp: msg.timestamp,
     isStreaming: msg.isStreaming,
     element: msg.element,
-    slotId: msg.role === 'tool_call' ? msg.id : undefined,
+    slotId: msg.role === 'tool_use' ? msg.id : undefined,
   }));
 }
 
@@ -201,7 +201,7 @@ export class MessageStore {
             } else if (block.type === 'text') {
               store.add({ role: 'assistant', content: block.text, timestamp: new Date(), inContext: true });
             } else if (block.type === 'tool_use') {
-              store.add({ role: 'tool_call', content: '', timestamp: new Date(), inContext: true, toolUseId: block.id, toolName: block.name, toolInput: block.input });
+              store.add({ role: 'tool_use', content: '', timestamp: new Date(), inContext: true, toolUseId: block.id, toolName: block.name, toolInput: block.input });
             }
           }
         }

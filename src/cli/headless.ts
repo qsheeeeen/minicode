@@ -49,7 +49,7 @@ export async function runHeadless(
   let lastPrintedIndex = 0;
   const streamed = new Map<string, number>();       // assistant msgId → chars printed
   const finalized = new Set<string>();               // msgIds with newline written
-  const toolCallLines = new Map<string, number>();   // tool_call msgId → lines printed
+  const toolCallLines = new Map<string, number>();   // tool_use msgId → lines printed
 
   agent.getStore().onChange(() => {
     const raw = agent.getStore().getAll();
@@ -57,16 +57,16 @@ export async function runHeadless(
     // 1. Print new messages that don't need streaming tracking
     for (let i = lastPrintedIndex; i < raw.length; i++) {
       const msg = raw[i];
-      // Skip: assistant (streamed), thinking (deferred), tool_call (element-tracked)
+      // Skip: assistant (streamed), thinking (deferred), tool_use (element-tracked)
       if (msg.role === 'user' || msg.role === 'status' || msg.role === 'error') {
         printMessage(msg);
       }
     }
     lastPrintedIndex = raw.length;
 
-    // 2. Track tool_call element updates — element grows from callFormat to callFormat + result
+    // 2. Track tool_use element updates — element grows from callFormat to callFormat + result
     for (const msg of raw) {
-      if (msg.role === 'tool_call' && msg.element) {
+      if (msg.role === 'tool_use' && msg.element) {
         const text = elementToText(msg.element);
         const lines = text.split('\n');
         const printedCount = toolCallLines.get(msg.id) || 0;
