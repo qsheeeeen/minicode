@@ -15,6 +15,9 @@ export const activateSkillTool: ToolDef = {
   format(args: Record<string, unknown>) {
     return React.createElement(Text, { color: 'yellow' }, `${this.name}(${args.name as string})`);
   },
+  formatResult(_output: string, input: Record<string, unknown>) {
+    return React.createElement(Text, { color: 'green' }, `Activated skill: ${input.name as string}`);
+  },
   execute: async (args: Record<string, unknown>, context?: ToolExecutionContext): Promise<ToolResult> => {
     const skillName = String(args.name);
     const skillBody = context?.skillRegistry?.getSkillBody(skillName);

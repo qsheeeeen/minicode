@@ -28,6 +28,10 @@ export const readTool: ToolDef = {
     }
     return React.createElement(Text, { color: 'yellow' }, info + ')');
   },
+  formatResult(output: string, _input: Record<string, unknown>) {
+    const lines = output.split('\n');
+    return React.createElement(Text, { dimColor: true }, `Read ${lines.length} lines, ${output.length} chars`);
+  },
   execute: async (args: Record<string, unknown>): Promise<ToolResult> => {
     try {
       const path = args.path as string;

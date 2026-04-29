@@ -552,7 +552,10 @@ export class Agent {
       if (msg.role === 'tool_result' && msg.toolUseId) {
         const toolMsg = toolUseMap.get(msg.toolUseId);
         if (toolMsg) {
-          const resultEl = React.createElement(Text, { dimColor: true }, msg.content);
+          const tool = this.toolRegistry.get(toolMsg.toolName ?? '');
+          const resultEl = tool?.formatResult
+            ? tool.formatResult(msg.content, toolMsg.toolInput ?? {})
+            : React.createElement(Text, { dimColor: true }, msg.content);
           toolMsg.element = toolMsg.element
             ? React.createElement(Box, { flexDirection: 'column' }, toolMsg.element, resultEl)
             : resultEl;
