@@ -366,9 +366,17 @@ export function App({
           </Box>
         ) : (
           <Box flexDirection="column">
-            {messages.map((msg, i) => (
-              <Message key={i} role={msg.role} content={msg.content} isStreaming={msg.isStreaming} element={msg.element} />
-            ))}
+            {messages
+              .filter(msg => {
+                if (msg.role === 'tool_result') return false;
+                if (!msg.element && !msg.content && !msg.isStreaming && msg.role !== 'user') return false;
+                return true;
+              })
+              .map((msg, i) => (
+                <Box key={i} flexDirection="column" marginTop={i > 0 ? 1 : 0}>
+                  <Message role={msg.role} content={msg.content} isStreaming={msg.isStreaming} element={msg.element} />
+                </Box>
+              ))}
           </Box>
         )}
         {agentSessions.length > 1 && (

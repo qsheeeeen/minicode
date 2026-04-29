@@ -9,72 +9,70 @@ interface MessageProps {
 }
 
 export function Message({ role, content, isStreaming, element }: MessageProps) {
-  // User message - dim color to distinguish from assistant
+  if (!element && !content && !isStreaming && role !== 'user') return null;
+
+  // Trim content whitespace when finalized to prevent blank lines from LLM output
+  const text = isStreaming ? content : content.trim();
+
   if (role === 'user') {
     return (
       <Box marginBottom={0} paddingX={0} width="100%">
-        <Text backgroundColor="gray" color="white">{content}</Text>
+        <Text backgroundColor="gray" color="white">{text}</Text>
       </Box>
     );
   }
 
-  // Assistant message - clean text
   if (role === 'assistant') {
     return (
       <Box marginBottom={0} paddingX={0} flexDirection="column">
-        <Text>{content}</Text>
+        <Text>{text}</Text>
         {isStreaming && <Text dimColor inverse>▋</Text>}
       </Box>
     );
   }
 
-  // Thinking message - dim, full content
   if (role === 'thinking') {
     return (
       <Box marginBottom={0} paddingX={0} flexDirection="column">
-        <Text dimColor>{content}</Text>
+        <Text dimColor>{text}</Text>
         {isStreaming && <Text dimColor inverse>▋</Text>}
       </Box>
     );
   }
 
-  // Tool call - use element from tool
   if (role === 'tool') {
     if (element) return element;
     return (
       <Box marginBottom={0} paddingX={4}>
-        <Text color="yellow">{content}</Text>
+        <Text color="yellow">{text}</Text>
       </Box>
     );
   }
 
-  // Tool result - already shown combined with tool_call, skip display
   if (role === 'tool_result') {
     return null;
   }
 
-  // System message - dim gray, no indent
   if (role === 'status') {
     if (element) return element;
     return (
       <Box marginBottom={0} paddingX={0}>
-        <Text dimColor>{content}</Text>
+        <Text dimColor>{text}</Text>
       </Box>
     );
   }
 
-  // Error message - red text, no background
   if (role === 'error') {
     return (
       <Box marginBottom={0}>
-        <Text color="red">{content}</Text>
+        <Text color="red">{text}</Text>
       </Box>
     );
   }
 
   return (
     <Box marginBottom={0}>
-      <Text>{content}</Text>
+      <Text>{text}</Text>
     </Box>
   );
 }
