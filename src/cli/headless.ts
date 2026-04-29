@@ -1,5 +1,5 @@
 import type { Agent } from '../agent.js';
-import type { AgentMessage } from '../messages.js';
+import type { MessageParam, ContentBlock } from '../llm/anthropic.js';
 import { elementToText } from '../utils/react.js';
 import type { SessionManager } from '../utils/session.js';
 
@@ -12,17 +12,7 @@ export async function runHeadless(
 ): Promise<void> {
   // Load session if requested
   if (sessionName || resumeRecent) {
-    const targetName = sessionName || (async () => {
-      const recent = await sessionManager.getMostRecent();
-      return recent || `session-${Date.now()}`;
-    })();
-
-    const name = await (async () => {
-      if (sessionName) return sessionName;
-      const recent = await sessionManager.getMostRecent();
-      return recent || `session-${Date.now()}`;
-    })();
-
+    const name = sessionName ?? (await sessionManager.getMostRecent()) ?? `session-${Date.now()}`;
     const data = await sessionManager.get(name);
     if (data) {
       agent.setMessages(data.messages as any);
@@ -35,6 +25,7 @@ export async function runHeadless(
       agent.setSession(name, newLogger);
     }
   }
+
   // Set headless display: confirm always denies
   agent.setDisplay({
     status: () => {},
@@ -46,66 +37,130 @@ export async function runHeadless(
     },
   });
 
-  let lastPrintedIndex = 0;
-  const streamed = new Map<string, number>();       // assistant msgId → chars printed
-  const finalized = new Set<string>();               // msgIds with newline written
-  const toolCallLines = new Map<string, number>();   // tool_use msgId → lines printed
+  let printedTurns = 0;
+  const printedBlocks = new Map<number, number>();        // turnIndex → blocks printed so far
+  const streamedChars = new Map<string, number>();         // "turnIdx:blockIdx" → chars printed
+  const finalizedBlocks = new Set<string>();               // "turnIdx:blockIdx" → finalized (printed newline)
+  const printedToolUses = new Set<string>();               // tool_use block IDs already printed
+  const printedResults = new Set<string>();                // tool_use IDs whose results have been printed
+
+  const toolRegistry = agent.getToolRegistry();
 
   agent.getStore().onChange(() => {
-    const raw = agent.getStore().getAll();
+    const turns = agent.getStore().getTurns();
+    const statuses = agent.getStore().getStatuses();
 
-    // 1. Print new messages that don't need streaming tracking
-    for (let i = lastPrintedIndex; i < raw.length; i++) {
-      const msg = raw[i];
-      // Skip: assistant (streamed), thinking (deferred), tool_use (element-tracked)
-      if (msg.role === 'user' || msg.role === 'status' || msg.role === 'error') {
-        printMessage(msg);
+    // Import toDisplayMessages dynamically to avoid circular deps
+    // Since we're in headless mode, we render inline instead
+    for (let ti = printedTurns; ti < turns.length; ti++) {
+      const turn = turns[ti];
+      if (turn.role === 'user') {
+        if (typeof turn.content === 'string') {
+          process.stdout.write(`[user] ${turn.content}\n\n`);
+        }
+        // tool_result turns are not printed separately; they appear under tool_use
+        printedTurns = ti + 1;
+        continue;
       }
-    }
-    lastPrintedIndex = raw.length;
 
-    // 2. Track tool_use element updates — element grows from callFormat to callFormat + result
-    for (const msg of raw) {
-      if (msg.role === 'tool_use' && msg.element) {
-        const text = elementToText(msg.element);
-        const lines = text.split('\n');
-        const printedCount = toolCallLines.get(msg.id) || 0;
-        // Add separator + prefix before first tool call output
-        if (printedCount === 0 && lines.length > 0) {
-          process.stdout.write('\n[tool] ');
-        }
-        for (let j = printedCount; j < lines.length; j++) {
-          if (lines[j]) console.log(j === 0 ? lines[j] : `       ${lines[j]}`);
-        }
-        if (lines.length > printedCount) {
-          toolCallLines.set(msg.id, lines.length);
-        }
-      }
-    }
+      if (turn.role === 'assistant' && Array.isArray(turn.content)) {
+        const blocks = turn.content as ContentBlock[];
+        const blocksPrinted = printedBlocks.get(ti) || 0;
 
-    // 3. Stream assistant text incrementally
-    for (const msg of raw) {
-      if (msg.role === 'assistant' && msg.content) {
-        const printed = streamed.get(msg.id) || 0;
-        if (msg.content.length > printed) {
-          // Add prefix before first chunk of assistant text
-          if (printed === 0) {
-            process.stdout.write('\n[assistant] ');
+        for (let bi = blocksPrinted; bi < blocks.length; bi++) {
+          const block = blocks[bi];
+          const blockKey = `${ti}:${bi}`;
+
+          // --- thinking: print when it stops growing ---
+          if (block.type === 'thinking') {
+            const prevLen = streamedChars.get(blockKey) || 0;
+            if (block.thinking.length > prevLen) {
+              // First time printing this thinking block
+              if (prevLen === 0) process.stdout.write(`\n[thinking] `);
+              process.stdout.write(block.thinking.slice(prevLen));
+              streamedChars.set(blockKey, block.thinking.length);
+            }
+            // Check if this block is finalized (not the last block of the last turn)
+            const isLastBlock = ti === turns.length - 1 && bi === blocks.length - 1;
+            if (!isLastBlock && !finalizedBlocks.has(blockKey)) {
+              process.stdout.write('\n');
+              finalizedBlocks.add(blockKey);
+            }
           }
-          process.stdout.write(msg.content.slice(printed));
-          streamed.set(msg.id, msg.content.length);
-        }
-        if (!msg.isStreaming && !finalized.has(msg.id)) {
-          process.stdout.write('\n');
-          finalized.add(msg.id);
-        }
-      }
 
-      // 4. Thinking: print when finalized, full content
-      if (msg.role === 'thinking' && !msg.isStreaming && msg.content && !finalized.has(msg.id)) {
-        console.log(`\n[thinking] ${msg.content}`);
-        finalized.add(msg.id);
+          // --- text: stream incrementally ---
+          if (block.type === 'text') {
+            const prevLen = streamedChars.get(blockKey) || 0;
+            if (block.text.length > prevLen) {
+              if (prevLen === 0) process.stdout.write('\n[assistant] ');
+              process.stdout.write(block.text.slice(prevLen));
+              streamedChars.set(blockKey, block.text.length);
+            }
+            const isLastBlock = ti === turns.length - 1 && bi === blocks.length - 1;
+            if (!isLastBlock && !finalizedBlocks.has(blockKey)) {
+              process.stdout.write('\n');
+              finalizedBlocks.add(blockKey);
+            }
+          }
+
+          // --- tool_use: print call line + immediate result ---
+          if (block.type === 'tool_use' && !printedToolUses.has(block.id)) {
+            printedToolUses.add(block.id);
+            const tool = toolRegistry.get(block.name);
+            const callEl = tool?.formatCall?.(block.input as Record<string, unknown>);
+            const callText = callEl ? elementToText(callEl) : `${block.name}(${JSON.stringify(block.input)})`;
+            process.stdout.write(`\n[tool] ${callText}\n`);
+
+            // Scan subsequent turns for matching tool_result
+            for (let rti = ti + 1; rti < turns.length; rti++) {
+              const rt = turns[rti];
+              if (rt.role === 'user' && Array.isArray(rt.content)) {
+                for (const rb of rt.content as any[]) {
+                  if (rb.type === 'tool_result' && rb.tool_use_id === block.id) {
+                    const raw = typeof rb.content === 'string' ? rb.content : JSON.stringify(rb.content);
+                    const lines = raw.split('\n');
+                    for (const line of lines) {
+                      if (line) console.log(`       ${line}`);
+                    }
+                    printedResults.add(block.id);
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        // Track progress
+        const isLastTurn = ti === turns.length - 1;
+        if (!isLastTurn) {
+          printedBlocks.set(ti, blocks.length);
+          printedTurns = ti + 1;
+        } else {
+          // Don't finalize the last turn's last block — it may still be streaming
+          printedBlocks.set(ti, blocks.length > 0 ? blocks.length - 1 : 0);
+        }
       }
+    }
+
+    // Print tool results for any printed tool_use blocks
+    for (const turn of turns) {
+      if (turn.role === 'user' && Array.isArray(turn.content)) {
+        for (const block of turn.content as any[]) {
+          if (block.type === 'tool_result' && printedToolUses.has(block.tool_use_id) && !printedResults.has(block.tool_use_id)) {
+            printedResults.add(block.tool_use_id);
+            const raw = typeof block.content === 'string' ? block.content : JSON.stringify(block.content);
+            const lines = raw.split('\n');
+            for (const line of lines) {
+              if (line) console.log(`       ${line}`);
+            }
+          }
+        }
+      }
+    }
+
+    // Print any new status messages
+    for (const s of statuses) {
+      if (s.role === 'error') console.error(`[error] ${s.content}`);
     }
   });
 
@@ -119,21 +174,5 @@ export async function runHeadless(
     } else {
       throw e;
     }
-  }
-}
-
-function printMessage(msg: AgentMessage): void {
-  switch (msg.role) {
-    case 'user':
-      process.stdout.write(`[user] ${msg.content}\n\n`);
-      break;
-
-    case 'status':
-      console.log(`[status] ${msg.content}`);
-      break;
-
-    case 'error':
-      console.error(`[error] ${msg.content}`);
-      break;
   }
 }

@@ -1,307 +1,107 @@
 import { describe, it, expect, vi } from 'vitest';
-import { MessageStore, toLLMMessages, toDisplayMessages, type AgentMessage } from './messages.js';
+import React from 'react';
+import { MessageStore, toDisplayMessages, type StatusMessage } from './messages.js';
+import type { MessageParam } from './llm/anthropic.js';
+import { ToolRegistry } from './tools/registry.js';
 
-describe('toLLMMessages', () => {
-  it('passes through plain user messages', () => {
-    const messages: AgentMessage[] = [
-      { id: '1', role: 'user', content: 'hello', timestamp: new Date(), inContext: true },
-    ];
-    const result = toLLMMessages(messages);
-    expect(result).toEqual([{ role: 'user', content: 'hello' }]);
+function makeToolRegistry(): ToolRegistry {
+  const registry = new ToolRegistry();
+  registry.register({
+    name: 'Read',
+    description: 'Read file',
+    input_schema: {},
+    execute: vi.fn() as any,
+    formatCall: vi.fn().mockReturnValue(React.createElement('div', {}, 'Read /a.txt')),
+    formatResult: vi.fn().mockReturnValue(React.createElement('div', {}, 'Result')),
   });
-
-  it('groups assistant text with following tool_uses', () => {
-    const messages: AgentMessage[] = [
-      { id: '1', role: 'assistant', content: 'thinking...', timestamp: new Date(), inContext: true },
-      { id: '2', role: 'tool_use', content: '', timestamp: new Date(), inContext: true, toolUseId: 'tool-1', toolName: 'Read', toolInput: { path: 'a.txt' } },
-    ];
-    const result = toLLMMessages(messages);
-    expect(result).toEqual([
-      {
-        role: 'assistant',
-        content: [
-          { type: 'text', text: 'thinking...' },
-          { type: 'tool_use', id: 'tool-1', name: 'Read', input: { path: 'a.txt' } },
-        ],
-      },
-    ]);
-  });
-
-  it('handles tool_use without preceding assistant text', () => {
-    const messages: AgentMessage[] = [
-      { id: '1', role: 'tool_use', content: '', timestamp: new Date(), inContext: true, toolUseId: 'tool-1', toolName: 'Bash', toolInput: { command: 'ls' } },
-    ];
-    const result = toLLMMessages(messages);
-    expect(result).toEqual([
-      {
-        role: 'assistant',
-        content: [
-          { type: 'tool_use', id: 'tool-1', name: 'Bash', input: { command: 'ls' } },
-        ],
-      },
-    ]);
-  });
-
-  it('groups consecutive tool_results into single user turn', () => {
-    const messages: AgentMessage[] = [
-      { id: '1', role: 'assistant', content: '', timestamp: new Date(), inContext: true },
-      { id: '2', role: 'tool_use', content: '', timestamp: new Date(), inContext: true, toolUseId: 'tool-1', toolName: 'Read', toolInput: {} },
-      { id: '3', role: 'tool_result', content: 'file contents', timestamp: new Date(), inContext: true, toolUseId: 'tool-1' },
-      { id: '4', role: 'tool_result', content: 'more output', timestamp: new Date(), inContext: true, toolUseId: 'tool-2' },
-    ];
-    const result = toLLMMessages(messages);
-    expect(result).toEqual([
-      { role: 'assistant', content: [{ type: 'tool_use', id: 'tool-1', name: 'Read', input: {} }] },
-      {
-        role: 'user',
-        content: [
-          { type: 'tool_result', tool_use_id: 'tool-1', content: 'file contents' },
-          { type: 'tool_result', tool_use_id: 'tool-2', content: 'more output' },
-        ],
-      },
-    ]);
-  });
-
-  it('filters out messages with inContext=false', () => {
-    const messages: AgentMessage[] = [
-      { id: '1', role: 'user', content: 'hello', timestamp: new Date(), inContext: true },
-      { id: '2', role: 'assistant', content: 'hidden', timestamp: new Date(), inContext: false },
-    ];
-    const result = toLLMMessages(messages);
-    expect(result).toEqual([{ role: 'user', content: 'hello' }]);
-  });
-});
+  return registry;
+}
 
 describe('toDisplayMessages', () => {
-  it('maps tool_use to tool role', () => {
-    const messages: AgentMessage[] = [
-      { id: '1', role: 'tool_use', content: '', timestamp: new Date(), inContext: true, toolUseId: 'tool-1', toolName: 'Read' },
-    ];
-    const result = toDisplayMessages(messages);
-    expect(result[0].role).toBe('tool');
+  const toolRegistry = makeToolRegistry();
+
+  it('renders user string turns', () => {
+    const turns: MessageParam[] = [{ role: 'user', content: 'hello' }];
+    const result = toDisplayMessages(turns, [], toolRegistry);
+    expect(result).toHaveLength(1);
+    expect(result[0].role).toBe('user');
+    expect(result[0].content).toBe('hello');
   });
 
-  it('maps status role correctly', () => {
-    const messages: AgentMessage[] = [
-      { id: '1', role: 'status', content: 'thinking...', timestamp: new Date(), inContext: true },
+  it('renders assistant text blocks', () => {
+    const turns: MessageParam[] = [
+      { role: 'assistant', content: [{ type: 'text', text: 'hi there' }] },
     ];
-    const result = toDisplayMessages(messages);
-    expect(result[0].role).toBe('status');
+    const result = toDisplayMessages(turns, [], toolRegistry);
+    expect(result).toHaveLength(1);
+    expect(result[0].role).toBe('assistant');
+    expect(result[0].content).toBe('hi there');
   });
 
-  it('includes slotId for tool_use messages', () => {
-    const messages: AgentMessage[] = [
-      { id: 'my-id', role: 'tool_use', content: '', timestamp: new Date(), inContext: true, toolUseId: 'tool-1', toolName: 'Read' },
+  it('attaches tool_result to matching tool_use element', () => {
+    const turns: MessageParam[] = [
+      { role: 'assistant', content: [{ type: 'tool_use', id: 't1', name: 'Read', input: { path: '/a.txt' } }] },
+      { role: 'user', content: [{ type: 'tool_result', tool_use_id: 't1', content: 'file contents' }] },
     ];
-    const result = toDisplayMessages(messages);
-    expect(result[0].slotId).toBe('my-id');
+    const result = toDisplayMessages(turns, [], toolRegistry);
+    expect(result).toHaveLength(1);
+    expect(result[0].element).toBeDefined();
+    expect(toolRegistry.get('Read')?.formatResult).toHaveBeenCalled();
   });
 
-  it('passes through isStreaming flag', () => {
-    const messages: AgentMessage[] = [
-      { id: '1', role: 'assistant', content: 'streaming', timestamp: new Date(), inContext: true, isStreaming: true },
+  it('appends status messages at the end', () => {
+    const turns: MessageParam[] = [{ role: 'user', content: 'hello' }];
+    const statuses: StatusMessage[] = [
+      { role: 'status', content: 'done', timestamp: new Date() },
     ];
-    const result = toDisplayMessages(messages);
-    expect(result[0].isStreaming).toBe(true);
+    const result = toDisplayMessages(turns, statuses, toolRegistry);
+    expect(result).toHaveLength(2);
+    expect(result[1].role).toBe('status');
   });
 });
 
 describe('MessageStore', () => {
-  describe('add', () => {
-    it('adds message with generated id', () => {
-      const store = new MessageStore();
-      const msg = store.add({ role: 'user', content: 'test', timestamp: new Date(), inContext: true });
-      expect(msg.id).toBe('msg-0');
-    });
-
-    it('increments id for each add', () => {
-      const store = new MessageStore();
-      store.add({ role: 'user', content: 'a', timestamp: new Date(), inContext: true });
-      const msg = store.add({ role: 'user', content: 'b', timestamp: new Date(), inContext: true });
-      expect(msg.id).toBe('msg-1');
-    });
+  it('setTurns replaces turns', () => {
+    const store = new MessageStore();
+    store.setTurns([{ role: 'user', content: 'hello' }]);
+    expect(store.getTurns()).toHaveLength(1);
   });
 
-  describe('get', () => {
-    it('returns message by id', () => {
-      const store = new MessageStore();
-      const added = store.add({ role: 'user', content: 'test', timestamp: new Date(), inContext: true });
-      const found = store.get(added.id);
-      expect(found?.content).toBe('test');
-    });
-
-    it('returns undefined for unknown id', () => {
-      const store = new MessageStore();
-      expect(store.get('unknown')).toBeUndefined();
-    });
+  it('addUserMessage appends user turn', () => {
+    const store = new MessageStore();
+    store.addUserMessage('hello');
+    expect(store.getTurns()[0]).toEqual({ role: 'user', content: 'hello' });
   });
 
-  describe('getAll', () => {
-    it('returns all messages', () => {
-      const store = new MessageStore();
-      store.add({ role: 'user', content: 'a', timestamp: new Date(), inContext: true });
-      store.add({ role: 'user', content: 'b', timestamp: new Date(), inContext: true });
-      expect(store.getAll()).toHaveLength(2);
-    });
+  it('toLLMMessages returns turns directly', () => {
+    const store = new MessageStore();
+    store.addUserMessage('hello');
+    expect(store.toLLMMessages()).toEqual([{ role: 'user', content: 'hello' }]);
   });
 
-  describe('getInContext', () => {
-    it('filters to inContext messages only', () => {
-      const store = new MessageStore();
-      store.add({ role: 'user', content: 'in', timestamp: new Date(), inContext: true });
-      store.add({ role: 'user', content: 'out', timestamp: new Date(), inContext: false });
-      expect(store.getInContext()).toHaveLength(1);
-      expect(store.getInContext()[0].content).toBe('in');
-    });
+  it('notifies onChange on setTurns', () => {
+    const store = new MessageStore();
+    const cb = vi.fn();
+    store.onChange(cb);
+    store.setTurns([{ role: 'user', content: 'hello' }]);
+    expect(cb).toHaveBeenCalled();
   });
 
-  describe('update', () => {
-    it('updates existing message', () => {
-      const store = new MessageStore();
-      const msg = store.add({ role: 'user', content: 'original', timestamp: new Date(), inContext: true });
-      store.update(msg.id, { content: 'updated' });
-      expect(store.get(msg.id)?.content).toBe('updated');
-    });
-
-    it('does nothing for unknown id', () => {
-      const store = new MessageStore();
-      store.add({ role: 'user', content: 'test', timestamp: new Date(), inContext: true });
-      store.update('unknown', { content: 'updated' });
-      expect(store.getAll()[0].content).toBe('test');
-    });
+  it('clear removes all turns and statuses', () => {
+    const store = new MessageStore();
+    store.addUserMessage('hello');
+    store.addStatus({ role: 'status', content: 'done', timestamp: new Date() });
+    store.clear();
+    expect(store.getTurns()).toEqual([]);
+    expect(store.getStatuses()).toEqual([]);
   });
 
-  describe('clear', () => {
-    it('removes all messages and resets id counter', () => {
-      const store = new MessageStore();
-      store.add({ role: 'user', content: 'a', timestamp: new Date(), inContext: true });
-      store.add({ role: 'user', content: 'b', timestamp: new Date(), inContext: true });
-      store.clear();
-      expect(store.getAll()).toHaveLength(0);
-      const msg = store.add({ role: 'user', content: 'c', timestamp: new Date(), inContext: true });
-      expect(msg.id).toBe('msg-0');
-    });
-  });
-
-  describe('replace', () => {
-    it('replaces all messages', () => {
-      const store = new MessageStore();
-      store.add({ role: 'user', content: 'a', timestamp: new Date(), inContext: true });
-      const newMessages: AgentMessage[] = [
-        { id: 'x', role: 'user', content: 'b', timestamp: new Date(), inContext: true },
-      ];
-      store.replace(newMessages);
-      expect(store.getAll()).toHaveLength(1);
-      expect(store.getAll()[0].content).toBe('b');
-    });
-  });
-
-  describe('onChange callback', () => {
-    it('notifies on add', () => {
-      const store = new MessageStore();
-      const cb = vi.fn();
-      store.onChange(cb);
-      store.add({ role: 'user', content: 'test', timestamp: new Date(), inContext: true });
-      expect(cb).toHaveBeenCalledTimes(1);
-    });
-
-    it('notifies on update', () => {
-      const store = new MessageStore();
-      const cb = vi.fn();
-      store.onChange(cb);
-      const msg = store.add({ role: 'user', content: 'test', timestamp: new Date(), inContext: true });
-      store.update(msg.id, { content: 'updated' });
-      expect(cb).toHaveBeenCalledTimes(2);
-    });
-
-    it('notifies on clear', () => {
-      const store = new MessageStore();
-      const cb = vi.fn();
-      store.onChange(cb);
-      store.add({ role: 'user', content: 'test', timestamp: new Date(), inContext: true });
-      store.clear();
-      expect(cb).toHaveBeenCalledTimes(2);
-    });
-
-    it('notifies on replace', () => {
-      const store = new MessageStore();
-      const cb = vi.fn();
-      store.onChange(cb);
-      store.replace([]);
-      expect(cb).toHaveBeenCalledTimes(1);
-    });
-  });
-});
-
-describe('MessageStore.fromMessageParams', () => {
-  it('restores user string message', () => {
-    const params = [{ role: 'user' as const, content: 'hello' }];
-    const store = MessageStore.fromMessageParams(params);
-    expect(store.getAll()).toHaveLength(1);
-    expect(store.getAll()[0].role).toBe('user');
-    expect(store.getAll()[0].content).toBe('hello');
-  });
-
-  it('restores assistant text message', () => {
-    const params = [{ role: 'assistant' as const, content: 'hi' }];
-    const store = MessageStore.fromMessageParams(params);
-    expect(store.getAll()[0].role).toBe('assistant');
-    expect(store.getAll()[0].content).toBe('hi');
-  });
-
-  it('restores tool_use blocks as separate messages', () => {
-    const params = [{
-      role: 'assistant' as const,
-      content: [
-        { type: 'text' as const, text: 'using tool' },
-        { type: 'tool_use' as const, id: 't1', name: 'Bash', input: { cmd: 'ls' } },
-      ],
-    }];
-    const store = MessageStore.fromMessageParams(params);
-    const msgs = store.getAll();
-    expect(msgs[0].role).toBe('assistant');
-    expect(msgs[1].role).toBe('tool_use');
-    expect(msgs[1].toolUseId).toBe('t1');
-    expect(msgs[1].toolName).toBe('Bash');
-  });
-
-  it('restores thinking blocks from assistant messages', () => {
-    const params = [{
-      role: 'assistant' as const,
-      content: [
-        { type: 'thinking' as const, thinking: 'let me think...' },
-        { type: 'tool_use' as const, id: 't1', name: 'Bash', input: { cmd: 'ls' } },
-      ],
-    }];
-    const store = MessageStore.fromMessageParams(params);
-    const msgs = store.getAll();
-    expect(msgs[0].role).toBe('thinking');
-    expect(msgs[0].content).toBe('let me think...');
-    expect(msgs[0].inContext).toBe(true);
-    expect(msgs[1].role).toBe('tool_use');
-  });
-
-  it('restores tool_result blocks from user messages', () => {
-    const params = [{
-      role: 'user' as const,
-      content: [
-        { type: 'tool_result' as const, tool_use_id: 't1', content: 'output' },
-      ],
-    }];
-    const store = MessageStore.fromMessageParams(params);
-    expect(store.getAll()[0].role).toBe('tool_result');
-    expect(store.getAll()[0].content).toBe('output');
-    expect(store.getAll()[0].toolUseId).toBe('t1');
-  });
-
-  it('handles non-string tool_result content', () => {
-    const params = [{
-      role: 'user' as const,
-      content: [
-        { type: 'tool_result' as const, tool_use_id: 't1', content: { json: true } },
-      ],
-    }];
-    const store = MessageStore.fromMessageParams(params);
-    expect(store.getAll()[0].content).toBe('{"json":true}');
+  it('streaming state toggles and notifies', () => {
+    const store = new MessageStore();
+    const cb = vi.fn();
+    store.onChange(cb);
+    store.setStreaming(true);
+    expect(store.isStreaming()).toBe(true);
+    expect(cb).toHaveBeenCalled();
   });
 });

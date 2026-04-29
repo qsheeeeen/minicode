@@ -1,207 +1,234 @@
-/**
- * Unified message model — single source of truth for both LLM context and TUI display.
- * AgentMessage[] is the canonical store. Two derived views:
- * - toLLMMessages() → Anthropic MessageParam[] for the API
- * - toDisplayMessages() → DisplayMessage[] for TUI rendering
- */
-
 import React from 'react';
-import type { MessageParam } from './llm/anthropic.js';
-import type { MessageRole as DisplayMessageRole } from './utils/session-display.js';
+import { Box, Text } from 'ink';
+import type { MessageParam, ContentBlock } from './llm/anthropic.js';
+import type { ToolRegistry } from './tools/registry.js';
 
-export type AgentMessageRole =
-  | 'user' | 'assistant' | 'thinking'
-  | 'tool_use' | 'tool_result'
-  | 'status' | 'error';
-
-export interface AgentMessage {
-  id: string;
-  role: AgentMessageRole;
+// UI-only status / error messages — not sent to LLM
+export interface StatusMessage {
+  role: 'status' | 'error';
   content: string;
-  displayContent?: string;
   timestamp: Date;
-  inContext: boolean;       // Whether sent to LLM
-  toolUseId?: string;       // Links tool_use ↔ tool_result
-  toolName?: string;
-  toolInput?: Record<string, unknown>;
   element?: React.ReactElement;
+}
+
+// Display layer uses these fields
+type MessageRole = 'user' | 'assistant' | 'status' | 'tool' | 'tool_result' | 'error' | 'thinking';
+export interface DisplayMessage {
+  role: MessageRole;
+  content: string;
+  timestamp?: Date;
   isStreaming?: boolean;
+  element?: React.ReactElement;
+  slotId?: string;
 }
 
-// Map AgentMessageRole to DisplayMessageRole for TUI
-function toDisplayRole(role: AgentMessageRole): DisplayMessageRole {
-  switch (role) {
-    case 'tool_use': return 'tool';
-    case 'status': return 'status';
-    default: return role;
-  }
-}
+// Convert MessageParam[] + statuses → DisplayMessage[]
+// Tool_use blocks are rendered via tool.formatCall/formatResult on the fly.
+export function toDisplayMessages(
+  turns: MessageParam[],
+  statuses: StatusMessage[],
+  toolRegistry: ToolRegistry,
+): DisplayMessage[] {
+  const result: DisplayMessage[] = [];
+  // Track tool_use display messages by block id for result attachment
+  const toolUseMsgs = new Map<string, DisplayMessage>();
+  // Track tool_use (name, input) for formatResult lookup
+  const toolUseData = new Map<string, { name: string; input: Record<string, unknown> }>();
 
-// Derive Anthropic MessageParam[] from AgentMessage[]
-//
-// The Anthropic API expects grouped turns:
-//   assistant: [text_block, thinking_block, tool_use_block, ...] → one turn
-//   user:      [tool_result_block, ...]                           → one turn
-//
-// The store keeps a flat list of AgentMessage entries. This function groups
-// consecutive thinking, assistant text, and tool_use blocks into one assistant
-// turn; consecutive tool_result blocks into one user turn; and emits plain
-// user messages directly.
-
-export function toLLMMessages(messages: AgentMessage[]): MessageParam[] {
-  const result: MessageParam[] = [];
-  const inContext = messages.filter(m => m.inContext);
-
-  let i = 0;
-  while (i < inContext.length) {
-    const msg = inContext[i];
-
-    // 1. Plain user text message
-    if (msg.role === 'user') {
-      result.push({ role: 'user', content: msg.content });
-      i++;
-      continue;
-    }
-
-    // 2. Assistant turn: collect ALL consecutive thinking, text, and tool_use blocks.
-    // The LLM may interleave thinking with text and tool_use within a single response.
-    const contentBlocks: any[] = [];
-    while (i < inContext.length) {
-      const cur = inContext[i];
-      if (cur.role === 'thinking') {
-        contentBlocks.push({ type: 'thinking', thinking: cur.content });
-        i++;
-      } else if (cur.role === 'assistant') {
-        if (cur.content) contentBlocks.push({ type: 'text', text: cur.content });
-        i++;
-      } else if (cur.role === 'tool_use') {
-        contentBlocks.push({ type: 'tool_use', id: cur.toolUseId, name: cur.toolName, input: cur.toolInput ?? {} });
-        i++;
-      } else {
-        break;
+  for (const turn of turns) {
+    if (turn.role === 'user') {
+      if (typeof turn.content === 'string') {
+        result.push({ role: 'user', content: turn.content });
+      }
+      // tool_result blocks handled in pass 2
+    } else if (turn.role === 'assistant') {
+      const blocks = Array.isArray(turn.content) ? turn.content : [];
+      for (const block of blocks as ContentBlock[]) {
+        if (block.type === 'thinking') {
+          result.push({ role: 'thinking', content: block.thinking });
+        } else if (block.type === 'text') {
+          result.push({ role: 'assistant', content: block.text });
+        } else if (block.type === 'tool_use') {
+          const tool = toolRegistry.get(block.name);
+          const element = tool?.formatCall?.(block.input as Record<string, unknown>);
+          const dm: DisplayMessage = { role: 'tool', content: '', element, slotId: block.id };
+          result.push(dm);
+          toolUseMsgs.set(block.id, dm);
+          toolUseData.set(block.id, { name: block.name, input: block.input as Record<string, unknown> });
+        }
       }
     }
+  }
 
-    if (contentBlocks.length > 0) {
-      result.push({ role: 'assistant', content: contentBlocks });
+  // Pass 2: attach tool_result content to matching tool_use display elements
+  for (const turn of turns) {
+    if (turn.role === 'user' && Array.isArray(turn.content)) {
+      for (const block of turn.content as any[]) {
+        if (block.type === 'tool_result') {
+          const dm = toolUseMsgs.get(block.tool_use_id);
+          const td = toolUseData.get(block.tool_use_id);
+          if (dm && td) {
+            const tool = toolRegistry.get(td.name);
+            const raw = typeof block.content === 'string' ? block.content : JSON.stringify(block.content);
+            const resultEl = tool?.formatResult
+              ? tool.formatResult(raw, td.input)
+              : React.createElement(Text, { dimColor: true }, raw);
+            dm.element = dm.element
+              ? React.createElement(Box, { flexDirection: 'column' }, dm.element, resultEl)
+              : resultEl;
+          }
+        }
+      }
     }
+  }
 
-    // 3. Tool results → one user turn
-    const toolResults: any[] = [];
-    while (i < inContext.length && inContext[i].role === 'tool_result') {
-      const tr = inContext[i];
-      toolResults.push({ type: 'tool_result', tool_use_id: tr.toolUseId, content: tr.content });
-      i++;
-    }
-    if (toolResults.length > 0) {
-      result.push({ role: 'user', content: toolResults });
-    }
+  // Append statuses at the end
+  for (const s of statuses) {
+    result.push({ role: s.role, content: s.content, element: s.element, timestamp: s.timestamp });
   }
 
   return result;
 }
 
-export function toDisplayMessages(messages: AgentMessage[]): import('./utils/session-display.js').DisplayMessage[] {
-  return messages.map(msg => ({
-    role: toDisplayRole(msg.role),
-    content: msg.displayContent ?? msg.content,
-    timestamp: msg.timestamp,
-    isStreaming: msg.isStreaming,
-    element: msg.element,
-    slotId: msg.role === 'tool_use' ? msg.id : undefined,
-  }));
-}
-
 export class MessageStore {
-  private messages: AgentMessage[] = [];
-  private nextId = 0;
+  private turns: MessageParam[] = [];
+  private statuses: StatusMessage[] = [];
   private changeCallback?: () => void;
+  private streaming = false;
+
+  // -- Streaming state (for TUI cursor animation) --
+
+  setStreaming(v: boolean): void {
+    if (this.streaming !== v) {
+      this.streaming = v;
+      this.notify();
+    }
+  }
+
+  isStreaming(): boolean {
+    return this.streaming;
+  }
 
   onChange(callback: () => void): void {
     this.changeCallback = callback;
   }
 
-  private notifyChange(): void {
+  private notify(): void {
     this.changeCallback?.();
   }
 
-  add(msg: Omit<AgentMessage, 'id'>): AgentMessage {
-    const full: AgentMessage = { ...msg, id: `msg-${this.nextId++}` };
-    this.messages.push(full);
-    this.notifyChange();
-    return full;
+  // -- Turn access --
+
+  getTurns(): MessageParam[] {
+    return this.turns;
   }
 
-  update(id: string, patch: Partial<AgentMessage>): void {
-    const idx = this.messages.findIndex(m => m.id === id);
-    if (idx !== -1) {
-      this.messages[idx] = { ...this.messages[idx], ...patch };
-      this.notifyChange();
-    }
+  /** Replace all turns (for session resume). */
+  setTurns(turns: MessageParam[]): void {
+    this.turns = turns;
+    this.notify();
   }
 
-  get(id: string): AgentMessage | undefined {
-    return this.messages.find(m => m.id === id);
-  }
-
-  getAll(): AgentMessage[] {
-    return this.messages;
-  }
-
-  getInContext(): AgentMessage[] {
-    return this.messages.filter(m => m.inContext);
-  }
-
+  /** Get API-format messages for LLM. Just returns turns — no conversion needed. */
   toLLMMessages(): MessageParam[] {
-    return toLLMMessages(this.messages);
+    return this.turns;
   }
 
-  toDisplayMessages(): import('./utils/session-display.js').DisplayMessage[] {
-    return toDisplayMessages(this.messages);
+  // -- User messages --
+
+  addUserMessage(content: string): void {
+    this.turns.push({ role: 'user', content });
+    this.notify();
   }
 
-  clear(): void {
-    this.messages = [];
-    this.nextId = 0;
-    this.notifyChange();
+  // -- Streaming: building assistant turns incrementally --
+
+  /** Start a new assistant turn (empty content array). */
+  startAssistantTurn(): void {
+    this.turns.push({ role: 'assistant', content: [] });
+    this.notify();
   }
 
-  replace(messages: AgentMessage[]): void {
-    this.messages = messages;
-    this.notifyChange();
+  /** Append a block to the last (open) assistant turn. Creates the turn if needed. */
+  appendToLastAssistantTurn(block: ContentBlock): void {
+    const last = this.turns[this.turns.length - 1];
+    if (!last || last.role !== 'assistant' || !Array.isArray(last.content)) {
+      this.startAssistantTurn();
+    }
+    const content = this.turns[this.turns.length - 1].content as ContentBlock[];
+    content.push(block);
+    this.notify();
   }
 
-  static fromMessageParams(params: MessageParam[]): MessageStore {
-    const store = new MessageStore();
-    for (const param of params) {
-      if (param.role === 'user') {
-        if (typeof param.content === 'string') {
-          store.add({ role: 'user', content: param.content, timestamp: new Date(), inContext: true });
-        } else if (Array.isArray(param.content)) {
-          // tool_result blocks — add inline to preserve chronological order
-          for (const block of param.content as any[]) {
-            if (block.type === 'tool_result') {
-              const raw = typeof block.content === 'string' ? block.content : JSON.stringify(block.content);
-              store.add({ role: 'tool_result', content: raw, timestamp: new Date(), inContext: true, toolUseId: block.tool_use_id });
-            }
-          }
-        }
-      } else if (param.role === 'assistant') {
-        if (typeof param.content === 'string') {
-          store.add({ role: 'assistant', content: param.content, timestamp: new Date(), inContext: true });
-        } else if (Array.isArray(param.content)) {
-          for (const block of param.content as any[]) {
-            if (block.type === 'thinking') {
-              store.add({ role: 'thinking', content: block.thinking, timestamp: new Date(), inContext: true });
-            } else if (block.type === 'text') {
-              store.add({ role: 'assistant', content: block.text, timestamp: new Date(), inContext: true });
-            } else if (block.type === 'tool_use') {
-              store.add({ role: 'tool_use', content: '', timestamp: new Date(), inContext: true, toolUseId: block.id, toolName: block.name, toolInput: block.input });
-            }
-          }
+  /** Get the last block in the last assistant turn (if any). */
+  getLastBlock(): ContentBlock | undefined {
+    const last = this.turns[this.turns.length - 1];
+    if (!last || last.role !== 'assistant' || !Array.isArray(last.content)) return undefined;
+    const blocks = last.content as ContentBlock[];
+    return blocks[blocks.length - 1];
+  }
+
+  /** Update the text/thinking content of the last block in the last assistant turn. */
+  updateLastBlock(updates: { text?: string; thinking?: string }): void {
+    const last = this.turns[this.turns.length - 1];
+    if (!last || last.role !== 'assistant' || !Array.isArray(last.content)) return;
+    const blocks = last.content as any[];
+    if (blocks.length === 0) return;
+    Object.assign(blocks[blocks.length - 1], updates);
+    this.notify();
+  }
+
+  // -- Tool results --
+
+  /** Add a user turn containing tool_result blocks. */
+  addToolResults(results: Array<{ toolUseId: string; content: string }>): void {
+    if (results.length === 0) return;
+    const blocks = results.map(r => ({
+      type: 'tool_result' as const,
+      tool_use_id: r.toolUseId,
+      content: r.content,
+    }));
+    this.turns.push({ role: 'user', content: blocks });
+    this.notify();
+  }
+
+  // -- Status / error messages --
+
+  addStatus(msg: StatusMessage): void {
+    this.statuses.push(msg);
+    this.notify();
+  }
+
+  getStatuses(): StatusMessage[] {
+    return this.statuses;
+  }
+
+  /** Convenience: generate display messages from current state. */
+  toDisplayMessages(toolRegistry: ToolRegistry): DisplayMessage[] {
+    const msgs = toDisplayMessages(this.turns, this.statuses, toolRegistry);
+    // Mark last assistant/text block as streaming if store is in streaming mode
+    if (this.streaming) {
+      for (let i = msgs.length - 1; i >= 0; i--) {
+        if (msgs[i].role === 'assistant' || msgs[i].role === 'thinking') {
+          msgs[i].isStreaming = true;
+          break;
         }
       }
     }
-    return store;
+    return msgs;
+  }
+
+  // -- Lifecycle --
+
+  clear(): void {
+    this.turns = [];
+    this.statuses = [];
+    this.notify();
+  }
+
+  replace(turns: MessageParam[]): void {
+    this.turns = turns;
+    this.statuses = [];
+    this.notify();
   }
 }

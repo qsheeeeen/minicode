@@ -2,7 +2,7 @@ import React from 'react';
 import { Text } from 'ink';
 import type { ToolDef, ToolResult, ToolExecutionContext } from './index.js';
 import type { AgentConfig } from '../agent.js';
-import type { AgentMessage } from '../messages.js';
+import type { MessageParam, ContentBlock } from '../llm/anthropic.js';
 import { Agent } from '../agent.js';
 import { ConsoleDisplay } from '../utils/display.js';
 
@@ -72,19 +72,18 @@ export const agentTool: ToolDef = {
     const parentSession = registry.get(parentId);
     if (parentSession) {
       const taskPreview = task.length > 40 ? task.slice(0, 40) + '...' : task;
-      parentSession.agent.getStore().add({
+      parentSession.agent.getStore().addStatus({
         role: 'status',
         content: `[Agent #${subId} started: ${taskPreview}]`,
         timestamp: new Date(),
-        inContext: false,
       });
     }
 
     try {
       await subAgent.run(task);
-      const storeMessages = subAgent.getStore().getAll();
-      const finalResponse = extractFinalResponse(storeMessages);
-      const summary = generateSummary(storeMessages);
+      const turns = subAgent.getStore().getTurns();
+      const finalResponse = extractFinalResponse(turns);
+      const summary = generateSummary(turns);
       registry.updateStatus(subId, 'completed');
       registry.updateSummary(subId, summary);
       registry.remove(subId);
@@ -105,28 +104,30 @@ export const agentTool: ToolDef = {
   }
 };
 
-function extractFinalResponse(messages: AgentMessage[]): string | null {
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const msg = messages[i];
-    if (msg.role === 'assistant' && msg.content.trim()) {
-      return msg.content.trim();
+function extractFinalResponse(turns: MessageParam[]): string | null {
+  for (let i = turns.length - 1; i >= 0; i--) {
+    const turn = turns[i];
+    if (turn.role === 'assistant' && Array.isArray(turn.content)) {
+      for (const block of turn.content as ContentBlock[]) {
+        if (block.type === 'text' && block.text.trim()) {
+          return block.text.trim();
+        }
+      }
     }
   }
   return null;
 }
 
-function generateSummary(messages: AgentMessage[]): string {
+function generateSummary(turns: MessageParam[]): string {
   let toolCallCount = 0;
-  let errors = 0;
 
-  for (const msg of messages) {
-    if (msg.role === 'tool_use') toolCallCount++;
-    if (msg.role === 'error') errors++;
+  for (const turn of turns) {
+    if (turn.role === 'assistant' && Array.isArray(turn.content)) {
+      for (const block of turn.content as ContentBlock[]) {
+        if (block.type === 'tool_use') toolCallCount++;
+      }
+    }
   }
 
-  const parts: string[] = [];
-  if (toolCallCount > 0) parts.push(`${toolCallCount} operations`);
-  if (errors > 0) parts.push(`${errors} errors`);
-
-  return parts.length === 0 ? 'Task completed' : parts.join(', ');
+  return toolCallCount > 0 ? `${toolCallCount} operations` : 'Task completed';
 }

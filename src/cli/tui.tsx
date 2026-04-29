@@ -86,7 +86,7 @@ function useDisplay(
 
     // Subscribe to store changes for display updates
     agent.getStore().onChange(() => {
-      setMessages(agent.getStore().toDisplayMessages());
+      setMessages(agent.getStore().toDisplayMessages(agent.getToolRegistry()));
     });
 
     registry.register({
@@ -117,7 +117,7 @@ function useDisplay(
           // Display is driven by store.onChange → toDisplayMessages(),
           // triggered by store.replace() inside setMessages().
         } else if (sessionName) {
-          agent.getStore().add({ role: 'status', content: `Created new session: ${sessionName}`, timestamp: new Date(), inContext: false });
+          agent.getStore().addStatus({ role: 'status', content: `Created new session: ${sessionName}`, timestamp: new Date() });
         }
       }
     };
@@ -212,9 +212,9 @@ export function App({
       await agentRef.current.run(llmText, { displayContent: displayText !== llmText ? displayText : undefined });
     } catch (e) {
       if (e instanceof Error && e.message === 'Aborted') {
-        agentRef.current.getStore().add({ role: 'status', content: '(Aborted)', timestamp: new Date(), inContext: false });
+        agentRef.current.getStore().addStatus({ role: 'status', content: '(Aborted)', timestamp: new Date() });
       } else if (e instanceof Error) {
-        agentRef.current.getStore().add({ role: 'error', content: `(Error: ${e.message})`, timestamp: new Date(), inContext: false });
+        agentRef.current.getStore().addStatus({ role: 'error', content: `(Error: ${e.message})`, timestamp: new Date() });
       } else {
         throw e;
       }
@@ -283,7 +283,7 @@ export function App({
       const nextSession = sessions[nextIndex];
       activeAgentIdRef.current = nextSession.id;
       setActiveAgentId(nextSession.id);
-      setMessages(nextSession.agent.getStore().toDisplayMessages());
+      setMessages(nextSession.agent.getStore().toDisplayMessages(nextSession.agent.getToolRegistry()));
     }
   }, { isActive: mode === 'chat' && approvalRequest === null });
 

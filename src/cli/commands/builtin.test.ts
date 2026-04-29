@@ -43,7 +43,7 @@ describe('Builtin commands', () => {
   });
 
   function makeStoreMock() {
-    return { add: vi.fn() };
+    return { addStatus: vi.fn() };
   }
 
   function makeAgentMock(overrides: Record<string, any> = {}) {
@@ -66,7 +66,7 @@ describe('Builtin commands', () => {
 
       await handlers['compress']([], ctx as CommandContext);
       expect(agentMock.compress).toHaveBeenCalled();
-      expect(agentMock.__store.add).toHaveBeenCalledWith(expect.objectContaining({ role: 'status' }));
+      expect(agentMock.__store.addStatus).toHaveBeenCalledWith(expect.objectContaining({ role: 'status' }));
     });
 
     it('/clear clears session and adds status via store', async () => {
@@ -89,7 +89,7 @@ describe('Builtin commands', () => {
       expect(agentMock.clearSession).toHaveBeenCalled();
       expect(agentMock.setTokenCount).toHaveBeenCalledWith(0);
       expect(ctx.setCurrentSession).toHaveBeenCalledWith(expect.stringMatching(/^session-/));
-      expect(agentMock.__store.add).toHaveBeenCalledWith(expect.objectContaining({ role: 'status' }));
+      expect(agentMock.__store.addStatus).toHaveBeenCalledWith(expect.objectContaining({ role: 'status' }));
     });
 
     it('/new creates new session and adds status via store', async () => {
@@ -110,7 +110,7 @@ describe('Builtin commands', () => {
       expect(agentMock.clearSession).toHaveBeenCalled();
       expect(agentMock.setSession).toHaveBeenCalledWith('my new session', expect.anything());
       expect(ctx.setCurrentSession).toHaveBeenCalledWith('my new session');
-      expect(agentMock.__store.add).toHaveBeenCalledWith(expect.objectContaining({ role: 'status' }));
+      expect(agentMock.__store.addStatus).toHaveBeenCalledWith(expect.objectContaining({ role: 'status' }));
     });
 
     it('/rename renames session and adds status via store', async () => {
@@ -133,7 +133,7 @@ describe('Builtin commands', () => {
       await handlers['rename'](['new-session'], ctx as CommandContext);
       expect(sessionManagerMock.rename).toHaveBeenCalledWith('old-session', 'new-session');
       expect(ctx.setCurrentSession).toHaveBeenCalledWith('new-session');
-      expect(storeMock.add).toHaveBeenCalledWith(expect.objectContaining({ role: 'status' }));
+      expect(storeMock.addStatus).toHaveBeenCalledWith(expect.objectContaining({ role: 'status' }));
     });
 
     it('/resume with no args lists sessions', async () => {
@@ -151,7 +151,7 @@ describe('Builtin commands', () => {
     });
 
     it('/resume with args loads session', async () => {
-      const storeMock = { add: vi.fn() };
+      const storeMock = { addStatus: vi.fn() };
       const agentMock = {
         setMessages: vi.fn(),
         setTokenCount: vi.fn(),
@@ -178,11 +178,11 @@ describe('Builtin commands', () => {
       expect(agentMock.setMessages).toHaveBeenCalled();
       expect(agentMock.setTokenCount).toHaveBeenCalledWith(100);
       expect(ctx.setCurrentSession).toHaveBeenCalledWith('session-1');
-      expect(storeMock.add).toHaveBeenCalledWith(expect.objectContaining({ role: 'status' }));
+      expect(storeMock.addStatus).toHaveBeenCalledWith(expect.objectContaining({ role: 'status' }));
     });
 
     it('/resume with unknown session shows error', async () => {
-      const storeMock = { add: vi.fn() };
+      const storeMock = { addStatus: vi.fn() };
       const sessionManagerMock = {
         get: vi.fn().mockResolvedValue(null),
       };
@@ -193,7 +193,7 @@ describe('Builtin commands', () => {
       };
 
       await handlers['resume'](['unknown'], ctx as CommandContext);
-      expect(storeMock.add).toHaveBeenCalledWith(expect.objectContaining({ role: 'error' }));
+      expect(storeMock.addStatus).toHaveBeenCalledWith(expect.objectContaining({ role: 'error' }));
     });
 
     it('/plan returns prompt text', () => {
