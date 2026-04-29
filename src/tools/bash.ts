@@ -4,7 +4,7 @@ import { spawn } from 'child_process';
 import type { ToolDef, ToolResult, ToolExecutionContext } from './index.js';
 
 export const bashTool: ToolDef = {
-  name: 'bash',
+  name: 'Bash',
   description: 'Execute a bash command in the current working directory. Returns stdout and stderr. Optionally provide a timeout in seconds.',
   requiresPermission: true,
   input_schema: {
@@ -15,8 +15,8 @@ export const bashTool: ToolDef = {
     },
     required: ['command']
   },
-  format: (args: Record<string, unknown>) => {
-    return React.createElement(Text, { color: 'yellow' }, `Bash(${args.command as string})`);
+  format(args: Record<string, unknown>) {
+    return React.createElement(Text, { color: 'yellow' }, `${this.name}(${args.command as string})`);
   },
   execute: async (args: Record<string, unknown>, context?: ToolExecutionContext): Promise<ToolResult> => {
     try {

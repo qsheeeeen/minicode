@@ -5,7 +5,7 @@ import { generateDiffSummary, renderDiffLines } from '../utils/diff.js';
 import type { ToolDef, ToolResult } from './index.js';
 
 export const editTool: ToolDef = {
-  name: 'edit',
+  name: 'Edit',
   description: 'Edit a file by replacing exact text. The oldText must match exactly (including whitespace). Use this for precise, surgical edits.',
   requiresPermission: true,
   input_schema: {
@@ -17,9 +17,9 @@ export const editTool: ToolDef = {
     },
     required: ['path', 'oldText', 'newText']
   },
-  format: (args: Record<string, unknown>) => {
+  format(args: Record<string, unknown>) {
     const path = args.path as string;
-    return React.createElement(Text, { color: 'yellow' }, `Edit(${path})`);
+    return React.createElement(Text, { color: 'yellow' }, `${this.name}(${path})`);
   },
   execute: async (args: Record<string, unknown>): Promise<ToolResult> => {
     try {

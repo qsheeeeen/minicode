@@ -7,7 +7,7 @@ import { Agent } from '../agent.js';
 import { ConsoleDisplay } from '../utils/display.js';
 
 export const agentTool: ToolDef = {
-  name: 'agent',
+  name: 'Agent',
   description: 'Delegate a sub-task to an independent agent. Creates a new agent session that runs in parallel. The sub-agent has access to all tools (except agent) and returns a concise summary.',
   requires: ['agentRegistry'],
   input_schema: {
@@ -20,10 +20,10 @@ export const agentTool: ToolDef = {
     },
     required: ['task']
   },
-  format: (args: Record<string, unknown>) => {
+  format(args: Record<string, unknown>) {
     const task = args.task as string;
     const taskPreview = task.length > 30 ? task.slice(0, 30) + '...' : task;
-    return React.createElement(Text, { color: 'yellow' }, `Agent(${taskPreview})`);
+    return React.createElement(Text, { color: 'yellow' }, `${this.name}(${taskPreview})`);
   },
 
   execute: async (args: Record<string, unknown>, context?: ToolExecutionContext): Promise<ToolResult> => {
@@ -45,7 +45,7 @@ export const agentTool: ToolDef = {
     const subConfig: AgentConfig = {
       ...config,
       display: new ConsoleDisplay(),
-      excludeTools: ['agent'],
+      excludeTools: ['Agent'],
       agentRegistry: registry,
       currentAgentId: subId,
     };

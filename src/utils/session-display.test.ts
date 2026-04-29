@@ -124,7 +124,7 @@ describe('SessionDisplayImpl', () => {
         messages: [{
           role: 'assistant',
           content: [
-            { type: 'tool_use', id: 'tool-1', name: 'read', input: { path: 'a.txt' } }
+            { type: 'tool_use', id: 'tool-1', name: 'Read', input: { path: 'a.txt' } }
           ],
         }],
       };

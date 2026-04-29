@@ -5,7 +5,7 @@ import path from 'path';
 import type { ToolDef, ToolResult } from './index.js';
 
 export const writeTool: ToolDef = {
-  name: 'write',
+  name: 'Write',
   description: 'Write content to a file. Creates the file if it doesn\'t exist, overwrites if it does. Automatically creates parent directories.',
   requiresPermission: true,
   input_schema: {
@@ -16,11 +16,11 @@ export const writeTool: ToolDef = {
     },
     required: ['path', 'content']
   },
-  format: (args: Record<string, unknown>) => {
+  format(args: Record<string, unknown>) {
     const filePath = args.path as string;
     const content = args.content as string;
     const lines = content.split('\n').length;
-    return React.createElement(Text, { color: 'yellow' }, `Write(${filePath}, ${lines} lines)`);
+    return React.createElement(Text, { color: 'yellow' }, `${this.name}(${filePath}, ${lines} lines)`);
   },
   execute: async (args: Record<string, unknown>): Promise<ToolResult> => {
     try {

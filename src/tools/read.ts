@@ -4,7 +4,7 @@ import fs from 'fs/promises';
 import type { ToolDef, ToolResult } from './index.js';
 
 export const readTool: ToolDef = {
-  name: 'read',
+  name: 'Read',
   description: 'Read the contents of a file. Supports text files. Defaults to first 2000 lines. Use offset/limit for large files.',
   input_schema: {
     type: 'object' as const,
@@ -15,11 +15,11 @@ export const readTool: ToolDef = {
     },
     required: ['path']
   },
-  format: (args: Record<string, unknown>) => {
+  format(args: Record<string, unknown>) {
     const path = args.path as string;
     const offset = args.offset as number | undefined;
     const limit = args.limit as number | undefined;
-    let info = `Read(${path}`;
+    let info = `${this.name}(${path}`;
     if (offset || limit) {
       const parts: string[] = [];
       if (offset) parts.push(`offset: ${offset}`);

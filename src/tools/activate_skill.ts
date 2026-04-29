@@ -3,7 +3,7 @@ import React from 'react';
 import { Text } from 'ink';
 
 export const activateSkillTool: ToolDef = {
-  name: 'activate_skill',
+  name: 'ActivateSkill',
   description: "Activates a specialized agent skill by name. Returns the skill's instructions wrapped in <activated_skill> tags. Use this when you identify a task that matches a skill's description.",
   input_schema: {
     type: 'object',
@@ -11,6 +11,9 @@ export const activateSkillTool: ToolDef = {
       name: { type: 'string', description: 'The name of the skill to activate.' }
     },
     required: ['name']
+  },
+  format(args: Record<string, unknown>) {
+    return React.createElement(Text, { color: 'yellow' }, `${this.name}(${args.name as string})`);
   },
   execute: async (args: Record<string, unknown>, context?: ToolExecutionContext): Promise<ToolResult> => {
     const skillName = String(args.name);

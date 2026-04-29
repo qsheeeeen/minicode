@@ -50,7 +50,7 @@ describe('PermissionService', () => {
   describe('check', () => {
     it('yolo always returns true', async () => {
       const service = new PermissionService({ initialMode: 'yolo' });
-      const result = await service.check('bash', { command: 'rm -rf /' }, 'Dangerous command');
+      const result = await service.check('Bash', { command: 'rm -rf /' }, 'Dangerous command');
       expect(result).toBe(true);
     });
 
@@ -58,7 +58,7 @@ describe('PermissionService', () => {
       const service = new PermissionService({ initialMode: 'manual' });
       const confirmMock = vi.fn().mockResolvedValue(true);
       const display = { confirm: confirmMock } as unknown as DisplayAdapter;
-      const result = await service.check('bash', { command: 'ls' }, 'List files', display);
+      const result = await service.check('Bash', { command: 'ls' }, 'List files', display);
       expect(result).toBe(true);
       expect(confirmMock).toHaveBeenCalledWith({
         title: 'Allow tool execution?',
@@ -68,7 +68,7 @@ describe('PermissionService', () => {
 
     it('manual returns true when display.confirm is undefined', async () => {
       const service = new PermissionService({ initialMode: 'manual' });
-      const result = await service.check('bash', { command: 'ls' }, 'List files');
+      const result = await service.check('Bash', { command: 'ls' }, 'List files');
       expect(result).toBe(true);
     });
 
@@ -76,7 +76,7 @@ describe('PermissionService', () => {
       const service = new PermissionService({ initialMode: 'manual' });
       const confirmMock = vi.fn().mockResolvedValue(false);
       const display = { confirm: confirmMock } as unknown as DisplayAdapter;
-      const result = await service.check('bash', { command: 'ls' }, 'List files', display);
+      const result = await service.check('Bash', { command: 'ls' }, 'List files', display);
       expect(result).toBe(false);
     });
   });
@@ -88,7 +88,7 @@ describe('PermissionService', () => {
 
     it('returns false when client is not set', async () => {
       const service = new PermissionService({ initialMode: 'auto' });
-      const result = await (service as any).autoDecide('bash', { command: 'ls' });
+      const result = await (service as any).autoDecide('Bash', { command: 'ls' });
       expect(result).toBe(false);
     });
 
@@ -99,7 +99,7 @@ describe('PermissionService', () => {
       const mockClient = { chat: mockChat } as unknown as AnthropicClient;
       const service = new PermissionService({ initialMode: 'auto', client: mockClient, model: 'claude-3' });
 
-      const result = await (service as any).autoDecide('read', { path: 'a.txt' });
+      const result = await (service as any).autoDecide('Read', { path: 'a.txt' });
 
       expect(result).toBe(true);
       expect(mockChat).toHaveBeenCalledWith(
@@ -116,7 +116,7 @@ describe('PermissionService', () => {
       const mockClient = { chat: mockChat } as unknown as AnthropicClient;
       const service = new PermissionService({ initialMode: 'auto', client: mockClient });
 
-      const result = await (service as any).autoDecide('bash', { command: 'rm -rf /' });
+      const result = await (service as any).autoDecide('Bash', { command: 'rm -rf /' });
 
       expect(result).toBe(false);
     });
@@ -128,7 +128,7 @@ describe('PermissionService', () => {
       const mockClient = { chat: mockChat } as unknown as AnthropicClient;
       const service = new PermissionService({ initialMode: 'auto', client: mockClient });
 
-      const result = await (service as any).autoDecide('bash', { command: 'echo hello' });
+      const result = await (service as any).autoDecide('Bash', { command: 'echo hello' });
 
       expect(result).toBe(true);
     });
@@ -140,7 +140,7 @@ describe('PermissionService', () => {
       const mockClient = { chat: mockChat } as unknown as AnthropicClient;
       const service = new PermissionService({ initialMode: 'auto', client: mockClient });
 
-      const result = await (service as any).autoDecide('bash', { command: 'ls' });
+      const result = await (service as any).autoDecide('Bash', { command: 'ls' });
 
       expect(result).toBe(false);
     });
@@ -150,7 +150,7 @@ describe('PermissionService', () => {
       const mockClient = { chat: mockChat } as unknown as AnthropicClient;
       const service = new PermissionService({ initialMode: 'auto', client: mockClient });
 
-      const result = await (service as any).autoDecide('bash', { command: 'ls' });
+      const result = await (service as any).autoDecide('Bash', { command: 'ls' });
 
       expect(result).toBe(false);
     });
@@ -160,7 +160,7 @@ describe('PermissionService', () => {
       const mockClient = { chat: mockChat } as unknown as AnthropicClient;
       const service = new PermissionService({ initialMode: 'auto', client: mockClient });
 
-      const result = await (service as any).autoDecide('bash', { command: 'ls' });
+      const result = await (service as any).autoDecide('Bash', { command: 'ls' });
 
       expect(result).toBe(false);
     });

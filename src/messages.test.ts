@@ -13,7 +13,7 @@ describe('toLLMMessages', () => {
   it('groups assistant text with following tool_calls', () => {
     const messages: AgentMessage[] = [
       { id: '1', role: 'assistant', content: 'thinking...', timestamp: new Date(), inContext: true },
-      { id: '2', role: 'tool_call', content: '', timestamp: new Date(), inContext: true, toolUseId: 'tool-1', toolName: 'read', toolInput: { path: 'a.txt' } },
+      { id: '2', role: 'tool_call', content: '', timestamp: new Date(), inContext: true, toolUseId: 'tool-1', toolName: 'Read', toolInput: { path: 'a.txt' } },
     ];
     const result = toLLMMessages(messages);
     expect(result).toEqual([
@@ -21,7 +21,7 @@ describe('toLLMMessages', () => {
         role: 'assistant',
         content: [
           { type: 'text', text: 'thinking...' },
-          { type: 'tool_use', id: 'tool-1', name: 'read', input: { path: 'a.txt' } },
+          { type: 'tool_use', id: 'tool-1', name: 'Read', input: { path: 'a.txt' } },
         ],
       },
     ]);
@@ -29,14 +29,14 @@ describe('toLLMMessages', () => {
 
   it('handles tool_call without preceding assistant text', () => {
     const messages: AgentMessage[] = [
-      { id: '1', role: 'tool_call', content: '', timestamp: new Date(), inContext: true, toolUseId: 'tool-1', toolName: 'bash', toolInput: { command: 'ls' } },
+      { id: '1', role: 'tool_call', content: '', timestamp: new Date(), inContext: true, toolUseId: 'tool-1', toolName: 'Bash', toolInput: { command: 'ls' } },
     ];
     const result = toLLMMessages(messages);
     expect(result).toEqual([
       {
         role: 'assistant',
         content: [
-          { type: 'tool_use', id: 'tool-1', name: 'bash', input: { command: 'ls' } },
+          { type: 'tool_use', id: 'tool-1', name: 'Bash', input: { command: 'ls' } },
         ],
       },
     ]);
@@ -45,13 +45,13 @@ describe('toLLMMessages', () => {
   it('groups consecutive tool_results into single user turn', () => {
     const messages: AgentMessage[] = [
       { id: '1', role: 'assistant', content: '', timestamp: new Date(), inContext: true },
-      { id: '2', role: 'tool_call', content: '', timestamp: new Date(), inContext: true, toolUseId: 'tool-1', toolName: 'read', toolInput: {} },
+      { id: '2', role: 'tool_call', content: '', timestamp: new Date(), inContext: true, toolUseId: 'tool-1', toolName: 'Read', toolInput: {} },
       { id: '3', role: 'tool_result', content: 'file contents', timestamp: new Date(), inContext: true, toolUseId: 'tool-1' },
       { id: '4', role: 'tool_result', content: 'more output', timestamp: new Date(), inContext: true, toolUseId: 'tool-2' },
     ];
     const result = toLLMMessages(messages);
     expect(result).toEqual([
-      { role: 'assistant', content: [{ type: 'tool_use', id: 'tool-1', name: 'read', input: {} }] },
+      { role: 'assistant', content: [{ type: 'tool_use', id: 'tool-1', name: 'Read', input: {} }] },
       {
         role: 'user',
         content: [
@@ -75,7 +75,7 @@ describe('toLLMMessages', () => {
 describe('toDisplayMessages', () => {
   it('maps tool_call to tool role', () => {
     const messages: AgentMessage[] = [
-      { id: '1', role: 'tool_call', content: '', timestamp: new Date(), inContext: true, toolUseId: 'tool-1', toolName: 'read' },
+      { id: '1', role: 'tool_call', content: '', timestamp: new Date(), inContext: true, toolUseId: 'tool-1', toolName: 'Read' },
     ];
     const result = toDisplayMessages(messages);
     expect(result[0].role).toBe('tool');
@@ -91,7 +91,7 @@ describe('toDisplayMessages', () => {
 
   it('includes slotId for tool_call messages', () => {
     const messages: AgentMessage[] = [
-      { id: 'my-id', role: 'tool_call', content: '', timestamp: new Date(), inContext: true, toolUseId: 'tool-1', toolName: 'read' },
+      { id: 'my-id', role: 'tool_call', content: '', timestamp: new Date(), inContext: true, toolUseId: 'tool-1', toolName: 'Read' },
     ];
     const result = toDisplayMessages(messages);
     expect(result[0].slotId).toBe('my-id');
@@ -254,7 +254,7 @@ describe('MessageStore.fromMessageParams', () => {
       role: 'assistant' as const,
       content: [
         { type: 'text' as const, text: 'using tool' },
-        { type: 'tool_use' as const, id: 't1', name: 'bash', input: { cmd: 'ls' } },
+        { type: 'tool_use' as const, id: 't1', name: 'Bash', input: { cmd: 'ls' } },
       ],
     }];
     const store = MessageStore.fromMessageParams(params);
@@ -262,7 +262,7 @@ describe('MessageStore.fromMessageParams', () => {
     expect(msgs[0].role).toBe('assistant');
     expect(msgs[1].role).toBe('tool_call');
     expect(msgs[1].toolUseId).toBe('t1');
-    expect(msgs[1].toolName).toBe('bash');
+    expect(msgs[1].toolName).toBe('Bash');
   });
 
   it('restores thinking blocks from assistant messages', () => {
@@ -270,7 +270,7 @@ describe('MessageStore.fromMessageParams', () => {
       role: 'assistant' as const,
       content: [
         { type: 'thinking' as const, thinking: 'let me think...' },
-        { type: 'tool_use' as const, id: 't1', name: 'bash', input: { cmd: 'ls' } },
+        { type: 'tool_use' as const, id: 't1', name: 'Bash', input: { cmd: 'ls' } },
       ],
     }];
     const store = MessageStore.fromMessageParams(params);

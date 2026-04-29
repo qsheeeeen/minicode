@@ -17,11 +17,11 @@ export const SYSTEM_PROMPT = `你是一个交互式 CLI 工具，帮助用户完
 
 # 指南：
 - 使用用户的语言
-- 使用 bash 进行文件操作，如 ls、grep、find
-- 编辑文件前先用 read 查看
-- 使用 edit 进行精确修改（旧文本必须完全匹配）
-- 仅在创建新文件或完全重写时使用 write
-- 总结操作时直接输出纯文本——不要用 cat 或 bash 来展示你做了什么
+- 使用 Bash 进行文件操作，如 ls、grep、find
+- 编辑文件前先用 Read 查看
+- 使用 Edit 进行精确修改（旧文本必须完全匹配）
+- 仅在创建新文件或完全重写时使用 Write
+- 总结操作时直接输出纯文本——不要用 cat 或 Bash 来展示你做了什么
 - 回复保持简洁严谨——不要使用比喻
 - 操作文件时清晰展示文件路径
 - 在操作前评估影响范围，和用户确认不可逆的操作，用户的确认单次生效
@@ -236,7 +236,7 @@ export class Agent {
           prompt += `  <skill>\n    <name>${skill.name}</name>\n    <description>${skill.description}</description>\n  </skill>\n`;
         });
         prompt += `</available_skills>\n`;
-        prompt += `\nTo activate a skill and receive its detailed instructions, use the activate_skill tool with the skill's name.\n`;
+        prompt += `\nTo activate a skill and receive its detailed instructions, use the ActivateSkill tool with the skill's name.\n`;
       }
     }
 
