@@ -31,7 +31,7 @@ describe('Builtin commands', () => {
 
   it('registers expected commands', () => {
     const registeredNames = registerCalls.map((call: any[]) => call[0].name);
-    
+
     expect(registeredNames).toContain('exit');
     expect(registeredNames).toContain('clear');
     expect(registeredNames).toContain('compress');
@@ -42,6 +42,15 @@ describe('Builtin commands', () => {
     expect(registeredNames).toContain('test');
   });
 
+  function makeStoreMock() {
+    return { add: vi.fn() };
+  }
+
+  function makeAgentMock(overrides: Record<string, any> = {}) {
+    const store = makeStoreMock();
+    return { getStore: vi.fn().mockReturnValue(store), ...overrides, __store: store };
+  }
+
   describe('handlers', () => {
     it('/exit calls ctx.exit()', async () => {
       const ctx: Partial<CommandContext> = { exit: vi.fn() };
@@ -49,24 +58,23 @@ describe('Builtin commands', () => {
       expect(ctx.exit).toHaveBeenCalled();
     });
 
-    it('/compress calls ctx.agent.compress() and sets messages', async () => {
-      const agentMock = { compress: vi.fn().mockResolvedValue(undefined) };
+    it('/compress calls ctx.agent.compress() and adds status via store', async () => {
+      const agentMock = makeAgentMock({ compress: vi.fn().mockResolvedValue(undefined) });
       const ctx: Partial<CommandContext> = {
         agent: agentMock as any,
-        setMessages: vi.fn()
       };
 
       await handlers['compress']([], ctx as CommandContext);
       expect(agentMock.compress).toHaveBeenCalled();
-      expect(ctx.setMessages).toHaveBeenCalledWith(expect.any(Function));
+      expect(agentMock.__store.add).toHaveBeenCalledWith(expect.objectContaining({ role: 'status' }));
     });
 
-    it('/clear clears session and sets new session', async () => {
-      const agentMock = {
+    it('/clear clears session and adds status via store', async () => {
+      const agentMock = makeAgentMock({
         clearSession: vi.fn(),
         setTokenCount: vi.fn(),
         setSession: vi.fn(),
-      };
+      });
       const sessionManagerMock = {
         getProjectHash: vi.fn().mockReturnValue('testhash'),
       };
@@ -81,53 +89,51 @@ describe('Builtin commands', () => {
       expect(agentMock.clearSession).toHaveBeenCalled();
       expect(agentMock.setTokenCount).toHaveBeenCalledWith(0);
       expect(ctx.setCurrentSession).toHaveBeenCalledWith(expect.stringMatching(/^session-/));
-      expect(ctx.setMessages).toHaveBeenCalledWith(expect.any(Function));
+      expect(agentMock.__store.add).toHaveBeenCalledWith(expect.objectContaining({ role: 'status' }));
     });
 
-    it('/new creates new session', async () => {
-      const agentMock = { 
+    it('/new creates new session and adds status via store', async () => {
+      const agentMock = makeAgentMock({
         clearSession: vi.fn(),
         setSession: vi.fn(),
-      };
+      });
       const sessionManagerMock = {
         getProjectHash: vi.fn().mockReturnValue('testhash'),
       };
-      const ctx: Partial<CommandContext> = { 
+      const ctx: Partial<CommandContext> = {
         agent: agentMock as any,
         sessionManager: sessionManagerMock as any,
         setCurrentSession: vi.fn(),
-        setMessages: vi.fn(),
       };
-      
+
       await handlers['new'](['my', 'new', 'session'], ctx as CommandContext);
       expect(agentMock.clearSession).toHaveBeenCalled();
       expect(agentMock.setSession).toHaveBeenCalledWith('my new session', expect.anything());
       expect(ctx.setCurrentSession).toHaveBeenCalledWith('my new session');
-      expect(ctx.setMessages).toHaveBeenCalled();
+      expect(agentMock.__store.add).toHaveBeenCalledWith(expect.objectContaining({ role: 'status' }));
     });
 
-    it('/rename renames session', async () => {
-      const agentMock = { 
+    it('/rename renames session and adds status via store', async () => {
+      const storeMock = makeStoreMock();
+      const agentMock = {
         currentSession: 'old-session',
         setSession: vi.fn(),
+        getStore: vi.fn().mockReturnValue(storeMock),
       };
       const sessionManagerMock = {
         getProjectHash: vi.fn().mockReturnValue('testhash'),
         rename: vi.fn().mockResolvedValue(undefined),
       };
-      const ctx: Partial<CommandContext> = { 
+      const ctx: Partial<CommandContext> = {
         agent: agentMock as any,
         sessionManager: sessionManagerMock as any,
         setCurrentSession: vi.fn(),
-        setMessages: vi.fn(),
       };
-      
-      // We need to implement a dummy for setMessages that takes a callback since rename uses prev => [...prev, ...]
-      (ctx.setMessages as any).mockImplementation((cb: any) => cb([]));
 
       await handlers['rename'](['new-session'], ctx as CommandContext);
       expect(sessionManagerMock.rename).toHaveBeenCalledWith('old-session', 'new-session');
       expect(ctx.setCurrentSession).toHaveBeenCalledWith('new-session');
+      expect(storeMock.add).toHaveBeenCalledWith(expect.objectContaining({ role: 'status' }));
     });
 
     it('/resume with no args lists sessions', async () => {

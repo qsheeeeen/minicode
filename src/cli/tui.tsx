@@ -212,9 +212,9 @@ export function App({
       await agentRef.current.run(llmText, { displayContent: displayText !== llmText ? displayText : undefined });
     } catch (e) {
       if (e instanceof Error && e.message === 'Aborted') {
-        setMessages(prev => [...prev, { role: 'status' as const, content: '(Aborted)', timestamp: new Date() }]);
+        agentRef.current.getStore().add({ role: 'status', content: '(Aborted)', timestamp: new Date(), inContext: false });
       } else if (e instanceof Error) {
-        setMessages(prev => [...prev, { role: 'error' as const, content: `(Error: ${e.message})`, timestamp: new Date() }]);
+        agentRef.current.getStore().add({ role: 'error', content: `(Error: ${e.message})`, timestamp: new Date(), inContext: false });
       } else {
         throw e;
       }

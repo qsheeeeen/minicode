@@ -20,7 +20,7 @@ commandRegistry.register({
     const newLogger = await createLogger(ctx.sessionManager.getProjectHash(), newSession);
     ctx.agent.setSession(newSession, newLogger);
     ctx.setCurrentSession(newSession);
-    ctx.setMessages(prev => [...prev, { role: 'status', content: '(Cleared)', timestamp: new Date() }]);
+    ctx.agent.getStore().add({ role: 'status', content: '(Cleared)', timestamp: new Date(), inContext: false });
   }
 });
 
@@ -29,7 +29,7 @@ commandRegistry.register({
   description: 'Compress conversation history',
   handler: async (_args, ctx): Promise<void> => {
     await ctx.agent.compress();
-    ctx.setMessages(prev => [...prev, { role: 'status', content: '(Compression complete)', timestamp: new Date() }]);
+    ctx.agent.getStore().add({ role: 'status', content: '(Compression complete)', timestamp: new Date(), inContext: false });
   }
 });
 
@@ -47,11 +47,12 @@ commandRegistry.register({
     ctx.agent.setEffort(value as EffortLevel);
     const { setEffort } = await import('../../config.js');
     await setEffort(value);
-    ctx.setMessages(prev => [...prev, {
+    ctx.agent.getStore().add({
       role: 'status',
       content: `(Effort set to: ${value})`,
-      timestamp: new Date()
-    }]);
+      timestamp: new Date(),
+      inContext: false,
+    });
   }
 });
 
@@ -66,7 +67,7 @@ commandRegistry.register({
       const newLogger = await createLogger(ctx.sessionManager.getProjectHash(), name);
       ctx.agent.setSession(name, newLogger);
       ctx.setCurrentSession(name);
-      ctx.setMessages(prev => [...prev, { role: 'status', content: `Created session: ${name}`, timestamp: new Date() }]);
+      ctx.agent.getStore().add({ role: 'status', content: `Created session: ${name}`, timestamp: new Date(), inContext: false });
     }
   }
 });
@@ -83,7 +84,7 @@ commandRegistry.register({
       const newLogger = await createLogger(ctx.sessionManager.getProjectHash(), newName);
       ctx.agent.setSession(newName, newLogger);
       ctx.setCurrentSession(newName);
-      ctx.setMessages(prev => [...prev, { role: 'status', content: `Renamed: ${oldName} -> ${newName}`, timestamp: new Date() }]);
+      ctx.agent.getStore().add({ role: 'status', content: `Renamed: ${oldName} -> ${newName}`, timestamp: new Date(), inContext: false });
     }
   }
 });
@@ -145,12 +146,12 @@ commandRegistry.register({
   handler: async (_args, ctx): Promise<void> => {
     const skillRegistry = ctx.agent.getSkillRegistry();
     if (!skillRegistry) {
-      ctx.setMessages(prev => [...prev, { role: 'status', content: '(No skill registry available)', timestamp: new Date() }]);
+      ctx.agent.getStore().add({ role: 'status', content: '(No skill registry available)', timestamp: new Date(), inContext: false });
       return;
     }
     const skills = skillRegistry.getAvailableSkills();
     if (skills.length === 0) {
-      ctx.setMessages(prev => [...prev, { role: 'status', content: '(No skills available)', timestamp: new Date() }]);
+      ctx.agent.getStore().add({ role: 'status', content: '(No skills available)', timestamp: new Date(), inContext: false });
       return;
     }
 
@@ -174,6 +175,6 @@ commandRegistry.register({
       lines.push(`  /${skill.name} - ${skill.description}`);
     }
 
-    ctx.setMessages(prev => [...prev, { role: 'status', content: lines.join('\n'), element, timestamp: new Date() }]);
+    ctx.agent.getStore().add({ role: 'status', content: lines.join('\n'), element, timestamp: new Date(), inContext: false });
   }
 });
