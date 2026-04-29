@@ -180,36 +180,34 @@ export function App({
     setInputProps(props);
   };
 
+  // Attach command resolver to agent so slash commands are handled uniformly
+  // (both TUI and headless go through the same agent.run() → resolveCommand path)
+  useEffect(() => {
+    agent.setCommandResolver(async (input: string) => {
+      return commandRegistry.parseAndExecute(input, {
+        agent,
+        sessionManager,
+        setMessages,
+        setCurrentSession,
+        setMode,
+        setInputMode,
+        setSessionList,
+        setSelectedIndex,
+        exit,
+      });
+    });
+  }, []);
+
   const handleSubmit = useCallback(async (value: string) => {
     if (!value.trim() || !agentRef.current) return;
 
-    const commandContext: CommandContext = {
-      agent: agentRef.current,
-      sessionManager,
-      setMessages,
-      setCurrentSession,
-      setMode,
-      setInputMode,
-      setSessionList,
-      setSelectedIndex,
-      exit,
-    };
-
-    const result = await commandRegistry.parseAndExecute(value, commandContext);
-    if (result.handled && !result.promptText) {
-      // Command was handled (system command like /skills)
-      // Clear input since command text should not persist
-      setInputValue('');
-      setInputKey(prev => prev + 1);
-      return;
-    }
-
-    const llmText = result.promptText ?? value;
-    const displayText = result.displayContent ?? result.promptText ?? value;
-    
     setIsLoading(true);
     try {
-      await agentRef.current.run(llmText, { displayContent: displayText !== llmText ? displayText : undefined });
+      const sent = await agentRef.current.run(value);
+      if (!sent) {
+        setIsLoading(false);
+        return;
+      }
     } catch (e) {
       if (e instanceof Error && e.message === 'Aborted') {
         agentRef.current.getStore().addStatus({ role: 'status', content: '(Aborted)', timestamp: new Date() });
@@ -222,7 +220,7 @@ export function App({
       setIsLoading(false);
       setStatus('');
     }
-  }, [exit]);
+  }, []);
 
   useEffect(() => {
     if (autoSubmitPending && agentRef.current && initialPrompt) {

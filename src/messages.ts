@@ -38,7 +38,8 @@ export function toDisplayMessages(
   for (const turn of turns) {
     if (turn.role === 'user') {
       if (typeof turn.content === 'string') {
-        result.push({ role: 'user', content: turn.content });
+        const displayContent = (turn as any)._display !== undefined ? (turn as any)._display : turn.content;
+        result.push({ role: 'user', content: displayContent });
       }
       // tool_result blocks handled in pass 2
     } else if (turn.role === 'assistant') {
@@ -129,15 +130,26 @@ export class MessageStore {
     this.notify();
   }
 
-  /** Get API-format messages for LLM. Just returns turns — no conversion needed. */
+  /** Get API-format messages for LLM. Strips display-only metadata. */
   toLLMMessages(): MessageParam[] {
-    return this.turns;
+    return this.turns.map(t => {
+      const msg = t as any;
+      if (msg._display !== undefined) {
+        const { _display, ...rest } = msg;
+        return rest as MessageParam;
+      }
+      return t;
+    });
   }
 
   // -- User messages --
 
-  addUserMessage(content: string): void {
-    this.turns.push({ role: 'user', content });
+  addUserMessage(content: string, displayContent?: string): void {
+    const msg: MessageParam = { role: 'user', content } as MessageParam;
+    if (displayContent !== undefined && displayContent !== content) {
+      (msg as any)._display = displayContent;
+    }
+    this.turns.push(msg);
     this.notify();
   }
 

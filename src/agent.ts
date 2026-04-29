@@ -48,6 +48,8 @@ export interface AgentConfig {
   currentSession?: string;
   logger?: pino.Logger;
   skillRegistry?: SkillRegistry;
+  /** Resolve slash commands before sending to LLM. Returned by both TUI and headless. */
+  resolveCommand?: (input: string) => Promise<{ handled: boolean; promptText?: string; displayContent?: string }>;
 }
 
 interface StreamingResult {
@@ -82,12 +84,17 @@ export class Agent {
   private logger?: pino.Logger;
   private saveSessionLock: Promise<void> = Promise.resolve();
   private isCompressing: boolean = false;
+  private resolveCommand?: (input: string) => Promise<{ handled: boolean; promptText?: string; displayContent?: string }>;
 
   public setSession(sessionName: string, logger?: pino.Logger): void {
     this.currentSession = sessionName;
     if (logger) {
       this.logger = logger;
     }
+  }
+
+  public setCommandResolver(resolver: (input: string) => Promise<{ handled: boolean; promptText?: string; displayContent?: string }>): void {
+    this.resolveCommand = resolver;
   }
 
   public setEffort(effort: EffortLevel): void {
@@ -110,6 +117,7 @@ export class Agent {
     this.skillRegistry = config.skillRegistry;
     this.currentAgentId = config.currentAgentId || '1';
     this.sessionManager = config.sessionManager;
+    this.resolveCommand = config.resolveCommand;
     if (config.currentSession) this.currentSession = config.currentSession;
     this.logger = config.logger;
     this.permissionService = new PermissionService({
@@ -398,10 +406,26 @@ export class Agent {
     this.store.addToolResults(results);
   }
 
-  async run(userMessage: string, opts?: { displayContent?: string }): Promise<void> {
-    this.store.addUserMessage(opts?.displayContent ?? userMessage);
+  async run(userMessage: string, opts?: { displayContent?: string }): Promise<boolean> {
+    // Resolve slash commands (e.g. /plan → expanded prompt, /clear → clear session)
+    let llmText = userMessage;
+    let displayOverride = opts?.displayContent;
+    if (this.resolveCommand) {
+      const resolved = await this.resolveCommand(userMessage);
+      if (resolved.handled) {
+        if (resolved.promptText) {
+          llmText = resolved.promptText;
+          displayOverride = resolved.displayContent;
+        } else {
+          // Handler command executed (e.g. /clear); nothing to send to LLM
+          return false;
+        }
+      }
+    }
+
+    this.store.addUserMessage(llmText, displayOverride);
     this.abortController = new AbortController();
-    this.logger?.info({ session: this.currentSession, userMessage }, 'Session started');
+    this.logger?.info({ session: this.currentSession, userMessage: llmText }, 'Session started');
 
     try {
       while (true) {
@@ -440,7 +464,7 @@ export class Agent {
         // Remove the last user message that triggered this aborted run
         const turns = this.store.getTurns();
         const last = turns[turns.length - 1];
-        if (last?.role === 'user' && typeof last.content === 'string' && last.content === userMessage) {
+        if (last?.role === 'user' && typeof last.content === 'string' && last.content === llmText) {
           turns.pop();
           this.store.setTurns(turns);
         }
@@ -450,6 +474,7 @@ export class Agent {
       this.logger?.info({ session: this.currentSession, totalTokens: this.tokenManager.getTotal() }, 'Session ended');
       await this.saveSession();
     }
+    return true;
   }
 
   // -- Public accessors --

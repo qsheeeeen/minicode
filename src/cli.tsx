@@ -114,12 +114,28 @@ const agent = new Agent({
   skillRegistry,
 });
 
+// Set shared command resolver so both headless and TUI use the same resolve path
+agent.setCommandResolver((input: string) =>
+  commandRegistry.parseAndExecute(input, {
+    agent,
+    sessionManager,
+    setMessages: () => {},
+    setCurrentSession: (name) => { initialSession = name; agent.currentSession = name; },
+    setMode: () => {},
+    setInputMode: () => {},
+    setSessionList: () => {},
+    setSelectedIndex: () => {},
+    exit: () => process.exit(0),
+  }),
+);
+
 // Branch: display layer only
 if (headless) {
   if (!initialPrompt) {
     console.error('Error: --headless requires a prompt argument');
     process.exit(1);
   }
+
   const { runHeadless } = await import('./cli/headless.js');
   await runHeadless(agent, initialPrompt, sessionManager, sessionName, resumeRecent);
   process.exit(0);
