@@ -431,11 +431,11 @@ export function App({
                 setInputValue('');
                 setInputKey(prev => prev + 1);
               } else {
+                setInputValue('');
+                setInputKey(prev => prev + 1);
                 setInputMode('chat');
                 setInputProps({});
                 await handleSubmit(value);
-                setInputValue('');
-                setInputKey(prev => prev + 1);
               }
             };
             const defaultProps: InputComponentProps & { inputKey?: number } = {
