@@ -434,6 +434,8 @@ export function App({
                 setInputMode('chat');
                 setInputProps({});
                 await handleSubmit(value);
+                setInputValue('');
+                setInputKey(prev => prev + 1);
               }
             };
             const defaultProps: InputComponentProps & { inputKey?: number } = {
