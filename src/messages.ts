@@ -8,6 +8,7 @@ export interface StatusMessage {
   role: 'status' | 'error';
   content: string;
   timestamp: Date;
+  turnIndex?: number;
   element?: React.ReactElement;
 }
 
@@ -30,18 +31,30 @@ export function toDisplayMessages(
   toolRegistry: ToolRegistry,
 ): DisplayMessage[] {
   const result: DisplayMessage[] = [];
-  // Track tool_use display messages by block id for result attachment
   const toolUseMsgs = new Map<string, DisplayMessage>();
-  // Track tool_use (name, input) for formatResult lookup
   const toolUseData = new Map<string, { name: string; input: Record<string, unknown> }>();
 
-  for (const turn of turns) {
+  // Index statuses by turnIndex for chronological interleaving
+  const byTurnIndex = new Map<number, StatusMessage[]>();
+  for (const s of statuses) {
+    const idx = s.turnIndex ?? turns.length;
+    if (!byTurnIndex.has(idx)) byTurnIndex.set(idx, []);
+    byTurnIndex.get(idx)!.push(s);
+  }
+
+  // Statuses with turnIndex 0 come before all turns
+  for (const s of byTurnIndex.get(0) ?? []) {
+    result.push({ role: s.role, content: s.content, element: s.element, timestamp: s.timestamp });
+  }
+
+  // Pass 1: process turns, interleaving statuses after each
+  for (let i = 0; i < turns.length; i++) {
+    const turn = turns[i];
     if (turn.role === 'user') {
       if (typeof turn.content === 'string') {
         const displayContent = (turn as any)._display !== undefined ? (turn as any)._display : turn.content;
         result.push({ role: 'user', content: displayContent });
       }
-      // tool_result blocks handled in pass 2
     } else if (turn.role === 'assistant') {
       const blocks = Array.isArray(turn.content) ? turn.content : [];
       for (const block of blocks as ContentBlock[]) {
@@ -58,6 +71,10 @@ export function toDisplayMessages(
           toolUseData.set(block.id, { name: block.name, input: block.input as Record<string, unknown> });
         }
       }
+    }
+    // Statuses added after this turn
+    for (const s of byTurnIndex.get(i + 1) ?? []) {
+      result.push({ role: s.role, content: s.content, element: s.element, timestamp: s.timestamp });
     }
   }
 
@@ -83,9 +100,11 @@ export function toDisplayMessages(
     }
   }
 
-  // Append statuses at the end
+  // Any unmatched statuses (turnIndex > turns.length) go at the end
   for (const s of statuses) {
-    result.push({ role: s.role, content: s.content, element: s.element, timestamp: s.timestamp });
+    if (s.turnIndex > turns.length) {
+      result.push({ role: s.role, content: s.content, element: s.element, timestamp: s.timestamp });
+    }
   }
 
   return result;
@@ -207,6 +226,7 @@ export class MessageStore {
   // -- Status / error messages --
 
   addStatus(msg: StatusMessage): void {
+    msg.turnIndex = this.turns.length;
     this.statuses.push(msg);
     this.notify();
   }

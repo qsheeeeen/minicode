@@ -49,14 +49,25 @@ describe('toDisplayMessages', () => {
     expect(toolRegistry.get('Read')?.formatResult).toHaveBeenCalled();
   });
 
-  it('appends status messages at the end', () => {
+  it('interleaves statuses with turns based on turnIndex', () => {
     const turns: MessageParam[] = [{ role: 'user', content: 'hello' }];
     const statuses: StatusMessage[] = [
-      { role: 'status', content: 'done', timestamp: new Date() },
+      { role: 'status', content: 'done', timestamp: new Date(), turnIndex: 1 },
     ];
     const result = toDisplayMessages(turns, statuses, toolRegistry);
     expect(result).toHaveLength(2);
     expect(result[1].role).toBe('status');
+  });
+
+  it('places turnIndex 0 statuses before all turns', () => {
+    const turns: MessageParam[] = [{ role: 'user', content: 'hello' }];
+    const statuses: StatusMessage[] = [
+      { role: 'status', content: 'cleared', timestamp: new Date(), turnIndex: 0 },
+    ];
+    const result = toDisplayMessages(turns, statuses, toolRegistry);
+    expect(result).toHaveLength(2);
+    expect(result[0].role).toBe('status');
+    expect(result[1].role).toBe('user');
   });
 });
 
