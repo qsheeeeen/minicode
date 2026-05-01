@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
+import type { ProviderConfig } from '../../config.js';
 
 export interface InputComponentProps {
   onSubmit?: (value: string) => void;  // For TextInput - actual LLM submission
@@ -90,6 +91,59 @@ export function SessionListInput({
   );
 }
 
+/** Model selection input - two-step provider then model */
+export function ModelSelectInput({
+  onExecute, onCancel,
+  providers = {},
+}: InputComponentProps & { providers?: Record<string, ProviderConfig> }) {
+  const [step, setStep] = useState<'provider' | 'model'>('provider');
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [selectedProvider, setSelectedProvider] = useState('');
+
+  const providerNames = Object.keys(providers).filter(k => providers[k]?.apiKey);
+  const modelNames = selectedProvider
+    ? Object.keys(providers[selectedProvider]?.models ?? {})
+    : [];
+  const items = step === 'provider' ? providerNames : modelNames;
+
+  useInput((_input, key) => {
+    if (key.return && items.length > 0) {
+      if (step === 'provider') {
+        setSelectedProvider(items[selectedIndex]);
+        setSelectedIndex(0);
+        setStep('model');
+      } else {
+        onExecute?.(`${items[selectedIndex]}@${selectedProvider}`);
+      }
+    } else if (key.escape) {
+      if (step === 'model') {
+        setStep('provider');
+        setSelectedIndex(providerNames.indexOf(selectedProvider));
+      } else if (onCancel) {
+        onCancel();
+      }
+    } else if (key.upArrow) {
+      setSelectedIndex(prev => Math.max(0, prev - 1));
+    } else if (key.downArrow) {
+      setSelectedIndex(prev => Math.min(items.length - 1, prev + 1));
+    }
+  });
+
+  const label = step === 'provider' ? 'Provider:' : `Models for ${selectedProvider}:`;
+
+  return (
+    <Box flexDirection="column">
+      <Text bold color="magenta">{label}</Text>
+      {items.map((name, i) => (
+        <Text key={name} color={i === selectedIndex ? 'magenta' : 'white'} bold={i === selectedIndex}>
+          {i === selectedIndex ? '> ' : '  '}{name}
+        </Text>
+      ))}
+      <Text dimColor>↑↓ navigate, Enter select, Esc {step === 'model' ? 'back' : 'cancel'}</Text>
+    </Box>
+  );
+}
+
 /** Confirm input - yes/no prompt */
 export function ConfirmInput({
   onExecute,
@@ -132,6 +186,7 @@ export const inputComponents: InputComponentRegistration[] = [
   { name: 'chat', Component: ChatInput },
   { name: 'effort-select', Component: EffortSelectInput },
   { name: 'session-list', Component: SessionListInput },
+  { name: 'model-select', Component: ModelSelectInput },
   { name: 'confirm', Component: ConfirmInput },
 ];
 

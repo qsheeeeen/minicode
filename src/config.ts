@@ -78,7 +78,7 @@ export async function getBaseURL(provider?: string): Promise<string | undefined>
   return providerConfig?.baseURL;
 }
 
-function parseModelSpecifier(
+export function parseModelSpecifier(
   spec: string,
   providers: Providers
 ): { modelName: string; providerName: string; providerConfig: ProviderConfig } | null {
@@ -175,6 +175,13 @@ export async function loadAllConfig(modelSpecifier?: string): Promise<ResolvedCo
 export async function setEffort(effort: string): Promise<void> {
   const config = await loadConfig();
   config.effort = effort as Config['effort'];
+  cachedConfig = config;
+  await fs.writeFile(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf-8');
+}
+
+export async function setModel(modelSpec: string): Promise<void> {
+  const config = await loadConfig();
+  config.model = modelSpec;
   cachedConfig = config;
   await fs.writeFile(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf-8');
 }

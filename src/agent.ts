@@ -109,6 +109,13 @@ export class Agent {
     this.effort = effort;
   }
 
+  public setModel(model: string, apiKey?: string, baseURL?: string): void {
+    this.model = model;
+    if (apiKey !== undefined) this.apiKey = apiKey;
+    if (baseURL !== undefined) this.baseURL = baseURL;
+    this.client = new AnthropicClient(this.apiKey, this.baseURL);
+  }
+
   constructor(config: AgentConfig = {}) {
     this.apiKey = config.apiKey;
     this.baseURL = config.baseURL;

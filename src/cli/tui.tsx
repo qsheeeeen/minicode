@@ -423,6 +423,19 @@ export function App({
                 setInputProps({});
                 setInputValue('');
                 setInputKey(prev => prev + 1);
+              } else if (inputMode === 'model-select') {
+                const { loadConfig, parseModelSpecifier } = await import('../config.js');
+                const config = await loadConfig();
+                const parsed = parseModelSpecifier(value, config.providers ?? {});
+                if (parsed) {
+                  agent.setModel(parsed.modelName, parsed.providerConfig.apiKey, parsed.providerConfig.baseURL);
+                  import('../config.js').then(m => m.setModel(value));
+                  setMessages(prev => [...prev, { role: 'status', content: `(Model set to: ${value})`, timestamp: new Date() }]);
+                }
+                setInputMode('chat');
+                setInputProps({});
+                setInputValue('');
+                setInputKey(prev => prev + 1);
               } else {
                 setInputValue('');
                 setInputKey(prev => prev + 1);

@@ -171,3 +171,14 @@ commandRegistry.register({
     ctx.agent.getStore().addStatus({ role: 'status', content: lines.join('\n'), element, timestamp: new Date() });
   }
 });
+
+commandRegistry.register({
+  name: 'model',
+  description: 'Switch model/provider',
+  handler: async (_args, ctx): Promise<void> => {
+    const { loadConfig } = await import('../../config.js');
+    const config = await loadConfig();
+    const providers = config.providers ?? {};
+    ctx.setInputMode('model-select', { providers });
+  },
+});
