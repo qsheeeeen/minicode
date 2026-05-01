@@ -1,5 +1,3 @@
-import React from 'react';
-import { Text, Box } from 'ink';
 import { AnthropicClient, MessageParam, Tool, Anthropic, ContentBlock, type EffortLevel } from './llm/anthropic.js';
 import { registerTools, ToolRegistry, ToolDef, ToolExecutionContext } from './tools/index.js';
 import { ConsoleDisplay, type DisplayAdapter } from './utils/display.js';
@@ -56,6 +54,16 @@ interface StreamingResult {
   response: Anthropic.Messages.Message;
   toolCalls: Array<{ block: Anthropic.Messages.ToolUseBlock; tool: ToolDef }>;
   hasToolCalls: boolean;
+}
+
+class ToolDeniedError extends Error {
+  constructor(
+    public readonly toolName: string,
+    public readonly displayText: string,
+  ) {
+    super(`Tool execution denied: ${toolName}`);
+    this.name = 'ToolDeniedError';
+  }
 }
 
 export class Agent {
@@ -358,7 +366,7 @@ export class Agent {
         : `${tool.name}(${JSON.stringify(args)})`;
       const allowed = await this.permissionService.check(tool.name, args, displayText, this.display);
       if (!allowed) {
-        return { output: 'User rejected', display: React.createElement(Text, { color: 'yellow' }, 'User rejected') };
+        throw new ToolDeniedError(tool.name, displayText);
       }
     }
     return tool.execute(args, context);
@@ -390,12 +398,21 @@ export class Agent {
 
     const results: Array<{ toolUseId: string; content: string }> = [];
 
-    for (const { block, tool } of toolCalls) {
+    for (let i = 0; i < toolCalls.length; i++) {
+      const { block, tool } = toolCalls[i];
       try {
         const result = await this.runTool(tool, block.input as Record<string, unknown>, context);
         results.push({ toolUseId: block.id, content: result.output });
         this.logger?.info({ session: this.currentSession, toolName: tool.name, toolInput: block.input }, 'Tool result');
       } catch (reason) {
+        if (reason instanceof ToolDeniedError) {
+          results.push({ toolUseId: block.id, content: 'User rejected' });
+          for (let j = i + 1; j < toolCalls.length; j++) {
+            results.push({ toolUseId: toolCalls[j].block.id, content: 'User rejected' });
+          }
+          this.store.addToolResults(results);
+          throw reason;
+        }
         const error = `Error: ${reason instanceof Error ? reason.message : String(reason)}`;
         results.push({ toolUseId: block.id, content: error });
         this.logger?.error({ session: this.currentSession, toolName: tool.name, error: String(reason) }, 'Tool error');
@@ -451,7 +468,19 @@ export class Agent {
 
         this.throwIfAborted();
 
-        await this.executeToolCalls(toolCalls);
+        try {
+          await this.executeToolCalls(toolCalls);
+        } catch (e) {
+          if (e instanceof ToolDeniedError) {
+            this.store.addStatus({
+              role: 'error',
+              content: `Tool "${e.toolName}" was denied by user`,
+              timestamp: new Date(),
+            });
+            break;
+          }
+          throw e;
+        }
 
         if (hasToolCalls) {
           await this.saveSession();
