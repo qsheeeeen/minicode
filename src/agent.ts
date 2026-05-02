@@ -6,7 +6,7 @@ import { CompressionService, CompressionServiceImpl } from './services/compressi
 import { AgentRegistry } from './services/agent-registry.js';
 import { MessageStore } from './messages.js';
 import { PermissionService, type PermissionMode } from './services/permission.js';
-import type { SkillRegistry } from './services/skill-registry.js';
+import type { SkillRegistry } from './cli/skills/skill-registry.js';
 import { elementToText } from './utils/react.js';
 import type { SessionManager } from './utils/session.js';
 import type pino from 'pino';

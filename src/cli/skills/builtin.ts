@@ -1,3 +1,4 @@
+import { skillRegistry } from './index.js';
 import type { SkillMeta } from './skill-registry.js';
 
 const skillCreator: SkillMeta = {
@@ -22,6 +23,4 @@ Every skill consists of a required \`SKILL.md\` file:
 4. Write the body with clear, concise instructions for the agent to follow.`
 };
 
-export const builtinSkills: SkillMeta[] = [
-  skillCreator
-];
+skillRegistry.register(skillCreator);

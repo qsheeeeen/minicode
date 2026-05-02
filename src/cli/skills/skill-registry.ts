@@ -53,12 +53,12 @@ export class SkillRegistry {
   public async loadSkills(skillsDir: string): Promise<void> {
     try {
       const entries = await fs.readdir(skillsDir, { withFileTypes: true });
-      
+
       for (const entry of entries) {
         if (entry.isDirectory()) {
           const skillDirPath = path.join(skillsDir, entry.name);
           const skillFilePath = path.join(skillDirPath, 'SKILL.md');
-          
+
           try {
             const content = await fs.readFile(skillFilePath, 'utf-8');
             const meta = this.parseSkillFile(content, skillDirPath);
