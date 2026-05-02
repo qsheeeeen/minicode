@@ -1,5 +1,3 @@
-import React from 'react';
-import { Box, Text } from 'ink';
 import * as Diff from 'diff';
 
 interface DiffLine {
@@ -45,35 +43,4 @@ export function generateDiffSummary(filePath: string, oldText: string, newText: 
   result.unshift({ type: 'header', lineNum: 0, content: header });
 
   return result;
-}
-
-/** Render unified diff: context=plain, removed=red - dim, added=green + normal */
-export function renderDiffLines(lines: DiffLine[]): React.ReactElement {
-  return React.createElement(
-    Box,
-    { flexDirection: 'column' },
-    ...lines.map((line, i) => {
-      if (line.type === 'header') {
-        return React.createElement(Text, { key: i, dimColor: true }, `  ${line.content}`);
-      }
-      const num = String(line.lineNum).padStart(4);
-      if (line.type === 'context') {
-        return React.createElement(Text, { key: i, dimColor: true }, `${num}   ${line.content}`);
-      }
-      if (line.type === 'remove') {
-        return React.createElement(
-          Box,
-          { key: i },
-          React.createElement(Text, { color: 'red' }, `${num} - `),
-          React.createElement(Text, { dimColor: true }, line.content),
-        );
-      }
-      return React.createElement(
-        Box,
-        { key: i },
-        React.createElement(Text, { color: 'green' }, `${num} + `),
-        React.createElement(Text, null, line.content),
-      );
-    }),
-  );
 }

@@ -1,5 +1,3 @@
-import React from 'react';
-import { Text } from 'ink';
 import type { ToolDef, ToolResult, ToolExecutionContext } from './index.js';
 import type { AgentConfig } from '../agent.js';
 import type { MessageParam, ContentBlock } from '../llm/anthropic.js';
@@ -20,15 +18,6 @@ export const agentTool: ToolDef = {
     },
     required: ['task']
   },
-  formatCall(args: Record<string, unknown>) {
-    const task = args.task as string;
-    const taskPreview = task.length > 30 ? task.slice(0, 30) + '...' : task;
-    return React.createElement(Text, { color: 'yellow' }, `${this.name}(${taskPreview})`);
-  },
-
-  formatResult(output: string, _input: Record<string, unknown>) {
-    return React.createElement(Text, { dimColor: true }, output);
-  },
   execute: async (args: Record<string, unknown>, context?: ToolExecutionContext): Promise<ToolResult> => {
     const task = args.task as string;
     const registry = context?.registry;
@@ -36,11 +25,11 @@ export const agentTool: ToolDef = {
     const parentId = context?.currentAgentId || '1';
 
     if (!registry) {
-      return { output: 'Error: AgentRegistry not available', display: React.createElement(Text, { color: 'red' }, 'Error: AgentRegistry not available') };
+      return { output: 'Error: AgentRegistry not available' };
     }
 
     if (!config) {
-      return { output: 'Error: Agent config not available', display: React.createElement(Text, { color: 'red' }, 'Error: Agent config not available') };
+      return { output: 'Error: Agent config not available' };
     }
 
     const subId = registry.allocateSubId();
@@ -89,17 +78,14 @@ export const agentTool: ToolDef = {
       registry.remove(subId);
 
       const output = finalResponse || `Agent #${subId} completed: ${summary}`;
-      return {
-        output,
-        display: React.createElement(Text, { dimColor: true }, output)
-      };
+      return { output };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       registry.updateStatus(subId, 'error');
       registry.updateSummary(subId, `Error: ${errorMsg}`);
       registry.remove(subId);
 
-      return { output: `Agent #${subId} failed: ${errorMsg}`, display: React.createElement(Text, { color: 'red' }, `Agent #${subId} failed: ${errorMsg}`) };
+      return { output: `Agent #${subId} failed: ${errorMsg}` };
     }
   }
 };

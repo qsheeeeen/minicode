@@ -1,7 +1,15 @@
-import React from 'react';
-import { Box, Text } from 'ink';
 import type { MessageParam, ContentBlock } from './llm/anthropic.js';
-import type { ToolRegistry } from './tools/registry.js';
+
+export interface ToolDisplayResult {
+  content: string;
+  element?: React.ReactElement;
+}
+
+export type ToolDisplayFormatter = (
+  toolName: string,
+  input: Record<string, unknown>,
+  output?: string,
+) => ToolDisplayResult;
 
 // UI-only status / error messages — not sent to LLM
 export interface StatusMessage {
@@ -24,11 +32,10 @@ export interface DisplayMessage {
 }
 
 // Convert MessageParam[] + statuses → DisplayMessage[]
-// Tool_use blocks are rendered via tool.formatCall/formatResult on the fly.
 export function toDisplayMessages(
   turns: MessageParam[],
   statuses: StatusMessage[],
-  toolRegistry: ToolRegistry,
+  formatDisplay?: ToolDisplayFormatter,
 ): DisplayMessage[] {
   const result: DisplayMessage[] = [];
   const toolUseMsgs = new Map<string, DisplayMessage>();
@@ -63,12 +70,14 @@ export function toDisplayMessages(
         } else if (block.type === 'text') {
           result.push({ role: 'text', content: block.text });
         } else if (block.type === 'tool_use') {
-          const tool = toolRegistry.get(block.name);
-          const element = tool?.formatCall?.(block.input as Record<string, unknown>);
-          const dm: DisplayMessage = { role: 'tool_use', content: '', element, slotId: block.id };
+          const input = block.input as Record<string, unknown>;
+          const display = formatDisplay
+            ? formatDisplay(block.name, input)
+            : { content: `${block.name}(${JSON.stringify(input)})` };
+          const dm: DisplayMessage = { role: 'tool_use', content: display.content, element: display.element, slotId: block.id };
           result.push(dm);
           toolUseMsgs.set(block.id, dm);
-          toolUseData.set(block.id, { name: block.name, input: block.input as Record<string, unknown> });
+          toolUseData.set(block.id, { name: block.name, input });
         }
       }
     }
@@ -86,14 +95,12 @@ export function toDisplayMessages(
           const dm = toolUseMsgs.get(block.tool_use_id);
           const td = toolUseData.get(block.tool_use_id);
           if (dm && td) {
-            const tool = toolRegistry.get(td.name);
             const raw = typeof block.content === 'string' ? block.content : JSON.stringify(block.content);
-            const resultEl = tool?.formatResult
-              ? tool.formatResult(raw, td.input)
-              : React.createElement(Text, { dimColor: true }, raw);
-            dm.element = dm.element
-              ? React.createElement(Box, { flexDirection: 'column' }, dm.element, resultEl)
-              : resultEl;
+            const display: ToolDisplayResult = formatDisplay
+              ? formatDisplay(td.name, td.input, raw)
+              : { content: raw };
+            dm.content = display.content;
+            dm.element = display.element;
           }
         }
       }
@@ -236,8 +243,8 @@ export class MessageStore {
   }
 
   /** Convenience: generate display messages from current state. */
-  toDisplayMessages(toolRegistry: ToolRegistry): DisplayMessage[] {
-    const msgs = toDisplayMessages(this.turns, this.statuses, toolRegistry);
+  toDisplayMessages(formatDisplay?: ToolDisplayFormatter): DisplayMessage[] {
+    const msgs = toDisplayMessages(this.turns, this.statuses, formatDisplay);
     // Mark last assistant/text block as streaming if store is in streaming mode
     if (this.streaming) {
       for (let i = msgs.length - 1; i >= 0; i--) {

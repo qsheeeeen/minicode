@@ -1,6 +1,5 @@
 import type { Agent } from '../agent.js';
 import type { MessageParam, ContentBlock } from '../llm/anthropic.js';
-import { elementToText } from '../utils/react.js';
 import type { SessionManager } from '../utils/session.js';
 
 export async function runHeadless(
@@ -44,14 +43,10 @@ export async function runHeadless(
   const printedToolUses = new Set<string>();               // tool_use block IDs already printed
   const printedResults = new Set<string>();                // tool_use IDs whose results have been printed
 
-  const toolRegistry = agent.getToolRegistry();
-
   agent.getStore().onChange(() => {
     const turns = agent.getStore().getTurns();
     const statuses = agent.getStore().getStatuses();
 
-    // Import toDisplayMessages dynamically to avoid circular deps
-    // Since we're in headless mode, we render inline instead
     for (let ti = printedTurns; ti < turns.length; ti++) {
       const turn = turns[ti];
       if (turn.role === 'user') {
@@ -106,9 +101,7 @@ export async function runHeadless(
           // --- tool_use: print call line + immediate result ---
           if (block.type === 'tool_use' && !printedToolUses.has(block.id)) {
             printedToolUses.add(block.id);
-            const tool = toolRegistry.get(block.name);
-            const callEl = tool?.formatCall?.(block.input as Record<string, unknown>);
-            const callText = callEl ? elementToText(callEl) : `${block.name}(${JSON.stringify(block.input)})`;
+            const callText = `${block.name}(${JSON.stringify(block.input)})`;
             process.stdout.write(`\n[tool] ${callText}\n`);
 
             // Scan subsequent turns for matching tool_result

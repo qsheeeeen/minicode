@@ -1,6 +1,5 @@
 export { ToolRegistry } from './registry.js';
 
-import React from 'react';
 import type { AgentRegistry } from '../services/agent-registry.js';
 import type { AgentConfig } from '../agent.js';
 import type { PermissionService } from '../services/permission.js';
@@ -13,36 +12,25 @@ import { activateSkillTool } from './activate_skill.js';
 import { ToolRegistry } from './registry.js';
 import type { SkillRegistry } from '../cli/skills/skill-registry.js';
 
-// Tool execution context - passed to tool execute
-export interface ToolDisplayHandle {
-  update(element: React.ReactElement): void;
-}
-
 export interface ToolExecutionContext {
   registry?: AgentRegistry;
   config?: AgentConfig;
   currentAgentId?: string;
-  display?: ToolDisplayHandle;
   signal?: AbortSignal;
   permissionService?: PermissionService;
   skillRegistry?: SkillRegistry;
 }
 
-/** Tool returns output for LLM and ink element for TUI */
 export interface ToolResult {
   output: string;
-  display: React.ReactElement;
 }
 
-// ToolDef interface defined here for consistent imports
 export type ToolRequirement = 'agentRegistry' | 'skillRegistry';
 
 export interface ToolDef {
   name: string;
   description: string;
   input_schema: Record<string, unknown>;
-  formatCall?: (args: Record<string, unknown>) => React.ReactElement;
-  formatResult?: (output: string, input: Record<string, unknown>) => React.ReactElement;
   execute: (args: Record<string, unknown>, context?: ToolExecutionContext) => Promise<ToolResult>;
   requires?: ToolRequirement[];
   requiresPermission?: boolean;

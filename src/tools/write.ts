@@ -1,5 +1,3 @@
-import React from 'react';
-import { Text } from 'ink';
 import fs from 'fs/promises';
 import path from 'path';
 import type { ToolDef, ToolResult } from './index.js';
@@ -16,15 +14,6 @@ export const writeTool: ToolDef = {
     },
     required: ['path', 'content']
   },
-  formatCall(args: Record<string, unknown>) {
-    const filePath = args.path as string;
-    const content = args.content as string;
-    const lines = content.split('\n').length;
-    return React.createElement(Text, { color: 'yellow' }, `${this.name}(${filePath}, ${lines} lines)`);
-  },
-  formatResult(output: string, _input: Record<string, unknown>) {
-    return React.createElement(Text, { dimColor: true }, output);
-  },
   execute: async (args: Record<string, unknown>): Promise<ToolResult> => {
     try {
       const filePath = args.path as string;
@@ -32,13 +21,10 @@ export const writeTool: ToolDef = {
       const dir = path.dirname(filePath);
       await fs.mkdir(dir, { recursive: true });
       await fs.writeFile(filePath, content, 'utf-8');
-      return {
-        output: `Wrote ${filePath}`,
-        display: React.createElement(Text, { dimColor: true }, `Wrote ${filePath}`)
-      };
+      return { output: `Wrote ${filePath}` };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      return { output: msg, display: React.createElement(Text, { color: 'red' }, msg) };
+      return { output: msg };
     }
   }
 };

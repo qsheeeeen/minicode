@@ -54,10 +54,4 @@ describe('bashTool', () => {
     });
   });
 
-  describe('format', () => {
-    it('formats command', () => {
-      const formatted = bashTool.formatCall({ command: 'ls -la' });
-      expect(formatted.props.children).toContain('ls -la');
-    });
-  });
 });

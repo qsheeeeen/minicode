@@ -1,5 +1,3 @@
-import React from 'react';
-import { Text } from 'ink';
 import { spawn } from 'child_process';
 import type { ToolDef, ToolResult, ToolExecutionContext } from './index.js';
 
@@ -15,12 +13,6 @@ export const bashTool: ToolDef = {
     },
     required: ['command']
   },
-  formatCall(args: Record<string, unknown>) {
-    return React.createElement(Text, { color: 'yellow' }, `${this.name}(${args.command as string})`);
-  },
-  formatResult(output: string, _input: Record<string, unknown>) {
-    return React.createElement(Text, { dimColor: true }, output);
-  },
   execute: async (args: Record<string, unknown>, context?: ToolExecutionContext): Promise<ToolResult> => {
     try {
       const command = args.command as string;
@@ -33,11 +25,9 @@ export const bashTool: ToolDef = {
 
         proc.stdout?.on('data', (d) => {
           stdout += d.toString();
-          context?.display?.update(React.createElement(Text, { dimColor: true }, stdout + (stderr ? '\n' + stderr : '')));
         });
         proc.stderr?.on('data', (d) => {
           stderr += d.toString();
-          context?.display?.update(React.createElement(Text, { dimColor: true }, stdout + (stderr ? '\n' + stderr : '')));
         });
 
         if (timeout) {
@@ -63,14 +53,10 @@ export const bashTool: ToolDef = {
           }
         });
       });
-      const trimmed = output.trim();
-      return {
-        output: trimmed,
-        display: React.createElement(Text, { dimColor: true }, trimmed)
-      };
+      return { output: output.trim() };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      return { output: msg, display: React.createElement(Text, { color: 'red' }, msg) };
+      return { output: msg };
     }
   }
 };

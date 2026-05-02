@@ -57,21 +57,4 @@ describe('readTool', () => {
     });
   });
 
-  describe('format', () => {
-    it('formats basic read command', () => {
-      const formatted = readTool.formatCall({ path: 'test.txt' });
-      expect(formatted.props.children).toContain('Read(test.txt)');
-    });
-
-    it('formats with offset and limit', () => {
-      const formatted = readTool.formatCall({ path: 'test.txt', offset: 10, limit: 50 });
-      expect(formatted.props.children).toContain('offset: 10');
-      expect(formatted.props.children).toContain('limit: 50');
-    });
-
-    it('formats with only offset', () => {
-      const formatted = readTool.formatCall({ path: 'test.txt', offset: 5 });
-      expect(formatted.props.children).toContain('offset: 5');
-    });
-  });
 });

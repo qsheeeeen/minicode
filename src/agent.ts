@@ -7,7 +7,6 @@ import { AgentRegistry } from './services/agent-registry.js';
 import { MessageStore } from './messages.js';
 import { PermissionService, type PermissionMode } from './services/permission.js';
 import type { SkillRegistry } from './cli/skills/skill-registry.js';
-import { elementToText } from './utils/react.js';
 import type { SessionManager } from './utils/session.js';
 import type pino from 'pino';
 
@@ -368,9 +367,7 @@ export class Agent {
   /** Run a single tool with permission check */
   private async runTool(tool: ToolDef, args: Record<string, unknown>, context: ToolExecutionContext): Promise<import('./tools/index.js').ToolResult> {
     if (tool.requiresPermission && this.permissionService) {
-      const displayText = tool.formatCall
-        ? elementToText(tool.formatCall(args))
-        : `${tool.name}(${JSON.stringify(args)})`;
+      const displayText = `${tool.name}(${JSON.stringify(args)})`;
       const allowed = await this.permissionService.check(tool.name, args, displayText, this.display);
       if (!allowed) {
         throw new ToolDeniedError(tool.name, displayText);

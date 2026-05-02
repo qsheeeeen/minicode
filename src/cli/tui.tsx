@@ -9,6 +9,7 @@ import { CallbackDisplay, type DisplayMessage, type ConfirmationRequest } from '
 import { commandRegistry, type CommandContext } from './commands/index.js';
 import './commands/builtin.js';
 import { Message } from './tui/Message.js';
+import { formatToolDisplay } from './tui/tool-display.js';
 import { getInputComponent, type InputComponentProps } from './tui/inputs.js';
 import type { SessionManager } from '../utils/session.js';
 import { AgentRegistry, type AgentSession } from '../services/agent-registry.js';
@@ -86,7 +87,7 @@ function useDisplay(
 
     // Subscribe to store changes for display updates
     agent.getStore().onChange(() => {
-      setMessages(agent.getStore().toDisplayMessages(agent.getToolRegistry()));
+      setMessages(agent.getStore().toDisplayMessages(formatToolDisplay));
     });
 
     registry.register({
@@ -281,7 +282,7 @@ export function App({
       const nextSession = sessions[nextIndex];
       activeAgentIdRef.current = nextSession.id;
       setActiveAgentId(nextSession.id);
-      setMessages(nextSession.agent.getStore().toDisplayMessages(nextSession.agent.getToolRegistry()));
+      setMessages(nextSession.agent.getStore().toDisplayMessages(formatToolDisplay));
     }
   }, { isActive: mode === 'chat' && approvalRequest === null });
 

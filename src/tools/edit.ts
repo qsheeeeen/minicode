@@ -1,7 +1,5 @@
-import React from 'react';
-import { Box, Text } from 'ink';
 import fs from 'fs/promises';
-import { generateDiffSummary, renderDiffLines } from '../utils/diff.js';
+import { generateDiffSummary } from '../utils/diff.js';
 import type { ToolDef, ToolResult } from './index.js';
 
 export const editTool: ToolDef = {
@@ -17,13 +15,6 @@ export const editTool: ToolDef = {
     },
     required: ['path', 'oldText', 'newText']
   },
-  formatCall(args: Record<string, unknown>) {
-    const path = args.path as string;
-    return React.createElement(Text, { color: 'yellow' }, `${this.name}(${path})`);
-  },
-  formatResult(output: string, _input: Record<string, unknown>) {
-    return React.createElement(Text, { dimColor: true }, output);
-  },
   execute: async (args: Record<string, unknown>): Promise<ToolResult> => {
     try {
       const path = args.path as string;
@@ -36,10 +27,14 @@ export const editTool: ToolDef = {
       content = content.replace(oldText, newText);
       await fs.writeFile(path, content, 'utf-8');
       const diffLines = generateDiffSummary(path, oldText, newText);
-      return { output: `Edited ${path}`, display: renderDiffLines(diffLines) };
+      const diffText = diffLines.map(l => {
+        const prefix = l.type === 'add' ? '+' : l.type === 'remove' ? '-' : ' ';
+        return `${String(l.lineNum).padStart(4)} ${prefix} ${l.content}`;
+      }).join('\n');
+      return { output: `Edited ${path}\n${diffText}` };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      return { output: msg, display: React.createElement(Text, { color: 'red' }, msg) };
+      return { output: msg };
     }
   }
 };

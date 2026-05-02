@@ -35,15 +35,4 @@ describe('writeTool', () => {
     });
   });
 
-  describe('format', () => {
-    it('formats with line count', () => {
-      const formatted = writeTool.formatCall({ path: 'test.txt', content: 'line1\nline2\nline3' });
-      expect(formatted.props.children).toContain('3 lines');
-    });
-
-    it('formats single line', () => {
-      const formatted = writeTool.formatCall({ path: 'test.txt', content: 'single line' });
-      expect(formatted.props.children).toContain('1 lines');
-    });
-  });
 });

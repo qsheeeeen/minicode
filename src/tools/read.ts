@@ -1,5 +1,3 @@
-import React from 'react';
-import { Text } from 'ink';
 import fs from 'fs/promises';
 import type { ToolDef, ToolResult } from './index.js';
 
@@ -15,23 +13,6 @@ export const readTool: ToolDef = {
     },
     required: ['path']
   },
-  formatCall(args: Record<string, unknown>) {
-    const path = args.path as string;
-    const offset = args.offset as number | undefined;
-    const limit = args.limit as number | undefined;
-    let info = `${this.name}(${path}`;
-    if (offset || limit) {
-      const parts: string[] = [];
-      if (offset) parts.push(`offset: ${offset}`);
-      if (limit) parts.push(`limit: ${limit}`);
-      info += `, ${parts.join(', ')}`;
-    }
-    return React.createElement(Text, { color: 'yellow' }, info + ')');
-  },
-  formatResult(output: string, _input: Record<string, unknown>) {
-    const lines = output.split('\n');
-    return React.createElement(Text, { dimColor: true }, `Read ${lines.length} lines, ${output.length} chars`);
-  },
   execute: async (args: Record<string, unknown>): Promise<ToolResult> => {
     try {
       const path = args.path as string;
@@ -42,13 +23,10 @@ export const readTool: ToolDef = {
       const start = (offset || 1) - 1;
       const end = limit ? start + limit : lines.length;
       const result = lines.slice(start, end).join('\n');
-      return {
-        output: result,
-        display: React.createElement(Text, { dimColor: true }, `Read ${lines.length} lines, ${content.length} chars`)
-      };
+      return { output: result };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      return { output: msg, display: React.createElement(Text, { color: 'red' }, msg) };
+      return { output: msg };
     }
   }
 };

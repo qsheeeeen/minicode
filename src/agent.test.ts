@@ -31,8 +31,7 @@ vi.mock('./tools/index.js', async (importOriginal) => {
         name: 'testTool',
         description: 'Test Tool',
         input_schema: { type: 'object', properties: {} },
-        execute: vi.fn().mockResolvedValue({ output: 'success', display: null }),
-        formatCall: vi.fn(),
+        execute: vi.fn().mockResolvedValue({ output: 'success' }),
       });
     },
   };

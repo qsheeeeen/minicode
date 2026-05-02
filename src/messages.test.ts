@@ -1,28 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
-import React from 'react';
 import { MessageStore, toDisplayMessages, type StatusMessage } from './messages.js';
 import type { MessageParam } from './llm/anthropic.js';
-import { ToolRegistry } from './tools/registry.js';
-
-function makeToolRegistry(): ToolRegistry {
-  const registry = new ToolRegistry();
-  registry.register({
-    name: 'Read',
-    description: 'Read file',
-    input_schema: {},
-    execute: vi.fn() as any,
-    formatCall: vi.fn().mockReturnValue(React.createElement('div', {}, 'Read /a.txt')),
-    formatResult: vi.fn().mockReturnValue(React.createElement('div', {}, 'Result')),
-  });
-  return registry;
-}
 
 describe('toDisplayMessages', () => {
-  const toolRegistry = makeToolRegistry();
 
   it('renders user string turns', () => {
     const turns: MessageParam[] = [{ role: 'user', content: 'hello' }];
-    const result = toDisplayMessages(turns, [], toolRegistry);
+    const result = toDisplayMessages(turns, []);
     expect(result).toHaveLength(1);
     expect(result[0].role).toBe('user');
     expect(result[0].content).toBe('hello');
@@ -32,21 +16,20 @@ describe('toDisplayMessages', () => {
     const turns: MessageParam[] = [
       { role: 'assistant', content: [{ type: 'text', text: 'hi there' }] },
     ];
-    const result = toDisplayMessages(turns, [], toolRegistry);
+    const result = toDisplayMessages(turns, []);
     expect(result).toHaveLength(1);
     expect(result[0].role).toBe('text');
     expect(result[0].content).toBe('hi there');
   });
 
-  it('attaches tool_result to matching tool_use element', () => {
+  it('attaches tool_result content to matching tool_use', () => {
     const turns: MessageParam[] = [
       { role: 'assistant', content: [{ type: 'tool_use', id: 't1', name: 'Read', input: { path: '/a.txt' } }] },
       { role: 'user', content: [{ type: 'tool_result', tool_use_id: 't1', content: 'file contents' }] },
     ];
-    const result = toDisplayMessages(turns, [], toolRegistry);
+    const result = toDisplayMessages(turns, []);
     expect(result).toHaveLength(1);
-    expect(result[0].element).toBeDefined();
-    expect(toolRegistry.get('Read')?.formatResult).toHaveBeenCalled();
+    expect(result[0].content).toContain('file contents');
   });
 
   it('interleaves statuses with turns based on turnIndex', () => {
@@ -54,7 +37,7 @@ describe('toDisplayMessages', () => {
     const statuses: StatusMessage[] = [
       { role: 'status', content: 'done', timestamp: new Date(), turnIndex: 1 },
     ];
-    const result = toDisplayMessages(turns, statuses, toolRegistry);
+    const result = toDisplayMessages(turns, statuses);
     expect(result).toHaveLength(2);
     expect(result[1].role).toBe('status');
   });
@@ -64,7 +47,7 @@ describe('toDisplayMessages', () => {
     const statuses: StatusMessage[] = [
       { role: 'status', content: 'cleared', timestamp: new Date(), turnIndex: 0 },
     ];
-    const result = toDisplayMessages(turns, statuses, toolRegistry);
+    const result = toDisplayMessages(turns, statuses);
     expect(result).toHaveLength(2);
     expect(result[0].role).toBe('status');
     expect(result[1].role).toBe('user');

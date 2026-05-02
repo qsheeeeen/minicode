@@ -18,7 +18,7 @@ describe('editTool', () => {
       const fs = await import('fs/promises');
       (fs.default.readFile as ReturnType<typeof vi.fn>).mockResolvedValue('hello world');
       const result = await editTool.execute({ path: 'test.txt', oldText: 'world', newText: 'minicode' });
-      expect(result.output).toBe('Edited test.txt');
+      expect(result.output).toContain('Edited test.txt');
       expect(fs.default.writeFile).toHaveBeenCalledWith('test.txt', 'hello minicode', 'utf-8');
     });
 
@@ -45,10 +45,4 @@ describe('editTool', () => {
     });
   });
 
-  describe('format', () => {
-    it('formats with file path', () => {
-      const formatted = editTool.formatCall({ path: 'test.txt', oldText: 'a', newText: 'b' });
-      expect(formatted.props.children).toContain('test.txt');
-    });
-  });
 });
