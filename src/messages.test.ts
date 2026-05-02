@@ -28,13 +28,13 @@ describe('toDisplayMessages', () => {
     expect(result[0].content).toBe('hello');
   });
 
-  it('renders assistant text blocks', () => {
+  it('renders text blocks', () => {
     const turns: MessageParam[] = [
       { role: 'assistant', content: [{ type: 'text', text: 'hi there' }] },
     ];
     const result = toDisplayMessages(turns, [], toolRegistry);
     expect(result).toHaveLength(1);
-    expect(result[0].role).toBe('assistant');
+    expect(result[0].role).toBe('text');
     expect(result[0].content).toBe('hi there');
   });
 

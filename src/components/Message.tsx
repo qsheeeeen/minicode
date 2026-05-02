@@ -1,8 +1,9 @@
 import React from 'react';
 import { Box, Text } from 'ink';
+import type { MessageRole } from '../messages.js';
 
 interface MessageProps {
-  role: 'user' | 'assistant' | 'status' | 'tool' | 'tool_result' | 'error' | 'thinking';
+  role: MessageRole;
   content: string;
   isStreaming?: boolean;
   element?: React.ReactElement;
@@ -22,7 +23,7 @@ export function Message({ role, content, isStreaming, element }: MessageProps) {
     );
   }
 
-  if (role === 'assistant') {
+  if (role === 'text') {
     return (
       <Box marginBottom={0} paddingX={0} flexDirection="column">
         <Text>{text}</Text>
@@ -40,7 +41,7 @@ export function Message({ role, content, isStreaming, element }: MessageProps) {
     );
   }
 
-  if (role === 'tool') {
+  if (role === 'tool_use') {
     if (element) return element;
     return (
       <Box marginBottom={0} paddingX={4}>

@@ -13,7 +13,7 @@ export interface StatusMessage {
 }
 
 // Display layer uses these fields
-type MessageRole = 'user' | 'assistant' | 'status' | 'tool' | 'tool_result' | 'error' | 'thinking';
+export type MessageRole = 'user' | 'text' | 'thinking' | 'tool_use' | 'tool_result' | 'status' | 'error';
 export interface DisplayMessage {
   role: MessageRole;
   content: string;
@@ -61,11 +61,11 @@ export function toDisplayMessages(
         if (block.type === 'thinking') {
           result.push({ role: 'thinking', content: block.thinking });
         } else if (block.type === 'text') {
-          result.push({ role: 'assistant', content: block.text });
+          result.push({ role: 'text', content: block.text });
         } else if (block.type === 'tool_use') {
           const tool = toolRegistry.get(block.name);
           const element = tool?.formatCall?.(block.input as Record<string, unknown>);
-          const dm: DisplayMessage = { role: 'tool', content: '', element, slotId: block.id };
+          const dm: DisplayMessage = { role: 'tool_use', content: '', element, slotId: block.id };
           result.push(dm);
           toolUseMsgs.set(block.id, dm);
           toolUseData.set(block.id, { name: block.name, input: block.input as Record<string, unknown> });
@@ -102,7 +102,7 @@ export function toDisplayMessages(
 
   // Any unmatched statuses (turnIndex > turns.length) go at the end
   for (const s of statuses) {
-    if (s.turnIndex > turns.length) {
+    if (s.turnIndex !== undefined && s.turnIndex > turns.length) {
       result.push({ role: s.role, content: s.content, element: s.element, timestamp: s.timestamp });
     }
   }
@@ -241,7 +241,7 @@ export class MessageStore {
     // Mark last assistant/text block as streaming if store is in streaming mode
     if (this.streaming) {
       for (let i = msgs.length - 1; i >= 0; i--) {
-        if (msgs[i].role === 'assistant' || msgs[i].role === 'thinking') {
+        if (msgs[i].role === 'text' || msgs[i].role === 'thinking') {
           msgs[i].isStreaming = true;
           break;
         }
