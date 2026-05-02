@@ -8,7 +8,7 @@ import type { ResolvedConfig } from '../config.js';
 import { CallbackDisplay, type DisplayMessage, type ConfirmationRequest } from '../utils/display.js';
 import { commandRegistry, type CommandContext } from './commands/index.js';
 import './commands/builtin.js';
-import { Message } from '../components/Message.js';
+import { Message } from './tui/Message.js';
 import { getInputComponent, type InputComponentProps } from './tui/inputs.js';
 import type { SessionManager } from '../utils/session.js';
 import { AgentRegistry, type AgentSession } from '../services/agent-registry.js';

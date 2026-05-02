@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Text } from 'ink';
-import type { MessageRole } from '../messages.js';
+import type { MessageRole } from '../../messages.js';
 
 interface MessageProps {
   role: MessageRole;
