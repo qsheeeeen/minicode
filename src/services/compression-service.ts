@@ -1,10 +1,6 @@
 import { AnthropicClient, type MessageParam, type Message, type Anthropic } from '../llm/anthropic.js';
 
-export interface CompressionService {
-  compress(messages: MessageParam[], client: AnthropicClient, model: string | undefined): Promise<MessageParam[]>;
-}
-
-export class CompressionServiceImpl implements CompressionService {
+export class CompressionService {
   private readonly recentCount = 10;
 
   async compress(messages: MessageParam[], client: AnthropicClient, model: string | undefined): Promise<MessageParam[]> {

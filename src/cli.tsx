@@ -101,12 +101,11 @@ const agent = new Agent({
   thinkingEnabled: config.thinking.enabled,
   effort: config.thinking.effort,
   userPrompt,
-  sessionManager,
-  permissionMode,
-  currentSession: initialSession,
-  logger,
-  skillRegistry,
 });
+agent.setSession(initialSession, logger);
+agent.setSessionManager(sessionManager);
+agent.setPermissionMode(permissionMode);
+agent.setSkillRegistry(skillRegistry);
 
 // Set shared command resolver so both headless and TUI use the same resolve path
 agent.setCommandResolver((input: string) =>

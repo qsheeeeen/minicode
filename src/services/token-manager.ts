@@ -1,17 +1,4 @@
-/**
- * Token management service for tracking LLM usage
- */
-export interface TokenManager {
-  addTokens(input: number, output: number, cacheCreation?: number, cacheRead?: number): void;
-  getTotal(): number;
-  getRatio(contextLength: number): number;
-  shouldCompress(contextLength: number, thresholdRatio: number): boolean;
-  getLastShownThreshold(): number;
-  updateThreshold(value: number): void;
-  reset(): void;
-}
-
-export class TokenManagerImpl implements TokenManager {
+export class TokenManager {
   private totalTokens = 0;
   private lastShownThreshold = 0;
 

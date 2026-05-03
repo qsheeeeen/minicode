@@ -1,8 +1,8 @@
 import { AnthropicClient, MessageParam, Tool, Anthropic, ContentBlock, type EffortLevel } from './llm/anthropic.js';
 import { registerTools, ToolRegistry, ToolDef, ToolExecutionContext } from './tools/index.js';
 import { ConsoleDisplay, type DisplayAdapter } from './utils/display.js';
-import { TokenManager, TokenManagerImpl } from './services/token-manager.js';
-import { CompressionService, CompressionServiceImpl } from './services/compression-service.js';
+import { TokenManager } from './services/token-manager.js';
+import { CompressionService } from './services/compression-service.js';
 import { AgentRegistry } from './services/agent-registry.js';
 import { MessageStore } from './messages.js';
 import { PermissionService, type PermissionMode } from './services/permission.js';
@@ -33,20 +33,10 @@ export interface AgentConfig {
   compressionThresholdRatio?: number;
   thinkingEnabled?: boolean;
   effort?: EffortLevel;
-  display?: DisplayAdapter;
-  tokenManager?: TokenManager;
-  compressionService?: CompressionService;
   userPrompt?: string;
   excludeTools?: string[];
   agentRegistry?: AgentRegistry;
   currentAgentId?: string;
-  permissionMode?: PermissionMode;
-  sessionManager?: SessionManager;
-  currentSession?: string;
-  logger?: pino.Logger;
-  skillRegistry?: SkillRegistry;
-  /** Resolve slash commands before sending to LLM. Returned by both TUI and headless. */
-  resolveCommand?: (input: string) => Promise<{ handled: boolean; promptText?: string; displayContent?: string }>;
 }
 
 interface StreamingResult {
@@ -84,7 +74,7 @@ export class Agent {
   private currentAgentId: string;
   private apiKey?: string;
   private baseURL?: string;
-  private permissionService?: PermissionService;
+  private permissionService: PermissionService;
   private abortController: AbortController | null = null;
   private currentStream: import('@anthropic-ai/sdk/lib/MessageStream.js').MessageStream<null> | null = null;
   private sessionManager?: SessionManager;
@@ -108,6 +98,18 @@ export class Agent {
     this.effort = effort;
   }
 
+  public setPermissionMode(mode: PermissionMode): void {
+    this.permissionService.setMode(mode);
+  }
+
+  public setSessionManager(sm: SessionManager): void {
+    this.sessionManager = sm;
+  }
+
+  public setSkillRegistry(sr: SkillRegistry): void {
+    this.skillRegistry = sr;
+  }
+
   public setModel(model: string, apiKey?: string, baseURL?: string): void {
     this.model = model;
     if (apiKey !== undefined) this.apiKey = apiKey;
@@ -124,25 +126,20 @@ export class Agent {
     this.compressionThresholdRatio = config.compressionThresholdRatio || 0.8;
     this.thinkingEnabled = config.thinkingEnabled || false;
     this.effort = config.effort;
-    this.tokenManager = config.tokenManager || new TokenManagerImpl();
-    this.compressionService = config.compressionService || new CompressionServiceImpl();
+    this.tokenManager = new TokenManager();
+    this.compressionService = new CompressionService();
     this.toolRegistry = new ToolRegistry();
     this.agentRegistry = config.agentRegistry;
-    this.skillRegistry = config.skillRegistry;
     this.currentAgentId = config.currentAgentId || '1';
-    this.sessionManager = config.sessionManager;
-    this.resolveCommand = config.resolveCommand;
-    if (config.currentSession) this.currentSession = config.currentSession;
-    this.logger = config.logger;
     this.permissionService = new PermissionService({
-      initialMode: config.permissionMode ?? 'manual',
+      initialMode: 'manual',
       client: this.apiKey ? this.client : undefined,
       model: this.model,
     });
 
-    registerTools(this.toolRegistry, { agentRegistry: this.agentRegistry, skillRegistry: this.skillRegistry }, config.excludeTools);
+    registerTools(this.toolRegistry, { agentRegistry: this.agentRegistry }, config.excludeTools);
 
-    this.display = config.display ?? new ConsoleDisplay();
+    this.display = new ConsoleDisplay();
     this.userPrompt = config.userPrompt || '';
   }
 
@@ -366,7 +363,7 @@ export class Agent {
 
   /** Run a single tool with permission check */
   private async runTool(tool: ToolDef, args: Record<string, unknown>, context: ToolExecutionContext): Promise<import('./tools/index.js').ToolResult> {
-    if (tool.requiresPermission && this.permissionService) {
+    if (tool.requiresPermission) {
       const displayText = `${tool.name}(${JSON.stringify(args)})`;
       const allowed = await this.permissionService.check(tool.name, args, displayText, this.display);
       if (!allowed) {
@@ -550,7 +547,7 @@ export class Agent {
     return this.skillRegistry;
   }
 
-  getPermissionService(): PermissionService | undefined {
+  getPermissionService(): PermissionService {
     return this.permissionService;
   }
 }

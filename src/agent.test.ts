@@ -38,7 +38,7 @@ vi.mock('./tools/index.js', async (importOriginal) => {
 });
 
 vi.mock('./services/token-manager.js', () => ({
-  TokenManagerImpl: vi.fn().mockImplementation(function() {
+  TokenManager: vi.fn().mockImplementation(function() {
     return {
       getTotal: vi.fn().mockReturnValue(100),
       addTokens: vi.fn(),
@@ -52,7 +52,7 @@ vi.mock('./services/token-manager.js', () => ({
 }));
 
 vi.mock('./services/compression-service.js', () => ({
-  CompressionServiceImpl: vi.fn().mockImplementation(function() {
+  CompressionService: vi.fn().mockImplementation(function() {
     return {
       compress: vi.fn().mockResolvedValue([{ role: 'user', content: 'compressed' }]),
     };
@@ -65,7 +65,7 @@ vi.mock('./services/permission.js', () => ({
   }),
 }));
 
-import { Agent, AgentConfig } from './agent.js';
+import { Agent } from './agent.js';
 import { MessageStore } from './messages.js';
 
 describe('Agent', () => {
@@ -81,8 +81,8 @@ describe('Agent', () => {
     });
 
     it('initializes with config values', () => {
-      const config: AgentConfig = { currentSession: 'test-session', userPrompt: 'custom' };
-      const agent = new Agent(config);
+      const agent = new Agent({ userPrompt: 'custom' });
+      agent.setSession('test-session');
       expect(agent.currentSession).toBe('test-session');
     });
   });

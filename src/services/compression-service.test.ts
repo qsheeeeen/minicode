@@ -1,16 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { CompressionServiceImpl } from './compression-service.js';
+import { CompressionService } from './compression-service.js';
 import type { AnthropicClient, MessageParam } from '../llm/anthropic.js';
 
 vi.mock('../llm/anthropic.js', () => ({
   AnthropicClient: vi.fn(),
 }));
 
-describe('CompressionServiceImpl', () => {
-  let service: CompressionServiceImpl;
+describe('CompressionService', () => {
+  let service: CompressionService;
 
   beforeEach(() => {
-    service = new CompressionServiceImpl();
+    service = new CompressionService();
   });
 
   describe('compress', () => {
