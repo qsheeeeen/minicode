@@ -11,7 +11,7 @@ import './commands/builtin.js';
 import { Message } from './tui/Message.js';
 import { formatToolDisplay } from './tui/tool-display.js';
 import { getInputComponent, type InputComponentProps } from './tui/inputs.js';
-import type { SessionManager } from '../utils/session.js';
+import { sessionManager } from '../utils/session.js';
 import { AgentRegistry, type AgentSession } from '../services/agent-registry.js';
 import type { PermissionMode } from '../services/permission.js';
 
@@ -21,7 +21,6 @@ export interface AppProps {
   version: string;
   promptFiles: string[];
   initialSession: string;
-  sessionManager: SessionManager;
   initialPrompt?: string;
   sessionName?: string;
   resumeRecent: boolean;
@@ -55,7 +54,6 @@ function useMultiAgent() {
 function useDisplay(
   agent: Agent,
   initialSession: string,
-  sessionManager: SessionManager,
   sessionName: string | undefined,
   resumeRecent: boolean,
   setAgentSessions: React.Dispatch<React.SetStateAction<AgentSession[]>>,
@@ -136,7 +134,6 @@ export function App({
   version,
   promptFiles,
   initialSession,
-  sessionManager,
   initialPrompt,
   sessionName,
   resumeRecent,
@@ -163,7 +160,7 @@ export function App({
 
   // Display hook: attach TUI display to agent, load initial session
   const { messages, setMessages, currentSession, setCurrentSession, tokenCount } = useDisplay(
-    agent, initialSession, sessionManager, sessionName, resumeRecent,
+    agent, initialSession, sessionName, resumeRecent,
     setAgentSessions, registryRef,
     setApprovalRequest,
   );
@@ -187,7 +184,6 @@ export function App({
     agent.setCommandResolver(async (input: string) => {
       return commandRegistry.parseAndExecute(input, {
         agent,
-        sessionManager,
         setMessages,
         setCurrentSession,
         setMode,

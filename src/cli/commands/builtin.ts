@@ -1,5 +1,8 @@
 import { commandRegistry } from './index.js';
 import type { EffortLevel } from '../../llm/anthropic.js';
+import { sessionManager } from '../../utils/session.js';
+import { skillRegistry } from '../skills/index.js';
+import { createLogger } from '../../utils/logger.js';
 
 commandRegistry.register({
   name: 'exit',
@@ -16,9 +19,9 @@ commandRegistry.register({
     ctx.agent.clearSession();
     ctx.agent.setTokenCount(0);
     const newSession = `session-${Date.now()}`;
-    const { createLogger } = await import('../../utils/logger.js');
-    const newLogger = await createLogger(ctx.sessionManager.getProjectHash(), newSession);
-    ctx.agent.setSession(newSession, newLogger);
+        const newLogger = await createLogger(sessionManager.getProjectHash(), newSession);
+    ctx.agent.setSession(newSession);
+    ctx.agent.setLogger(newLogger);
     ctx.setCurrentSession(newSession);
     ctx.agent.getStore().addStatus({ role: 'status', content: '(Cleared)', timestamp: new Date() });
   }
@@ -63,9 +66,9 @@ commandRegistry.register({
     const name = args.join(' ');
     if (name) {
       ctx.agent.clearSession();
-      const { createLogger } = await import('../../utils/logger.js');
-      const newLogger = await createLogger(ctx.sessionManager.getProjectHash(), name);
-      ctx.agent.setSession(name, newLogger);
+            const newLogger = await createLogger(sessionManager.getProjectHash(), name);
+      ctx.agent.setSession(name);
+      ctx.agent.setLogger(newLogger);
       ctx.setCurrentSession(name);
       ctx.agent.getStore().addStatus({ role: 'status', content: `Created session: ${name}`, timestamp: new Date() });
     }
@@ -79,10 +82,10 @@ commandRegistry.register({
     const newName = args.join(' ');
     if (newName) {
       const oldName = ctx.agent.currentSession;
-      await ctx.sessionManager.rename(oldName, newName);
-      const { createLogger } = await import('../../utils/logger.js');
-      const newLogger = await createLogger(ctx.sessionManager.getProjectHash(), newName);
-      ctx.agent.setSession(newName, newLogger);
+      await sessionManager.rename(oldName, newName);
+            const newLogger = await createLogger(sessionManager.getProjectHash(), newName);
+      ctx.agent.setSession(newName);
+      ctx.agent.setLogger(newLogger);
       ctx.setCurrentSession(newName);
       ctx.agent.getStore().addStatus({ role: 'status', content: `Renamed: ${oldName} -> ${newName}`, timestamp: new Date() });
     }
@@ -94,20 +97,20 @@ commandRegistry.register({
   description: 'Load a session (without args: list sessions)',
   handler: async (args, ctx): Promise<void> => {
     if (args.length === 0) {
-      const sessions = await ctx.sessionManager.list();
+      const sessions = await sessionManager.list();
       ctx.setInputMode('session-list', { sessions });
     } else {
       const name = args[0];
-      const data = await ctx.sessionManager.get(name);
+      const data = await sessionManager.get(name);
       if (data) {
         ctx.agent.setMessages(data.messages as any);
         const totalTokens = data.totalTokens || 0;
         if (totalTokens > 0) {
           ctx.agent.setTokenCount(totalTokens);
         }
-        const { createLogger } = await import('../../utils/logger.js');
-        const newLogger = await createLogger(ctx.sessionManager.getProjectHash(), name);
-        ctx.agent.setSession(name, newLogger);
+                const newLogger = await createLogger(sessionManager.getProjectHash(), name);
+        ctx.agent.setSession(name);
+        ctx.agent.setLogger(newLogger);
         ctx.setCurrentSession(name);
         ctx.agent.getStore().addStatus({ role: 'status', content: `Loaded session: ${name}`, timestamp: new Date() });
       } else {
@@ -137,11 +140,6 @@ commandRegistry.register({
   name: 'skills',
   description: 'List available skills',
   handler: async (_args, ctx): Promise<void> => {
-    const skillRegistry = ctx.agent.getSkillRegistry();
-    if (!skillRegistry) {
-      ctx.agent.getStore().addStatus({ role: 'status', content: '(No skill registry available)', timestamp: new Date() });
-      return;
-    }
     const skills = skillRegistry.getAvailableSkills();
     if (skills.length === 0) {
       ctx.agent.getStore().addStatus({ role: 'status', content: '(No skills available)', timestamp: new Date() });

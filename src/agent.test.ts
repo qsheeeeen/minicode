@@ -65,6 +65,18 @@ vi.mock('./services/permission.js', () => ({
   }),
 }));
 
+vi.mock('./utils/session.js', () => ({
+  sessionManager: {
+    save: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+
+vi.mock('./cli/skills/index.js', () => ({
+  skillRegistry: {
+    getAvailableSkills: vi.fn().mockReturnValue([]),
+  },
+}));
+
 import { Agent } from './agent.js';
 import { MessageStore } from './messages.js';
 

@@ -1,7 +1,30 @@
-import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from 'vitest';
 import { commandRegistry, CommandContext } from './index.js';
 
-// Setup mock before loading the module
+const { sessionManagerMock } = vi.hoisted(() => ({
+  sessionManagerMock: {
+    getProjectHash: vi.fn().mockReturnValue('testhash'),
+    get: vi.fn().mockResolvedValue(null),
+    list: vi.fn().mockResolvedValue([]),
+    rename: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+
+vi.mock('../../utils/session.js', () => ({
+  sessionManager: sessionManagerMock,
+}));
+
+vi.mock('../../utils/logger.js', () => ({
+  createLogger: vi.fn().mockResolvedValue({ info: vi.fn(), error: vi.fn() }),
+}));
+
+vi.mock('../skills/index.js', () => ({
+  skillRegistry: {
+    getAvailableSkills: vi.fn().mockReturnValue([]),
+  },
+}));
+
+// Setup mock for command registry
 vi.mock('./index.js', () => ({
   commandRegistry: {
     register: vi.fn(),
@@ -22,6 +45,9 @@ describe('Builtin commands', () => {
       acc[call[0].name] = call[0].handler || call[0].prompt;
       return acc;
     }, {});
+  });
+
+  beforeEach(() => {
     vi.clearAllMocks();
   });
 
@@ -74,13 +100,10 @@ describe('Builtin commands', () => {
         clearSession: vi.fn(),
         setTokenCount: vi.fn(),
         setSession: vi.fn(),
+        setLogger: vi.fn(),
       });
-      const sessionManagerMock = {
-        getProjectHash: vi.fn().mockReturnValue('testhash'),
-      };
       const ctx: Partial<CommandContext> = {
         agent: agentMock as any,
-        sessionManager: sessionManagerMock as any,
         setCurrentSession: vi.fn(),
         setMessages: vi.fn(),
       };
@@ -96,19 +119,16 @@ describe('Builtin commands', () => {
       const agentMock = makeAgentMock({
         clearSession: vi.fn(),
         setSession: vi.fn(),
+        setLogger: vi.fn(),
       });
-      const sessionManagerMock = {
-        getProjectHash: vi.fn().mockReturnValue('testhash'),
-      };
       const ctx: Partial<CommandContext> = {
         agent: agentMock as any,
-        sessionManager: sessionManagerMock as any,
         setCurrentSession: vi.fn(),
       };
 
       await handlers['new'](['my', 'new', 'session'], ctx as CommandContext);
       expect(agentMock.clearSession).toHaveBeenCalled();
-      expect(agentMock.setSession).toHaveBeenCalledWith('my new session', expect.anything());
+      expect(agentMock.setSession).toHaveBeenCalledWith('my new session');
       expect(ctx.setCurrentSession).toHaveBeenCalledWith('my new session');
       expect(agentMock.__store.addStatus).toHaveBeenCalledWith(expect.objectContaining({ role: 'status' }));
     });
@@ -118,15 +138,11 @@ describe('Builtin commands', () => {
       const agentMock = {
         currentSession: 'old-session',
         setSession: vi.fn(),
+        setLogger: vi.fn(),
         getStore: vi.fn().mockReturnValue(storeMock),
-      };
-      const sessionManagerMock = {
-        getProjectHash: vi.fn().mockReturnValue('testhash'),
-        rename: vi.fn().mockResolvedValue(undefined),
       };
       const ctx: Partial<CommandContext> = {
         agent: agentMock as any,
-        sessionManager: sessionManagerMock as any,
         setCurrentSession: vi.fn(),
       };
 
@@ -137,11 +153,8 @@ describe('Builtin commands', () => {
     });
 
     it('/resume with no args lists sessions', async () => {
-      const sessionManagerMock = {
-        list: vi.fn().mockResolvedValue([{ name: 'session-1' }, { name: 'session-2' }]),
-      };
+      sessionManagerMock.list.mockResolvedValue([{ name: 'session-1' }, { name: 'session-2' }]);
       const ctx: Partial<CommandContext> = {
-        sessionManager: sessionManagerMock as any,
         setInputMode: vi.fn(),
       };
 
@@ -151,24 +164,21 @@ describe('Builtin commands', () => {
     });
 
     it('/resume with args loads session', async () => {
+      sessionManagerMock.get.mockResolvedValue({
+        messages: [],
+        totalTokens: 100,
+      });
       const storeMock = { addStatus: vi.fn() };
       const agentMock = {
         setMessages: vi.fn(),
         setTokenCount: vi.fn(),
         setSession: vi.fn(),
+        setLogger: vi.fn(),
         getToolRegistry: vi.fn(),
         getStore: vi.fn().mockReturnValue(storeMock),
       };
-      const sessionManagerMock = {
-        getProjectHash: vi.fn().mockReturnValue('testhash'),
-        get: vi.fn().mockResolvedValue({
-          messages: [],
-          totalTokens: 100,
-        }),
-      };
       const ctx: Partial<CommandContext> = {
         agent: agentMock as any,
-        sessionManager: sessionManagerMock as any,
         setCurrentSession: vi.fn(),
         setMessages: vi.fn(),
       };
@@ -182,13 +192,10 @@ describe('Builtin commands', () => {
     });
 
     it('/resume with unknown session shows error', async () => {
+      sessionManagerMock.get.mockResolvedValue(null);
       const storeMock = { addStatus: vi.fn() };
-      const sessionManagerMock = {
-        get: vi.fn().mockResolvedValue(null),
-      };
       const ctx: Partial<CommandContext> = {
         agent: { getStore: vi.fn().mockReturnValue(storeMock) } as any,
-        sessionManager: sessionManagerMock as any,
         setMessages: vi.fn(),
       };
 

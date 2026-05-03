@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 import { render } from 'ink';
 import { loadAllConfig } from './config.js';
 import { Agent } from './agent.js';
-import { SessionManager } from './utils/session.js';
+import { sessionManager } from './utils/session.js';
 import { createLogger } from './utils/logger.js';
 import { parseArgs, type PermissionMode } from './cli/args.js';
 import { loadGlobalPrompt, loadProjectPrompt } from './utils/prompts.js';
@@ -49,8 +49,6 @@ const promptFiles: string[] = [];
 if (globalPrompt) promptFiles.push('~/.minicode/MINICODE.md');
 if (projectPrompt) promptFiles.push(`./${config.promptFile}`);
 const userPrompt = [globalPrompt, projectPrompt].filter(Boolean).join('\n\n');
-
-const sessionManager = new SessionManager();
 
 // Determine initial session
 let initialSession: string;
@@ -102,16 +100,14 @@ const agent = new Agent({
   effort: config.thinking.effort,
   userPrompt,
 });
-agent.setSession(initialSession, logger);
-agent.setSessionManager(sessionManager);
+agent.setSession(initialSession);
+agent.setLogger(logger);
 agent.setPermissionMode(permissionMode);
-agent.setSkillRegistry(skillRegistry);
 
 // Set shared command resolver so both headless and TUI use the same resolve path
 agent.setCommandResolver((input: string) =>
   commandRegistry.parseAndExecute(input, {
     agent,
-    sessionManager,
     setMessages: () => {},
     setCurrentSession: (name) => { initialSession = name; agent.currentSession = name; },
     setMode: () => {},
@@ -130,7 +126,7 @@ if (headless) {
   }
 
   const { runHeadless } = await import('./cli/headless.js');
-  await runHeadless(agent, initialPrompt, sessionManager, sessionName, resumeRecent);
+  await runHeadless(agent, initialPrompt, sessionName, resumeRecent);
   process.exit(0);
 }
 
@@ -141,7 +137,6 @@ render(<App
   version={VERSION}
   promptFiles={promptFiles}
   initialSession={initialSession}
-  sessionManager={sessionManager}
   initialPrompt={initialPrompt}
   sessionName={sessionName}
   resumeRecent={resumeRecent}

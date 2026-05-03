@@ -1,11 +1,10 @@
 import type { Agent } from '../agent.js';
 import type { MessageParam, ContentBlock } from '../llm/anthropic.js';
-import type { SessionManager } from '../utils/session.js';
+import { sessionManager } from '../utils/session.js';
 
 export async function runHeadless(
   agent: Agent,
   initialPrompt: string,
-  sessionManager: SessionManager,
   sessionName?: string,
   resumeRecent?: boolean,
 ): Promise<void> {
@@ -21,7 +20,8 @@ export async function runHeadless(
       }
       const { createLogger } = await import('../utils/logger.js');
       const newLogger = await createLogger(sessionManager.getProjectHash(), name);
-      agent.setSession(name, newLogger);
+      agent.setSession(name);
+      agent.setLogger(newLogger);
     }
   }
 

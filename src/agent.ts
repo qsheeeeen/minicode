@@ -6,8 +6,8 @@ import { CompressionService } from './services/compression-service.js';
 import { AgentRegistry } from './services/agent-registry.js';
 import { MessageStore } from './messages.js';
 import { PermissionService, type PermissionMode } from './services/permission.js';
-import type { SkillRegistry } from './cli/skills/skill-registry.js';
-import type { SessionManager } from './utils/session.js';
+import { skillRegistry } from './cli/skills/index.js';
+import { sessionManager } from './utils/session.js';
 import type pino from 'pino';
 
 export const SYSTEM_PROMPT = `你是一个交互式 CLI 工具，帮助用户完成软件工程任务。请使用以下指令和可用工具来协助用户。
@@ -70,24 +70,23 @@ export class Agent {
   private display: DisplayAdapter;
   private userPrompt: string;
   private agentRegistry?: AgentRegistry;
-  private skillRegistry?: SkillRegistry;
   private currentAgentId: string;
   private apiKey?: string;
   private baseURL?: string;
   private permissionService: PermissionService;
   private abortController: AbortController | null = null;
   private currentStream: import('@anthropic-ai/sdk/lib/MessageStream.js').MessageStream<null> | null = null;
-  private sessionManager?: SessionManager;
   private logger?: pino.Logger;
   private saveSessionLock: Promise<void> = Promise.resolve();
   private isCompressing: boolean = false;
   private resolveCommand?: (input: string) => Promise<{ handled: boolean; promptText?: string; displayContent?: string }>;
 
-  public setSession(sessionName: string, logger?: pino.Logger): void {
+  public setSession(sessionName: string): void {
     this.currentSession = sessionName;
-    if (logger) {
-      this.logger = logger;
-    }
+  }
+
+  public setLogger(logger: pino.Logger): void {
+    this.logger = logger;
   }
 
   public setCommandResolver(resolver: (input: string) => Promise<{ handled: boolean; promptText?: string; displayContent?: string }>): void {
@@ -100,14 +99,6 @@ export class Agent {
 
   public setPermissionMode(mode: PermissionMode): void {
     this.permissionService.setMode(mode);
-  }
-
-  public setSessionManager(sm: SessionManager): void {
-    this.sessionManager = sm;
-  }
-
-  public setSkillRegistry(sr: SkillRegistry): void {
-    this.skillRegistry = sr;
   }
 
   public setModel(model: string, apiKey?: string, baseURL?: string): void {
@@ -137,7 +128,7 @@ export class Agent {
       model: this.model,
     });
 
-    registerTools(this.toolRegistry, { agentRegistry: this.agentRegistry }, config.excludeTools);
+    registerTools(this.toolRegistry, { agentRegistry: this.agentRegistry, skillRegistry }, config.excludeTools);
 
     this.display = new ConsoleDisplay();
     this.userPrompt = config.userPrompt || '';
@@ -149,10 +140,8 @@ export class Agent {
 
   /** Save current session state to disk */
   private saveSession(): Promise<void> {
-    if (!this.sessionManager) return Promise.resolve();
-
     this.saveSessionLock = this.saveSessionLock.then(async () => {
-      await this.sessionManager!.save(this.currentSession, {
+      await sessionManager.save(this.currentSession, {
         model: this.model || 'unknown',
         messages: this.store.toLLMMessages() as any,
         totalTokens: this.tokenManager.getTotal(),
@@ -238,16 +227,14 @@ export class Agent {
       prompt += `\n\n# Project Context\n${this.userPrompt}`;
     }
 
-    if (this.skillRegistry) {
-      const availableSkills = this.skillRegistry.getAvailableSkills();
-      if (availableSkills.length > 0) {
-        prompt += `\n\n<available_skills>\n`;
-        availableSkills.forEach(skill => {
-          prompt += `  <skill>\n    <name>${skill.name}</name>\n    <description>${skill.description}</description>\n  </skill>\n`;
-        });
-        prompt += `</available_skills>\n`;
-        prompt += `\nTo activate a skill and receive its detailed instructions, use the ActivateSkill tool with the skill's name.\n`;
-      }
+    const availableSkills = skillRegistry.getAvailableSkills();
+    if (availableSkills.length > 0) {
+      prompt += `\n\n<available_skills>\n`;
+      availableSkills.forEach(skill => {
+        prompt += `  <skill>\n    <name>${skill.name}</name>\n    <description>${skill.description}</description>\n  </skill>\n`;
+      });
+      prompt += `</available_skills>\n`;
+      prompt += `\nTo activate a skill and receive its detailed instructions, use the ActivateSkill tool with the skill's name.\n`;
     }
 
     return prompt;
@@ -379,7 +366,7 @@ export class Agent {
 
     const context: ToolExecutionContext = {
       registry: this.agentRegistry,
-      skillRegistry: this.skillRegistry,
+      skillRegistry: skillRegistry,
       signal: this.abortController?.signal,
       config: {
         apiKey: this.apiKey,
@@ -541,10 +528,6 @@ export class Agent {
 
   getToolRegistry(): ToolRegistry {
     return this.toolRegistry;
-  }
-
-  getSkillRegistry(): SkillRegistry | undefined {
-    return this.skillRegistry;
   }
 
   getPermissionService(): PermissionService {

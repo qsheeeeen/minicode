@@ -1,5 +1,4 @@
 import type { Agent } from '../../agent.js';
-import type { SessionManager } from '../../utils/session.js';
 import type { DisplayMessage } from '../../utils/display.js';
 
 export interface CommandHandler {
@@ -13,7 +12,6 @@ export interface CommandHandler {
 
 export interface CommandContext {
   agent: Agent;
-  sessionManager: SessionManager;
   setMessages: (msg: DisplayMessage[] | ((prev: DisplayMessage[]) => DisplayMessage[])) => void;
   setCurrentSession: (name: string) => void;
   setMode: (mode: 'chat' | 'session-list' | 'effort-select') => void;
