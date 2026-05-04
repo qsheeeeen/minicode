@@ -1,4 +1,5 @@
-import fs from 'fs/promises';
+import fs from 'fs';
+import fsPromises from 'fs/promises';
 import path from 'path';
 import os from 'os';
 import type { EffortLevel } from './llm/anthropic.js';
@@ -39,8 +40,8 @@ export async function loadConfig(refresh = false): Promise<Config> {
   if (cachedConfig && !refresh) return cachedConfig;
 
   try {
-    await fs.mkdir(CONFIG_DIR, { recursive: true });
-    const content = await fs.readFile(CONFIG_PATH, 'utf-8');
+    await fsPromises.mkdir(CONFIG_DIR, { recursive: true });
+    const content = await fsPromises.readFile(CONFIG_PATH, 'utf-8');
     cachedConfig = JSON.parse(content) as Config;
     return cachedConfig ?? {};
   } catch {
@@ -51,31 +52,6 @@ export async function loadConfig(refresh = false): Promise<Config> {
 
 export function invalidateConfig(): void {
   cachedConfig = null;
-}
-
-export async function getProviderConfig(provider?: string): Promise<ProviderConfig | undefined> {
-  const config = await loadConfig();
-  if (!provider) {
-    // Try to extract provider from model config
-    const spec = config.model;
-    if (spec) {
-      const parts = spec.split('@');
-      provider = parts[1] || Object.keys(config.providers || {})[0];
-    } else {
-      provider = Object.keys(config.providers || {})[0];
-    }
-  }
-  return config.providers?.[provider];
-}
-
-export async function getApiKey(provider?: string): Promise<string | undefined> {
-  const providerConfig = await getProviderConfig(provider);
-  return providerConfig?.apiKey;
-}
-
-export async function getBaseURL(provider?: string): Promise<string | undefined> {
-  const providerConfig = await getProviderConfig(provider);
-  return providerConfig?.baseURL;
 }
 
 export function parseModelSpecifier(
@@ -90,45 +66,13 @@ export function parseModelSpecifier(
   return { modelName, providerName, providerConfig };
 }
 
-export async function getModelConfig(modelSpecifier?: string): Promise<{ provider: string; model: string; apiKey: string; baseURL?: string; contextLength?: number } | null> {
-  const config = await loadConfig();
-  const spec = modelSpecifier || config.model;
-  if (!spec) return null;
-
-  const parsed = parseModelSpecifier(spec, config.providers ?? {});
-  if (!parsed) return null;
-
-  const modelConfig = parsed.providerConfig.models?.[parsed.modelName];
-  return {
-    provider: parsed.providerName,
-    model: parsed.modelName,
-    apiKey: parsed.providerConfig.apiKey!,
-    baseURL: parsed.providerConfig.baseURL,
-    contextLength: modelConfig?.contextLength
-  };
-}
-
-export async function getCompressionThreshold(): Promise<number> {
-  const config = await loadConfig();
-  return config.compressionThreshold ?? 0.8;
-}
-
-export async function getThinkingConfig(): Promise<{ enabled: boolean; effort?: EffortLevel }> {
-  const config = await loadConfig();
-  return {
-    enabled: config.thinking ?? false,
-    effort: config.effort
-  };
-}
-
-export async function getPromptFile(): Promise<string> {
-  const config = await loadConfig();
-  return config.promptFile || 'MINICODE.md';
-}
-
-export async function getSkillsDir(): Promise<string | undefined> {
-  const config = await loadConfig();
-  return config.skillsDir;
+export function loadConfigSync(): Config {
+  try {
+    const content = fs.readFileSync(CONFIG_PATH, 'utf-8');
+    return JSON.parse(content) as Config;
+  } catch {
+    return {};
+  }
 }
 
 export interface ResolvedConfig {
@@ -176,12 +120,12 @@ export async function setEffort(effort: string): Promise<void> {
   const config = await loadConfig();
   config.effort = effort as Config['effort'];
   cachedConfig = config;
-  await fs.writeFile(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf-8');
+  await fsPromises.writeFile(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf-8');
 }
 
 export async function setModel(modelSpec: string): Promise<void> {
   const config = await loadConfig();
   config.model = modelSpec;
   cachedConfig = config;
-  await fs.writeFile(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf-8');
+  await fsPromises.writeFile(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf-8');
 }

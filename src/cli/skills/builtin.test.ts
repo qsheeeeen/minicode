@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { skillRegistry } from './index.js';
-import './builtin.js';
 
 describe('builtin skills', () => {
   it('registers skill-creator into registry', () => {
@@ -12,6 +11,19 @@ describe('builtin skills', () => {
 
   it('skill-creator has a body', () => {
     const body = skillRegistry.getSkillBody('skill-creator');
+    expect(body).toBeDefined();
+    expect(body!.length).toBeGreaterThan(0);
+  });
+
+  it('registers init skill into registry', () => {
+    const skills = skillRegistry.getAvailableSkills();
+    const init = skills.find(s => s.name === 'init');
+    expect(init).toBeDefined();
+    expect(init!.description).toContain('onboarding flow');
+  });
+
+  it('init skill has a body', () => {
+    const body = skillRegistry.getSkillBody('init');
     expect(body).toBeDefined();
     expect(body!.length).toBeGreaterThan(0);
   });
