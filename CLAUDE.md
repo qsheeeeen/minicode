@@ -59,7 +59,7 @@ When adding or modifying config options, always update `config.example.json`.
 
 ```
 src/
-├── cli.tsx                  # TUI entry point, CLI args, React app
+├── cli.tsx                  # CLI entry point (TUI + headless modes), React app
 ├── agent.ts                 # Agent class with tool execution loop
 ├── messages.ts              # MessageStore (API + display message model)
 ├── config.ts                # Multi-provider config loader
@@ -68,19 +68,22 @@ src/
 │   ├── cli.tsx              # Top-level TUI App component + hooks
 │   ├── tui.tsx              # Legacy App (re-exported from cli.tsx)
 │   ├── headless.ts          # Headless (non-TUI) mode runner
-│   ├── tui/inputs.tsx       # Input component variants
-│   └── commands/
-│       ├── index.ts         # CommandRegistry class
-│       └── builtin.ts       # Builtin slash command registrations
-├── components/
-│   └── Message.tsx          # Message display component by role
+│   ├── tui/
+│   │   ├── Message.tsx      # Message display component by role
+│   │   ├── inputs.tsx       # Input component variants
+│   │   └── tool-display.tsx # Tool call/result rendering
+│   ├── commands/
+│   │   ├── index.ts         # CommandRegistry class
+│   │   └── builtin.ts       # Builtin slash command registrations
+│   └── skills/
+│       ├── index.ts         # SkillRegistry singleton export
+│       ├── skill-registry.ts # Skill loading from SKILL.md files
+│       └── builtin.ts       # Builtin skill definitions
 ├── llm/
 │   └── anthropic.ts         # AnthropicClient — streaming + non-streaming
 ├── services/
 │   ├── agent-registry.ts    # Multi-agent coordination
 │   ├── permission.ts        # PermissionService (manual/yolo/auto)
-│   ├── skill-registry.ts    # Skill loading from SKILL.md files
-│   ├── builtin-skills.ts    # Builtin skill definitions
 │   ├── token-manager.ts     # Token tracking + compression triggers
 │   ├── compression-service.ts  # LLM-based conversation summarization
 │   └── index.ts             # Re-exports
@@ -94,10 +97,9 @@ src/
     ├── diff.ts              # Unified diff generation
     ├── display.ts           # DisplayAdapter + CallbackDisplay + ConsoleDisplay
     ├── prompts.ts           # Global (~/.minicode/MINICODE.md) and project prompt loading
-    ├── session.ts           # SessionManager (v1/v2 persistence)
+    ├── session.ts           # SessionManager (v1/v2 persistence) — module singleton
     ├── session-display.ts   # Legacy v1 session → display message conversion
-    ├── logger.ts            # pino-based session-scoped logging
-    └── react.ts             # React element → plain text helper
+    └── logger.ts            # pino-based session-scoped logging
 ```
 
 ### Core Flow
@@ -127,7 +129,8 @@ src/
 - Skills follow agentSkills.io format: directory with `SKILL.md` (YAML frontmatter + markdown body)
 - `SkillRegistry` loads skills from `skillsDir` config path, parses frontmatter for name/description
 - Available skills listed in system prompt; `ActivateSkill` tool loads full instructions into context
-- Builtin skills defined in `src/services/builtin-skills.ts`; project skills from `.minicode/skills/`
+- Builtin skills defined in `src/cli/skills/builtin.ts`; project skills from `.claude/skills/`
+- Project prompt file (`MINICODE.md` by default) is loaded into context alongside system prompt
 
 **Display adapters:**
 - `CallbackDisplay` — for TUI (hooks into React state via callbacks)
