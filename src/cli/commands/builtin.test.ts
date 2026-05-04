@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from 'vitest';
-import { commandRegistry, CommandContext } from './index.js';
+import { commandRegistry, type CommandContext } from './index.js';
 
 const { sessionManagerMock } = vi.hoisted(() => ({
   sessionManagerMock: {
@@ -24,48 +24,30 @@ vi.mock('../skills/index.js', () => ({
   },
 }));
 
-// Setup mock for command registry
-vi.mock('./index.js', () => ({
-  commandRegistry: {
-    register: vi.fn(),
-  }
-}));
-
-// Load the module to execute the register calls
-import './builtin.js';
-
 describe('Builtin commands', () => {
-  let registerCalls: any[];
-  let handlers: Record<string, any> = {};
-
   beforeAll(() => {
-    // Capture the calls made during module load
-    registerCalls = (commandRegistry.register as any).mock.calls.slice();
-    handlers = registerCalls.reduce((acc: any, call: any[]) => {
-      acc[call[0].name] = call[0].handler || call[0].prompt;
-      return acc;
-    }, {});
-  });
-
-  beforeEach(() => {
-    vi.clearAllMocks();
+    // Commands are already registered on the real commandRegistry at import time
   });
 
   afterAll(() => {
     vi.restoreAllMocks();
   });
 
-  it('registers expected commands', () => {
-    const registeredNames = registerCalls.map((call: any[]) => call[0].name);
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
 
-    expect(registeredNames).toContain('exit');
-    expect(registeredNames).toContain('clear');
-    expect(registeredNames).toContain('compress');
-    expect(registeredNames).toContain('new');
-    expect(registeredNames).toContain('rename');
-    expect(registeredNames).toContain('resume');
-    expect(registeredNames).toContain('plan');
-    expect(registeredNames).toContain('test');
+  it('registers expected commands', () => {
+    const names = commandRegistry.getCommandNames();
+
+    expect(names).toContain('exit');
+    expect(names).toContain('clear');
+    expect(names).toContain('compress');
+    expect(names).toContain('new');
+    expect(names).toContain('rename');
+    expect(names).toContain('resume');
+    expect(names).toContain('plan');
+    expect(names).toContain('test');
   });
 
   function makeStoreMock() {
@@ -80,17 +62,17 @@ describe('Builtin commands', () => {
   describe('handlers', () => {
     it('/exit calls ctx.exit()', async () => {
       const ctx: Partial<CommandContext> = { exit: vi.fn() };
-      await handlers['exit']([], ctx as CommandContext);
+      const result = await commandRegistry.parseAndExecute('/exit', ctx as CommandContext);
+      expect(result.handled).toBe(true);
       expect(ctx.exit).toHaveBeenCalled();
     });
 
     it('/compress calls ctx.agent.compress() and adds status via store', async () => {
       const agentMock = makeAgentMock({ compress: vi.fn().mockResolvedValue(undefined) });
-      const ctx: Partial<CommandContext> = {
-        agent: agentMock as any,
-      };
+      const ctx: Partial<CommandContext> = { agent: agentMock as any };
 
-      await handlers['compress']([], ctx as CommandContext);
+      const result = await commandRegistry.parseAndExecute('/compress', ctx as CommandContext);
+      expect(result.handled).toBe(true);
       expect(agentMock.compress).toHaveBeenCalled();
       expect(agentMock.__store.addStatus).toHaveBeenCalledWith(expect.objectContaining({ role: 'status' }));
     });
@@ -108,7 +90,8 @@ describe('Builtin commands', () => {
         setMessages: vi.fn(),
       };
 
-      await handlers['clear']([], ctx as CommandContext);
+      const result = await commandRegistry.parseAndExecute('/clear', ctx as CommandContext);
+      expect(result.handled).toBe(true);
       expect(agentMock.clearSession).toHaveBeenCalled();
       expect(agentMock.setTokenCount).toHaveBeenCalledWith(0);
       expect(ctx.setCurrentSession).toHaveBeenCalledWith(expect.stringMatching(/^session-/));
@@ -126,7 +109,8 @@ describe('Builtin commands', () => {
         setCurrentSession: vi.fn(),
       };
 
-      await handlers['new'](['my', 'new', 'session'], ctx as CommandContext);
+      const result = await commandRegistry.parseAndExecute('/new my new session', ctx as CommandContext);
+      expect(result.handled).toBe(true);
       expect(agentMock.clearSession).toHaveBeenCalled();
       expect(agentMock.setSession).toHaveBeenCalledWith('my new session');
       expect(ctx.setCurrentSession).toHaveBeenCalledWith('my new session');
@@ -146,7 +130,8 @@ describe('Builtin commands', () => {
         setCurrentSession: vi.fn(),
       };
 
-      await handlers['rename'](['new-session'], ctx as CommandContext);
+      const result = await commandRegistry.parseAndExecute('/rename new-session', ctx as CommandContext);
+      expect(result.handled).toBe(true);
       expect(sessionManagerMock.rename).toHaveBeenCalledWith('old-session', 'new-session');
       expect(ctx.setCurrentSession).toHaveBeenCalledWith('new-session');
       expect(storeMock.addStatus).toHaveBeenCalledWith(expect.objectContaining({ role: 'status' }));
@@ -158,7 +143,8 @@ describe('Builtin commands', () => {
         setInputMode: vi.fn(),
       };
 
-      await handlers['resume']([], ctx as CommandContext);
+      const result = await commandRegistry.parseAndExecute('/resume', ctx as CommandContext);
+      expect(result.handled).toBe(true);
       expect(sessionManagerMock.list).toHaveBeenCalled();
       expect(ctx.setInputMode).toHaveBeenCalledWith('session-list', { sessions: [{ name: 'session-1' }, { name: 'session-2' }] });
     });
@@ -183,7 +169,8 @@ describe('Builtin commands', () => {
         setMessages: vi.fn(),
       };
 
-      await handlers['resume'](['session-1'], ctx as CommandContext);
+      const result = await commandRegistry.parseAndExecute('/resume session-1', ctx as CommandContext);
+      expect(result.handled).toBe(true);
       expect(sessionManagerMock.get).toHaveBeenCalledWith('session-1');
       expect(agentMock.setMessages).toHaveBeenCalled();
       expect(agentMock.setTokenCount).toHaveBeenCalledWith(100);
@@ -199,20 +186,21 @@ describe('Builtin commands', () => {
         setMessages: vi.fn(),
       };
 
-      await handlers['resume'](['unknown'], ctx as CommandContext);
+      const result = await commandRegistry.parseAndExecute('/resume unknown', ctx as CommandContext);
+      expect(result.handled).toBe(true);
       expect(storeMock.addStatus).toHaveBeenCalledWith(expect.objectContaining({ role: 'error' }));
     });
 
-    it('/plan returns prompt text', () => {
-      const result = handlers['plan']();
-      expect(typeof result).toBe('string');
-      expect(result).toContain('executable plan');
+    it('/plan returns prompt text', async () => {
+      const result = await commandRegistry.parseAndExecute('/plan', {} as CommandContext);
+      expect(result.handled).toBe(true);
+      expect(result.promptText).toContain('executable plan');
     });
 
-    it('/test returns prompt text', () => {
-      const result = handlers['test']();
-      expect(typeof result).toBe('string');
-      expect(result).toContain('Run a simple test of all available tools');
+    it('/test returns prompt text', async () => {
+      const result = await commandRegistry.parseAndExecute('/test', {} as CommandContext);
+      expect(result.handled).toBe(true);
+      expect(result.promptText).toContain('Run a simple test of all available tools');
     });
   });
 });

@@ -7,7 +7,6 @@ import type { MessageParam, EffortLevel } from '../llm/anthropic.js';
 import type { ResolvedConfig } from '../config.js';
 import { CallbackDisplay, type DisplayMessage, type ConfirmationRequest } from '../utils/display.js';
 import { commandRegistry, type CommandContext } from './commands/index.js';
-import './commands/builtin.js';
 import { Message } from './tui/Message.js';
 import { formatToolDisplay } from './tui/tool-display.js';
 import { getInputComponent, type InputComponentProps } from './tui/inputs.js';
