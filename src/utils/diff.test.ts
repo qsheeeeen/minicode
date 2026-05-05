@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { generateDiffSummary, type DiffLine } from './diff.js';
+import { generateDiffSummary } from './diff.js';
 
 describe('generateDiffSummary', () => {
   it('returns header with file path and stats', () => {

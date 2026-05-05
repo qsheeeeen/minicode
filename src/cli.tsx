@@ -125,7 +125,7 @@ if (headless) {
     process.exit(1);
   }
 
-  const { runHeadless } = await import('./cli/headless.js');
+  const { runHeadless } = await import('./headless.js');
   await runHeadless(agent, initialPrompt, sessionName, resumeRecent);
   process.exit(0);
 }

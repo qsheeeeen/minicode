@@ -1,4 +1,4 @@
-import { AnthropicClient, type MessageParam, type Message, type Anthropic } from '../llm/anthropic.js';
+import type { AnthropicClient, MessageParam, Message, Anthropic } from '../llm/anthropic.js';
 
 export class CompressionService {
   private readonly recentCount = 10;

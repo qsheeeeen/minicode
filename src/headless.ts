@@ -18,7 +18,7 @@ export async function runHeadless(
       if (totalTokens > 0) {
         agent.setTokenCount(totalTokens);
       }
-      const { createLogger } = await import('../utils/logger.js');
+      const { createLogger } = await import('./utils/logger.js');
       const newLogger = await createLogger(sessionManager.getProjectHash(), name);
       agent.setSession(name);
       agent.setLogger(newLogger);

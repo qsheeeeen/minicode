@@ -2,7 +2,6 @@ import type { ToolDef, ToolResult, ToolExecutionContext } from './index.js';
 import type { AgentConfig } from '../agent.js';
 import type { MessageParam, ContentBlock } from '../llm/anthropic.js';
 import { Agent } from '../agent.js';
-import { ConsoleDisplay } from '../utils/display.js';
 
 export const agentTool: ToolDef = {
   name: 'Agent',
@@ -36,7 +35,6 @@ export const agentTool: ToolDef = {
 
     const subConfig: AgentConfig = {
       ...config,
-      display: new ConsoleDisplay(),
       excludeTools: ['Agent'],
       agentRegistry: registry,
       currentAgentId: subId,

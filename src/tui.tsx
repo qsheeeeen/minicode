@@ -1,12 +1,11 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { Box, Text, useInput, useApp } from 'ink';
 import { Spinner, ProgressBar } from '@inkjs/ui';
-import TextInput from 'ink-text-input';
 import { Agent } from './agent.js';
 import type { MessageParam, EffortLevel } from './llm/anthropic.js';
 import type { ResolvedConfig } from './config.js';
 import { CallbackDisplay, type DisplayMessage, type ConfirmationRequest } from './utils/display.js';
-import { commandRegistry, type CommandContext } from './commands/index.js';
+import { commandRegistry } from './commands/index.js';
 import { Message } from './tui/Message.js';
 import { formatToolDisplay } from './tui/tool-display.js';
 import { getInputComponent, type InputComponentProps } from './tui/inputs.js';
