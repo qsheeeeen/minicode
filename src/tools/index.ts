@@ -10,7 +10,7 @@ import { bashTool } from './bash.js';
 import { agentTool } from './agent.js';
 import { activateSkillTool } from './activate_skill.js';
 import { ToolRegistry } from './registry.js';
-import type { SkillRegistry } from '../cli/skills/skill-registry.js';
+import type { SkillRegistry } from '../cli/skills/index.js';
 
 export interface ToolExecutionContext {
   registry?: AgentRegistry;

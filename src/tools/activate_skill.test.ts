@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { activateSkillTool } from './activate_skill.js';
-import type { SkillRegistry } from '../cli/skills/skill-registry.js';
+import type { SkillRegistry } from '../cli/skills/index.js';
 
 describe('activateSkillTool', () => {
   it('returns activated skill body wrapped in tags', async () => {

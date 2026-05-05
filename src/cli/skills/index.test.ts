@@ -1,8 +1,19 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { skillRegistry, SkillRegistry } from './index.js';
+import { describe, it, expect } from 'vitest';
 import fs from 'fs/promises';
+import path from 'path';
+import os from 'os';
+import { skillRegistry, SkillRegistry } from './index.js';
 
-vi.mock('fs/promises');
+async function createTempSkillDir(
+  skillDirName: string,
+  skillMdContent: string,
+): Promise<string> {
+  const baseDir = await fs.mkdtemp(path.join(os.tmpdir(), 'skill-test-'));
+  const skillDir = path.join(baseDir, skillDirName);
+  await fs.mkdir(skillDir);
+  await fs.writeFile(path.join(skillDir, 'SKILL.md'), skillMdContent, 'utf-8');
+  return baseDir;
+}
 
 describe('builtin skills', () => {
   it('registers exactly 2 builtin skills', () => {
@@ -43,142 +54,224 @@ describe('builtin skills', () => {
   });
 });
 
-describe('SkillRegistry loadSkills', () => {
-  let registry: SkillRegistry;
+describe('SkillRegistry', () => {
+  describe('loadSkills', () => {
+    it('loads valid SKILL.md with frontmatter', async () => {
+      const content = [
+        '---',
+        'name: my-skill',
+        'description: This is a test skill.',
+        '---',
+        '# Skill Body',
+        'Some text here.',
+      ].join('\n');
 
-  beforeEach(() => {
-    registry = new SkillRegistry();
-    vi.clearAllMocks();
-  });
+      const baseDir = await createTempSkillDir('my-skill', content);
+      try {
+        const registry = new SkillRegistry();
+        await registry.loadSkills(baseDir);
 
-  it('loads valid SKILL.md files from a directory', async () => {
-    vi.mocked(fs.readdir).mockResolvedValue([
-      { name: 'my-skill', isDirectory: () => true, isFile: () => false, isBlockDevice: () => false, isCharacterDevice: () => false, isSocket: () => false, isFIFO: () => false, isSymbolicLink: () => false, parentPath: '', path: '' },
-    ] as any);
-    vi.mocked(fs.readFile).mockResolvedValue(`---
-name: my-skill
-description: Does something useful
----
+        const skills = registry.getAvailableSkills();
+        expect(skills).toHaveLength(1);
+        expect(skills[0].name).toBe('my-skill');
+        expect(skills[0].description).toBe('This is a test skill.');
+        expect(registry.getSkillBody('my-skill')).toBe('# Skill Body\nSome text here.');
+      } finally {
+        await fs.rm(baseDir, { recursive: true, force: true });
+      }
+    });
 
-# My Skill
-Do the thing.
-`);
+    it('loads multiple skills from the same directory', async () => {
+      const baseDir = await fs.mkdtemp(path.join(os.tmpdir(), 'skill-test-'));
+      try {
+        const dirA = path.join(baseDir, 'skill-a');
+        const dirB = path.join(baseDir, 'skill-b');
+        await fs.mkdir(dirA);
+        await fs.mkdir(dirB);
+        await fs.writeFile(path.join(dirA, 'SKILL.md'), '---\nname: skill-a\ndescription: First skill\n---\n\nBody A');
+        await fs.writeFile(path.join(dirB, 'SKILL.md'), '---\nname: skill-b\ndescription: Second skill\n---\n\nBody B');
 
-    await registry.loadSkills('/skills');
+        const registry = new SkillRegistry();
+        await registry.loadSkills(baseDir);
 
-    const available = registry.getAvailableSkills();
-    expect(available).toHaveLength(1);
-    expect(available[0]).toEqual({ name: 'my-skill', description: 'Does something useful' });
-    expect(registry.getSkillBody('my-skill')).toBe('# My Skill\nDo the thing.');
-  });
+        const skills = registry.getAvailableSkills();
+        expect(skills).toHaveLength(2);
+        expect(skills.map(s => s.name).sort()).toEqual(['skill-a', 'skill-b']);
+      } finally {
+        await fs.rm(baseDir, { recursive: true, force: true });
+      }
+    });
 
-  it('does not load non-directory entries', async () => {
-    vi.mocked(fs.readdir).mockResolvedValue([
-      { name: 'readme.md', isDirectory: () => false, isFile: () => true, isBlockDevice: () => false, isCharacterDevice: () => false, isSocket: () => false, isFIFO: () => false, isSymbolicLink: () => false, parentPath: '', path: '' },
-    ] as any);
+    it('ignores non-directory entries', async () => {
+      const baseDir = await fs.mkdtemp(path.join(os.tmpdir(), 'skill-test-'));
+      try {
+        await fs.writeFile(path.join(baseDir, 'readme.md'), 'not a skill dir');
 
-    await registry.loadSkills('/skills');
-    expect(registry.getAvailableSkills()).toHaveLength(0);
-  });
+        const registry = new SkillRegistry();
+        await registry.loadSkills(baseDir);
+        expect(registry.getAvailableSkills()).toHaveLength(0);
+      } finally {
+        await fs.rm(baseDir, { recursive: true, force: true });
+      }
+    });
 
-  it('handles missing skills directory gracefully', async () => {
-    vi.mocked(fs.readdir).mockRejectedValue(new Error('ENOENT'));
+    it('handles missing skills directory gracefully', async () => {
+      const registry = new SkillRegistry();
+      await registry.loadSkills('/nonexistent/skills/dir');
+      expect(registry.getAvailableSkills()).toHaveLength(0);
+    });
 
-    await expect(registry.loadSkills('/nonexistent')).resolves.toBeUndefined();
-    expect(registry.getAvailableSkills()).toHaveLength(0);
-  });
+    it('ignores empty directories', async () => {
+      const baseDir = await fs.mkdtemp(path.join(os.tmpdir(), 'skill-test-'));
+      try {
+        const emptyDir = path.join(baseDir, 'empty-dir');
+        await fs.mkdir(emptyDir);
 
-  it('handles missing SKILL.md inside a skill directory gracefully', async () => {
-    vi.mocked(fs.readdir).mockResolvedValue([
-      { name: 'broken-skill', isDirectory: () => true, isFile: () => false, isBlockDevice: () => false, isCharacterDevice: () => false, isSocket: () => false, isFIFO: () => false, isSymbolicLink: () => false, parentPath: '', path: '' },
-    ] as any);
-    vi.mocked(fs.readFile).mockRejectedValue(new Error('ENOENT'));
+        const registry = new SkillRegistry();
+        await registry.loadSkills(baseDir);
 
-    await registry.loadSkills('/skills');
-    expect(registry.getAvailableSkills()).toHaveLength(0);
-  });
+        expect(registry.getAvailableSkills()).toHaveLength(0);
+      } finally {
+        await fs.rm(baseDir, { recursive: true, force: true });
+      }
+    });
 
-  it('skips SKILL.md with invalid YAML frontmatter', async () => {
-    vi.mocked(fs.readdir).mockResolvedValue([
-      { name: 'bad-yaml', isDirectory: () => true, isFile: () => false, isBlockDevice: () => false, isCharacterDevice: () => false, isSocket: () => false, isFIFO: () => false, isSymbolicLink: () => false, parentPath: '', path: '' },
-    ] as any);
-    vi.mocked(fs.readFile).mockResolvedValue(`---
-name: "unclosed
-description: Broken YAML
----
+    it('ignores SKILL.md without frontmatter', async () => {
+      const content = ['# Skill Body', 'Some text here.'].join('\n');
 
-Body text
-`);
+      const baseDir = await createTempSkillDir('no-frontmatter', content);
+      try {
+        const registry = new SkillRegistry();
+        await registry.loadSkills(baseDir);
 
-    await registry.loadSkills('/skills');
-    expect(registry.getAvailableSkills()).toHaveLength(0);
-  });
+        expect(registry.getAvailableSkills()).toHaveLength(0);
+      } finally {
+        await fs.rm(baseDir, { recursive: true, force: true });
+      }
+    });
 
-  it('skips SKILL.md without frontmatter', async () => {
-    vi.mocked(fs.readdir).mockResolvedValue([
-      { name: 'no-frontmatter', isDirectory: () => true, isFile: () => false, isBlockDevice: () => false, isCharacterDevice: () => false, isSocket: () => false, isFIFO: () => false, isSymbolicLink: () => false, parentPath: '', path: '' },
-    ] as any);
-    vi.mocked(fs.readFile).mockResolvedValue('# Just a heading\nNo frontmatter here.');
+    it('skips SKILL.md with invalid YAML frontmatter', async () => {
+      const content = [
+        '---',
+        'name: "unclosed',
+        'description: Broken YAML',
+        '---',
+        'Body text',
+      ].join('\n');
 
-    await registry.loadSkills('/skills');
-    expect(registry.getAvailableSkills()).toHaveLength(0);
-  });
+      const baseDir = await createTempSkillDir('bad-yaml', content);
+      try {
+        const registry = new SkillRegistry();
+        await registry.loadSkills(baseDir);
+        expect(registry.getAvailableSkills()).toHaveLength(0);
+      } finally {
+        await fs.rm(baseDir, { recursive: true, force: true });
+      }
+    });
 
-  it('skips SKILL.md with missing name in frontmatter', async () => {
-    vi.mocked(fs.readdir).mockResolvedValue([
-      { name: 'no-name', isDirectory: () => true, isFile: () => false, isBlockDevice: () => false, isCharacterDevice: () => false, isSocket: () => false, isFIFO: () => false, isSymbolicLink: () => false, parentPath: '', path: '' },
-    ] as any);
-    vi.mocked(fs.readFile).mockResolvedValue(`---
-description: Forgot the name field
----
+    it('parses YAML frontmatter with quotes correctly', async () => {
+      const content = [
+        '---',
+        'name: "quoted-skill"',
+        "description: 'Quoted description'",
+        '---',
+        '# Body',
+      ].join('\n');
 
-Body
-`);
+      const baseDir = await createTempSkillDir('quoted', content);
+      try {
+        const registry = new SkillRegistry();
+        await registry.loadSkills(baseDir);
 
-    await registry.loadSkills('/skills');
-    expect(registry.getAvailableSkills()).toHaveLength(0);
-  });
+        const skills = registry.getAvailableSkills();
+        expect(skills).toHaveLength(1);
+        expect(skills[0].name).toBe('quoted-skill');
+        expect(skills[0].description).toBe('Quoted description');
+      } finally {
+        await fs.rm(baseDir, { recursive: true, force: true });
+      }
+    });
 
-  it('skips SKILL.md with missing description in frontmatter', async () => {
-    vi.mocked(fs.readdir).mockResolvedValue([
-      { name: 'no-desc', isDirectory: () => true, isFile: () => false, isBlockDevice: () => false, isCharacterDevice: () => false, isSocket: () => false, isFIFO: () => false, isSymbolicLink: () => false, parentPath: '', path: '' },
-    ] as any);
-    vi.mocked(fs.readFile).mockResolvedValue(`---
-name: no-desc
----
+    it('handles YAML folded block scalar for description', async () => {
+      const content = [
+        '---',
+        'name: block-skill',
+        'description: >',
+        '  A multi-line description',
+        '  wrapped with YAML folded block scalar.',
+        '---',
+        '# Body',
+      ].join('\n');
 
-Body
-`);
+      const baseDir = await createTempSkillDir('block', content);
+      try {
+        const registry = new SkillRegistry();
+        await registry.loadSkills(baseDir);
 
-    await registry.loadSkills('/skills');
-    expect(registry.getAvailableSkills()).toHaveLength(0);
-  });
+        const skills = registry.getAvailableSkills();
+        expect(skills).toHaveLength(1);
+        expect(skills[0].description).toContain('A multi-line description');
+      } finally {
+        await fs.rm(baseDir, { recursive: true, force: true });
+      }
+    });
 
-  it('loads multiple skills from the same directory', async () => {
-    vi.mocked(fs.readdir).mockResolvedValue([
-      { name: 'skill-a', isDirectory: () => true, isFile: () => false, isBlockDevice: () => false, isCharacterDevice: () => false, isSocket: () => false, isFIFO: () => false, isSymbolicLink: () => false, parentPath: '', path: '' },
-      { name: 'skill-b', isDirectory: () => true, isFile: () => false, isBlockDevice: () => false, isCharacterDevice: () => false, isSocket: () => false, isFIFO: () => false, isSymbolicLink: () => false, parentPath: '', path: '' },
-    ] as any);
-    vi.mocked(fs.readFile)
-      .mockResolvedValueOnce(`---
-name: skill-a
-description: First skill
----
+    it('ignores skills missing required name field', async () => {
+      const content = [
+        '---',
+        'description: Only description here.',
+        '---',
+        '# Body',
+      ].join('\n');
 
-Body A
-`)
-      .mockResolvedValueOnce(`---
-name: skill-b
-description: Second skill
----
+      const baseDir = await createTempSkillDir('no-name', content);
+      try {
+        const registry = new SkillRegistry();
+        await registry.loadSkills(baseDir);
 
-Body B
-`);
+        expect(registry.getAvailableSkills()).toHaveLength(0);
+      } finally {
+        await fs.rm(baseDir, { recursive: true, force: true });
+      }
+    });
 
-    await registry.loadSkills('/skills');
+    it('ignores skills missing required description field', async () => {
+      const content = [
+        '---',
+        'name: no-desc',
+        '---',
+        '# Body',
+      ].join('\n');
 
-    const available = registry.getAvailableSkills();
-    expect(available).toHaveLength(2);
-    expect(available.map(s => s.name).sort()).toEqual(['skill-a', 'skill-b']);
+      const baseDir = await createTempSkillDir('no-desc', content);
+      try {
+        const registry = new SkillRegistry();
+        await registry.loadSkills(baseDir);
+
+        expect(registry.getAvailableSkills()).toHaveLength(0);
+      } finally {
+        await fs.rm(baseDir, { recursive: true, force: true });
+      }
+    });
+
+    it('ignores non-object YAML frontmatter (array)', async () => {
+      const content = [
+        '---',
+        '- item1',
+        '- item2',
+        '---',
+        '# Body',
+      ].join('\n');
+
+      const baseDir = await createTempSkillDir('array', content);
+      try {
+        const registry = new SkillRegistry();
+        await registry.loadSkills(baseDir);
+
+        expect(registry.getAvailableSkills()).toHaveLength(0);
+      } finally {
+        await fs.rm(baseDir, { recursive: true, force: true });
+      }
+    });
   });
 });
