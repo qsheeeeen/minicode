@@ -1,11 +1,8 @@
 import { AnthropicClient, Anthropic, type MessageParam, type Tool, type ContentBlock, type EffortLevel } from './llm/anthropic.js';
 import { registerTools, ToolRegistry, ToolDef, ToolExecutionContext } from './tools/index.js';
 import { ConsoleDisplay, type DisplayAdapter } from './utils/display.js';
-import { TokenManager } from './services/token-manager.js';
-import { CompressionService } from './services/compression-service.js';
-import { AgentRegistry } from './services/agent-registry.js';
+import { TokenManager, CompressionService, AgentRegistry, PermissionService, type PermissionMode } from './services/index.js';
 import { MessageStore } from './messages.js';
-import { PermissionService, type PermissionMode } from './services/permission.js';
 import { skillRegistry } from './skills/index.js';
 import { sessionManager } from './utils/session.js';
 import type pino from 'pino';

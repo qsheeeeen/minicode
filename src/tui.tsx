@@ -10,8 +10,7 @@ import { Message } from './tui/Message.js';
 import { formatToolDisplay } from './tui/tool-display.js';
 import { getInputComponent, type InputComponentProps } from './tui/inputs.js';
 import { sessionManager } from './utils/session.js';
-import { AgentRegistry, type AgentSession } from './services/agent-registry.js';
-import type { PermissionMode } from './services/permission.js';
+import { AgentRegistry, type AgentSession, type PermissionMode } from './services/index.js';
 
 export interface AppProps {
   agent: Agent;
