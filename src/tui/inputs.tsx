@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Box, Text, useInput } from 'ink';
-import TextInput from 'ink-text-input';
-import { Select } from '@inkjs/ui';
+import { Select, TextInput } from '@inkjs/ui';
 import type { ProviderConfig } from '../config.js';
 
 export interface InputComponentProps {
@@ -18,7 +17,7 @@ export function ChatInput({ onSubmit, value, onChange, inputKey }: InputComponen
   return (
     <TextInput
       key={inputKey}
-      value={value || ''}
+      defaultValue={value || ''}
       onChange={onChange || (() => {})}
       onSubmit={onSubmit}
       placeholder="Type a message or /command..."
