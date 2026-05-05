@@ -1,12 +1,16 @@
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from 'vitest';
 import { commandRegistry, type CommandContext } from './index.js';
 
-const { sessionManagerMock } = vi.hoisted(() => ({
+const { sessionManagerMock, configMock } = vi.hoisted(() => ({
   sessionManagerMock: {
     getProjectHash: vi.fn().mockReturnValue('testhash'),
     get: vi.fn().mockResolvedValue(null),
     list: vi.fn().mockResolvedValue([]),
     rename: vi.fn().mockResolvedValue(undefined),
+  },
+  configMock: {
+    setEffort: vi.fn().mockResolvedValue(undefined),
+    loadConfig: vi.fn().mockResolvedValue({ providers: {} }),
   },
 }));
 
@@ -22,6 +26,20 @@ vi.mock('../skills/index.js', () => ({
   skillRegistry: {
     getAvailableSkills: vi.fn().mockReturnValue([]),
   },
+}));
+
+vi.mock('../../config.js', () => ({
+  setEffort: configMock.setEffort,
+  loadConfig: configMock.loadConfig,
+}));
+
+vi.mock('react', () => ({
+  createElement: vi.fn((...args: any[]) => args),
+}));
+
+vi.mock('ink', () => ({
+  Box: 'Box',
+  Text: 'Text',
 }));
 
 describe('Builtin commands', () => {
@@ -43,11 +61,14 @@ describe('Builtin commands', () => {
     expect(names).toContain('exit');
     expect(names).toContain('clear');
     expect(names).toContain('compress');
+    expect(names).toContain('effort');
     expect(names).toContain('new');
     expect(names).toContain('rename');
     expect(names).toContain('resume');
     expect(names).toContain('plan');
     expect(names).toContain('test');
+    expect(names).toContain('skills');
+    expect(names).toContain('model');
   });
 
   function makeStoreMock() {
@@ -201,6 +222,90 @@ describe('Builtin commands', () => {
       const result = await commandRegistry.parseAndExecute('/test', {} as CommandContext);
       expect(result.handled).toBe(true);
       expect(result.promptText).toContain('Run a simple test of all available tools');
+    });
+
+    it('/effort with no args shows effort select UI', async () => {
+      const ctx: Partial<CommandContext> = {
+        setInputMode: vi.fn(),
+      };
+      const result = await commandRegistry.parseAndExecute('/effort', ctx as CommandContext);
+      expect(result.handled).toBe(true);
+      expect(ctx.setInputMode).toHaveBeenCalledWith('effort-select');
+    });
+
+    it('/effort with invalid value shows effort select UI', async () => {
+      const ctx: Partial<CommandContext> = {
+        setInputMode: vi.fn(),
+      };
+      const result = await commandRegistry.parseAndExecute('/effort invalid', ctx as CommandContext);
+      expect(result.handled).toBe(true);
+      expect(ctx.setInputMode).toHaveBeenCalledWith('effort-select');
+    });
+
+    it('/effort with valid value sets effort and adds status', async () => {
+      const storeMock = { addStatus: vi.fn() };
+      const agentMock = {
+        setEffort: vi.fn(),
+        getStore: vi.fn().mockReturnValue(storeMock),
+      };
+      const ctx: Partial<CommandContext> = {
+        agent: agentMock as any,
+      };
+      const result = await commandRegistry.parseAndExecute('/effort high', ctx as CommandContext);
+      expect(result.handled).toBe(true);
+      expect(agentMock.setEffort).toHaveBeenCalledWith('high');
+      expect(configMock.setEffort).toHaveBeenCalledWith('high');
+      expect(storeMock.addStatus).toHaveBeenCalledWith(expect.objectContaining({
+        role: 'status',
+        content: '(Effort set to: high)',
+      }));
+    });
+
+    it('/skills with no skills shows no-skills status', async () => {
+      const skillRegistry = await import('../skills/index.js');
+      (skillRegistry.skillRegistry.getAvailableSkills as any).mockReturnValue([]);
+      const storeMock = { addStatus: vi.fn() };
+      const agentMock = { getStore: vi.fn().mockReturnValue(storeMock) };
+      const ctx: Partial<CommandContext> = { agent: agentMock as any };
+
+      const result = await commandRegistry.parseAndExecute('/skills', ctx as CommandContext);
+      expect(result.handled).toBe(true);
+      expect(storeMock.addStatus).toHaveBeenCalledWith(expect.objectContaining({
+        role: 'status',
+        content: '(No skills available)',
+      }));
+    });
+
+    it('/skills with available skills renders skill list', async () => {
+      const skillRegistry = await import('../skills/index.js');
+      (skillRegistry.skillRegistry.getAvailableSkills as any).mockReturnValue([
+        { name: 'my-skill', description: 'A custom skill' },
+        { name: 'other', description: 'Another one' },
+      ]);
+      const storeMock = { addStatus: vi.fn() };
+      const agentMock = { getStore: vi.fn().mockReturnValue(storeMock) };
+      const ctx: Partial<CommandContext> = { agent: agentMock as any };
+
+      const result = await commandRegistry.parseAndExecute('/skills', ctx as CommandContext);
+      expect(result.handled).toBe(true);
+      expect(storeMock.addStatus).toHaveBeenCalledWith(expect.objectContaining({
+        role: 'status',
+        content: 'Available skills:\n  /my-skill - A custom skill\n  /other - Another one',
+      }));
+    });
+
+    it('/model shows model select UI', async () => {
+      configMock.loadConfig.mockResolvedValue({
+        providers: { anthropic: {}, zhipu: {} },
+      });
+      const ctx: Partial<CommandContext> = {
+        setInputMode: vi.fn(),
+      };
+      const result = await commandRegistry.parseAndExecute('/model', ctx as CommandContext);
+      expect(result.handled).toBe(true);
+      expect(ctx.setInputMode).toHaveBeenCalledWith('model-select', {
+        providers: { anthropic: {}, zhipu: {} },
+      });
     });
   });
 });
