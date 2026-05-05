@@ -2,17 +2,17 @@ import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { Box, Text, useInput, useApp } from 'ink';
 import { Spinner, ProgressBar } from '@inkjs/ui';
 import TextInput from 'ink-text-input';
-import { Agent } from '../agent.js';
-import type { MessageParam, EffortLevel } from '../llm/anthropic.js';
-import type { ResolvedConfig } from '../config.js';
-import { CallbackDisplay, type DisplayMessage, type ConfirmationRequest } from '../utils/display.js';
+import { Agent } from './agent.js';
+import type { MessageParam, EffortLevel } from './llm/anthropic.js';
+import type { ResolvedConfig } from './config.js';
+import { CallbackDisplay, type DisplayMessage, type ConfirmationRequest } from './utils/display.js';
 import { commandRegistry, type CommandContext } from './commands/index.js';
 import { Message } from './tui/Message.js';
 import { formatToolDisplay } from './tui/tool-display.js';
 import { getInputComponent, type InputComponentProps } from './tui/inputs.js';
-import { sessionManager } from '../utils/session.js';
-import { AgentRegistry, type AgentSession } from '../services/agent-registry.js';
-import type { PermissionMode } from '../services/permission.js';
+import { sessionManager } from './utils/session.js';
+import { AgentRegistry, type AgentSession } from './services/agent-registry.js';
+import type { PermissionMode } from './services/permission.js';
 
 export interface AppProps {
   agent: Agent;
@@ -406,7 +406,7 @@ export function App({
               if (inputMode === 'effort-select') {
                 // Directly set effort without going through command handler
                 agent.setEffort(value as EffortLevel);
-                import('../config.js').then(m => m.setEffort(value));
+                import('./config.js').then(m => m.setEffort(value));
                 setMessages(prev => [...prev, { role: 'status', content: `(Effort set to: ${value})`, timestamp: new Date() }]);
                 setInputMode('chat');
                 setInputProps({});
@@ -420,12 +420,12 @@ export function App({
                 setInputValue('');
                 setInputKey(prev => prev + 1);
               } else if (inputMode === 'model-select') {
-                const { loadConfig, parseModelSpecifier } = await import('../config.js');
+                const { loadConfig, parseModelSpecifier } = await import('./config.js');
                 const config = await loadConfig();
                 const parsed = parseModelSpecifier(value, config.providers ?? {});
                 if (parsed) {
                   agent.setModel(parsed.modelName, parsed.providerConfig.apiKey, parsed.providerConfig.baseURL);
-                  import('../config.js').then(m => m.setModel(value));
+                  import('./config.js').then(m => m.setModel(value));
                   setMessages(prev => [...prev, { role: 'status', content: `(Model set to: ${value})`, timestamp: new Date() }]);
                 }
                 setInputMode('chat');

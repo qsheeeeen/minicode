@@ -59,26 +59,21 @@ When adding or modifying config options, always update `config.example.json`.
 
 ```
 src/
-├── cli.tsx                  # CLI entry point (TUI + headless modes), React app
+├── cli.tsx                  # CLI entry point — renders App, parses args, starts TUI/headless
+├── tui.tsx                  # Top-level TUI App component + hooks
+├── headless.ts              # Headless (non-TUI) mode runner
+├── args.ts                  # CLI argument parsing (yargs)
 ├── agent.ts                 # Agent class with tool execution loop
 ├── messages.ts              # MessageStore (API + display message model)
 ├── config.ts                # Multi-provider config loader
-├── cli/
-│   ├── args.ts              # CLI argument parsing (yargs)
-│   ├── cli.tsx              # Top-level TUI App component + hooks
-│   ├── tui.tsx              # Legacy App (re-exported from cli.tsx)
-│   ├── headless.ts          # Headless (non-TUI) mode runner
-│   ├── tui/
-│   │   ├── Message.tsx      # Message display component by role
-│   │   ├── inputs.tsx       # Input component variants
-│   │   └── tool-display.tsx # Tool call/result rendering
-│   ├── commands/
-│   │   ├── index.ts         # CommandRegistry class
-│   │   └── builtin.ts       # Builtin slash command registrations
-│   └── skills/
-│       ├── index.ts         # SkillRegistry singleton export
-│       ├── skill-registry.ts # Skill loading from SKILL.md files
-│       └── builtin.ts       # Builtin skill definitions
+├── tui/
+│   ├── Message.tsx          # Message display component by role
+│   ├── inputs.tsx           # Input component variants
+│   └── tool-display.tsx     # Tool call/result rendering
+├── commands/
+│   └── index.ts             # CommandRegistry class + builtin slash commands
+├── skills/
+│   └── index.ts             # SkillRegistry class + builtin skills
 ├── llm/
 │   └── anthropic.ts         # AnthropicClient — streaming + non-streaming
 ├── services/

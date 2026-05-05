@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
 import { commandRegistry, type CommandContext } from './index.js';
 
 const { sessionManagerMock, configMock } = vi.hoisted(() => ({
@@ -14,11 +14,11 @@ const { sessionManagerMock, configMock } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('../../utils/session.js', () => ({
+vi.mock('../utils/session.js', () => ({
   sessionManager: sessionManagerMock,
 }));
 
-vi.mock('../../utils/logger.js', () => ({
+vi.mock('../utils/logger.js', () => ({
   createLogger: vi.fn().mockResolvedValue({ info: vi.fn(), error: vi.fn() }),
 }));
 
@@ -28,7 +28,7 @@ vi.mock('../skills/index.js', () => ({
   },
 }));
 
-vi.mock('../../config.js', () => ({
+vi.mock('../config.js', () => ({
   setEffort: configMock.setEffort,
   loadConfig: configMock.loadConfig,
 }));
@@ -306,6 +306,113 @@ describe('Builtin commands', () => {
       expect(ctx.setInputMode).toHaveBeenCalledWith('model-select', {
         providers: { anthropic: {}, zhipu: {} },
       });
+    });
+  });
+});
+
+describe('CommandRegistry', () => {
+  let savedCommands: Map<string, any>;
+
+  beforeEach(() => {
+    savedCommands = new Map((commandRegistry as any).commands);
+    (commandRegistry as any).commands = new Map();
+  });
+
+  afterEach(() => {
+    (commandRegistry as any).commands = savedCommands;
+  });
+
+  function createMockContext(): CommandContext {
+    return {
+      agent: {} as any,
+      setMessages: vi.fn(),
+      setCurrentSession: vi.fn(),
+      setMode: vi.fn(),
+      setInputMode: vi.fn(),
+      setSessionList: vi.fn(),
+      setSelectedIndex: vi.fn(),
+      exit: vi.fn(),
+    };
+  }
+
+  describe('register', () => {
+    it('registers command with handler', async () => {
+      const handler = vi.fn();
+      commandRegistry.register({ name: 'test', description: 'Test command', handler });
+      const result = await commandRegistry.parseAndExecute('/test', createMockContext());
+      expect(result.handled).toBe(true);
+      expect(handler).toHaveBeenCalled();
+    });
+
+    it('registers command with prompt', async () => {
+      commandRegistry.register({ name: 'idea', description: 'Share ideas', prompt: () => 'Here is my idea' });
+      const result = await commandRegistry.parseAndExecute('/idea', createMockContext());
+      expect(result.handled).toBe(true);
+      expect(result.promptText).toBe('Here is my idea');
+    });
+
+    it('throws when neither handler nor prompt provided', () => {
+      expect(() => commandRegistry.register({ name: 'bad', description: 'Invalid' } as any)).toThrow('must have either handler or prompt');
+    });
+
+    it('throws when both handler and prompt provided', () => {
+      expect(() => commandRegistry.register({
+        name: 'bad',
+        description: 'Invalid',
+        handler: vi.fn(),
+        prompt: () => 'text',
+      } as any)).toThrow('cannot have both handler and prompt');
+    });
+  });
+
+  describe('parseAndExecute', () => {
+    it('returns handled=false for non-command input', async () => {
+      const result = await commandRegistry.parseAndExecute('hello', createMockContext());
+      expect(result.handled).toBe(false);
+    });
+
+    it('strips leading slash and parses args', async () => {
+      const handler = vi.fn();
+      commandRegistry.register({ name: 'cmd', description: 'Test', handler });
+      await commandRegistry.parseAndExecute('/cmd arg1 arg2', createMockContext());
+      expect(handler).toHaveBeenCalledWith(['arg1', 'arg2'], expect.anything());
+    });
+
+    it('trims whitespace', async () => {
+      const handler = vi.fn();
+      commandRegistry.register({ name: 'cmd', description: 'Test', handler });
+      await commandRegistry.parseAndExecute('/cmd  arg1  ', createMockContext());
+      expect(handler).toHaveBeenCalledWith(['arg1'], expect.anything());
+    });
+
+    it('returns handled=false for unknown command', async () => {
+      const result = await commandRegistry.parseAndExecute('/unknown', createMockContext());
+      expect(result.handled).toBe(false);
+    });
+  });
+
+  describe('getCommandNames', () => {
+    it('returns all registered command names', () => {
+      commandRegistry.register({ name: 'cmd1', description: 'One', handler: vi.fn() });
+      commandRegistry.register({ name: 'cmd2', description: 'Two', handler: vi.fn() });
+      expect(commandRegistry.getCommandNames()).toContain('cmd1');
+      expect(commandRegistry.getCommandNames()).toContain('cmd2');
+    });
+  });
+
+  describe('getCommandList', () => {
+    it('returns command names and descriptions', () => {
+      commandRegistry.register({ name: 'test', description: 'A test command', handler: vi.fn() });
+      const list = commandRegistry.getCommandList();
+      expect(list).toContainEqual({ name: 'test', description: 'A test command' });
+    });
+  });
+
+  describe('getHelp', () => {
+    it('formats help text', () => {
+      commandRegistry.register({ name: 'exit', description: 'Exit the app', handler: vi.fn() });
+      const help = commandRegistry.getHelp();
+      expect(help).toContain('/exit - Exit the app');
     });
   });
 });

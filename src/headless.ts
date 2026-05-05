@@ -1,6 +1,6 @@
-import type { Agent } from '../agent.js';
-import type { MessageParam, ContentBlock } from '../llm/anthropic.js';
-import { sessionManager } from '../utils/session.js';
+import type { Agent } from './agent.js';
+import type { MessageParam, ContentBlock } from './llm/anthropic.js';
+import { sessionManager } from './utils/session.js';
 
 export async function runHeadless(
   agent: Agent,

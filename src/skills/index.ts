@@ -1,7 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { parse as parseYaml } from 'yaml';
-import { loadConfigSync } from '../../config.js';
+import { loadConfigSync } from '../config.js';
 
 export interface SkillMeta {
   name: string;

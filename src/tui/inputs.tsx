@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
-import type { ProviderConfig } from '../../config.js';
+import type { ProviderConfig } from '../config.js';
 
 export interface InputComponentProps {
   onSubmit?: (value: string) => void;  // For TextInput - actual LLM submission

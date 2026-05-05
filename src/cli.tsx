@@ -7,11 +7,11 @@ import { loadAllConfig } from './config.js';
 import { Agent } from './agent.js';
 import { sessionManager } from './utils/session.js';
 import { createLogger } from './utils/logger.js';
-import { parseArgs, type PermissionMode } from './cli/args.js';
+import { parseArgs, type PermissionMode } from './args.js';
 import { loadGlobalPrompt, loadProjectPrompt } from './utils/prompts.js';
-import { skillRegistry } from './cli/skills/index.js';
-import { App } from './cli/tui.js';
-import { commandRegistry } from './cli/commands/index.js';
+import { skillRegistry } from './skills/index.js';
+import { App } from './tui.js';
+import { commandRegistry } from './commands/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

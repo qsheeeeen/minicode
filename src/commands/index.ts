@@ -1,5 +1,5 @@
-import type { Agent } from '../../agent.js';
-import type { DisplayMessage } from '../../utils/display.js';
+import type { Agent } from '../agent.js';
+import type { DisplayMessage } from '../utils/display.js';
 
 export interface CommandHandler {
   name: string;
@@ -80,10 +80,10 @@ export const commandRegistry = new CommandRegistry();
 
 // -- builtin commands ---------------------------------------------------------
 
-import type { EffortLevel } from '../../llm/anthropic.js';
-import { sessionManager } from '../../utils/session.js';
+import type { EffortLevel } from '../llm/anthropic.js';
+import { sessionManager } from '../utils/session.js';
 import { skillRegistry } from '../skills/index.js';
-import { createLogger } from '../../utils/logger.js';
+import { createLogger } from '../utils/logger.js';
 
 commandRegistry.register({
   name: 'exit',
@@ -129,7 +129,7 @@ commandRegistry.register({
       return;
     }
     ctx.agent.setEffort(value as EffortLevel);
-    const { setEffort } = await import('../../config.js');
+    const { setEffort } = await import('../config.js');
     await setEffort(value);
     ctx.agent.getStore().addStatus({
       role: 'status',
@@ -255,7 +255,7 @@ commandRegistry.register({
   name: 'model',
   description: 'Switch model/provider',
   handler: async (_args, ctx): Promise<void> => {
-    const { loadConfig } = await import('../../config.js');
+    const { loadConfig } = await import('../config.js');
     const config = await loadConfig();
     const providers = config.providers ?? {};
     ctx.setInputMode('model-select', { providers });
