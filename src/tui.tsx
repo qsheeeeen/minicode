@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { Box, Text, useInput, useApp } from 'ink';
-import { Spinner, ProgressBar } from '@inkjs/ui';
+import { Spinner, ProgressBar, Select } from '@inkjs/ui';
 import { Agent } from './agent.js';
 import type { MessageParam, EffortLevel } from './llm/anthropic.js';
 import type { ResolvedConfig } from './config.js';
@@ -223,23 +223,6 @@ export function App({
     }
   }, [autoSubmitPending, initialPrompt, handleSubmit]);
 
-  // Approval prompt input handler — resolves pending confirm promise
-  useInput((_input, key) => {
-    if (!approvalRequest) return;
-    if (_input === 'y' || key.return) {
-      approvalRequest.resolve(true);
-      setApprovalRequest(null);
-    } else if (_input === 'n' || key.escape) {
-      approvalRequest.resolve(false);
-      setApprovalRequest(null);
-    } else if (_input === 'a') {
-      approvalRequest.resolve(true);
-      setApprovalRequest(null);
-      agent.getPermissionService()?.setMode('yolo');
-      setPermissionMode('yolo');
-    }
-  }, { isActive: approvalRequest !== null });
-
   // Main input handler
   useInput((input, key) => {
     if (key.ctrl && input === 'c') {
@@ -379,7 +362,6 @@ export function App({
           <Box flexDirection="column">
             <Text bold color="yellow">{approvalRequest.title}</Text>
             <Text>{approvalRequest.message}</Text>
-            <Text dimColor>[y] Yes  [n] No  [a] Yes to all</Text>
           </Box>
         </Box>
       )}
@@ -396,7 +378,23 @@ export function App({
           )}
         </Box>
         {approvalRequest ? (
-          <Text dimColor>Waiting for approval...</Text>
+          <Select
+            options={[
+              { label: 'Yes', value: 'yes' },
+              { label: 'No', value: 'no' },
+              { label: 'Yes to all', value: 'yolo' },
+            ]}
+            onChange={(value) => {
+              if (value === 'yolo') {
+                approvalRequest.resolve(true);
+                agent.getPermissionService()?.setMode('yolo');
+                setPermissionMode('yolo');
+              } else {
+                approvalRequest.resolve(value === 'yes');
+              }
+              setApprovalRequest(null);
+            }}
+          />
         ) : (
           (() => {
             const InputComponent = getInputComponent(inputMode);

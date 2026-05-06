@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Box, Text, useInput } from 'ink';
-import { Select, TextInput } from '@inkjs/ui';
+import { Select, TextInput, ConfirmInput as InkConfirmInput } from '@inkjs/ui';
 import type { ProviderConfig } from '../config.js';
 
 export interface InputComponentProps {
@@ -131,28 +131,13 @@ export function ConfirmInput({
   onCancel,
   message = 'Confirm?',
 }: InputComponentProps & { message?: string }) {
-  const [selected, setSelected] = useState<'yes' | 'no'>('yes');
-
-  useInput((_input, key) => {
-    if (key.leftArrow || key.rightArrow || key.tab) {
-      setSelected(prev => prev === 'yes' ? 'no' : 'yes');
-    } else if (key.return) {
-      onExecute?.(selected);
-    } else if (key.escape && onCancel) {
-      onCancel();
-    } else if (_input === 'y') {
-      onExecute?.('yes');
-    } else if (_input === 'n') {
-      onExecute?.('no');
-    }
-  });
-
   return (
-    <Box>
-      <Text>{message} </Text>
-      <Text bold color={selected === 'yes' ? 'green' : 'white'}>[Y]</Text>
-      <Text color="gray">/</Text>
-      <Text bold color={selected === 'no' ? 'red' : 'white'}>[N]</Text>
+    <Box gap={1}>
+      <Text>{message}</Text>
+      <InkConfirmInput
+        onConfirm={() => onExecute?.('yes')}
+        onCancel={onCancel || (() => onExecute?.('no'))}
+      />
     </Box>
   );
 }
