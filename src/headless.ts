@@ -25,14 +25,14 @@ export async function runHeadless(
     }
   }
 
-  // Set headless display: confirm always denies
+  // Set headless display: prompt always denies
   agent.setDisplay({
     status: () => {},
     error: (msg) => console.error(`[error] ${msg}`),
     updateTokenCount: () => {},
-    confirm: async (req) => {
-      console.log(`[Permission denied: ${req.message}] -- use --permission yolo or auto in headless mode`);
-      return false;
+    prompt: async (req) => {
+      console.log(`[Denied: ${req.message}] -- use --permission yolo or auto in headless mode`);
+      return '';
     },
   });
 

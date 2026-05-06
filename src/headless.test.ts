@@ -35,16 +35,16 @@ describe('runHeadless', () => {
     expect(mockSetDisplay).toHaveBeenCalled();
     const displayArg = mockSetDisplay.mock.calls[0][0];
     expect(displayArg).toBeDefined();
-    expect(typeof displayArg.confirm).toBe('function');
+    expect(typeof displayArg.prompt).toBe('function');
   });
 
-  it('headless display confirm always returns false', async () => {
+  it('headless display prompt always returns empty string', async () => {
     mockRun.mockResolvedValueOnce(undefined);
-    let capturedConfirm: Function = () => true;
-    mockSetDisplay.mockImplementationOnce((d: any) => { capturedConfirm = d.confirm; });
+    let capturedPrompt: Function = () => 'yes';
+    mockSetDisplay.mockImplementationOnce((d: any) => { capturedPrompt = d.prompt; });
     await runHeadless(mockAgent as any, 'test prompt');
-    const result = await capturedConfirm({ title: 'test', message: 'msg' });
-    expect(result).toBe(false);
+    const result = await capturedPrompt({ message: 'msg', options: [{ label: 'Yes', value: 'yes' }] });
+    expect(result).toBe('');
   });
 
   it('calls agent.run with initial prompt', async () => {

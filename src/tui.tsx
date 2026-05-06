@@ -4,11 +4,11 @@ import { Spinner, ProgressBar, Select } from '@inkjs/ui';
 import { Agent } from './agent.js';
 import type { MessageParam, EffortLevel } from './llm/anthropic.js';
 import type { ResolvedConfig } from './config.js';
-import { CallbackDisplay, type DisplayMessage, type ConfirmationRequest, type AskUserQuestion } from './utils/display.js';
+import { CallbackDisplay, type DisplayMessage, type Prompt } from './utils/display.js';
 import { commandRegistry } from './commands/index.js';
 import { Message } from './tui/Message.js';
 import { formatToolDisplay } from './tui/tool-display.js';
-import { getInputComponent, AskUserInput, type InputComponentProps } from './tui/inputs.js';
+import { getInputComponent, type InputComponentProps } from './tui/inputs.js';
 import { sessionManager } from './utils/session.js';
 import { AgentRegistry, type AgentSession, type PermissionMode } from './services/index.js';
 
@@ -36,7 +36,6 @@ function useMultiAgent() {
     registryRef.current = registry;
     registry.setUpdateCallback((sessions) => {
       setAgentSessions(sessions);
-      // Auto-switch to main if current agent was removed
       if (activeAgentIdRef.current !== '1' && !sessions.find(s => s.id === activeAgentIdRef.current)) {
         activeAgentIdRef.current = '1';
         setActiveAgentId('1');
@@ -55,9 +54,7 @@ function useDisplay(
   resumeRecent: boolean,
   setAgentSessions: React.Dispatch<React.SetStateAction<AgentSession[]>>,
   registryRef: RefObject<AgentRegistry | null>,
-  setApprovalRequest: (req: (ConfirmationRequest & { resolve: (v: boolean) => void }) | null) => void,
-  setAskUserRequest: (req: AskUserQuestion | null) => void,
-  askUserResolveRef: RefObject<(value: string) => void>,
+  setPendingPrompt: (req: (Prompt & { resolve: (value: string) => void }) | null) => void,
 ) {
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [currentSession, setCurrentSession] = useState(initialSession);
@@ -67,26 +64,13 @@ function useDisplay(
     const registry = registryRef.current;
     if (!registry) return;
 
-    // Confirm resolver ref — used by key handlers to resolve pending confirms
-    const confirmResolvers: Array<(v: boolean) => void> = [];
-
-    // Set up TUI display adapter with confirm via React state
     agent.setDisplay(new CallbackDisplay({
       onTokenUpdate: setTokenCount,
-      onConfirm: (req: ConfirmationRequest) => new Promise<boolean>((resolve) => {
-        confirmResolvers.push(resolve);
-        setApprovalRequest({ ...req, resolve });
-      }),
-      onAskUser: (req) => new Promise<string>((resolve) => {
-        askUserResolveRef.current = resolve;
-        setAskUserRequest(req);
+      onPrompt: (req) => new Promise<string>((resolve) => {
+        setPendingPrompt({ ...req, resolve });
       }),
     }));
 
-    // Expose resolvers so key handlers can resolve them
-    (agent as any).__confirmResolvers = confirmResolvers;
-
-    // Subscribe to store changes for display updates
     agent.getStore().onChange(() => {
       setMessages(agent.getStore().toDisplayMessages(formatToolDisplay));
     });
@@ -105,7 +89,6 @@ function useDisplay(
       status: 'idle',
     }]);
 
-    // Load initial session
     const loadInitial = async () => {
       agent.currentSession = initialSession;
       if (sessionName || resumeRecent) {
@@ -116,8 +99,6 @@ function useDisplay(
           if (totalTokens > 0) {
             agent.setTokenCount(totalTokens);
           }
-          // Display is driven by store.onChange → toDisplayMessages(),
-          // triggered by store.replace() inside setMessages().
         } else if (sessionName) {
           agent.getStore().addStatus({ role: 'status', content: `Created new session: ${sessionName}`, timestamp: new Date() });
         }
@@ -125,7 +106,7 @@ function useDisplay(
     };
     loadInitial();
 
-    return () => { (agent as any).__confirmResolvers = []; };
+    return () => {};
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return { messages, setMessages, currentSession, setCurrentSession, tokenCount };
@@ -154,11 +135,11 @@ export function App({
   const [inputKey, setInputKey] = useState(0);
   const [autoSubmitPending, setAutoSubmitPending] = useState(!!initialPrompt);
   const [permissionMode, setPermissionMode] = useState<PermissionMode>(agent.getPermissionService()?.getMode() ?? 'manual');
-  const [approvalRequest, setApprovalRequest] = useState<(ConfirmationRequest & { resolve: (v: boolean) => void }) | null>(null);
-  const [askUserRequest, setAskUserRequest] = useState<AskUserQuestion | null>(null);
-  const askUserResolveRef = useRef<(value: string) => void>(() => {});
+  const [pendingPrompt, setPendingPrompt] = useState<(Prompt & { resolve: (value: string) => void }) | null>(null);
   const agentRef = useRef<Agent>(agent);
   const { exit } = useApp();
+
+  const isModal = pendingPrompt !== null;
 
   // Multi-agent hook
   const { activeAgentId, activeAgentIdRef, setActiveAgentId, agentSessions, setAgentSessions, registryRef } = useMultiAgent();
@@ -167,9 +148,7 @@ export function App({
   const { messages, setMessages, currentSession, setCurrentSession, tokenCount } = useDisplay(
     agent, initialSession, sessionName, resumeRecent,
     setAgentSessions, registryRef,
-    setApprovalRequest,
-    setAskUserRequest,
-    askUserResolveRef,
+    setPendingPrompt,
   );
 
   const setSessionList = (sessions: Array<{ name: string }>) => {
@@ -185,8 +164,6 @@ export function App({
     setInputProps(props);
   };
 
-  // Attach command resolver to agent so slash commands are handled uniformly
-  // (both TUI and headless go through the same agent.run() → resolveCommand path)
   useEffect(() => {
     agent.setCommandResolver(async (input: string) => {
       return commandRegistry.parseAndExecute(input, {
@@ -238,13 +215,9 @@ export function App({
     if (key.ctrl && input === 'c') {
       if (isLoading) {
         agentRef.current?.abort();
-        if (approvalRequest) {
-          approvalRequest.resolve(false);
-          setApprovalRequest(null);
-        }
-        if (askUserRequest) {
-          askUserResolveRef.current('');
-          setAskUserRequest(null);
+        if (pendingPrompt) {
+          pendingPrompt.resolve('');
+          setPendingPrompt(null);
         }
       } else {
         exit();
@@ -258,9 +231,9 @@ export function App({
     }
     if (key.escape && isLoading) {
       agentRef.current?.abort();
-      if (approvalRequest) {
-        approvalRequest.resolve(false);
-        setApprovalRequest(null);
+      if (pendingPrompt) {
+        pendingPrompt.resolve('');
+        setPendingPrompt(null);
       }
       return;
     }
@@ -274,7 +247,7 @@ export function App({
       setActiveAgentId(nextSession.id);
       setMessages(nextSession.agent.getStore().toDisplayMessages(formatToolDisplay));
     }
-  }, { isActive: mode === 'chat' && approvalRequest === null && askUserRequest === null });
+  }, { isActive: mode === 'chat' && !isModal });
 
   // Command autocomplete
   const commandList = useMemo(
@@ -289,13 +262,12 @@ export function App({
   }, [inputValue, commandList]);
   const [selectedSuggestion, setSelectedSuggestion] = useState(0);
 
-  // Reset selection when matches change
   useEffect(() => {
     setSelectedSuggestion(0);
   }, [matchingCommands.length]);
 
   useInput((_input, key) => {
-    if (mode !== 'chat' || approvalRequest !== null || matchingCommands.length === 0) return;
+    if (mode !== 'chat' || isModal || matchingCommands.length === 0) return;
     if (key.upArrow) {
       setSelectedSuggestion(prev => (prev - 1 + matchingCommands.length) % matchingCommands.length);
     } else if (key.downArrow) {
@@ -304,7 +276,7 @@ export function App({
       setInputValue(`/${matchingCommands[selectedSuggestion].name} `);
       setInputKey(prev => prev + 1);
     }
-  }, { isActive: mode === 'chat' && approvalRequest === null && askUserRequest === null && matchingCommands.length > 0 });
+  }, { isActive: mode === 'chat' && !isModal && matchingCommands.length > 0 });
 
   // Permission mode display helpers
   const modeLabel = permissionMode;
@@ -370,20 +342,10 @@ export function App({
         )}
       </Box>
 
-      {/* Approval prompt */}
-      {approvalRequest && (
+      {/* Pending prompt */}
+      {pendingPrompt && (
         <Box borderStyle="round" borderColor="yellow" paddingX={1}>
-          <Box flexDirection="column">
-            <Text bold color="yellow">{approvalRequest.title}</Text>
-            <Text>{approvalRequest.message}</Text>
-          </Box>
-        </Box>
-      )}
-
-      {/* AskUser prompt */}
-      {askUserRequest && (
-        <Box borderStyle="round" borderColor="cyan" paddingX={1}>
-          <Text>{askUserRequest.question}</Text>
+          <Text>{pendingPrompt.message}</Text>
         </Box>
       )}
 
@@ -392,43 +354,21 @@ export function App({
         <Box flexBasis={3} flexShrink={0}>
           {isLoading ? (
             <Spinner label="" />
-          ) : approvalRequest ? (
-            <Text color="yellow" bold>!</Text>
-          ) : askUserRequest ? (
-            <Text color="cyan" bold>?</Text>
+          ) : isModal ? (
+            <Text color="yellow" bold>?</Text>
           ) : (
             <Text color="blue" bold>{'>'}</Text>
           )}
         </Box>
-        {approvalRequest ? (
+        {pendingPrompt ? (
           <Select
-            options={[
-              { label: 'Yes', value: 'yes' },
-              { label: 'No', value: 'no' },
-              { label: 'Yes to all', value: 'yolo' },
-            ]}
+            options={pendingPrompt.options.map(o => ({
+              label: o.description ? `${o.label} — ${o.description}` : o.label,
+              value: o.value,
+            }))}
             onChange={(value) => {
-              if (value === 'yolo') {
-                approvalRequest.resolve(true);
-                agent.getPermissionService()?.setMode('yolo');
-                setPermissionMode('yolo');
-              } else {
-                approvalRequest.resolve(value === 'yes');
-              }
-              setApprovalRequest(null);
-            }}
-          />
-        ) : askUserRequest ? (
-          <AskUserInput
-            question={askUserRequest.question}
-            options={askUserRequest.options}
-            onExecute={(value) => {
-              askUserResolveRef.current(value);
-              setAskUserRequest(null);
-            }}
-            onCancel={() => {
-              askUserResolveRef.current('');
-              setAskUserRequest(null);
+              pendingPrompt.resolve(value);
+              setPendingPrompt(null);
             }}
           />
         ) : (
@@ -436,7 +376,6 @@ export function App({
             const InputComponent = getInputComponent(inputMode);
             const handleSubmitValue = async (value: string) => {
               if (inputMode === 'effort-select') {
-                // Directly set effort without going through command handler
                 agent.setEffort(value as EffortLevel);
                 import('./config.js').then(m => m.setEffort(value));
                 setMessages(prev => [...prev, { role: 'status', content: `(Effort set to: ${value})`, timestamp: new Date() }]);
@@ -445,7 +384,6 @@ export function App({
                 setInputValue('');
                 setInputKey(prev => prev + 1);
               } else if (inputMode === 'session-list') {
-                // Directly resume session
                 handleSubmit(`/resume ${value}`);
                 setInputMode('chat');
                 setInputProps({});
@@ -490,7 +428,7 @@ export function App({
       </Box>
 
       {/* Command autocomplete suggestions */}
-      {matchingCommands.length > 0 && !approvalRequest && !isLoading && (
+      {matchingCommands.length > 0 && !isModal && !isLoading && (
         <Box flexDirection="column" paddingX={2} borderStyle="single" borderColor="gray">
           {matchingCommands.map((cmd, i) => (
             <Box key={cmd.name} flexDirection="row">

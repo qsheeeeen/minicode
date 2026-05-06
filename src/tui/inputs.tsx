@@ -131,30 +131,6 @@ export interface InputComponentRegistration {
   Component: React.ComponentType<InputComponentProps>;
 }
 
-/** AskUser input — question with predefined options */
-export function AskUserInput({
-  onExecute, onCancel,
-  question = '',
-  options = [],
-}: InputComponentProps & { question?: string; options?: Array<{ label: string; description: string }> }) {
-  useInput((_input, key) => {
-    if (key.escape && onCancel) onCancel();
-  });
-
-  const selectOptions = options.map(o => ({ label: `${o.label} — ${o.description}`, value: o.label }));
-
-  return (
-    <Box flexDirection="column">
-      {selectOptions.length > 0 ? (
-        <Select options={selectOptions} onChange={(v) => onExecute?.(v)} />
-      ) : (
-        <Text dimColor>No options available</Text>
-      )}
-      <Text dimColor>↑↓ navigate, Enter select, Esc reject</Text>
-    </Box>
-  );
-}
-
 export const inputComponents: InputComponentRegistration[] = [
   { name: 'chat', Component: ChatInput },
   { name: 'effort-select', Component: EffortSelectInput },

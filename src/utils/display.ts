@@ -3,39 +3,38 @@ import type { DisplayMessage } from '../messages.js';
 
 export type { DisplayMessage };
 
+export interface PromptOption {
+  label: string;
+  value: string;
+  description?: string;
+}
+
+export interface Prompt {
+  message: string;
+  options: PromptOption[];
+}
+
 type DisplayCallback = {
   onMessage?: (msg: DisplayMessage) => void;
   onTokenUpdate?: (tokens: number) => void;
-  onConfirm?: (req: ConfirmationRequest) => Promise<boolean>;
-  onAskUser?: (req: AskUserQuestion) => Promise<string>;
+  onPrompt?: (req: Prompt) => Promise<string>;
 };
-
-export interface ConfirmationRequest {
-  title: string;
-  message: string;
-}
-
-export interface AskUserQuestion {
-  question: string;
-  options: Array<{ label: string; description: string }>;
-}
 
 export interface DisplayAdapter {
   status(msg: string): void;
   error(msg: string): void;
   updateTokenCount(tokens: number): void;
-  confirm?(req: ConfirmationRequest): Promise<boolean>;
-  askUser?(req: AskUserQuestion): Promise<string>;
+  prompt?(req: Prompt): Promise<string>;
 }
 
 export class ConsoleDisplay implements DisplayAdapter {
   status(msg: string): void { console.log(`[Status] ${msg}`); }
   error(msg: string): void { console.log(`[Error] ${msg}`); }
   updateTokenCount(_tokens: number): void {}
-  async askUser(req: AskUserQuestion): Promise<string> {
-    console.log(`[AskUser] ${req.question}`);
+  async prompt(req: Prompt): Promise<string> {
+    console.log(`[Prompt] ${req.message}`);
     for (const o of req.options) {
-      console.log(`  [${o.label}] ${o.description}`);
+      console.log(`  [${o.value}] ${o.description ?? ''}`);
     }
     return '';
   }
@@ -62,8 +61,8 @@ export class RecordDisplay implements DisplayAdapter {
     this.events.push({ type: 'tokenCount', data: tokens, timestamp: new Date() });
   }
 
-  async askUser(req: AskUserQuestion): Promise<string> {
-    this.events.push({ type: 'status', data: `[AskUser] ${req.question}`, timestamp: new Date() });
+  async prompt(req: Prompt): Promise<string> {
+    this.events.push({ type: 'status', data: `[Prompt] ${req.message}`, timestamp: new Date() });
     return '';
   }
 }
@@ -83,11 +82,7 @@ export class CallbackDisplay implements DisplayAdapter {
     this.callbacks.onTokenUpdate?.(tokens);
   }
 
-  confirm(req: ConfirmationRequest): Promise<boolean> {
-    return this.callbacks.onConfirm?.(req) ?? Promise.resolve(true);
-  }
-
-  askUser(req: AskUserQuestion): Promise<string> {
-    return this.callbacks.onAskUser?.(req) ?? Promise.resolve('');
+  prompt(req: Prompt): Promise<string> {
+    return this.callbacks.onPrompt?.(req) ?? Promise.resolve('');
   }
 }

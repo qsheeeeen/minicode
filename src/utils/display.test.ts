@@ -73,18 +73,18 @@ describe('CallbackDisplay', () => {
     expect(onTokenUpdate).toHaveBeenCalledWith(5000);
   });
 
-  it('calls onConfirm when confirm is called', async () => {
-    const onConfirm = vi.fn().mockResolvedValue(true);
-    const display = new CallbackDisplay({ onConfirm });
-    const result = await display.confirm({ title: 'Test', message: 'Do it?' });
-    expect(result).toBe(true);
-    expect(onConfirm).toHaveBeenCalledWith({ title: 'Test', message: 'Do it?' });
+  it('calls onPrompt when prompt is called', async () => {
+    const onPrompt = vi.fn().mockResolvedValue('yes');
+    const display = new CallbackDisplay({ onPrompt });
+    const result = await display.prompt({ message: 'Test?', options: [{ label: 'Yes', value: 'yes' }] });
+    expect(result).toBe('yes');
+    expect(onPrompt).toHaveBeenCalledWith({ message: 'Test?', options: [{ label: 'Yes', value: 'yes' }] });
   });
 
-  it('confirm returns true when onConfirm is undefined', async () => {
+  it('prompt returns empty string when onPrompt is undefined', async () => {
     const display = new CallbackDisplay({});
-    const result = await display.confirm({ title: 'Test', message: 'Do it?' });
-    expect(result).toBe(true);
+    const result = await display.prompt({ message: 'Test?', options: [{ label: 'Yes', value: 'yes' }] });
+    expect(result).toBe('');
   });
 });
 

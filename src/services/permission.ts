@@ -38,8 +38,21 @@ export class PermissionService {
     switch (this.mode) {
       case 'yolo':
         return true;
-      case 'manual':
-        return display?.confirm?.({ title: 'Allow tool execution?', message: displayText }) ?? true;
+      case 'manual': {
+        const answer = await display?.prompt?.({
+          message: `Allow tool execution?\n${displayText}`,
+          options: [
+            { label: 'Yes', value: 'yes' },
+            { label: 'No', value: 'no' },
+            { label: 'Yes to all', value: 'yolo' },
+          ],
+        }) ?? 'yes';
+        if (answer === 'yolo') {
+          this.setMode('yolo');
+          return true;
+        }
+        return answer === 'yes';
+      }
       case 'auto':
         return this.autoDecide(toolName, toolInput);
     }

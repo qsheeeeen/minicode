@@ -43,7 +43,7 @@ export const askUserTool: ToolDef = {
     const question = args.question as string;
     const options = args.options as Array<{ label: string; description: string }>;
 
-    const answer = await context?.display?.askUser?.({ question, options });
+    const answer = await context?.display?.prompt?.({ message: question, options: options.map(o => ({ ...o, value: o.label })) });
 
     if (!answer) {
       throw new ToolDeniedError('AskUser', question);

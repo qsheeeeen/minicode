@@ -54,28 +54,28 @@ describe('PermissionService', () => {
       expect(result).toBe(true);
     });
 
-    it('manual uses display.confirm when available', async () => {
+    it('manual uses display.prompt when available', async () => {
       const service = new PermissionService({ initialMode: 'manual' });
-      const confirmMock = vi.fn().mockResolvedValue(true);
-      const display = { confirm: confirmMock } as unknown as DisplayAdapter;
+      const promptMock = vi.fn().mockResolvedValue('yes');
+      const display = { prompt: promptMock } as unknown as DisplayAdapter;
       const result = await service.check('Bash', { command: 'ls' }, 'List files', display);
       expect(result).toBe(true);
-      expect(confirmMock).toHaveBeenCalledWith({
-        title: 'Allow tool execution?',
-        message: 'List files',
+      expect(promptMock).toHaveBeenCalledWith({
+        message: expect.stringContaining('List files'),
+        options: expect.arrayContaining([{ label: 'Yes', value: 'yes' }]),
       });
     });
 
-    it('manual returns true when display.confirm is undefined', async () => {
+    it('manual returns true when display.prompt is undefined', async () => {
       const service = new PermissionService({ initialMode: 'manual' });
       const result = await service.check('Bash', { command: 'ls' }, 'List files');
       expect(result).toBe(true);
     });
 
-    it('manual returns false when display.confirm returns false', async () => {
+    it('manual returns false when display.prompt returns no', async () => {
       const service = new PermissionService({ initialMode: 'manual' });
-      const confirmMock = vi.fn().mockResolvedValue(false);
-      const display = { confirm: confirmMock } as unknown as DisplayAdapter;
+      const promptMock = vi.fn().mockResolvedValue('no');
+      const display = { prompt: promptMock } as unknown as DisplayAdapter;
       const result = await service.check('Bash', { command: 'ls' }, 'List files', display);
       expect(result).toBe(false);
     });
