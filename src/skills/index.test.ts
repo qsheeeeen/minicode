@@ -1,7 +1,14 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
+
+const { configMock } = vi.hoisted(() => ({
+  configMock: { loadConfigSync: vi.fn().mockReturnValue({ promptFile: 'MINICODE.md' }) },
+}));
+
+vi.mock('../config.js', () => configMock);
+
 import { skillRegistry, SkillRegistry } from './index.js';
 
 async function createTempSkillDir(
