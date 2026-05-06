@@ -1,14 +1,14 @@
-import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo, type RefObject } from 'react';
 import { Box, Text, useInput, useApp } from 'ink';
 import { Spinner, ProgressBar, Select } from '@inkjs/ui';
 import { Agent } from './agent.js';
 import type { MessageParam, EffortLevel } from './llm/anthropic.js';
 import type { ResolvedConfig } from './config.js';
-import { CallbackDisplay, type DisplayMessage, type ConfirmationRequest } from './utils/display.js';
+import { CallbackDisplay, type DisplayMessage, type ConfirmationRequest, type AskUserQuestion } from './utils/display.js';
 import { commandRegistry } from './commands/index.js';
 import { Message } from './tui/Message.js';
 import { formatToolDisplay } from './tui/tool-display.js';
-import { getInputComponent, type InputComponentProps } from './tui/inputs.js';
+import { getInputComponent, AskUserInput, type InputComponentProps } from './tui/inputs.js';
 import { sessionManager } from './utils/session.js';
 import { AgentRegistry, type AgentSession, type PermissionMode } from './services/index.js';
 
@@ -54,8 +54,10 @@ function useDisplay(
   sessionName: string | undefined,
   resumeRecent: boolean,
   setAgentSessions: React.Dispatch<React.SetStateAction<AgentSession[]>>,
-  registryRef: React.MutableRefObject<AgentRegistry | null>,
+  registryRef: RefObject<AgentRegistry | null>,
   setApprovalRequest: (req: (ConfirmationRequest & { resolve: (v: boolean) => void }) | null) => void,
+  setAskUserRequest: (req: AskUserQuestion | null) => void,
+  askUserResolveRef: RefObject<(value: string) => void>,
 ) {
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [currentSession, setCurrentSession] = useState(initialSession);
@@ -74,6 +76,10 @@ function useDisplay(
       onConfirm: (req: ConfirmationRequest) => new Promise<boolean>((resolve) => {
         confirmResolvers.push(resolve);
         setApprovalRequest({ ...req, resolve });
+      }),
+      onAskUser: (req) => new Promise<string>((resolve) => {
+        askUserResolveRef.current = resolve;
+        setAskUserRequest(req);
       }),
     }));
 
@@ -149,6 +155,8 @@ export function App({
   const [autoSubmitPending, setAutoSubmitPending] = useState(!!initialPrompt);
   const [permissionMode, setPermissionMode] = useState<PermissionMode>(agent.getPermissionService()?.getMode() ?? 'manual');
   const [approvalRequest, setApprovalRequest] = useState<(ConfirmationRequest & { resolve: (v: boolean) => void }) | null>(null);
+  const [askUserRequest, setAskUserRequest] = useState<AskUserQuestion | null>(null);
+  const askUserResolveRef = useRef<(value: string) => void>(() => {});
   const agentRef = useRef<Agent>(agent);
   const { exit } = useApp();
 
@@ -160,6 +168,8 @@ export function App({
     agent, initialSession, sessionName, resumeRecent,
     setAgentSessions, registryRef,
     setApprovalRequest,
+    setAskUserRequest,
+    askUserResolveRef,
   );
 
   const setSessionList = (sessions: Array<{ name: string }>) => {
@@ -232,6 +242,10 @@ export function App({
           approvalRequest.resolve(false);
           setApprovalRequest(null);
         }
+        if (askUserRequest) {
+          askUserResolveRef.current('');
+          setAskUserRequest(null);
+        }
       } else {
         exit();
       }
@@ -260,7 +274,7 @@ export function App({
       setActiveAgentId(nextSession.id);
       setMessages(nextSession.agent.getStore().toDisplayMessages(formatToolDisplay));
     }
-  }, { isActive: mode === 'chat' && approvalRequest === null });
+  }, { isActive: mode === 'chat' && approvalRequest === null && askUserRequest === null });
 
   // Command autocomplete
   const commandList = useMemo(
@@ -290,7 +304,7 @@ export function App({
       setInputValue(`/${matchingCommands[selectedSuggestion].name} `);
       setInputKey(prev => prev + 1);
     }
-  }, { isActive: mode === 'chat' && approvalRequest === null && matchingCommands.length > 0 });
+  }, { isActive: mode === 'chat' && approvalRequest === null && askUserRequest === null && matchingCommands.length > 0 });
 
   // Permission mode display helpers
   const modeLabel = permissionMode;
@@ -366,6 +380,13 @@ export function App({
         </Box>
       )}
 
+      {/* AskUser prompt */}
+      {askUserRequest && (
+        <Box borderStyle="round" borderColor="cyan" paddingX={1}>
+          <Text>{askUserRequest.question}</Text>
+        </Box>
+      )}
+
       {/* Input */}
       <Box borderStyle="single" borderColor="gray" paddingX={1}>
         <Box flexBasis={3} flexShrink={0}>
@@ -373,6 +394,8 @@ export function App({
             <Spinner label="" />
           ) : approvalRequest ? (
             <Text color="yellow" bold>!</Text>
+          ) : askUserRequest ? (
+            <Text color="cyan" bold>?</Text>
           ) : (
             <Text color="blue" bold>{'>'}</Text>
           )}
@@ -393,6 +416,19 @@ export function App({
                 approvalRequest.resolve(value === 'yes');
               }
               setApprovalRequest(null);
+            }}
+          />
+        ) : askUserRequest ? (
+          <AskUserInput
+            question={askUserRequest.question}
+            options={askUserRequest.options}
+            onExecute={(value) => {
+              askUserResolveRef.current(value);
+              setAskUserRequest(null);
+            }}
+            onCancel={() => {
+              askUserResolveRef.current('');
+              setAskUserRequest(null);
             }}
           />
         ) : (

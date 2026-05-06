@@ -7,6 +7,7 @@ type DisplayCallback = {
   onMessage?: (msg: DisplayMessage) => void;
   onTokenUpdate?: (tokens: number) => void;
   onConfirm?: (req: ConfirmationRequest) => Promise<boolean>;
+  onAskUser?: (req: AskUserQuestion) => Promise<string>;
 };
 
 export interface ConfirmationRequest {
@@ -14,17 +15,30 @@ export interface ConfirmationRequest {
   message: string;
 }
 
+export interface AskUserQuestion {
+  question: string;
+  options: Array<{ label: string; description: string }>;
+}
+
 export interface DisplayAdapter {
   status(msg: string): void;
   error(msg: string): void;
   updateTokenCount(tokens: number): void;
   confirm?(req: ConfirmationRequest): Promise<boolean>;
+  askUser?(req: AskUserQuestion): Promise<string>;
 }
 
 export class ConsoleDisplay implements DisplayAdapter {
   status(msg: string): void { console.log(`[Status] ${msg}`); }
   error(msg: string): void { console.log(`[Error] ${msg}`); }
   updateTokenCount(_tokens: number): void {}
+  async askUser(req: AskUserQuestion): Promise<string> {
+    console.log(`[AskUser] ${req.question}`);
+    for (const o of req.options) {
+      console.log(`  [${o.label}] ${o.description}`);
+    }
+    return '';
+  }
 }
 
 export interface DisplayEvent {
@@ -47,6 +61,11 @@ export class RecordDisplay implements DisplayAdapter {
   updateTokenCount(tokens: number): void {
     this.events.push({ type: 'tokenCount', data: tokens, timestamp: new Date() });
   }
+
+  async askUser(req: AskUserQuestion): Promise<string> {
+    this.events.push({ type: 'status', data: `[AskUser] ${req.question}`, timestamp: new Date() });
+    return '';
+  }
 }
 
 export class CallbackDisplay implements DisplayAdapter {
@@ -66,5 +85,9 @@ export class CallbackDisplay implements DisplayAdapter {
 
   confirm(req: ConfirmationRequest): Promise<boolean> {
     return this.callbacks.onConfirm?.(req) ?? Promise.resolve(true);
+  }
+
+  askUser(req: AskUserQuestion): Promise<string> {
+    return this.callbacks.onAskUser?.(req) ?? Promise.resolve('');
   }
 }

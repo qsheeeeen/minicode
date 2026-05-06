@@ -1,5 +1,5 @@
 import { AnthropicClient, Anthropic, type MessageParam, type Tool, type ContentBlock, type EffortLevel } from './llm/anthropic.js';
-import { registerTools, ToolRegistry, ToolDef, ToolExecutionContext } from './tools/index.js';
+import { registerTools, ToolRegistry, ToolDef, ToolExecutionContext, ToolDeniedError } from './tools/index.js';
 import { ConsoleDisplay, type DisplayAdapter } from './utils/display.js';
 import { TokenManager, CompressionService, AgentRegistry, PermissionService, type PermissionMode } from './services/index.js';
 import { MessageStore } from './messages.js';
@@ -41,16 +41,6 @@ interface StreamingResult {
   response: Anthropic.Messages.Message;
   toolCalls: Array<{ block: Anthropic.Messages.ToolUseBlock; tool: ToolDef }>;
   hasToolCalls: boolean;
-}
-
-class ToolDeniedError extends Error {
-  constructor(
-    public readonly toolName: string,
-    public readonly displayText: string,
-  ) {
-    super(`Tool execution denied: ${toolName}`);
-    this.name = 'ToolDeniedError';
-  }
 }
 
 export class Agent {
@@ -400,6 +390,7 @@ export class Agent {
       },
       currentAgentId: this.currentAgentId,
       permissionService: this.permissionService,
+      display: this.display,
     };
 
     this.logger?.info({ session: this.currentSession, toolCount: toolCalls.length, tools: toolCalls.map(t => t.block.name) }, 'Executing tools sequentially');

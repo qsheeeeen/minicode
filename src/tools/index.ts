@@ -9,8 +9,20 @@ import { editTool } from './edit.js';
 import { bashTool } from './bash.js';
 import { agentTool } from './agent.js';
 import { activateSkillTool } from './activate_skill.js';
+import { askUserTool } from './ask_user.js';
 import { ToolRegistry } from './registry.js';
+
+export class ToolDeniedError extends Error {
+  constructor(
+    public readonly toolName: string,
+    public readonly displayText: string,
+  ) {
+    super(`Tool execution denied: ${toolName}`);
+    this.name = 'ToolDeniedError';
+  }
+}
 import type { SkillRegistry } from '../skills/index.js';
+import type { DisplayAdapter } from '../utils/display.js';
 
 export interface ToolExecutionContext {
   registry?: AgentRegistry;
@@ -19,6 +31,7 @@ export interface ToolExecutionContext {
   signal?: AbortSignal;
   permissionService?: PermissionService;
   skillRegistry?: SkillRegistry;
+  display?: DisplayAdapter;
 }
 
 export interface ToolResult {
@@ -41,7 +54,7 @@ export interface ToolAvailability {
   skillRegistry?: SkillRegistry;
 }
 
-export const allTools: ToolDef[] = [readTool, writeTool, editTool, bashTool, agentTool, activateSkillTool];
+export const allTools: ToolDef[] = [readTool, writeTool, editTool, bashTool, agentTool, activateSkillTool, askUserTool];
 
 export function registerTools(
   registry: ToolRegistry,

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Box, Text, useInput } from 'ink';
-import { Select, TextInput, ConfirmInput as InkConfirmInput } from '@inkjs/ui';
+import { Select, TextInput } from '@inkjs/ui';
 import type { ProviderConfig } from '../config.js';
 
 export interface InputComponentProps {
@@ -125,27 +125,34 @@ export function ModelSelectInput({
   );
 }
 
-/** Confirm input - yes/no prompt */
-export function ConfirmInput({
-  onExecute,
-  onCancel,
-  message = 'Confirm?',
-}: InputComponentProps & { message?: string }) {
-  return (
-    <Box gap={1}>
-      <Text>{message}</Text>
-      <InkConfirmInput
-        onConfirm={() => onExecute?.('yes')}
-        onCancel={onCancel || (() => onExecute?.('no'))}
-      />
-    </Box>
-  );
-}
-
 /** Input component registry */
 export interface InputComponentRegistration {
   name: string;
   Component: React.ComponentType<InputComponentProps>;
+}
+
+/** AskUser input — question with predefined options */
+export function AskUserInput({
+  onExecute, onCancel,
+  question = '',
+  options = [],
+}: InputComponentProps & { question?: string; options?: Array<{ label: string; description: string }> }) {
+  useInput((_input, key) => {
+    if (key.escape && onCancel) onCancel();
+  });
+
+  const selectOptions = options.map(o => ({ label: `${o.label} — ${o.description}`, value: o.label }));
+
+  return (
+    <Box flexDirection="column">
+      {selectOptions.length > 0 ? (
+        <Select options={selectOptions} onChange={(v) => onExecute?.(v)} />
+      ) : (
+        <Text dimColor>No options available</Text>
+      )}
+      <Text dimColor>↑↓ navigate, Enter select, Esc reject</Text>
+    </Box>
+  );
 }
 
 export const inputComponents: InputComponentRegistration[] = [
@@ -153,7 +160,6 @@ export const inputComponents: InputComponentRegistration[] = [
   { name: 'effort-select', Component: EffortSelectInput },
   { name: 'session-list', Component: SessionListInput },
   { name: 'model-select', Component: ModelSelectInput },
-  { name: 'confirm', Component: ConfirmInput },
 ];
 
 export function getInputComponent(name: string): React.ComponentType<InputComponentProps> {

@@ -41,6 +41,9 @@ function callContent(name: string, input: Record<string, unknown>): string {
     case 'ActivateSkill': {
       return `${name}(${input.name as string})`;
     }
+    case 'AskUser': {
+      return `${name}("${input.question as string}")`;
+    }
     default:
       return `${name}(${summary(input)})`;
   }
