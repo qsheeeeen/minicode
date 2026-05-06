@@ -290,12 +290,7 @@ export function App({
       <Box borderStyle="single" borderColor="gray" paddingX={1} marginBottom={1}>
         <Box flexGrow={1}>
           <Text bold color="cyan">Mini Code</Text>
-          <Text dimColor> v</Text>
-          <Text dimColor>{version}</Text>
-          <Text dimColor> | </Text>
-          <Text color="green">{config.model!.provider}</Text>
-          <Text dimColor>:</Text>
-          <Text>{config.model!.model}</Text>
+          <Text dimColor> v{version}</Text>
           {promptFiles.length > 0 && (
             <>
               <Text dimColor> | </Text>
@@ -305,14 +300,8 @@ export function App({
         </Box>
         <Box>
           {agentSessions.length > 1 && (
-            <>
-              <Text bold color="cyan">[{activeAgentId === '1' ? 'M' : activeAgentId}]</Text>
-              <Text dimColor> | </Text>
-            </>
+            <Text bold color="cyan">[{activeAgentId === '1' ? 'M' : activeAgentId}]</Text>
           )}
-          <Text dimColor>{currentSession}</Text>
-          {status && !isLoading && <Text dimColor> | </Text>}
-          {status && !isLoading && <Text color="magenta">{status}</Text>}
         </Box>
       </Box>
 
@@ -350,6 +339,16 @@ export function App({
           <Text>{pendingPrompt.message}</Text>
         </Box>
       )}
+
+      {/* Model / session info */}
+      <Box paddingX={1}>
+        <Text color="green">{config.model!.provider}</Text>
+        <Text dimColor>:</Text>
+        <Text>{config.model!.model}</Text>
+        <Text dimColor> | {currentSession}</Text>
+        {status && !isLoading && <Text dimColor> | </Text>}
+        {status && !isLoading && <Text color="magenta">{status}</Text>}
+      </Box>
 
       {/* Input */}
       <Box borderStyle="single" borderColor="gray" paddingX={1}>
