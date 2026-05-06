@@ -5,6 +5,7 @@ import { TokenManager, CompressionService, AgentRegistry, PermissionService, typ
 import { MessageStore } from './messages.js';
 import { skillRegistry } from './skills/index.js';
 import { sessionManager } from './utils/session.js';
+import { execSync } from 'child_process';
 import type pino from 'pino';
 
 export const SYSTEM_PROMPT = `你是一个交互式 CLI 工具，帮助用户完成软件工程任务。请使用以下指令和可用工具来协助用户。
@@ -76,6 +77,8 @@ export class Agent {
   private logger?: pino.Logger;
   private saveSessionLock: Promise<void> = Promise.resolve();
   private isCompressing: boolean = false;
+  private environmentContext = '';
+  private systemPrompt = '';
   private resolveCommand?: (input: string) => Promise<{ handled: boolean; promptText?: string; displayContent?: string }>;
 
   public setSession(sessionName: string): void {
@@ -129,6 +132,9 @@ export class Agent {
 
     this.display = new ConsoleDisplay();
     this.userPrompt = config.userPrompt || '';
+
+    this.refreshEnvironment();
+    this.refreshSystemPrompt();
   }
 
   setDisplay(display: DisplayAdapter): void {
@@ -217,9 +223,26 @@ export class Agent {
     }
   }
 
-  /** Build system prompt with optional user/project context */
-  private getSystemPrompt(): string {
+  private refreshEnvironment(): void {
+    let ctx = `Working directory: ${process.cwd()}\n`;
+    try {
+      const status = execSync('git status', { encoding: 'utf-8', timeout: 5000 });
+      ctx += `\n${status.trim()}\n`;
+      ctx += `\nThis is the git status at the start of the conversation. Note that this status is a snapshot in time, and will not update during the conversation.`;
+    } catch {
+      // Not a git repo or git unavailable — skip
+    }
+    this.environmentContext = ctx;
+  }
+
+  /** Build and cache the system prompt — call once per run or on explicit refresh */
+  refreshSystemPrompt(): void {
     let prompt = SYSTEM_PROMPT;
+
+    if (this.environmentContext) {
+      prompt += `\n\n# Environment\n${this.environmentContext}`;
+    }
+
     if (this.userPrompt) {
       prompt += `\n\n# Project Context\n${this.userPrompt}`;
     }
@@ -234,13 +257,13 @@ export class Agent {
       prompt += `\nTo activate a skill and receive its detailed instructions, use the ActivateSkill tool with the skill's name.\n`;
     }
 
-    return prompt;
+    this.systemPrompt = prompt;
   }
 
   /** Handle streaming response: build assistant turn incrementally */
   private async handleStreamingResponse(toolDefs: Tool[]): Promise<StreamingResult> {
     const stream = this.client.chatStream(this.store.toLLMMessages(), toolDefs, {
-      system: this.getSystemPrompt(),
+      system: this.systemPrompt,
       model: this.model,
       signal: this.abortController?.signal,
       effort: this.effort
