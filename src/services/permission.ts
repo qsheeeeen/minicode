@@ -1,5 +1,5 @@
 import type { AnthropicClient } from '../llm/anthropic.js';
-import type { DisplayAdapter } from '../utils/display.js';
+import type { UserPrompter } from '../utils/display.js';
 
 export type PermissionMode = 'manual' | 'yolo' | 'auto';
 
@@ -9,6 +9,7 @@ export class PermissionService {
   private mode: PermissionMode;
   private client?: AnthropicClient;
   private model?: string;
+  private prompter?: UserPrompter;
 
   constructor(options: {
     initialMode: PermissionMode;
@@ -28,18 +29,22 @@ export class PermissionService {
     this.mode = mode;
   }
 
+  setPrompter(prompter: UserPrompter): void {
+    this.prompter = prompter;
+  }
+
   cycleMode(): PermissionMode {
     const idx = MODES.indexOf(this.mode);
     this.mode = MODES[(idx + 1) % MODES.length];
     return this.mode;
   }
 
-  async check(toolName: string, toolInput: Record<string, unknown>, displayText: string, display?: DisplayAdapter): Promise<boolean> {
+  async check(toolName: string, toolInput: Record<string, unknown>, displayText: string): Promise<boolean> {
     switch (this.mode) {
       case 'yolo':
         return true;
       case 'manual': {
-        const answer = await display?.prompt?.({
+        const answer = await this.prompter?.prompt({
           message: `Allow tool execution?\n${displayText}`,
           options: [
             { label: 'Yes', value: 'yes' },

@@ -1,14 +1,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const mockRun = vi.fn();
-const mockSetDisplay = vi.fn();
+const mockSetEvents = vi.fn();
+const mockSetPrompter = vi.fn();
 const mockOnChange = vi.fn();
 const mockGetTurns = vi.fn().mockReturnValue([]);
 const mockGetStatuses = vi.fn().mockReturnValue([]);
 
 const mockAgent = {
   run: mockRun,
-  setDisplay: mockSetDisplay,
+  setEvents: mockSetEvents,
+  setPrompter: mockSetPrompter,
   getStore: vi.fn().mockReturnValue({
     onChange: mockOnChange,
     getTurns: mockGetTurns,
@@ -29,19 +31,19 @@ describe('runHeadless', () => {
   beforeEach(() => { vi.clearAllMocks(); });
   afterEach(() => { vi.restoreAllMocks(); });
 
-  it('sets headless display on agent', async () => {
+  it('sets headless events and prompter on agent', async () => {
     mockRun.mockResolvedValueOnce(undefined);
     await runHeadless(mockAgent as any, 'test prompt');
-    expect(mockSetDisplay).toHaveBeenCalled();
-    const displayArg = mockSetDisplay.mock.calls[0][0];
-    expect(displayArg).toBeDefined();
-    expect(typeof displayArg.prompt).toBe('function');
+    expect(mockSetEvents).toHaveBeenCalled();
+    expect(mockSetPrompter).toHaveBeenCalled();
+    const prompterArg = mockSetPrompter.mock.calls[0][0];
+    expect(typeof prompterArg.prompt).toBe('function');
   });
 
-  it('headless display prompt always returns empty string', async () => {
+  it('headless prompter always returns empty string', async () => {
     mockRun.mockResolvedValueOnce(undefined);
     let capturedPrompt: Function = () => 'yes';
-    mockSetDisplay.mockImplementationOnce((d: any) => { capturedPrompt = d.prompt; });
+    mockSetPrompter.mockImplementationOnce((p: any) => { capturedPrompt = p.prompt; });
     await runHeadless(mockAgent as any, 'test prompt');
     const result = await capturedPrompt({ message: 'msg', options: [{ label: 'Yes', value: 'yes' }] });
     expect(result).toBe('');

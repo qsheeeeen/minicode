@@ -1,6 +1,6 @@
 import { AnthropicClient, Anthropic, type MessageParam, type Tool, type ContentBlock, type EffortLevel } from './llm/anthropic.js';
 import { registerTools, ToolRegistry, ToolDef, ToolExecutionContext, ToolDeniedError } from './tools/index.js';
-import { ConsoleDisplay, type DisplayAdapter } from './utils/display.js';
+import { ConsoleEvents, ConsolePrompter, type AgentEvents, type UserPrompter } from './utils/display.js';
 import { TokenManager, CompressionService, AgentRegistry, PermissionService, type PermissionMode } from './services/index.js';
 import { MessageStore } from './messages.js';
 import { skillRegistry } from './skills/index.js';
@@ -55,7 +55,8 @@ export class Agent {
   public currentSession = `session-${Date.now()}`;
   private thinkingEnabled: boolean;
   private effort?: EffortLevel;
-  private display: DisplayAdapter;
+  private events: AgentEvents;
+  private prompter: UserPrompter;
   private userPrompt: string;
   private agentRegistry?: AgentRegistry;
   private currentAgentId: string;
@@ -120,15 +121,21 @@ export class Agent {
 
     registerTools(this.toolRegistry, { agentRegistry: this.agentRegistry, skillRegistry }, config.excludeTools);
 
-    this.display = new ConsoleDisplay();
+    this.events = new ConsoleEvents();
+    this.prompter = new ConsolePrompter();
     this.userPrompt = config.userPrompt || '';
 
     this.refreshEnvironment();
     this.refreshSystemPrompt();
   }
 
-  setDisplay(display: DisplayAdapter): void {
-    this.display = display;
+  setEvents(events: AgentEvents): void {
+    this.events = events;
+  }
+
+  setPrompter(prompter: UserPrompter): void {
+    this.prompter = prompter;
+    this.permissionService.setPrompter(prompter);
   }
 
   /** Save current session state to disk */
@@ -204,7 +211,7 @@ export class Agent {
       const compressed = await this.compressionService.compress(this.store.toLLMMessages(), this.client, this.model);
       this.store.setTurns(compressed);
       this.tokenManager.reset();
-      this.display.updateTokenCount(0);
+      this.events.tokenUpdate(0);
       this.store.addStatus({ role: 'status', content: `(Compressed to ${compressed.length} turns)`, timestamp: new Date() });
     } catch (e) {
       this.store.addStatus({ role: 'error', content: `(Compression failed: ${(e as Error).message})`, timestamp: new Date() });
@@ -339,7 +346,7 @@ export class Agent {
       response.usage.cache_creation_input_tokens ?? 0,
       response.usage.cache_read_input_tokens ?? 0,
     );
-    this.display.updateTokenCount(this.tokenManager.getTotal());
+    this.events.tokenUpdate(this.tokenManager.getTotal());
     const ratio = this.tokenManager.getRatio(this.contextLength);
     const percentage = Math.floor(ratio * 100);
 
@@ -362,7 +369,7 @@ export class Agent {
   private async runTool(tool: ToolDef, args: Record<string, unknown>, context: ToolExecutionContext): Promise<import('./tools/index.js').ToolResult> {
     if (tool.requiresPermission) {
       const displayText = `${tool.name}(${JSON.stringify(args)})`;
-      const allowed = await this.permissionService.check(tool.name, args, displayText, this.display);
+      const allowed = await this.permissionService.check(tool.name, args, displayText);
       if (!allowed) {
         throw new ToolDeniedError(tool.name, displayText);
       }
@@ -390,7 +397,7 @@ export class Agent {
       },
       currentAgentId: this.currentAgentId,
       permissionService: this.permissionService,
-      display: this.display,
+      prompter: this.prompter,
     };
 
     this.logger?.info({ session: this.currentSession, toolCount: toolCalls.length, tools: toolCalls.map(t => t.block.name) }, 'Executing tools sequentially');
@@ -529,7 +536,7 @@ export class Agent {
     if (count > 0) {
       this.tokenManager.addTokens(count, 0);
     }
-    this.display.updateTokenCount(this.tokenManager.getTotal());
+    this.events.tokenUpdate(this.tokenManager.getTotal());
   }
 
   clearSession(): void {

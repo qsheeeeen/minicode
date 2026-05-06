@@ -4,7 +4,7 @@ import { Spinner, ProgressBar, Select } from '@inkjs/ui';
 import { Agent } from './agent.js';
 import type { MessageParam, EffortLevel } from './llm/anthropic.js';
 import type { ResolvedConfig } from './config.js';
-import { CallbackDisplay, type DisplayMessage, type Prompt } from './utils/display.js';
+import { CallbackEvents, CallbackPrompter, type DisplayMessage, type Prompt } from './utils/display.js';
 import { commandRegistry } from './commands/index.js';
 import { Message } from './tui/Message.js';
 import { formatToolDisplay } from './tui/tool-display.js';
@@ -64,12 +64,14 @@ function useDisplay(
     const registry = registryRef.current;
     if (!registry) return;
 
-    agent.setDisplay(new CallbackDisplay({
+    agent.setEvents(new CallbackEvents({
+      onStatus: (msg) => setMessages(prev => [...prev, msg]),
       onTokenUpdate: setTokenCount,
-      onPrompt: (req) => new Promise<string>((resolve) => {
-        setPendingPrompt({ ...req, resolve });
-      }),
     }));
+
+    agent.setPrompter(new CallbackPrompter((req) => new Promise<string>((resolve) => {
+      setPendingPrompt({ ...req, resolve });
+    })));
 
     agent.getStore().onChange(() => {
       setMessages(agent.getStore().toDisplayMessages(formatToolDisplay));

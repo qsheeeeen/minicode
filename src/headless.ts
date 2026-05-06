@@ -25,11 +25,13 @@ export async function runHeadless(
     }
   }
 
-  // Set headless display: prompt always denies
-  agent.setDisplay({
+  // Set headless events and prompter
+  agent.setEvents({
     status: () => {},
     error: (msg) => console.error(`[error] ${msg}`),
-    updateTokenCount: () => {},
+    tokenUpdate: () => {},
+  });
+  agent.setPrompter({
     prompt: async (req) => {
       console.log(`[Denied: ${req.message}] -- use --permission yolo or auto in headless mode`);
       return '';

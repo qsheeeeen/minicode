@@ -1,11 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { PermissionService, type PermissionMode } from './permission.js';
+import { PermissionService } from './permission.js';
 import type { AnthropicClient } from '../llm/anthropic.js';
-import type { DisplayAdapter } from '../utils/display.js';
-
-vi.mock('../llm/anthropic.js', () => ({
-  AnthropicClient: vi.fn(),
-}));
 
 describe('PermissionService', () => {
   describe('getMode', () => {
@@ -54,11 +49,11 @@ describe('PermissionService', () => {
       expect(result).toBe(true);
     });
 
-    it('manual uses display.prompt when available', async () => {
+    it('manual uses prompter.prompt when available', async () => {
       const service = new PermissionService({ initialMode: 'manual' });
       const promptMock = vi.fn().mockResolvedValue('yes');
-      const display = { prompt: promptMock } as unknown as DisplayAdapter;
-      const result = await service.check('Bash', { command: 'ls' }, 'List files', display);
+      service.setPrompter({ prompt: promptMock });
+      const result = await service.check('Bash', { command: 'ls' }, 'List files');
       expect(result).toBe(true);
       expect(promptMock).toHaveBeenCalledWith({
         message: expect.stringContaining('List files'),
@@ -66,17 +61,17 @@ describe('PermissionService', () => {
       });
     });
 
-    it('manual returns true when display.prompt is undefined', async () => {
+    it('manual returns true when prompter is undefined', async () => {
       const service = new PermissionService({ initialMode: 'manual' });
       const result = await service.check('Bash', { command: 'ls' }, 'List files');
       expect(result).toBe(true);
     });
 
-    it('manual returns false when display.prompt returns no', async () => {
+    it('manual returns false when prompter returns no', async () => {
       const service = new PermissionService({ initialMode: 'manual' });
       const promptMock = vi.fn().mockResolvedValue('no');
-      const display = { prompt: promptMock } as unknown as DisplayAdapter;
-      const result = await service.check('Bash', { command: 'ls' }, 'List files', display);
+      service.setPrompter({ prompt: promptMock });
+      const result = await service.check('Bash', { command: 'ls' }, 'List files');
       expect(result).toBe(false);
     });
   });

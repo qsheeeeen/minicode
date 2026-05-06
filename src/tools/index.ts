@@ -22,7 +22,7 @@ export class ToolDeniedError extends Error {
   }
 }
 import type { SkillRegistry } from '../skills/index.js';
-import type { DisplayAdapter } from '../utils/display.js';
+import type { UserPrompter } from '../utils/display.js';
 
 export interface ToolExecutionContext {
   registry?: AgentRegistry;
@@ -31,7 +31,7 @@ export interface ToolExecutionContext {
   signal?: AbortSignal;
   permissionService?: PermissionService;
   skillRegistry?: SkillRegistry;
-  display?: DisplayAdapter;
+  prompter?: UserPrompter;
 }
 
 export interface ToolResult {

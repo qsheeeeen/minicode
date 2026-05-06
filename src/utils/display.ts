@@ -14,23 +14,27 @@ export interface Prompt {
   options: PromptOption[];
 }
 
-type DisplayCallback = {
-  onMessage?: (msg: DisplayMessage) => void;
-  onTokenUpdate?: (tokens: number) => void;
-  onPrompt?: (req: Prompt) => Promise<string>;
-};
-
-export interface DisplayAdapter {
+/** Push notifications: agent → human */
+export interface AgentEvents {
   status(msg: string): void;
   error(msg: string): void;
-  updateTokenCount(tokens: number): void;
-  prompt?(req: Prompt): Promise<string>;
+  tokenUpdate(tokens: number): void;
 }
 
-export class ConsoleDisplay implements DisplayAdapter {
+/** Request-response: agent asks, human answers */
+export interface UserPrompter {
+  prompt(req: Prompt): Promise<string>;
+}
+
+// -- console implementations ------------------------------------------------
+
+export class ConsoleEvents implements AgentEvents {
   status(msg: string): void { console.log(`[Status] ${msg}`); }
   error(msg: string): void { console.log(`[Error] ${msg}`); }
-  updateTokenCount(_tokens: number): void {}
+  tokenUpdate(_tokens: number): void {}
+}
+
+export class ConsolePrompter implements UserPrompter {
   async prompt(req: Prompt): Promise<string> {
     console.log(`[Prompt] ${req.message}`);
     for (const o of req.options) {
@@ -40,26 +44,30 @@ export class ConsoleDisplay implements DisplayAdapter {
   }
 }
 
-export interface DisplayEvent {
-  type: 'status' | 'error' | 'tokenCount';
+// -- recording implementations (for tests) ----------------------------------
+
+export interface EventRecord {
+  type: 'status' | 'error' | 'tokenUpdate';
   data: string | number;
   timestamp: Date;
 }
 
-export class RecordDisplay implements DisplayAdapter {
-  events: DisplayEvent[] = [];
+export class RecordEvents implements AgentEvents {
+  events: EventRecord[] = [];
 
   status(msg: string): void {
     this.events.push({ type: 'status', data: msg, timestamp: new Date() });
   }
-
   error(msg: string): void {
     this.events.push({ type: 'error', data: msg, timestamp: new Date() });
   }
-
-  updateTokenCount(tokens: number): void {
-    this.events.push({ type: 'tokenCount', data: tokens, timestamp: new Date() });
+  tokenUpdate(tokens: number): void {
+    this.events.push({ type: 'tokenUpdate', data: tokens, timestamp: new Date() });
   }
+}
+
+export class RecordPrompter implements UserPrompter {
+  events: EventRecord[] = [];
 
   async prompt(req: Prompt): Promise<string> {
     this.events.push({ type: 'status', data: `[Prompt] ${req.message}`, timestamp: new Date() });
@@ -67,22 +75,32 @@ export class RecordDisplay implements DisplayAdapter {
   }
 }
 
-export class CallbackDisplay implements DisplayAdapter {
-  constructor(private callbacks: DisplayCallback) {}
+// -- TUI callbacks ----------------------------------------------------------
+
+type TuiCallbacks = {
+  onStatus?: (msg: DisplayMessage) => void;
+  onTokenUpdate?: (tokens: number) => void;
+  onPrompt?: (req: Prompt) => Promise<string>;
+};
+
+export class CallbackEvents implements AgentEvents {
+  constructor(private cb: { onStatus?: (msg: DisplayMessage) => void; onTokenUpdate?: (tokens: number) => void }) {}
 
   status(msg: string): void {
-    this.callbacks.onMessage?.({ role: 'status', content: msg, timestamp: new Date() });
+    this.cb.onStatus?.({ role: 'status', content: msg, timestamp: new Date() });
   }
-
   error(msg: string): void {
-    this.callbacks.onMessage?.({ role: 'error', content: msg, timestamp: new Date() });
+    this.cb.onStatus?.({ role: 'error', content: msg, timestamp: new Date() });
   }
+  tokenUpdate(tokens: number): void {
+    this.cb.onTokenUpdate?.(tokens);
+  }
+}
 
-  updateTokenCount(tokens: number): void {
-    this.callbacks.onTokenUpdate?.(tokens);
-  }
+export class CallbackPrompter implements UserPrompter {
+  constructor(private onPrompt: (req: Prompt) => Promise<string>) {}
 
   prompt(req: Prompt): Promise<string> {
-    return this.callbacks.onPrompt?.(req) ?? Promise.resolve('');
+    return this.onPrompt(req);
   }
 }
