@@ -12,6 +12,7 @@ export interface PromptOption {
 export interface Prompt {
   message: string;
   options: PromptOption[];
+  multiSelect?: boolean;
 }
 
 /** Push notifications: agent → human */

@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect, useMemo, type RefObject } from 'react';
 import { Box, Text, useInput, useApp } from 'ink';
-import { Spinner, ProgressBar, Select } from '@inkjs/ui';
+import { Spinner, ProgressBar, Select, MultiSelect } from '@inkjs/ui';
 import { Agent } from './agent.js';
 import type { MessageParam, EffortLevel } from './llm/anthropic.js';
 import type { ResolvedConfig } from './config.js';
@@ -362,16 +362,35 @@ export function App({
           )}
         </Box>
         {pendingPrompt ? (
-          <Select
-            options={pendingPrompt.options.map(o => ({
-              label: o.description ? `${o.label} — ${o.description}` : o.label,
-              value: o.value,
-            }))}
-            onChange={(value) => {
-              pendingPrompt.resolve(value);
-              setPendingPrompt(null);
-            }}
-          />
+          pendingPrompt.multiSelect ? (
+            <Box flexDirection="column">
+              <MultiSelect
+                options={pendingPrompt.options.map(o => ({
+                  label: o.description ? `${o.label} — ${o.description}` : o.label,
+                  value: o.value,
+                }))}
+                onSubmit={(values) => {
+                  pendingPrompt.resolve(values.join(', '));
+                  setPendingPrompt(null);
+                }}
+              />
+              <Text dimColor>Space select  Enter confirm  Esc cancel</Text>
+            </Box>
+          ) : (
+            <Box flexDirection="column">
+              <Select
+                options={pendingPrompt.options.map(o => ({
+                  label: o.description ? `${o.label} — ${o.description}` : o.label,
+                  value: o.value,
+                }))}
+                onChange={(value) => {
+                  pendingPrompt.resolve(value);
+                  setPendingPrompt(null);
+                }}
+              />
+              <Text dimColor>↑↓ navigate  Enter select  Esc cancel</Text>
+            </Box>
+          )
         ) : (
           (() => {
             const InputComponent = getInputComponent(inputMode);
