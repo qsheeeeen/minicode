@@ -245,10 +245,10 @@ export class MessageStore {
   /** Convenience: generate display messages from current state. */
   toDisplayMessages(formatDisplay?: ToolDisplayFormatter): DisplayMessage[] {
     const msgs = toDisplayMessages(this.turns, this.statuses, formatDisplay);
-    // Mark last assistant/text block as streaming if store is in streaming mode
+    // Mark last non-empty text/thinking block as streaming
     if (this.streaming) {
       for (let i = msgs.length - 1; i >= 0; i--) {
-        if (msgs[i].role === 'text' || msgs[i].role === 'thinking') {
+        if ((msgs[i].role === 'text' || msgs[i].role === 'thinking') && msgs[i].content) {
           msgs[i].isStreaming = true;
           break;
         }

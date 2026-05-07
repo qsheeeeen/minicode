@@ -266,7 +266,6 @@ export class Agent {
       effort: this.effort
     });
     this.currentStream = stream;
-    this.store.setStreaming(true);
 
     let blockStreaming = false;
     const toolCalls: Array<{ block: Anthropic.Messages.ToolUseBlock; tool: ToolDef }> = [];
@@ -275,6 +274,7 @@ export class Agent {
     stream.on('thinking', (delta: string) => {
       if (!blockStreaming) {
         blockStreaming = true;
+        this.store.setStreaming(true);
         this.store.appendToLastAssistantTurn({ type: 'thinking', thinking: delta } as ContentBlock);
       } else {
         const last = this.store.getLastBlock();
@@ -289,6 +289,7 @@ export class Agent {
     stream.on('text', (delta: string) => {
       if (!blockStreaming) {
         blockStreaming = true;
+        this.store.setStreaming(true);
         this.store.appendToLastAssistantTurn({ type: 'text', text: delta } as ContentBlock);
       } else {
         const last = this.store.getLastBlock();

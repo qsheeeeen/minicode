@@ -316,11 +316,11 @@ export function App({
             {messages
               .filter(msg => {
                 if (msg.role === 'tool_result') return false;
-                if (!msg.element && !msg.content && !msg.isStreaming && msg.role !== 'user') return false;
+                if (!msg.element && !msg.content) return false;
                 return true;
               })
               .map((msg, i) => (
-                <Box key={i} flexDirection="column" marginTop={i > 0 ? 1 : 0}>
+                <Box key={i}>
                   <Message role={msg.role} content={msg.content} isStreaming={msg.isStreaming} element={msg.element} />
                 </Box>
               ))}
