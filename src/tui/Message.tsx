@@ -12,68 +12,70 @@ interface MessageProps {
 export function Message({ role, content, isStreaming, element }: MessageProps) {
   if (!element && !content && !isStreaming && role !== 'user') return null;
 
-  // Trim content whitespace when finalized to prevent blank lines from LLM output
   const text = isStreaming ? content : content.trim();
 
-  if (role === 'user') {
-    return (
-      <Box marginBottom={0} paddingX={0} width="100%">
-        <Text backgroundColor="gray" color="white">{text}</Text>
-      </Box>
-    );
-  }
+  switch (role) {
+    case 'user':
+      return (
+        <Box marginBottom={0} paddingX={1} backgroundColor="gray">
+          <Text color="white" bold>{text}</Text>
+        </Box>
+      );
 
-  if (role === 'text') {
-    return (
-      <Box marginBottom={0} paddingX={0} flexDirection="column">
-        <Text>{text}</Text>
-        {isStreaming && <Text dimColor inverse>▋</Text>}
-      </Box>
-    );
-  }
+    case 'text':
+      return (
+        <Box marginBottom={0} flexDirection="column">
+          <Text>{text}</Text>
+          {isStreaming && <Text dimColor inverse>▋</Text>}
+        </Box>
+      );
 
-  if (role === 'thinking') {
-    return (
-      <Box marginBottom={0} paddingX={0} flexDirection="column">
-        <Text dimColor>{text}</Text>
-        {isStreaming && <Text dimColor inverse>▋</Text>}
-      </Box>
-    );
-  }
+    case 'thinking':
+      return (
+        <Box marginBottom={0} flexDirection="column">
+          <Text color="gray" italic>Thinking</Text>
+          <Box>
+            <Text dimColor>{text}</Text>
+            {isStreaming && <Text dimColor inverse>▋</Text>}
+          </Box>
+        </Box>
+      );
 
-  if (role === 'tool_use') {
-    if (element) return element;
-    return (
-      <Box marginBottom={0} paddingX={4}>
-        <Text color="yellow">{text}</Text>
-      </Box>
-    );
-  }
+    case 'tool_use':
+      if (element) return element;
+      return (
+        <Box marginBottom={0} paddingLeft={2}>
+          <Text dimColor>{'▸'} {text}</Text>
+        </Box>
+      );
 
-  if (role === 'tool_result') {
-    return null;
-  }
+    case 'tool_result':
+      return (
+        <Box marginBottom={0} paddingLeft={4}>
+          <Text dimColor>{text}</Text>
+        </Box>
+      );
 
-  if (role === 'status') {
-    if (element) return element;
-    return (
-      <Box marginBottom={0} paddingX={0}>
-        <Text dimColor>{text}</Text>
-      </Box>
-    );
-  }
+    case 'status':
+      if (element) return element;
+      return (
+        <Box marginBottom={0} paddingLeft={2}>
+          <Text color="gray">{'—'} {text}</Text>
+        </Box>
+      );
 
-  if (role === 'error') {
-    return (
-      <Box marginBottom={0}>
-        <Text color="red">{text}</Text>
-      </Box>
-    );
-  }
+    case 'error':
+      return (
+        <Box marginBottom={0} paddingLeft={2}>
+          <Text color="red" bold>{'✕'} {text}</Text>
+        </Box>
+      );
 
-  return (
-    <Box marginBottom={0}>
-      <Text>{text}</Text>
-    </Box>
-  );
+    default:
+      return (
+        <Box marginBottom={0}>
+          <Text>{text}</Text>
+        </Box>
+      );
+  }
 }

@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect, useMemo, type RefObject } from 'react';
 import { Box, Text, useInput, useApp } from 'ink';
-import { Spinner, ProgressBar, Select, MultiSelect } from '@inkjs/ui';
+import { ProgressBar, Select, MultiSelect } from '@inkjs/ui';
 import { Agent } from './agent.js';
 import type { MessageParam, EffortLevel } from './llm/anthropic.js';
 import type { ResolvedConfig } from './config.js';
@@ -287,7 +287,7 @@ export function App({
   return (
     <Box flexDirection="column" height="100%">
       {/* Header */}
-      <Box borderStyle="single" borderColor="gray" paddingX={1} marginBottom={1}>
+      <Box paddingX={1} marginBottom={1}>
         <Box flexGrow={1}>
           <Text bold color="cyan">Mini Code</Text>
           <Text dimColor> v{version}</Text>
@@ -340,26 +340,10 @@ export function App({
         </Box>
       )}
 
-      {/* Model / session info */}
-      <Box paddingX={1}>
-        <Text color="green">{config.model!.provider}</Text>
-        <Text dimColor>:</Text>
-        <Text>{config.model!.model}</Text>
-        <Text dimColor> | {currentSession}</Text>
-        {status && !isLoading && <Text dimColor> | </Text>}
-        {status && !isLoading && <Text color="magenta">{status}</Text>}
-      </Box>
-
       {/* Input */}
       <Box borderStyle="single" borderColor="gray" paddingX={1}>
         <Box flexBasis={3} flexShrink={0}>
-          {isLoading ? (
-            <Spinner label="" />
-          ) : isModal ? (
-            <Text color="yellow" bold>?</Text>
-          ) : (
-            <Text color="blue" bold>{'>'}</Text>
-          )}
+          <Text color="cyan" bold>{'>'}</Text>
         </Box>
         {pendingPrompt ? (
           pendingPrompt.multiSelect ? (
@@ -449,7 +433,7 @@ export function App({
 
       {/* Command autocomplete suggestions */}
       {matchingCommands.length > 0 && !isModal && !isLoading && (
-        <Box flexDirection="column" paddingX={2} borderStyle="single" borderColor="gray">
+        <Box flexDirection="column" paddingX={2}>
           {matchingCommands.map((cmd, i) => (
             <Box key={cmd.name} flexDirection="row">
               <Box flexBasis={2} flexShrink={0}>
@@ -469,7 +453,17 @@ export function App({
         </Box>
       )}
 
-      {/* Status bar: tokens + context progress + permission mode */}
+      {/* Model / session info */}
+      <Box paddingX={1}>
+        <Text color="green">{config.model!.provider}</Text>
+        <Text dimColor>:</Text>
+        <Text>{config.model!.model}</Text>
+        <Text dimColor> | {currentSession}</Text>
+        {status && !isLoading && <Text dimColor> | </Text>}
+        {status && !isLoading && <Text color="magenta">{status}</Text>}
+      </Box>
+
+      {/* Status bar */}
       <Box paddingX={1} gap={1}>
         <Text dimColor>{tokenCount.toLocaleString()}/{(config.model?.contextLength || 200000).toLocaleString()}</Text>
         <Box flexBasis={20}><ProgressBar value={Math.min(100, tokenCount / (config.model?.contextLength || 200000) * 100)} /></Box>
@@ -477,8 +471,6 @@ export function App({
         <Text dimColor> │ </Text>
         <Text color={modeColor}>{modeLabel}</Text>
         <Text dimColor> (Shift+Tab)</Text>
-        {isLoading && <Text dimColor> │ </Text>}
-        {isLoading && <Text color="magenta">esc to abort</Text>}
       </Box>
     </Box>
   );
