@@ -1,16 +1,5 @@
 import type { MessageParam, ContentBlock } from './llm/anthropic.js';
 
-export interface ToolDisplayResult {
-  content: string;
-  element?: React.ReactElement;
-}
-
-export type ToolDisplayFormatter = (
-  toolName: string,
-  input: Record<string, unknown>,
-  output?: string,
-) => ToolDisplayResult;
-
 // UI-only status / error messages — not sent to LLM
 export interface StatusMessage {
   role: 'status' | 'error';
@@ -20,26 +9,36 @@ export interface StatusMessage {
   element?: React.ReactElement;
 }
 
-// Display layer uses these fields
+// Display layer — each role carries only the fields it needs
 export type MessageRole = 'user' | 'text' | 'thinking' | 'tool' | 'status' | 'error';
-export interface DisplayMessage {
-  role: MessageRole;
-  content: string;
-  timestamp?: Date;
-  isStreaming?: boolean;
-  element?: React.ReactElement;
-  slotId?: string;
-}
+
+export type DisplayMessage =
+  | { role: 'user'; content: string }
+  | { role: 'text'; content: string; isStreaming?: boolean }
+  | { role: 'thinking'; content: string; isStreaming?: boolean }
+  | { role: 'tool'; name: string; input: Record<string, unknown>; output?: string; slotId: string }
+  | { role: 'status'; content: string; element?: React.ReactElement; timestamp?: Date }
+  | { role: 'error'; content: string; timestamp?: Date };
 
 // Convert MessageParam[] + statuses → DisplayMessage[]
 export function toDisplayMessages(
   turns: MessageParam[],
   statuses: StatusMessage[],
-  formatDisplay: ToolDisplayFormatter,
 ): DisplayMessage[] {
-  const result: DisplayMessage[] = [];
-  const toolUseMsgs = new Map<string, DisplayMessage>();
-  const toolUseData = new Map<string, { name: string; input: Record<string, unknown> }>();
+  // Build result map from tool_result blocks
+  const results = new Map<string, string>();
+  for (const turn of turns) {
+    if (turn.role === 'user' && Array.isArray(turn.content)) {
+      for (const block of turn.content as any[]) {
+        if (block.type === 'tool_result') {
+          results.set(
+            block.tool_use_id,
+            typeof block.content === 'string' ? block.content : JSON.stringify(block.content),
+          );
+        }
+      }
+    }
+  }
 
   // Index statuses by turnIndex for chronological interleaving
   const byTurnIndex = new Map<number, StatusMessage[]>();
@@ -49,12 +48,14 @@ export function toDisplayMessages(
     byTurnIndex.get(idx)!.push(s);
   }
 
+  const result: DisplayMessage[] = [];
+
   // Statuses with turnIndex 0 come before all turns
   for (const s of byTurnIndex.get(0) ?? []) {
     result.push({ role: s.role, content: s.content, element: s.element, timestamp: s.timestamp });
   }
 
-  // Pass 1: process turns, interleaving statuses after each
+  // Single pass: process turns, interleaving statuses after each
   for (let i = 0; i < turns.length; i++) {
     const turn = turns[i];
     if (turn.role === 'user') {
@@ -70,36 +71,19 @@ export function toDisplayMessages(
         } else if (block.type === 'text') {
           result.push({ role: 'text', content: block.text });
         } else if (block.type === 'tool_use') {
-          const input = block.input as Record<string, unknown>;
-          const display = formatDisplay(block.name, input);
-          const dm: DisplayMessage = { role: 'tool', content: display.content, element: display.element, slotId: block.id };
-          result.push(dm);
-          toolUseMsgs.set(block.id, dm);
-          toolUseData.set(block.id, { name: block.name, input });
+          result.push({
+            role: 'tool',
+            name: block.name,
+            input: (block.input as Record<string, unknown>) ?? {},
+            output: results.get(block.id),
+            slotId: block.id,
+          });
         }
       }
     }
     // Statuses added after this turn
     for (const s of byTurnIndex.get(i + 1) ?? []) {
       result.push({ role: s.role, content: s.content, element: s.element, timestamp: s.timestamp });
-    }
-  }
-
-  // Pass 2: attach tool_result content to matching tool_use display elements
-  for (const turn of turns) {
-    if (turn.role === 'user' && Array.isArray(turn.content)) {
-      for (const block of turn.content as any[]) {
-        if (block.type === 'tool_result') {
-          const dm = toolUseMsgs.get(block.tool_use_id);
-          const td = toolUseData.get(block.tool_use_id);
-          if (dm && td) {
-            const raw = typeof block.content === 'string' ? block.content : JSON.stringify(block.content);
-            const display = formatDisplay(td.name, td.input, raw);
-            dm.content = display.content;
-            dm.element = display.element;
-          }
-        }
-      }
     }
   }
 
@@ -239,13 +223,14 @@ export class MessageStore {
   }
 
   /** Convenience: generate display messages from current state. */
-  toDisplayMessages(formatDisplay: ToolDisplayFormatter): DisplayMessage[] {
-    const msgs = toDisplayMessages(this.turns, this.statuses, formatDisplay);
+  toDisplayMessages(): DisplayMessage[] {
+    const msgs = toDisplayMessages(this.turns, this.statuses);
     // Mark last non-empty text/thinking block as streaming
     if (this.streaming) {
       for (let i = msgs.length - 1; i >= 0; i--) {
-        if ((msgs[i].role === 'text' || msgs[i].role === 'thinking') && msgs[i].content) {
-          msgs[i].isStreaming = true;
+        const m = msgs[i];
+        if ((m.role === 'text' || m.role === 'thinking') && m.content) {
+          m.isStreaming = true;
           break;
         }
       }

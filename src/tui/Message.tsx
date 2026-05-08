@@ -1,31 +1,20 @@
-import React from 'react';
 import { Box, Text } from 'ink';
-import type { MessageRole } from '../messages.js';
+import type { DisplayMessage } from '../messages.js';
+import { ToolDisplay } from './tool-display.js';
 
-interface MessageProps {
-  role: MessageRole;
-  content: string;
-  isStreaming?: boolean;
-  element?: React.ReactElement;
-}
-
-export function Message({ role, content, isStreaming, element }: MessageProps) {
-  if (!element && !content && !isStreaming) return null;
-
-  const text = isStreaming ? content : content.trim();
-
-  switch (role) {
+export function Message({ msg }: { msg: DisplayMessage }) {
+  switch (msg.role) {
     case 'user':
       return (
         <Box marginBottom={1} paddingX={1} backgroundColor="gray">
-          <Text color="white" bold>{text}</Text>
+          <Text color="white" bold>{msg.content.trim() || ' '}</Text>
         </Box>
       );
 
     case 'text':
       return (
         <Box marginBottom={1}>
-          <Text>{text}</Text>
+          <Text>{msg.isStreaming ? msg.content : msg.content.trim() || ' '}</Text>
         </Box>
       );
 
@@ -34,34 +23,34 @@ export function Message({ role, content, isStreaming, element }: MessageProps) {
         <Box marginBottom={1} flexDirection="column">
           <Text color="gray" italic>Thinking</Text>
           <Box>
-            <Text dimColor>{text}</Text>
+            <Text dimColor>{msg.isStreaming ? msg.content : msg.content.trim()}</Text>
           </Box>
         </Box>
       );
 
     case 'tool':
-      return <Box marginBottom={1}>{element}</Box>;
+      return (
+        <Box marginBottom={1}>
+          <ToolDisplay name={msg.name} input={msg.input} output={msg.output} />
+        </Box>
+      );
 
     case 'status':
-      if (element) return <Box marginBottom={1}>{element}</Box>;
+      if (msg.element) return <Box marginBottom={1}>{msg.element}</Box>;
       return (
         <Box marginBottom={1} paddingLeft={2}>
-          <Text color="gray">{'—'} {text}</Text>
+          <Text color="gray">{'—'} {msg.content}</Text>
         </Box>
       );
 
     case 'error':
       return (
         <Box marginBottom={1} paddingLeft={2}>
-          <Text color="red" bold>{'✕'} {text}</Text>
+          <Text color="red" bold>{'✕'} {msg.content}</Text>
         </Box>
       );
 
     default:
-      return (
-        <Box marginBottom={1}>
-          <Text>{text}</Text>
-        </Box>
-      );
+      return null;
   }
 }

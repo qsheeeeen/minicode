@@ -7,7 +7,7 @@ import type { ResolvedConfig } from './config.js';
 import { CallbackEvents, CallbackPrompter, type DisplayMessage, type Prompt } from './utils/display.js';
 import { commandRegistry } from './commands/index.js';
 import { Message } from './tui/Message.js';
-import { formatToolDisplay } from './tui/tool-display.js';
+
 import { getInputComponent, type InputComponentProps } from './tui/inputs.js';
 import { sessionManager } from './utils/session.js';
 import { AgentRegistry, type AgentSession, type PermissionMode } from './services/index.js';
@@ -74,7 +74,7 @@ function useDisplay(
     })));
 
     agent.getStore().onChange(() => {
-      setMessages(agent.getStore().toDisplayMessages(formatToolDisplay));
+      setMessages(agent.getStore().toDisplayMessages());
     });
 
     registry.register({
@@ -247,7 +247,7 @@ export function App({
       const nextSession = sessions[nextIndex];
       activeAgentIdRef.current = nextSession.id;
       setActiveAgentId(nextSession.id);
-      setMessages(nextSession.agent.getStore().toDisplayMessages(formatToolDisplay));
+      setMessages(nextSession.agent.getStore().toDisplayMessages());
     }
   }, { isActive: mode === 'chat' && !isModal });
 
@@ -315,12 +315,13 @@ export function App({
           <Box flexDirection="column">
             {messages
               .filter(msg => {
-                if (!msg.element && !msg.content) return false;
-                return true;
+                if (msg.role === 'tool') return true;
+                if (msg.role === 'status' && msg.element) return true;
+                return !!msg.content;
               })
               .map((msg, i) => (
                 <Box key={i}>
-                  <Message role={msg.role} content={msg.content} isStreaming={msg.isStreaming} element={msg.element} />
+                  <Message msg={msg} />
                 </Box>
               ))}
           </Box>

@@ -82,12 +82,10 @@ function renderDiff(output: string): React.ReactElement {
   }
 
   const elements: React.ReactElement[] = [];
-  // First line is "Edited path"
   elements.push(React.createElement(Text, { key: 0, dimColor: true }, lines[0]));
 
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i];
-    // Parse: "NNNN + content" or "NNNN - content" or "NNNN   content"
     if (line.match(/^\s*\d+\s+\+/)) {
       elements.push(React.createElement(Text, { key: i, color: 'green' }, line));
     } else if (line.match(/^\s*\d+\s+-/)) {
@@ -100,27 +98,15 @@ function renderDiff(output: string): React.ReactElement {
   return React.createElement(Box, { flexDirection: 'column' }, ...elements);
 }
 
-export interface ToolDisplayResult {
-  content: string;
-  element?: React.ReactElement;
-}
-
-export function formatToolDisplay(
-  toolName: string,
-  input: Record<string, unknown>,
-  output?: string,
-): ToolDisplayResult {
-  const callEl = formatCall(toolName, input);
-  const callText = callContent(toolName, input);
-
-  if (output === undefined) {
-    return { content: callText, element: callEl };
-  }
-
-  const resultEl = formatResult(toolName, output);
-  const block = resultEl
+export function ToolDisplay({ name, input, output }: {
+  name: string;
+  input: Record<string, unknown>;
+  output?: string;
+}) {
+  const callEl = formatCall(name, input);
+  if (output === undefined) return callEl;
+  const resultEl = formatResult(name, output);
+  return resultEl
     ? React.createElement(Box, { flexDirection: 'column' }, callEl, resultEl)
     : callEl;
-
-  return { content: `${callText}\n${output}`, element: block };
 }
