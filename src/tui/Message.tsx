@@ -39,20 +39,8 @@ export function Message({ role, content, isStreaming, element }: MessageProps) {
         </Box>
       );
 
-    case 'tool_use':
-      if (element) return <Box marginBottom={1}>{element}</Box>;
-      return (
-        <Box marginBottom={1} paddingLeft={2}>
-          <Text dimColor>{'▸'} {text}</Text>
-        </Box>
-      );
-
-    case 'tool_result':
-      return (
-        <Box marginBottom={1} paddingLeft={4}>
-          <Text dimColor>{text}</Text>
-        </Box>
-      );
+    case 'tool':
+      return <Box marginBottom={1}>{element}</Box>;
 
     case 'status':
       if (element) return <Box marginBottom={1}>{element}</Box>;

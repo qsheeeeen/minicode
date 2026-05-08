@@ -1,12 +1,19 @@
 import { describe, it, expect, vi } from 'vitest';
-import { MessageStore, toDisplayMessages, type StatusMessage } from './messages.js';
+import { MessageStore, toDisplayMessages, type StatusMessage, type ToolDisplayFormatter } from './messages.js';
 import type { MessageParam } from './llm/anthropic.js';
+
+const fmt: ToolDisplayFormatter = (name, input, output) => {
+  if (output !== undefined) {
+    return { content: `${name}: ${output}` };
+  }
+  return { content: `${name}(${JSON.stringify(input)})` };
+};
 
 describe('toDisplayMessages', () => {
 
   it('renders user string turns', () => {
     const turns: MessageParam[] = [{ role: 'user', content: 'hello' }];
-    const result = toDisplayMessages(turns, []);
+    const result = toDisplayMessages(turns, [], fmt);
     expect(result).toHaveLength(1);
     expect(result[0].role).toBe('user');
     expect(result[0].content).toBe('hello');
@@ -16,7 +23,7 @@ describe('toDisplayMessages', () => {
     const turns: MessageParam[] = [
       { role: 'assistant', content: [{ type: 'text', text: 'hi there' }] },
     ];
-    const result = toDisplayMessages(turns, []);
+    const result = toDisplayMessages(turns, [], fmt);
     expect(result).toHaveLength(1);
     expect(result[0].role).toBe('text');
     expect(result[0].content).toBe('hi there');
@@ -27,7 +34,7 @@ describe('toDisplayMessages', () => {
       { role: 'assistant', content: [{ type: 'tool_use', id: 't1', name: 'Read', input: { path: '/a.txt' } }] },
       { role: 'user', content: [{ type: 'tool_result', tool_use_id: 't1', content: 'file contents' }] },
     ];
-    const result = toDisplayMessages(turns, []);
+    const result = toDisplayMessages(turns, [], fmt);
     expect(result).toHaveLength(1);
     expect(result[0].content).toContain('file contents');
   });
@@ -37,7 +44,7 @@ describe('toDisplayMessages', () => {
     const statuses: StatusMessage[] = [
       { role: 'status', content: 'done', timestamp: new Date(), turnIndex: 1 },
     ];
-    const result = toDisplayMessages(turns, statuses);
+    const result = toDisplayMessages(turns, statuses, fmt);
     expect(result).toHaveLength(2);
     expect(result[1].role).toBe('status');
   });
@@ -47,7 +54,7 @@ describe('toDisplayMessages', () => {
     const statuses: StatusMessage[] = [
       { role: 'status', content: 'cleared', timestamp: new Date(), turnIndex: 0 },
     ];
-    const result = toDisplayMessages(turns, statuses);
+    const result = toDisplayMessages(turns, statuses, fmt);
     expect(result).toHaveLength(2);
     expect(result[0].role).toBe('status');
     expect(result[1].role).toBe('user');

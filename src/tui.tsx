@@ -315,7 +315,6 @@ export function App({
           <Box flexDirection="column">
             {messages
               .filter(msg => {
-                if (msg.role === 'tool_result') return false;
                 if (!msg.element && !msg.content) return false;
                 return true;
               })

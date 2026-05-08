@@ -21,7 +21,7 @@ export interface StatusMessage {
 }
 
 // Display layer uses these fields
-export type MessageRole = 'user' | 'text' | 'thinking' | 'tool_use' | 'tool_result' | 'status' | 'error';
+export type MessageRole = 'user' | 'text' | 'thinking' | 'tool' | 'status' | 'error';
 export interface DisplayMessage {
   role: MessageRole;
   content: string;
@@ -35,7 +35,7 @@ export interface DisplayMessage {
 export function toDisplayMessages(
   turns: MessageParam[],
   statuses: StatusMessage[],
-  formatDisplay?: ToolDisplayFormatter,
+  formatDisplay: ToolDisplayFormatter,
 ): DisplayMessage[] {
   const result: DisplayMessage[] = [];
   const toolUseMsgs = new Map<string, DisplayMessage>();
@@ -71,10 +71,8 @@ export function toDisplayMessages(
           result.push({ role: 'text', content: block.text });
         } else if (block.type === 'tool_use') {
           const input = block.input as Record<string, unknown>;
-          const display = formatDisplay
-            ? formatDisplay(block.name, input)
-            : { content: `${block.name}(${JSON.stringify(input)})` };
-          const dm: DisplayMessage = { role: 'tool_use', content: display.content, element: display.element, slotId: block.id };
+          const display = formatDisplay(block.name, input);
+          const dm: DisplayMessage = { role: 'tool', content: display.content, element: display.element, slotId: block.id };
           result.push(dm);
           toolUseMsgs.set(block.id, dm);
           toolUseData.set(block.id, { name: block.name, input });
@@ -96,9 +94,7 @@ export function toDisplayMessages(
           const td = toolUseData.get(block.tool_use_id);
           if (dm && td) {
             const raw = typeof block.content === 'string' ? block.content : JSON.stringify(block.content);
-            const display: ToolDisplayResult = formatDisplay
-              ? formatDisplay(td.name, td.input, raw)
-              : { content: raw };
+            const display = formatDisplay(td.name, td.input, raw);
             dm.content = display.content;
             dm.element = display.element;
           }
@@ -243,7 +239,7 @@ export class MessageStore {
   }
 
   /** Convenience: generate display messages from current state. */
-  toDisplayMessages(formatDisplay?: ToolDisplayFormatter): DisplayMessage[] {
+  toDisplayMessages(formatDisplay: ToolDisplayFormatter): DisplayMessage[] {
     const msgs = toDisplayMessages(this.turns, this.statuses, formatDisplay);
     // Mark last non-empty text/thinking block as streaming
     if (this.streaming) {
