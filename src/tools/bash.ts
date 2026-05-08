@@ -1,6 +1,10 @@
 import { spawn } from 'child_process';
 import type { ToolDef, ToolResult, ToolExecutionContext } from './index.js';
 
+function stripAnsiCodes(text: string): string {
+  return text.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
+}
+
 export const bashTool: ToolDef = {
   name: 'Bash',
   description: 'Execute a bash command in the current working directory. Returns stdout and stderr. Optionally provide a timeout in seconds.',
@@ -24,10 +28,10 @@ export const bashTool: ToolDef = {
         let stderr = '';
 
         proc.stdout?.on('data', (d) => {
-          stdout += d.toString();
+          stdout += stripAnsiCodes(d.toString());
         });
         proc.stderr?.on('data', (d) => {
-          stderr += d.toString();
+          stderr += stripAnsiCodes(d.toString());
         });
 
         if (timeout) {
