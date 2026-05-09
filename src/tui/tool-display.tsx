@@ -68,7 +68,7 @@ function formatResult(name: string, output: string): React.ReactElement | null {
       return React.createElement(Text, { dimColor: true }, output);
     }
     case 'ActivateSkill': {
-      return React.createElement(Text, { color: 'green' }, output);
+      return React.createElement(Text, { dimColor: true }, 'Loaded');
     }
     default:
       return React.createElement(Text, { dimColor: true }, output);
