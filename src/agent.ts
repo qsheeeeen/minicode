@@ -27,6 +27,7 @@ export interface AgentConfig {
   apiKey?: string;
   baseURL?: string;
   model?: string;
+  provider?: string;
   contextLength?: number;
   compressionThresholdRatio?: number;
   thinkingEnabled?: boolean;
@@ -49,6 +50,7 @@ export class Agent {
   private toolRegistry: ToolRegistry;
   private store = new MessageStore();
   private model?: string;
+  private modelProvider?: string;
   private contextLength: number;
   private compressionThresholdRatio: number;
   private tokenManager: TokenManager;
@@ -94,18 +96,25 @@ export class Agent {
     this.permissionService.setMode(mode);
   }
 
-  public setModel(model: string, apiKey?: string, baseURL?: string): void {
+  public setModel(model: string, apiKey?: string, baseURL?: string, provider?: string, contextLength?: number): void {
     this.model = model;
+    if (provider !== undefined) this.modelProvider = provider;
     if (apiKey !== undefined) this.apiKey = apiKey;
     if (baseURL !== undefined) this.baseURL = baseURL;
+    if (contextLength !== undefined) this.contextLength = contextLength;
     this.client = new AnthropicClient(this.apiKey, this.baseURL);
   }
+
+  getModelName(): string | undefined { return this.model; }
+  getModelProvider(): string | undefined { return this.modelProvider; }
+  getContextLength(): number { return this.contextLength; }
 
   constructor(config: AgentConfig = {}) {
     this.apiKey = config.apiKey;
     this.baseURL = config.baseURL;
     this.client = new AnthropicClient(this.apiKey, this.baseURL);
     this.model = config.model;
+    this.modelProvider = config.provider;
     this.contextLength = config.contextLength || 200000;
     this.compressionThresholdRatio = config.compressionThresholdRatio || 0.8;
     this.thinkingEnabled = config.thinkingEnabled || false;

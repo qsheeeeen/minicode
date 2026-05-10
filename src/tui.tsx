@@ -281,8 +281,8 @@ export function App({
   }, { isActive: mode === 'chat' && !isModal && matchingCommands.length > 0 });
 
   // Permission mode display helpers
-  const modeLabel = permissionMode;
-  const modeColor = permissionMode === 'manual' ? 'yellow' : permissionMode === 'yolo' ? 'red' : 'cyan';
+  const modeLabel = agentRef.current.getPermissionService()?.getMode() ?? 'manual';
+  const modeColor = modeLabel === 'manual' ? 'yellow' : modeLabel === 'yolo' ? 'red' : 'cyan';
 
   return (
     <Box flexDirection="column" height="100%">
@@ -411,7 +411,7 @@ export function App({
                   if (modelSpec) {
                     const parsed = parseModelSpecifier(modelSpec, config.providers ?? {});
                     if (parsed) {
-                      agent.setModel(parsed.modelName, parsed.providerConfig.apiKey, parsed.providerConfig.baseURL);
+                      agent.setModel(parsed.modelName, parsed.providerConfig.apiKey, parsed.providerConfig.baseURL, parsed.providerName, parsed.providerConfig.models?.[parsed.modelName]?.contextLength);
                       import('./config.js').then(m => m.setModel(modelSpec));
                       if (tierMatch[2]) {
                         // User was editing the mapping — persist it
@@ -474,9 +474,9 @@ export function App({
 
       {/* Model / session info */}
       <Box paddingX={1}>
-        <Text color="green">{config.model!.provider}</Text>
+        <Text color="green">{agentRef.current.getModelProvider()}</Text>
         <Text dimColor>:</Text>
-        <Text>{config.model!.model}</Text>
+        <Text>{agentRef.current.getModelName()}</Text>
         <Text dimColor> | {currentSession}</Text>
         {status && !isLoading && <Text dimColor> | </Text>}
         {status && !isLoading && <Text color="magenta">{status}</Text>}
@@ -484,9 +484,9 @@ export function App({
 
       {/* Status bar */}
       <Box paddingX={1} gap={1}>
-        <Text dimColor>{tokenCount.toLocaleString()}/{(config.model?.contextLength || 200000).toLocaleString()}</Text>
-        <Box flexBasis={20}><ProgressBar value={Math.min(100, tokenCount / (config.model?.contextLength || 200000) * 100)} /></Box>
-        <Text dimColor>{Math.min(100, Math.floor(tokenCount / (config.model?.contextLength || 200000) * 100))}%</Text>
+        <Text dimColor>{tokenCount.toLocaleString()}/{agentRef.current.getContextLength().toLocaleString()}</Text>
+        <Box flexBasis={20}><ProgressBar value={Math.min(100, tokenCount / agentRef.current.getContextLength() * 100)} /></Box>
+        <Text dimColor>{Math.min(100, Math.floor(tokenCount / agentRef.current.getContextLength() * 100))}%</Text>
         <Text dimColor> │ </Text>
         <Text color={modeColor}>{modeLabel}</Text>
         <Text dimColor> (Shift+Tab)</Text>

@@ -26,7 +26,7 @@ export const setModelTool: ToolDef = {
 
     const agent = context?.registry?.get(context.currentAgentId || '1')?.agent;
     if (agent) {
-      agent.setModel(parsed.modelName, parsed.providerConfig.apiKey, parsed.providerConfig.baseURL);
+      agent.setModel(parsed.modelName, parsed.providerConfig.apiKey, parsed.providerConfig.baseURL, parsed.providerName, parsed.providerConfig.models?.[parsed.modelName]?.contextLength);
     }
     await setModel(modelSpec);
     return { output: `Switched to tier ${tier}: ${modelSpec}` };

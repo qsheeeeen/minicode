@@ -101,6 +101,7 @@ const agent = new Agent({
   apiKey: config.model!.apiKey,
   baseURL: config.model!.baseURL,
   model: config.model!.model,
+  provider: config.model!.provider,
   contextLength: config.model!.contextLength,
   compressionThresholdRatio: config.compressionThreshold,
   thinkingEnabled: config.thinking.enabled,
