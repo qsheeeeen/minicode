@@ -7,9 +7,10 @@ import { readTool } from './read.js';
 import { writeTool } from './write.js';
 import { editTool } from './edit.js';
 import { bashTool } from './bash.js';
-import { agentTool } from './agent.js';
+import { agentTool } from './sub_agent.js';
 import { activateSkillTool } from './activate_skill.js';
 import { askUserTool } from './ask_user.js';
+import { setModelTool } from './set_model.js';
 import { ToolRegistry } from './registry.js';
 
 export class ToolDeniedError extends Error {
@@ -54,7 +55,7 @@ export interface ToolAvailability {
   skillRegistry?: SkillRegistry;
 }
 
-export const allTools: ToolDef[] = [readTool, writeTool, editTool, bashTool, agentTool, activateSkillTool, askUserTool];
+export const allTools: ToolDef[] = [readTool, writeTool, editTool, bashTool, agentTool, activateSkillTool, askUserTool, setModelTool];
 
 export function registerTools(
   registry: ToolRegistry,

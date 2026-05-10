@@ -33,7 +33,7 @@ function callContent(name: string, input: Record<string, unknown>): string {
     case 'Bash': {
       return `${name}(${input.command as string})`;
     }
-    case 'Agent': {
+    case 'SubAgent': {
       const task = input.task as string;
       const preview = task.length > 30 ? task.slice(0, 30) + '...' : task;
       return `${name}(${preview})`;
@@ -43,6 +43,9 @@ function callContent(name: string, input: Record<string, unknown>): string {
     }
     case 'AskUser': {
       return `${name}("${input.question as string}")`;
+    }
+    case 'SetModel': {
+      return `${name}(Tier ${input.tier as string})`;
     }
     default:
       return `${name}(${summary(input)})`;
@@ -64,7 +67,7 @@ function formatResult(name: string, output: string): React.ReactElement | null {
     case 'Bash': {
       return React.createElement(Text, { dimColor: true }, output);
     }
-    case 'Agent': {
+    case 'SubAgent': {
       return React.createElement(Text, { dimColor: true }, output);
     }
     case 'ActivateSkill': {
