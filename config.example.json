@@ -18,6 +18,11 @@
     }
   },
   "model": "claude-sonnet-4-5@anthropic",
+  "tiers": {
+    "1": "claude-haiku-4-5@anthropic",
+    "2": "claude-sonnet-4-5@anthropic",
+    "3": "claude-opus-4@anthropic"
+  },
   "compressionThreshold": 0.8,
   "thinking": false,
   "effort": "medium",

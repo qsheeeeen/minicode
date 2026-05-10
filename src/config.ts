@@ -26,6 +26,7 @@ export interface Providers {
 export interface Config {
   providers?: Providers;
   model?: string;  // format: model@provider, e.g. "glm-4.7@zhipu"
+  tiers?: Record<string, string>;  // tier -> model@provider, e.g. { "1": "claude-sonnet@anthropic" }
   compressionThreshold?: number;  // 0-1, compress at this ratio of context
   thinking?: boolean;  // enable extended thinking
   effort?: EffortLevel;  // reasoning effort level
@@ -126,6 +127,14 @@ export async function setEffort(effort: string): Promise<void> {
 export async function setModel(modelSpec: string): Promise<void> {
   const config = await loadConfig();
   config.model = modelSpec;
+  cachedConfig = config;
+  await fsPromises.writeFile(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf-8');
+}
+
+export async function setTier(tier: string, modelSpec: string): Promise<void> {
+  const config = await loadConfig();
+  if (!config.tiers) config.tiers = {};
+  config.tiers[tier] = modelSpec;
   cachedConfig = config;
   await fsPromises.writeFile(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf-8');
 }

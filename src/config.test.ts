@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import fs from 'fs';
-import { loadConfig, loadConfigSync, invalidateConfig, loadAllConfig, parseModelSpecifier } from './config.js';
+import { loadConfig, loadConfigSync, invalidateConfig, loadAllConfig, parseModelSpecifier, setTier } from './config.js';
 
 vi.mock('fs/promises', () => ({
   default: {
@@ -125,5 +125,39 @@ describe('loadAllConfig', () => {
       delete process.env.MODEL;
     }
     expect(config.model?.model).toBe('glm-4');
+  });
+});
+
+describe('tiers', () => {
+  beforeEach(() => {
+    invalidateConfig();
+    vi.clearAllMocks();
+  });
+
+  it('parses tiers from config', async () => {
+    const fs = await import('fs/promises');
+    (fs.default.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(JSON.stringify({
+      tiers: { '1': 'claude-sonnet@anthropic', '2': 'glm-4.7@zhipu' },
+    }));
+    const config = await loadConfig();
+    expect(config.tiers).toEqual({ '1': 'claude-sonnet@anthropic', '2': 'glm-4.7@zhipu' });
+  });
+
+  it('tiers is undefined when not in config', async () => {
+    const fs = await import('fs/promises');
+    (fs.default.readFile as ReturnType<typeof vi.fn>).mockResolvedValue('{}');
+    const config = await loadConfig();
+    expect(config.tiers).toBeUndefined();
+  });
+
+  it('setTier writes tier mapping', async () => {
+    const fs = await import('fs/promises');
+    (fs.default.readFile as ReturnType<typeof vi.fn>).mockResolvedValue('{}');
+    await setTier('1', 'claude-opus@anthropic');
+    expect(fs.default.writeFile).toHaveBeenCalledWith(
+      expect.stringContaining('config.json'),
+      expect.stringContaining('"1"'),
+      'utf-8',
+    );
   });
 });

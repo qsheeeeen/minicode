@@ -221,7 +221,7 @@ describe('Builtin commands', () => {
     it('/test returns prompt text', async () => {
       const result = await commandRegistry.parseAndExecute('/test', {} as CommandContext);
       expect(result.handled).toBe(true);
-      expect(result.promptText).toContain('Run a simple test of all available tools');
+      expect(result.promptText).toContain('smoke test of your available tools');
     });
 
     it('/effort with no args shows effort select UI', async () => {
@@ -305,6 +305,7 @@ describe('Builtin commands', () => {
       expect(result.handled).toBe(true);
       expect(ctx.setInputMode).toHaveBeenCalledWith('model-select', {
         providers: { anthropic: {}, zhipu: {} },
+        tiers: {},
       });
     });
   });

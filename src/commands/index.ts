@@ -258,6 +258,7 @@ commandRegistry.register({
     const { loadConfig } = await import('../config.js');
     const config = await loadConfig();
     const providers = config.providers ?? {};
-    ctx.setInputMode('model-select', { providers });
+    const tiers = config.tiers ?? {};
+    ctx.setInputMode('model-select', { providers, tiers });
   },
 });

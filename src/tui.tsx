@@ -394,13 +394,32 @@ export function App({
                 setInputValue('');
                 setInputKey(prev => prev + 1);
               } else if (inputMode === 'model-select') {
-                const { loadConfig, parseModelSpecifier } = await import('./config.js');
+                const { loadConfig, parseModelSpecifier, setTier } = await import('./config.js');
                 const config = await loadConfig();
-                const parsed = parseModelSpecifier(value, config.providers ?? {});
-                if (parsed) {
-                  agent.setModel(parsed.modelName, parsed.providerConfig.apiKey, parsed.providerConfig.baseURL);
-                  import('./config.js').then(m => m.setModel(value));
-                  setMessages(prev => [...prev, { role: 'status', content: `(Model set to: ${value})`, timestamp: new Date() }]);
+
+                // Parse tier-prefixed value: "N:" (switch only) or "N:model@provider" (update + switch)
+                const tierMatch = value.match(/^(\d):(.*)$/);
+                if (tierMatch) {
+                  const tier = tierMatch[1];
+                  let modelSpec = tierMatch[2];
+
+                  // If only "N:" → use current tiers mapping
+                  if (!modelSpec) {
+                    modelSpec = config.tiers?.[tier] || '';
+                  }
+
+                  if (modelSpec) {
+                    const parsed = parseModelSpecifier(modelSpec, config.providers ?? {});
+                    if (parsed) {
+                      agent.setModel(parsed.modelName, parsed.providerConfig.apiKey, parsed.providerConfig.baseURL);
+                      import('./config.js').then(m => m.setModel(modelSpec));
+                      if (tierMatch[2]) {
+                        // User was editing the mapping — persist it
+                        setTier(tier, modelSpec);
+                      }
+                      setMessages(prev => [...prev, { role: 'status', content: `(Model set to: ${modelSpec})`, timestamp: new Date() }]);
+                    }
+                  }
                 }
                 setInputMode('chat');
                 setInputProps({});
