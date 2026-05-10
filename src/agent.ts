@@ -32,6 +32,7 @@ export interface AgentConfig {
   thinkingEnabled?: boolean;
   effort?: EffortLevel;
   userPrompt?: string;
+  projectPromptFile?: string;
   excludeTools?: string[];
   agentRegistry?: AgentRegistry;
   currentAgentId?: string;
@@ -58,6 +59,7 @@ export class Agent {
   private events: AgentEvents;
   private prompter: UserPrompter;
   private userPrompt: string;
+  private projectPromptFile: string;
   private agentRegistry?: AgentRegistry;
   private currentAgentId: string;
   private apiKey?: string;
@@ -124,6 +126,7 @@ export class Agent {
     this.events = new ConsoleEvents();
     this.prompter = new ConsolePrompter();
     this.userPrompt = config.userPrompt || '';
+    this.projectPromptFile = config.projectPromptFile || '';
 
     this.refreshEnvironment();
     this.refreshSystemPrompt();
@@ -241,7 +244,11 @@ export class Agent {
     }
 
     if (this.userPrompt) {
-      prompt += `\n\n# Project Context\n${this.userPrompt}`;
+      prompt += `\n\n# Additional Instructions\n${this.userPrompt}`;
+    }
+
+    if (this.projectPromptFile) {
+      prompt += `\n\n# Workspace Information\nThis workspace's description is in \`${this.projectPromptFile}\`. Use the Read tool to load it when you need project-specific context. Do NOT read it preemptively — only when the task would benefit from project-specific knowledge.`;
     }
 
     const availableSkills = skillRegistry.getAvailableSkills();

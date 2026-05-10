@@ -8,7 +8,7 @@ import { Agent } from './agent.js';
 import { sessionManager } from './utils/session.js';
 import { createLogger } from './utils/logger.js';
 import { parseArgs, type PermissionMode } from './args.js';
-import { loadGlobalPrompt, loadProjectPrompt } from './utils/prompts.js';
+import { loadGlobalPrompt } from './utils/prompts.js';
 import { skillRegistry } from './skills/index.js';
 import { App } from './tui.js';
 import { commandRegistry } from './commands/index.js';
@@ -40,15 +40,22 @@ if (!config.model) {
 // Resolve permission mode: CLI flag > config > default
 const permissionMode: PermissionMode = cliPermissionMode || config.permissionMode || 'manual';
 
-// Load global and project prompts
-const [globalPrompt, projectPrompt] = await Promise.all([
-  loadGlobalPrompt(),
-  loadProjectPrompt(process.cwd(), config.promptFile)
-]);
+// Load global prompt only (project prompt is loaded on-demand by the LLM)
+const globalPrompt = await loadGlobalPrompt();
 const promptFiles: string[] = [];
 if (globalPrompt) promptFiles.push('~/.minicode/MINICODE.md');
-if (projectPrompt) promptFiles.push(`./${config.promptFile}`);
-const userPrompt = [globalPrompt, projectPrompt].filter(Boolean).join('\n\n');
+
+const projectPromptPath = path.resolve(process.cwd(), config.promptFile);
+let projectPromptFile = '';
+try {
+  const fs = await import('fs/promises');
+  await fs.access(projectPromptPath);
+  projectPromptFile = `./${config.promptFile}`;
+  promptFiles.push(projectPromptFile);
+} catch {
+  // Project prompt file doesn't exist — skip
+}
+const userPrompt = globalPrompt || '';
 
 // Determine initial session
 let initialSession: string;
@@ -99,6 +106,7 @@ const agent = new Agent({
   thinkingEnabled: config.thinking.enabled,
   effort: config.thinking.effort,
   userPrompt,
+  projectPromptFile,
 });
 agent.setSession(initialSession);
 agent.setLogger(logger);
