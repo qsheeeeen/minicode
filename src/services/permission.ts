@@ -51,7 +51,8 @@ export class PermissionService {
             { label: 'No', value: 'no' },
             { label: 'Yes to all', value: 'yolo' },
           ],
-        }) ?? 'yes';
+        });
+        if (!answer) return false;  // empty = cancelled via Esc/Ctrl+C
         if (answer === 'yolo') {
           this.setMode('yolo');
           return true;

@@ -61,10 +61,10 @@ describe('PermissionService', () => {
       });
     });
 
-    it('manual returns true when prompter is undefined', async () => {
+    it('manual denies when prompter is undefined (no UI to ask)', async () => {
       const service = new PermissionService({ initialMode: 'manual' });
       const result = await service.check('Bash', { command: 'ls' }, 'List files');
-      expect(result).toBe(true);
+      expect(result).toBe(false);
     });
 
     it('manual returns false when prompter returns no', async () => {

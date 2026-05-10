@@ -251,6 +251,14 @@ export function App({
     }
   }, { isActive: mode === 'chat' && !isModal });
 
+  // Modal input handler — Esc / Ctrl+C to cancel pending prompts
+  useInput((input, key) => {
+    if ((key.escape || (key.ctrl && input === 'c')) && pendingPrompt) {
+      pendingPrompt.resolve('');
+      setPendingPrompt(null);
+    }
+  }, { isActive: isModal });
+
   // Command autocomplete
   const commandList = useMemo(
     () => commandRegistry.getCommandList().sort((a, b) => a.name.localeCompare(b.name)),
