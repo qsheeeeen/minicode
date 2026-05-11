@@ -10,7 +10,7 @@ function formatCall(name: string, input: Record<string, unknown>): React.ReactEl
   return React.createElement(Text, { color: 'yellow' }, content);
 }
 
-function callContent(name: string, input: Record<string, unknown>): string {
+export function callContent(name: string, input: Record<string, unknown>): string {
   switch (name) {
     case 'Read': {
       const path = input.path as string;

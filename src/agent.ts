@@ -4,6 +4,7 @@ import { ConsoleEvents, ConsolePrompter, type AgentEvents, type UserPrompter } f
 import { TokenManager, CompressionService, AgentRegistry, PermissionService, type PermissionMode } from './services/index.js';
 import { MessageStore } from './messages.js';
 import { skillRegistry } from './skills/index.js';
+import { callContent } from './tui/tool-display.js';
 import { sessionManager } from './utils/session.js';
 import { execSync } from 'child_process';
 import type pino from 'pino';
@@ -385,7 +386,7 @@ export class Agent {
   /** Run a single tool with permission check */
   private async runTool(tool: ToolDef, args: Record<string, unknown>, context: ToolExecutionContext): Promise<import('./tools/index.js').ToolResult> {
     if (tool.requiresPermission) {
-      const displayText = `${tool.name}(${JSON.stringify(args)})`;
+      const displayText = callContent(tool.name, args);
       const allowed = await this.permissionService.check(tool.name, args, displayText);
       if (!allowed) {
         throw new ToolDeniedError(tool.name, displayText);
