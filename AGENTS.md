@@ -1,5 +1,11 @@
 # AGENTS.md
 
+## Project Structure
+
+- Project skills: `.claude/skills/` (agentSkills.io format: directory with `SKILL.md`)
+- Slash commands: `src/commands/index.ts` — `handler` type for system commands, `prompt` type injects text into conversation
+- Plans: auto-generated to `.claude/plans/` after `/plan` command
+
 ## Build & Run Commands
 
 ```bash
@@ -57,7 +63,7 @@ When adding or modifying config options, always update `config.example.json`.
 
 ```
 src/
-├── cli.tsx                  # CLI entry point — renders App, parses args, starts TUI/headless
+├── cli.tsx                  # CLI entry point — renders App, parses args, starts TUI/headless (tsx dev mode)
 ├── tui.tsx                  # Top-level TUI App component + hooks
 ├── headless.ts              # Headless (non-TUI) mode runner
 ├── args.ts                  # CLI argument parsing (yargs)
@@ -161,3 +167,9 @@ Then add to the `registerTools()` call in `src/tools/index.ts`.
 - Read the code to understand the structure. Allow large refactors to implement the best solution from scratch.
 - When adding or modifying config options, always update `config.example.json` with the corresponding example.
 - When using `@anthropic-ai/sdk` see API docs: https://platform.claude.com/docs/en/api/messages
+
+## Current Unstaged Changes
+
+The following files have unstaged modifications — check before committing:
+- `src/tools/ask_user.ts` — may contain active work
+- `src/tools/ask_user.test.ts` — corresponding test updates
