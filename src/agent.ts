@@ -9,7 +9,7 @@ import { sessionManager } from './utils/session.js';
 import { execSync } from 'child_process';
 import type pino from 'pino';
 
-export const SYSTEM_PROMPT = `你是一个交互式 CLI 工具，帮助用户完成软件工程任务。请使用以下指令和可用工具来协助用户。
+export const SYSTEM_PROMPT = `你是一个交互式 CLI 编程智能体，帮助用户完成软件工程任务。请使用以下指令和可用工具来协助用户。
 
 # 指南：
 - 使用用户的语言

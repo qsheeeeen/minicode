@@ -118,7 +118,7 @@ Before asking anything, check if ${promptFile} already exists at the project roo
 
 ## Phase 1: Ask what to set up
 
-Use AskUserQuestion to find out what the user wants. Which question you ask depends on Phase 0. Call AskUserQuestion with **only Q1** — do NOT include Q2 in the same call. Only ask Q2 after you've seen the Q1 answer, since "Let agent decide" skips it.
+Use AskUser to find out what the user wants. Which question you ask depends on Phase 0. Call AskUserQuestion with **only Q1** — do NOT include Q2 in the same call. Only ask Q2 after you've seen the Q1 answer, since "Let agent decide" skips it.
 
 Before the first question, print this primer as normal assistant text so first-time users know the terms:
 
@@ -170,7 +170,7 @@ Note what you could NOT figure out from code alone — these become interview qu
 
 ## Phase 3: Fill in the gaps
 
-Use AskUserQuestion to gather what you still need to write good ${promptFile} files and skills. Ask only things the code can't answer.
+Use AskUser to gather what you still need to write good ${promptFile} files and skills. Ask only things the code can't answer.
 
 If the user chose project ${promptFile}, both, or "Let agent decide": ask about codebase practices — non-obvious commands, gotchas, branch/PR conventions, required env setup, testing quirks. Skip things already in README or obvious from manifest files. Do not mark any options as "recommended" — this is about how their team works, not best practices.
 
@@ -199,7 +199,7 @@ Propose what fits. If the user gave a Q2 hint and your proposal deviates from it
 > • **[Artifact type: file/hook/skill/note]** — [one-line description]
 > • …
 
-Then call AskUserQuestion with a simple question ("Does this look right?") and options like "Looks good — proceed" | "Drop the hook" | "Drop the skill". Don't use the \`preview\` field — the proposal is already visible in scrollback. The tool auto-adds an "Other" option for custom tweaks.
+Then call AskUser with a simple question ("Does this look right?") and options like "Looks good — proceed" | "Drop the hook" | "Drop the skill". The tool auto-adds an "Other" option for custom tweaks.
 
 **Build the preference queue** from the accepted proposal. Each entry: {type: hook|skill|note, description, target file, any Phase-2-sourced details like the actual test/format command}. Phase 6 and Phase 7's hooks sub-bullet consume this queue; Phases 4/5 gate on the approved proposal's file bullets directly; Phase 7's GitHub-CLI and linting checks run regardless of queue contents.
 
@@ -207,7 +207,7 @@ Then call AskUserQuestion with a simple question ("Does this look right?") and o
 
 Write a minimal ${promptFile} at the project root. Every line must pass this test: "Would removing this cause agent to make mistakes?" If no, cut it.
 
-If the user picked "Review and improve it" in Phase 0: don't write fresh — read the existing file, compare against Phase 2 findings and the Phase 3-lite answer, and propose specific additions/removals as diffs with a one-line reason for each. The existing file is the baseline; your job is to catch what's missing, outdated, or bloated. After printing the diffs, call AskUserQuestion ("Apply these edits?" with options like "Apply all" | "Let me pick which" | "Skip — leave it as is") before writing anything.
+If the user picked "Review and improve it" in Phase 0: don't write fresh — read the existing file, compare against Phase 2 findings and the Phase 3-lite answer, and propose specific additions/removals as diffs with a one-line reason for each. The existing file is the baseline; your job is to catch what's missing, outdated, or bloated. After printing the diffs, call AskUser ("Apply these edits?" with options like "Apply all" | "Let me pick which" | "Skip — leave it as is") before writing anything.
 
 **Consume \`note\` entries from the Phase 3 preference queue whose target is ${promptFile}** (team-level notes) — add each as a concise line in the most relevant section. These are the behaviors the user wants agent to follow but didn't need guaranteed (e.g., "propose a plan before implementing", "explain the tradeoffs when refactoring"). Leave personal-targeted notes for Phase 5.
 
@@ -250,7 +250,7 @@ Include:
 
 Keep it short — only include what would make agent's responses noticeably better for this user.
 
-If Phase 2 found multiple git worktrees and the user confirmed they use sibling/external worktrees (not nested inside the main repo): the upward file walk won't find a single CLAUDE.local.md from all worktrees. Write the actual personal content to \`~/.claude/<project-name>-instructions.md\` and make CLAUDE.local.md a one-line stub that imports it: \`@~/.claude/<project-name>-instructions.md\`. The user can copy this one-line stub to each sibling worktree. Never put this import in the project ${promptFile}. If worktrees are nested inside the main repo (e.g., \`.claude/worktrees/\`), no special handling is needed — the main repo's CLAUDE.local.md is found automatically.
+If Phase 2 found multiple git worktrees and the user confirmed they use sibling/external worktrees (not nested inside the main repo): the upward file walk won't find a single CLAUDE.local.md from all worktrees. Write the actual personal content to \`~/.claude/<project-name>-instructions.md\` and make CLAUDE.local.md a one-line stub that imports it: \`\x40~/.claude/<project-name>-instructions.md\`. The user can copy this one-line stub to each sibling worktree. Never put this import in the project ${promptFile}. If worktrees are nested inside the main repo (e.g., \`.claude/worktrees/\`), no special handling is needed — the main repo's CLAUDE.local.md is found automatically.
 
 If CLAUDE.local.md already exists: read it, propose specific additions, and do not silently overwrite.
 
@@ -291,11 +291,10 @@ Recap what was set up — which files were written and the key points included i
 Then tell the user that you'll be introducing a few more suggestions for optimizing their codebase and agent setup based on what you found. Present these as a single, well-formatted to-do list where every item is relevant to this repo. Put the most impactful items first.
 
 When building the list, work through these checks and include only what applies:
-- If frontend code was detected (React, Vue, Svelte, etc.): \`/plugin install frontend-design@claude-plugins-official\` gives agent design principles and component patterns so it produces polished UI; \`/plugin install playwright@claude-plugins-official\` lets agent launch a real browser, screenshot what it built, and fix visual bugs itself.
+- If frontend code was detected (React, Vue, Svelte, etc.): suggest setting up a skill for frontend design patterns.
 - If you found gaps in Phase 7 (missing GitHub CLI, missing linting) and the user said no: list them here with a one-line reason why each helps.
 - If tests are missing or sparse: suggest setting up a test framework so agent can verify its own changes.
-- To help you create skills and optimize existing skills using evals, agent has an official skill-creator plugin you can install. Install it with \`/plugin install skill-creator@claude-plugins-official\`, then run \`/skill-creator <skill-name>\` to create new skills or refine any existing skill. (Always include this one.)
-- Browse official plugins with \`/plugin\` — these bundle skills, agents, hooks, and MCP servers that you may find helpful. You can also create your own custom plugins to share them with others. (Always include this one.)`
+- You can create skills for repeatable workflows (e.g., verify changes, deploy, session reports). Use the built-in skill-creator skill to help create them: activate it with \`/skill-creator\`.`
 };
 
 skillRegistry.register(skillCreator);
