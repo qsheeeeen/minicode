@@ -45,12 +45,15 @@ export const askUserTool: ToolDef = {
     context?: ToolExecutionContext,
   ): Promise<ToolResult> => {
     const question = args.question as string;
-    const options = args.options as Array<{ label: string; description: string }>;
+    const options = args.options;
+    if (!Array.isArray(options)) {
+      return { output: `Error: AskUser tool requires 'options' to be an array, received: ${JSON.stringify(args.options)}` };
+    }
     const multiSelect = (args.multiSelect as boolean) ?? false;
 
     const answer = await context?.prompter?.prompt({
       message: question,
-      options: options.map(o => ({ ...o, value: o.label })),
+      options: (options as Array<{ label: string; description: string }>).map(o => ({ ...o, value: o.label })),
       multiSelect,
     });
 

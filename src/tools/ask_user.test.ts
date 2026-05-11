@@ -63,6 +63,14 @@ describe('askUserTool', () => {
       );
     });
 
+    it('returns error when options is not an array', async () => {
+      const result = await askUserTool.execute(
+        { question: 'What?', options: null } as any,
+        {} as any,
+      );
+      expect(result.output).toContain("Error: AskUser tool requires 'options' to be an array");
+    });
+
     it('defaults multiSelect to false when omitted', async () => {
       const mockPrompt = vi.fn().mockResolvedValue('A');
       await askUserTool.execute(
