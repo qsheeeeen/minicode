@@ -38,14 +38,14 @@ export function Message({ msg }: { msg: DisplayMessage }) {
     case 'status':
       if (msg.element) return <Box marginBottom={1}>{msg.element}</Box>;
       return (
-        <Box marginBottom={1} paddingLeft={2}>
-          <Text color="gray">{'—'} {msg.content}</Text>
+        <Box marginBottom={1}>
+          <Text color="white">{'—'} {msg.content}</Text>
         </Box>
       );
 
     case 'error':
       return (
-        <Box marginBottom={1} paddingLeft={2}>
+        <Box marginBottom={1}>
           <Text color="red" bold>{'✕'} {msg.content}</Text>
         </Box>
       );
