@@ -30,7 +30,7 @@ export interface Config {
   compressionThreshold?: number;  // 0-1, compress at this ratio of context
   thinking?: boolean;  // enable extended thinking
   effort?: EffortLevel;  // reasoning effort level
-  promptFile?: string;  // project prompt filename (default: MINICODE.md)
+  promptFile?: string;  // project prompt filename (default: AGENTS.md)
   permissionMode?: 'manual' | 'yolo' | 'auto';
   skillsDir?: string;  // project skills directory (default: .minicode/skills)  // default permission mode
 }
@@ -111,7 +111,7 @@ export async function loadAllConfig(modelSpecifier?: string): Promise<ResolvedCo
       enabled: config.thinking ?? false,
       effort: config.effort
     },
-    promptFile: config.promptFile || 'MINICODE.md',
+    promptFile: config.promptFile || 'AGENTS.md',
     permissionMode: config.permissionMode,
     skillsDir: config.skillsDir
   };

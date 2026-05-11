@@ -83,7 +83,7 @@ export class SkillRegistry {
 
 export const skillRegistry = new SkillRegistry();
 
-const promptFile = loadConfigSync().promptFile || 'MINICODE.md';
+const promptFile = loadConfigSync().promptFile || 'AGENTS.md';
 
 const skillCreator: SkillMeta = {
   name: 'skill-creator',

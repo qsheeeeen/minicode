@@ -8,7 +8,7 @@ import { Agent } from './agent.js';
 import { sessionManager } from './utils/session.js';
 import { createLogger } from './utils/logger.js';
 import { parseArgs, type PermissionMode } from './args.js';
-import { loadGlobalPrompt } from './utils/prompts.js';
+import { loadGlobalPrompt, DEFAULT_PROMPT_FILE } from './utils/prompts.js';
 import { skillRegistry } from './skills/index.js';
 import { App } from './tui.js';
 import { commandRegistry } from './commands/index.js';
@@ -43,7 +43,7 @@ const permissionMode: PermissionMode = cliPermissionMode || config.permissionMod
 // Load global prompt only (project prompt is loaded on-demand by the LLM)
 const globalPrompt = await loadGlobalPrompt();
 const promptFiles: string[] = [];
-if (globalPrompt) promptFiles.push('~/.minicode/MINICODE.md');
+if (globalPrompt) promptFiles.push(`~/.minicode/${DEFAULT_PROMPT_FILE}`);
 
 const projectPromptPath = path.resolve(process.cwd(), config.promptFile);
 let projectPromptFile = '';

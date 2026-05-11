@@ -47,7 +47,7 @@ Model priority: CLI `--model` > `MODEL` env var > config `model` field.
   "compressionThreshold": 0.8,               // 0-1, compress at this ratio
   "thinking": false,                         // extended thinking
   "effort": "medium",                        // reasoning effort level
-  "promptFile": "MINICODE.md",               // project prompt filename
+  "promptFile": "AGENTS.md", // project prompt filename
   "permissionMode": "manual",                // manual | yolo | auto
   "skillsDir": ".minicode/skills"            // project skills directory
 }
@@ -91,7 +91,7 @@ src/
 └── utils/
     ├── diff.ts              # Unified diff generation
     ├── display.ts           # DisplayAdapter + CallbackDisplay + ConsoleDisplay
-    ├── prompts.ts           # Global (~/.minicode/MINICODE.md) and project prompt loading
+    ├── prompts.ts           # Global (~/.minicode/AGENTS.md) and project prompt loading
     ├── session.ts           # SessionManager (v1/v2 persistence) — module singleton
     ├── session-display.ts   # Legacy v1 session → display message conversion
     └── logger.ts            # pino-based session-scoped logging
@@ -125,7 +125,7 @@ src/
 - `SkillRegistry` loads skills from `skillsDir` config path, parses frontmatter for name/description
 - Available skills listed in system prompt; `ActivateSkill` tool loads full instructions into context
 - Builtin skills defined in `src/cli/skills/builtin.ts`; project skills from `.claude/skills/`
-- Project prompt file (`MINICODE.md` by default) is loaded into context alongside system prompt
+- Project prompt file (`AGENTS.md` by default) is loaded into context alongside system prompt
 
 **Display adapters:**
 - `CallbackDisplay` — for TUI (hooks into React state via callbacks)

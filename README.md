@@ -13,7 +13,7 @@ A minimal coding agent powered by LLMs. Simple, opinionated, hackable.
 - **Session persistence** — auto-save, resume, rename, per-project isolation
 - **Smart compression** — LLM-based conversation summarization at configurable token threshold
 - **Extended thinking** — configurable thinking budget with dimmed streaming display
-- **Project prompts** — global (`~/.minicode/MINICODE.md`) and per-project (`./MINICODE.md`) prompt files
+- **Project prompts** — global (`~/.minicode/AGENTS.md`) and per-project (`./AGENTS.md`) prompt files
 
 ## Setup
 
@@ -35,7 +35,7 @@ A minimal coding agent powered by LLMs. Simple, opinionated, hackable.
      "compressionThreshold": 0.8,
      "thinking": true,
      "thinkingTokens": 20000,
-     "promptFile": "MINICODE.md"
+     "promptFile": "AGENTS.md"
    }
    ```
 

@@ -2,7 +2,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
 
-const DEFAULT_PROMPT_FILE = 'MINICODE.md';
+export const DEFAULT_PROMPT_FILE = 'AGENTS.md';
 
 export async function readPromptFile(filePath: string): Promise<string> {
   try {
