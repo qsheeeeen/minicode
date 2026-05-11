@@ -107,7 +107,7 @@ describe('loadAllConfig', () => {
     expect(config.model?.model).toBe('claude-3');
     expect(config.compressionThreshold).toBe(0.8);
     expect(config.thinking.enabled).toBe(false);
-    expect(config.promptFile).toBe('MINICODE.md');
+    expect(config.promptFile).toBe('AGENTS.md');
   });
 
   it('uses environment MODEL override', async () => {

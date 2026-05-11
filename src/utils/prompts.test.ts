@@ -38,7 +38,7 @@ describe('loadGlobalPrompt', () => {
     await loadGlobalPrompt();
     const readCall = (fs.default.readFile as ReturnType<typeof vi.fn>).mock.calls[0][0];
     expect(readCall).toContain('.minicode');
-    expect(readCall).toContain('MINICODE.md');
+    expect(readCall).toContain('AGENTS.md');
   });
 });
 
@@ -52,7 +52,7 @@ describe('loadProjectPrompt', () => {
     (fs.default.readFile as ReturnType<typeof vi.fn>).mockResolvedValue('project prompt');
     await loadProjectPrompt('/my/project');
     const readCall = (fs.default.readFile as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(readCall).toBe('/my/project/MINICODE.md');
+    expect(readCall).toBe('/my/project/AGENTS.md');
   });
 
   it('uses custom prompt filename', async () => {
