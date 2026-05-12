@@ -27,11 +27,15 @@ export const editTool: ToolDef = {
       content = content.replace(oldText, newText);
       await fs.writeFile(path, content, 'utf-8');
       const diffLines = generateDiffSummary(path, oldText, newText);
-      const diffText = diffLines.map(l => {
-        const prefix = l.type === 'add' ? '+' : l.type === 'remove' ? '-' : ' ';
-        return `${String(l.lineNum).padStart(4)} ${prefix} ${l.content}`;
-      }).join('\n');
-      return { output: `Edited ${path}\n${diffText}` };
+      const headerLine = diffLines.find(l => l.type === 'header');
+      const diffText = diffLines
+        .filter(l => l.type !== 'header')
+        .map(l => {
+          const prefix = l.type === 'add' ? '+' : l.type === 'remove' ? '-' : ' ';
+          return `${String(l.lineNum).padStart(4)} ${prefix} ${l.content}`;
+        }).join('\n');
+      const stats = headerLine ? ` (${headerLine.content})` : '';
+      return { output: `Edited ${path}${stats}\n${diffText}` };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       return { output: msg };

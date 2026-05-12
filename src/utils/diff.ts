@@ -39,8 +39,8 @@ export function generateDiffSummary(filePath: string, oldText: string, newText: 
     }
   }
 
-  const header = `${filePath}: -${removed}/+${added} lines`;
-  result.unshift({ type: 'header', lineNum: 0, content: header });
+  const header = `-${removed}/+${added} lines`;
+  result.unshift({ type: 'header', lineNum: -1, content: header });
 
   return result;
 }

@@ -2,15 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { generateDiffSummary } from './diff.js';
 
 describe('generateDiffSummary', () => {
-  it('returns header with file path and stats', () => {
+  it('returns header with line stats', () => {
     const result = generateDiffSummary('test.txt', 'hello', 'hello');
     expect(result[0].type).toBe('header');
-    expect(result[0].content).toContain('test.txt');
-  });
-
-  it('returns header with 0/0 for identical text', () => {
-    const result = generateDiffSummary('test.txt', 'hello', 'hello');
-    expect(result[0].content).toBe('test.txt: -0/+0 lines');
+    expect(result[0].content).toBe('-0/+0 lines');
   });
 
   it('detects added lines', () => {
