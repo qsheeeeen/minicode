@@ -1,16 +1,19 @@
-import { useState, useCallback, useRef, useEffect, useMemo, type RefObject } from 'react';
-import { Box, Text, useInput, useApp } from 'ink';
-import { ProgressBar, Select, MultiSelect } from '@inkjs/ui';
+import React, { useCallback, useRef, useEffect, RefObject } from 'react';
+import { Box, useInput, useApp } from 'ink';
 import { Agent } from './agent.js';
-import type { MessageParam, EffortLevel } from './llm/anthropic.js';
+import type { MessageParam } from './llm/anthropic.js';
 import type { ResolvedConfig } from './config.js';
-import { CallbackEvents, CallbackPrompter, type DisplayMessage, type Prompt } from './utils/display.js';
+import { CallbackEvents, CallbackPrompter } from './utils/display.js';
 import { commandRegistry } from './commands/index.js';
-import { Message } from './tui/Message.js';
-
-import { getInputComponent, type InputComponentProps } from './tui/inputs.js';
 import { sessionManager } from './utils/session.js';
-import { AgentRegistry, type AgentSession, type PermissionMode } from './services/index.js';
+import { AgentRegistry, type AgentSession } from './services/index.js';
+
+import { TuiProvider, useTuiState, useTuiDispatch } from './tui/store.js';
+import { Header } from './tui/Header.js';
+import { MessageList } from './tui/MessageList.js';
+import { ModalPrompter } from './tui/ModalPrompter.js';
+import { InputArea } from './tui/InputArea.js';
+import { StatusBar } from './tui/StatusBar.js';
 
 export interface AppProps {
   agent: Agent;
@@ -24,57 +27,61 @@ export interface AppProps {
   agentRegistry: AgentRegistry;
 }
 
-
-/** Hook: multi-agent coordination and switching */
-function useMultiAgent(registry: AgentRegistry) {
-  const [activeAgentId, setActiveAgentId] = useState<string>('1');
-  const [agentSessions, setAgentSessions] = useState<AgentSession[]>([]);
-  const registryRef = useRef<AgentRegistry>(registry);
-  const activeAgentIdRef = useRef('1');
+/** Hook: multi-agent coordination and switching using Global Store */
+function useMultiAgent(registry: AgentRegistry, agentRef: React.MutableRefObject<Agent>) {
+  const { activeAgentId } = useTuiState();
+  const dispatch = useTuiDispatch();
+  const activeAgentIdRef = useRef(activeAgentId);
 
   useEffect(() => {
-    registryRef.current = registry;
     registry.setUpdateCallback((sessions) => {
-      setAgentSessions(sessions);
+      dispatch({ type: 'SET_AGENT_SESSIONS', payload: sessions });
       if (activeAgentIdRef.current !== '1' && !sessions.find(s => s.id === activeAgentIdRef.current)) {
         activeAgentIdRef.current = '1';
-        setActiveAgentId('1');
+        dispatch({ type: 'SET_ACTIVE_AGENT_ID', payload: '1' });
       }
     });
-  }, [registry]);
+  }, [registry, dispatch]);
 
-  return { activeAgentId, activeAgentIdRef, setActiveAgentId, agentSessions, setAgentSessions, registryRef };
+  useInput((input, key) => {
+    if (key.ctrl && input === 'o') {
+      const sessions = registry.getAll() || [];
+      if (sessions.length <= 1) return;
+      const currentIndex = sessions.findIndex(s => s.id === activeAgentIdRef.current);
+      const nextIndex = (currentIndex + 1) % sessions.length;
+      const nextSession = sessions[nextIndex];
+      activeAgentIdRef.current = nextSession.id;
+      dispatch({ type: 'SET_ACTIVE_AGENT_ID', payload: nextSession.id });
+      dispatch({ type: 'SET_MESSAGES', payload: nextSession.agent.getStore().toDisplayMessages() });
+      agentRef.current = nextSession.agent;
+    }
+  });
+
+  return { activeAgentIdRef };
 }
 
-/** Hook: attach display to agent, load initial session */
+/** Hook: attach display to agent, load initial session using Global Store */
 function useDisplay(
   agent: Agent,
   initialSession: string,
   sessionName: string | undefined,
   resumeRecent: boolean,
-  setAgentSessions: React.Dispatch<React.SetStateAction<AgentSession[]>>,
-  registryRef: RefObject<AgentRegistry | null>,
-  setPendingPrompt: (req: (Prompt & { resolve: (value: string) => void }) | null) => void,
+  registry: AgentRegistry,
 ) {
-  const [messages, setMessages] = useState<DisplayMessage[]>([]);
-  const [currentSession, setCurrentSession] = useState(initialSession);
-  const [tokenCount, setTokenCount] = useState(0);
+  const dispatch = useTuiDispatch();
 
   useEffect(() => {
-    const registry = registryRef.current;
-    if (!registry) return;
-
     agent.setEvents(new CallbackEvents({
-      onStatus: (msg) => setMessages(prev => [...prev, msg]),
-      onTokenUpdate: setTokenCount,
+      onStatus: (msg) => dispatch({ type: 'ADD_MESSAGE', payload: msg }),
+      onTokenUpdate: (count) => dispatch({ type: 'SET_TOKEN_COUNT', payload: count }),
     }));
 
     agent.setPrompter(new CallbackPrompter((req) => new Promise<string>((resolve) => {
-      setPendingPrompt({ ...req, resolve });
+      dispatch({ type: 'SET_PENDING_PROMPT', payload: { ...req, resolve } });
     })));
 
     agent.getStore().onChange(() => {
-      setMessages(agent.getStore().toDisplayMessages());
+      dispatch({ type: 'SET_MESSAGES', payload: agent.getStore().toDisplayMessages() });
     });
 
     registry.register({
@@ -84,15 +91,18 @@ function useDisplay(
       status: 'idle',
     });
 
-    setAgentSessions([{
-      id: '1',
-      type: 'main',
-      agent,
-      status: 'idle',
-    }]);
+    dispatch({
+      type: 'SET_AGENT_SESSIONS', payload: [{
+        id: '1',
+        type: 'main',
+        agent,
+        status: 'idle',
+      }],
+    });
 
     const loadInitial = async () => {
       agent.currentSession = initialSession;
+      dispatch({ type: 'SET_CURRENT_SESSION', payload: initialSession });
       if (sessionName || resumeRecent) {
         const data = await sessionManager.get(initialSession);
         if (data) {
@@ -100,6 +110,7 @@ function useDisplay(
           const totalTokens = data.totalTokens || 0;
           if (totalTokens > 0) {
             agent.setTokenCount(totalTokens);
+            dispatch({ type: 'SET_TOKEN_COUNT', payload: totalTokens });
           }
         } else if (sessionName) {
           agent.getStore().addStatus({ role: 'status', content: `Created new session: ${sessionName}`, timestamp: new Date() });
@@ -108,15 +119,12 @@ function useDisplay(
     };
     loadInitial();
 
-    return () => {};
+    return () => { };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  return { messages, setMessages, currentSession, setCurrentSession, tokenCount };
 }
 
-export function App({
+function AppContent({
   agent,
-  config,
   version,
   promptFiles,
   initialSession,
@@ -124,72 +132,47 @@ export function App({
   sessionName,
   resumeRecent,
   agentRegistry,
-}: AppProps) {
-  const [status, setStatus] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [mode, setMode] = useState<'chat' | 'session-list' | 'effort-select'>('chat');
-  const [inputMode, setInputModeState] = useState('chat');
-  const [inputProps, setInputProps] = useState<Record<string, unknown>>({});
-  const [sessionListState, setSessionListState] = useState<{
-    sessions: Array<{ name: string }>;
-    selectedIndex: number;
-  }>({ sessions: [], selectedIndex: 0 });
-  const [inputValue, setInputValue] = useState('');
-  const [inputKey, setInputKey] = useState(0);
-  const [autoSubmitPending, setAutoSubmitPending] = useState(!!initialPrompt);
-  const [permissionMode, setPermissionMode] = useState<PermissionMode>(agent.getPermissionService()?.getMode() ?? 'manual');
-  const [pendingPrompt, setPendingPrompt] = useState<(Prompt & { resolve: (value: string) => void }) | null>(null);
-  const agentRef = useRef<Agent>(agent);
+}: Omit<AppProps, 'config'>) {
   const { exit } = useApp();
+  const dispatch = useTuiDispatch();
+  const { input, pendingPrompt, isLoading } = useTuiState();
+  const agentRef = useRef<Agent>(agent);
 
-  const isModal = pendingPrompt !== null;
+  const [autoSubmitPending, setAutoSubmitPending] = React.useState(!!initialPrompt);
 
-  // Multi-agent hook
-  const { activeAgentId, activeAgentIdRef, setActiveAgentId, agentSessions, setAgentSessions, registryRef } = useMultiAgent(agentRegistry);
-
-  // Display hook: attach TUI display to agent, load initial session
-  const { messages, setMessages, currentSession, setCurrentSession, tokenCount } = useDisplay(
-    agent, initialSession, sessionName, resumeRecent,
-    setAgentSessions, registryRef,
-    setPendingPrompt,
-  );
-
-  const setSessionList = (sessions: Array<{ name: string }>) => {
-    setSessionListState(prev => ({ ...prev, sessions }));
-  };
-
-  const setSelectedIndex = (index: number) => {
-    setSessionListState(prev => ({ ...prev, selectedIndex: index }));
-  };
-
-  const setInputMode = (mode: string, props: Record<string, unknown> = {}) => {
-    setInputModeState(mode);
-    setInputProps(props);
-  };
+  useMultiAgent(agentRegistry, agentRef);
+  useDisplay(agent, initialSession, sessionName, resumeRecent, agentRegistry);
 
   useEffect(() => {
-    agent.setCommandResolver(async (input: string) => {
-      return commandRegistry.parseAndExecute(input, {
-        agent,
-        setMessages,
-        setCurrentSession,
-        setMode,
-        setInputMode,
-        setSessionList,
-        setSelectedIndex,
+    agent.setCommandResolver(async (cmdInput: string) => {
+      return commandRegistry.parseAndExecute(cmdInput, {
+        agent: agentRef.current,
+        setMessages: (msgs) => {
+          if (typeof msgs === 'function') {
+            // we don't have access to prev state directly without a complex reducer action if it uses a callback
+            // we skip complex implementation here as command registry doesn't use the functional update form
+          } else {
+            dispatch({ type: 'SET_MESSAGES', payload: msgs });
+          }
+        },
+        setCurrentSession: (session) => dispatch({ type: 'SET_CURRENT_SESSION', payload: session }),
+        setMode: () => { /* deprecated, combined with input.mode */ },
+        setInputMode: (mode, props) => dispatch({ type: 'SET_INPUT_MODE', payload: { mode, props } }),
+        setSessionList: (sessions) => dispatch({ type: 'SET_SESSION_LIST', payload: { sessions } }),
+        setSelectedIndex: (index) => dispatch({ type: 'SET_SELECTED_SESSION_INDEX', payload: index }),
         exit,
       });
     });
-  }, []);
+  }, [dispatch, exit]);
 
   const handleSubmit = useCallback(async (value: string) => {
     if (!value.trim() || !agentRef.current) return;
 
-    setIsLoading(true);
+    dispatch({ type: 'SET_IS_LOADING', payload: true });
     try {
       const sent = await agentRef.current.run(value);
       if (!sent) {
-        setIsLoading(false);
+        dispatch({ type: 'SET_IS_LOADING', payload: false });
         return;
       }
     } catch (e) {
@@ -201,10 +184,10 @@ export function App({
         throw e;
       }
     } finally {
-      setIsLoading(false);
-      setStatus('');
+      dispatch({ type: 'SET_IS_LOADING', payload: false });
+      dispatch({ type: 'SET_STATUS', payload: '' });
     }
-  }, []);
+  }, [dispatch]);
 
   useEffect(() => {
     if (autoSubmitPending && agentRef.current && initialPrompt) {
@@ -213,14 +196,15 @@ export function App({
     }
   }, [autoSubmitPending, initialPrompt, handleSubmit]);
 
-  // Main input handler
-  useInput((input, key) => {
-    if (key.ctrl && input === 'c') {
+  const isModal = pendingPrompt !== null;
+
+  useInput((keyInput, key) => {
+    if (key.ctrl && keyInput === 'c') {
       if (isLoading) {
         agentRef.current?.abort();
         if (pendingPrompt) {
           pendingPrompt.resolve('');
-          setPendingPrompt(null);
+          dispatch({ type: 'SET_PENDING_PROMPT', payload: null });
         }
       } else {
         exit();
@@ -228,278 +212,43 @@ export function App({
       return;
     }
     if (key.shift && key.tab) {
-      const next = agent.getPermissionService()?.cycleMode() ?? 'manual';
-      setPermissionMode(next);
+      const next = agentRef.current.getPermissionService()?.cycleMode() ?? 'manual';
+      dispatch({ type: 'SET_PERMISSION_MODE', payload: next });
       return;
     }
     if (key.escape && isLoading) {
       agentRef.current?.abort();
       if (pendingPrompt) {
         pendingPrompt.resolve('');
-        setPendingPrompt(null);
+        dispatch({ type: 'SET_PENDING_PROMPT', payload: null });
       }
       return;
     }
-    if (key.ctrl && input === 'o') {
-      const sessions = registryRef.current?.getAll() || [];
-      if (sessions.length <= 1) return;
-      const currentIndex = sessions.findIndex(s => s.id === activeAgentIdRef.current);
-      const nextIndex = (currentIndex + 1) % sessions.length;
-      const nextSession = sessions[nextIndex];
-      activeAgentIdRef.current = nextSession.id;
-      setActiveAgentId(nextSession.id);
-      setMessages(nextSession.agent.getStore().toDisplayMessages());
-    }
-  }, { isActive: mode === 'chat' && !isModal });
+  }, { isActive: input.mode === 'chat' && !isModal });
 
-  // Modal input handler — Esc / Ctrl+C to cancel pending prompts
-  useInput((input, key) => {
-    if ((key.escape || (key.ctrl && input === 'c')) && pendingPrompt) {
+  useInput((keyInput, key) => {
+    if ((key.escape || (key.ctrl && keyInput === 'c')) && pendingPrompt) {
       pendingPrompt.resolve('');
-      setPendingPrompt(null);
+      dispatch({ type: 'SET_PENDING_PROMPT', payload: null });
     }
   }, { isActive: isModal });
 
-  // Command autocomplete
-  const commandList = useMemo(
-    () => commandRegistry.getCommandList().sort((a, b) => a.name.localeCompare(b.name)),
-    [],
-  );
-  const matchingCommands = useMemo(() => {
-    if (!inputValue.startsWith('/')) return [];
-    const partial = inputValue.slice(1).toLowerCase();
-    if (partial === '') return commandList;
-    return commandList.filter(cmd => cmd.name.toLowerCase().startsWith(partial));
-  }, [inputValue, commandList]);
-  const [selectedSuggestion, setSelectedSuggestion] = useState(0);
-
-  useEffect(() => {
-    setSelectedSuggestion(0);
-  }, [matchingCommands.length]);
-
-  useInput((_input, key) => {
-    if (mode !== 'chat' || isModal || matchingCommands.length === 0) return;
-    if (key.upArrow) {
-      setSelectedSuggestion(prev => (prev - 1 + matchingCommands.length) % matchingCommands.length);
-    } else if (key.downArrow) {
-      setSelectedSuggestion(prev => (prev + 1) % matchingCommands.length);
-    } else if (key.tab) {
-      setInputValue(`/${matchingCommands[selectedSuggestion].name} `);
-      setInputKey(prev => prev + 1);
-    }
-  }, { isActive: mode === 'chat' && !isModal && matchingCommands.length > 0 });
-
-  // Permission mode display helpers
-  const modeLabel = agentRef.current.getPermissionService()?.getMode() ?? 'manual';
-  const modeColor = modeLabel === 'manual' ? 'yellow' : modeLabel === 'yolo' ? 'red' : 'cyan';
 
   return (
     <Box flexDirection="column" height="100%">
-      {/* Header */}
-      <Box paddingX={1} marginBottom={1}>
-        <Box flexGrow={1}>
-          <Text bold color="cyan">Mini Code</Text>
-          <Text dimColor> v{version}</Text>
-          {promptFiles.length > 0 && (
-            <>
-              <Text dimColor> | </Text>
-              <Text dimColor>{promptFiles.join(', ')}</Text>
-            </>
-          )}
-        </Box>
-        <Box>
-          {agentSessions.length > 1 && (
-            <Text bold color="cyan">[{activeAgentId === '1' ? 'M' : activeAgentId}]</Text>
-          )}
-        </Box>
-      </Box>
-
-      {/* Messages */}
-      <Box flexGrow={1} flexDirection="column" paddingX={1}>
-        {messages.length === 0 ? (
-          <Box flexGrow={1} justifyContent="center" alignItems="center">
-            <Text dimColor>Type a message to start...</Text>
-          </Box>
-        ) : (
-          <Box flexDirection="column">
-            {messages
-              .filter(msg => {
-                if (msg.role === 'tool') return true;
-                if (msg.role === 'status' && msg.element) return true;
-                return !!msg.content;
-              })
-              .map((msg, i) => (
-                <Box key={i}>
-                  <Message msg={msg} />
-                </Box>
-              ))}
-          </Box>
-        )}
-        {agentSessions.length > 1 && (
-          <Box marginTop={1}>
-            <Text dimColor color="yellow">Ctrl+O: switch agent</Text>
-          </Box>
-        )}
-      </Box>
-
-      {/* Pending prompt */}
-      {pendingPrompt && (
-        <Box borderStyle="round" borderColor="yellow" paddingX={1}>
-          <Text>{pendingPrompt.message}</Text>
-        </Box>
-      )}
-
-      {/* Input */}
-      <Box borderStyle="single" borderColor="gray" paddingX={1}>
-        <Box flexBasis={3} flexShrink={0}>
-          <Text color="cyan" bold>{'>'}</Text>
-        </Box>
-        {pendingPrompt ? (
-          pendingPrompt.multiSelect ? (
-            <Box flexDirection="column">
-              <MultiSelect
-                options={pendingPrompt.options.map(o => ({
-                  label: o.description ? `${o.label} — ${o.description}` : o.label,
-                  value: o.value,
-                }))}
-                onSubmit={(values) => {
-                  pendingPrompt.resolve(values.join(', '));
-                  setPendingPrompt(null);
-                }}
-              />
-              <Text dimColor>Space select  Enter confirm  Esc cancel</Text>
-            </Box>
-          ) : (
-            <Box flexDirection="column">
-              <Select
-                options={pendingPrompt.options.map(o => ({
-                  label: o.description ? `${o.label} — ${o.description}` : o.label,
-                  value: o.value,
-                }))}
-                onChange={(value) => {
-                  pendingPrompt.resolve(value);
-                  setPendingPrompt(null);
-                }}
-              />
-              <Text dimColor>↑↓ navigate  Enter select  Esc cancel</Text>
-            </Box>
-          )
-        ) : (
-          (() => {
-            const InputComponent = getInputComponent(inputMode);
-            const handleSubmitValue = async (value: string) => {
-              if (inputMode === 'effort-select') {
-                agent.setEffort(value as EffortLevel);
-                import('./config.js').then(m => m.setEffort(value));
-                setMessages(prev => [...prev, { role: 'status', content: `(Effort set to: ${value})`, timestamp: new Date() }]);
-                setInputMode('chat');
-                setInputProps({});
-                setInputValue('');
-                setInputKey(prev => prev + 1);
-              } else if (inputMode === 'session-list') {
-                handleSubmit(`/resume ${value}`);
-                setInputMode('chat');
-                setInputProps({});
-                setInputValue('');
-                setInputKey(prev => prev + 1);
-              } else if (inputMode === 'model-select') {
-                const { loadConfig, parseModelSpecifier, setTier } = await import('./config.js');
-                const config = await loadConfig();
-
-                // Parse tier-prefixed value: "N:" (switch only) or "N:model@provider" (update + switch)
-                const tierMatch = value.match(/^(\d):(.*)$/);
-                if (tierMatch) {
-                  const tier = tierMatch[1];
-                  let modelSpec = tierMatch[2];
-
-                  // If only "N:" → use current tiers mapping
-                  if (!modelSpec) {
-                    modelSpec = config.tiers?.[tier] || '';
-                  }
-
-                  if (modelSpec) {
-                    const parsed = parseModelSpecifier(modelSpec, config.providers ?? {});
-                    if (parsed) {
-                      agent.setModel(parsed.modelName, parsed.providerConfig.apiKey, parsed.providerConfig.baseURL, parsed.providerName, parsed.providerConfig.models?.[parsed.modelName]?.contextLength);
-                      import('./config.js').then(m => m.setModel(modelSpec));
-                      if (tierMatch[2]) {
-                        // User was editing the mapping — persist it
-                        setTier(tier, modelSpec);
-                      }
-                      setMessages(prev => [...prev, { role: 'status', content: `(Model set to: ${modelSpec})`, timestamp: new Date() }]);
-                    }
-                  }
-                }
-                setInputMode('chat');
-                setInputProps({});
-                setInputValue('');
-                setInputKey(prev => prev + 1);
-              } else {
-                setInputValue('');
-                setInputKey(prev => prev + 1);
-                setInputMode('chat');
-                setInputProps({});
-                await handleSubmit(value);
-              }
-            };
-            const defaultProps: InputComponentProps & { inputKey?: number } = {
-              onSubmit: inputMode === 'chat' ? handleSubmitValue : undefined,
-              onCancel: () => {
-                setInputMode('chat');
-                setInputProps({});
-                setInputValue('');
-              },
-              value: inputValue,
-              onChange: (v) => setInputValue(v),
-              inputKey,
-              onExecute: inputMode !== 'chat' ? handleSubmitValue : undefined,
-            };
-            return <InputComponent {...defaultProps} {...inputProps} />;
-          })()
-        )}
-      </Box>
-
-      {/* Command autocomplete suggestions */}
-      {matchingCommands.length > 0 && !isModal && !isLoading && (
-        <Box flexDirection="column" paddingX={2}>
-          {matchingCommands.map((cmd, i) => (
-            <Box key={cmd.name} flexDirection="row">
-              <Box flexBasis={2} flexShrink={0}>
-                <Text>{i === selectedSuggestion ? <Text color="cyan">{'>'}</Text> : ' '}</Text>
-              </Box>
-              <Box flexBasis={20} flexShrink={0}>
-                <Text color={i === selectedSuggestion ? 'cyan' : 'white'} bold={i === selectedSuggestion}>
-                  /{cmd.name}
-                </Text>
-              </Box>
-              <Box flexGrow={1} flexShrink={1}>
-                <Text dimColor wrap="truncate">{cmd.description.split('\n')[0].trim()}</Text>
-              </Box>
-            </Box>
-          ))}
-          <Text dimColor> ↑↓ navigate  Tab accept</Text>
-        </Box>
-      )}
-
-      {/* Model / session info */}
-      <Box paddingX={1}>
-        <Text color="green">{agentRef.current.getModelProvider()}</Text>
-        <Text dimColor>:</Text>
-        <Text>{agentRef.current.getModelName()}</Text>
-        <Text dimColor> | {currentSession}</Text>
-        {status && !isLoading && <Text dimColor> | </Text>}
-        {status && !isLoading && <Text color="magenta">{status}</Text>}
-      </Box>
-
-      {/* Status bar */}
-      <Box paddingX={1} gap={1}>
-        <Text dimColor>{tokenCount.toLocaleString()}/{agentRef.current.getContextLength().toLocaleString()}</Text>
-        <Box flexBasis={20}><ProgressBar value={Math.min(100, tokenCount / agentRef.current.getContextLength() * 100)} /></Box>
-        <Text dimColor>{Math.min(100, Math.floor(tokenCount / agentRef.current.getContextLength() * 100))}%</Text>
-        <Text dimColor> │ </Text>
-        <Text color={modeColor}>{modeLabel}</Text>
-        <Text dimColor> (Shift+Tab)</Text>
-      </Box>
+      <Header version={version} promptFiles={promptFiles} agentRef={agentRef} />
+      <MessageList />
+      <ModalPrompter />
+      <InputArea agentRef={agentRef} handleSubmit={handleSubmit} />
+      <StatusBar agentRef={agentRef} />
     </Box>
+  );
+}
+
+export function App(props: AppProps) {
+  return (
+    <TuiProvider initialState={{ permissionMode: props.agent.getPermissionService()?.getMode() ?? 'manual' }}>
+      <AppContent {...props} />
+    </TuiProvider>
   );
 }
