@@ -21,18 +21,18 @@ export interface AppProps {
   initialPrompt?: string;
   sessionName?: string;
   resumeRecent: boolean;
+  agentRegistry: AgentRegistry;
 }
 
 
 /** Hook: multi-agent coordination and switching */
-function useMultiAgent() {
+function useMultiAgent(registry: AgentRegistry) {
   const [activeAgentId, setActiveAgentId] = useState<string>('1');
   const [agentSessions, setAgentSessions] = useState<AgentSession[]>([]);
-  const registryRef = useRef<AgentRegistry | null>(null);
+  const registryRef = useRef<AgentRegistry>(registry);
   const activeAgentIdRef = useRef('1');
 
   useEffect(() => {
-    const registry = new AgentRegistry();
     registryRef.current = registry;
     registry.setUpdateCallback((sessions) => {
       setAgentSessions(sessions);
@@ -41,7 +41,7 @@ function useMultiAgent() {
         setActiveAgentId('1');
       }
     });
-  }, []);
+  }, [registry]);
 
   return { activeAgentId, activeAgentIdRef, setActiveAgentId, agentSessions, setAgentSessions, registryRef };
 }
@@ -123,6 +123,7 @@ export function App({
   initialPrompt,
   sessionName,
   resumeRecent,
+  agentRegistry,
 }: AppProps) {
   const [status, setStatus] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -144,7 +145,7 @@ export function App({
   const isModal = pendingPrompt !== null;
 
   // Multi-agent hook
-  const { activeAgentId, activeAgentIdRef, setActiveAgentId, agentSessions, setAgentSessions, registryRef } = useMultiAgent();
+  const { activeAgentId, activeAgentIdRef, setActiveAgentId, agentSessions, setAgentSessions, registryRef } = useMultiAgent(agentRegistry);
 
   // Display hook: attach TUI display to agent, load initial session
   const { messages, setMessages, currentSession, setCurrentSession, tokenCount } = useDisplay(

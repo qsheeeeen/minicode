@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import { render } from 'ink';
 import { loadAllConfig } from './config.js';
 import { Agent } from './agent.js';
+import { AgentRegistry } from './services/index.js';
 import { sessionManager } from './utils/session.js';
 import { createLogger } from './utils/logger.js';
 import { parseArgs, type PermissionMode } from './args.js';
@@ -96,6 +97,9 @@ for (const skill of skillRegistry.getAvailableSkills()) {
   });
 }
 
+// Create shared AgentRegistry (used by both Agent tools and TUI state display)
+const sharedAgentRegistry = new AgentRegistry();
+
 // Create Agent (composition root — single creation point)
 const agent = new Agent({
   apiKey: config.model!.apiKey,
@@ -108,6 +112,7 @@ const agent = new Agent({
   effort: config.thinking.effort,
   userPrompt,
   projectPromptFile,
+  agentRegistry: sharedAgentRegistry,
 });
 agent.setSession(initialSession);
 agent.setLogger(logger);
@@ -149,4 +154,5 @@ render(<App
   initialPrompt={initialPrompt}
   sessionName={sessionName}
   resumeRecent={resumeRecent}
+  agentRegistry={sharedAgentRegistry}
 />, { exitOnCtrlC: false });
