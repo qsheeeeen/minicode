@@ -45,17 +45,18 @@ export async function runHeadless(
   const printedToolUses = new Set<string>();               // tool_use block IDs already printed
   const printedResults = new Set<string>();                // tool_use IDs whose results have been printed
 
-  agent.getStore().onChange(() => {
+  function render(isFinal = false) {
     const turns = agent.getStore().getTurns();
     const statuses = agent.getStore().getStatuses();
 
     for (let ti = printedTurns; ti < turns.length; ti++) {
       const turn = turns[ti];
+      const isLastTurn = ti === turns.length - 1;
+
       if (turn.role === 'user') {
         if (typeof turn.content === 'string') {
-          process.stdout.write(`[user] ${turn.content}\n\n`);
+          process.stdout.write(`[user]\n${turn.content.trim()}\n\n`);
         }
-        // tool_result turns are not printed separately; they appear under tool_use
         printedTurns = ti + 1;
         continue;
       }
@@ -67,20 +68,19 @@ export async function runHeadless(
         for (let bi = blocksPrinted; bi < blocks.length; bi++) {
           const block = blocks[bi];
           const blockKey = `${ti}:${bi}`;
+          const isLastBlock = isLastTurn && bi === blocks.length - 1;
 
-          // --- thinking: print when it stops growing ---
+          // --- thinking: stream incrementally ---
           if (block.type === 'thinking') {
             const prevLen = streamedChars.get(blockKey) || 0;
             if (block.thinking.length > prevLen) {
-              // First time printing this thinking block
-              if (prevLen === 0) process.stdout.write(`\n[thinking] `);
-              process.stdout.write(block.thinking.slice(prevLen));
+              if (prevLen === 0) process.stdout.write(`[thinking]\n`);
+              const content = prevLen === 0 ? block.thinking.trimStart() : block.thinking.slice(prevLen);
+              process.stdout.write(content);
               streamedChars.set(blockKey, block.thinking.length);
             }
-            // Check if this block is finalized (not the last block of the last turn)
-            const isLastBlock = ti === turns.length - 1 && bi === blocks.length - 1;
-            if (!isLastBlock && !finalizedBlocks.has(blockKey)) {
-              process.stdout.write('\n');
+            if ((!isLastBlock || isFinal) && !finalizedBlocks.has(blockKey)) {
+              process.stdout.write(block.thinking.endsWith('\n') ? '\n' : '\n\n');
               finalizedBlocks.add(blockKey);
             }
           }
@@ -89,13 +89,13 @@ export async function runHeadless(
           if (block.type === 'text') {
             const prevLen = streamedChars.get(blockKey) || 0;
             if (block.text.length > prevLen) {
-              if (prevLen === 0) process.stdout.write('\n[assistant] ');
-              process.stdout.write(block.text.slice(prevLen));
+              if (prevLen === 0) process.stdout.write(`[assistant]\n`);
+              const content = prevLen === 0 ? block.text.trimStart() : block.text.slice(prevLen);
+              process.stdout.write(content);
               streamedChars.set(blockKey, block.text.length);
             }
-            const isLastBlock = ti === turns.length - 1 && bi === blocks.length - 1;
-            if (!isLastBlock && !finalizedBlocks.has(blockKey)) {
-              process.stdout.write('\n');
+            if ((!isLastBlock || isFinal) && !finalizedBlocks.has(blockKey)) {
+              process.stdout.write(block.text.endsWith('\n') ? '\n' : '\n\n');
               finalizedBlocks.add(blockKey);
             }
           }
@@ -104,7 +104,7 @@ export async function runHeadless(
           if (block.type === 'tool_use' && !printedToolUses.has(block.id)) {
             printedToolUses.add(block.id);
             const callText = `${block.name}(${JSON.stringify(block.input)})`;
-            process.stdout.write(`\n[tool] ${callText}\n`);
+            process.stdout.write(`[tool] ${callText}\n`);
 
             // Scan subsequent turns for matching tool_result
             for (let rti = ti + 1; rti < turns.length; rti++) {
@@ -115,8 +115,9 @@ export async function runHeadless(
                     const raw = typeof rb.content === 'string' ? rb.content : JSON.stringify(rb.content);
                     const lines = raw.split('\n');
                     for (const line of lines) {
-                      if (line) console.log(`       ${line}`);
+                      if (line) process.stdout.write(`       ${line}\n`);
                     }
+                    if (!isLastBlock || isFinal) process.stdout.write('\n');
                     printedResults.add(block.id);
                   }
                 }
@@ -126,12 +127,14 @@ export async function runHeadless(
         }
 
         // Track progress
-        const isLastTurn = ti === turns.length - 1;
         if (!isLastTurn) {
           printedBlocks.set(ti, blocks.length);
           printedTurns = ti + 1;
+        } else if (isFinal) {
+          printedBlocks.set(ti, blocks.length);
+          printedTurns = ti + 1;
         } else {
-          // Don't finalize the last turn's last block — it may still be streaming
+          // While streaming, keep the last block "active"
           printedBlocks.set(ti, blocks.length > 0 ? blocks.length - 1 : 0);
         }
       }
@@ -148,6 +151,7 @@ export async function runHeadless(
             for (const line of lines) {
               if (line) console.log(`       ${line}`);
             }
+            process.stdout.write('\n');
           }
         }
       }
@@ -157,10 +161,13 @@ export async function runHeadless(
     for (const s of statuses) {
       if (s.role === 'error') console.error(`[error] ${s.content}`);
     }
-  });
+  }
+
+  const unsubscribe = agent.getStore().onChange(() => render(false));
 
   try {
     await agent.run(initialPrompt);
+    render(true);
   } catch (e) {
     if (e instanceof Error && e.message === 'Aborted') {
       console.log('(Aborted)');
@@ -169,5 +176,7 @@ export async function runHeadless(
     } else {
       throw e;
     }
+  } finally {
+    unsubscribe();
   }
 }

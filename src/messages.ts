@@ -116,8 +116,15 @@ export class MessageStore {
     return this.streaming;
   }
 
-  onChange(callback: () => void): void {
+  // Subscribe to updates. Returns an unsubscribe function.
+  onChange(callback: () => void): (() => void) {
     this.changeCallback = callback;
+    return () => {
+      // Only clear if still the same listener (prevents stale cleanup)
+      if (this.changeCallback === callback) {
+        this.changeCallback = undefined;
+      }
+    };
   }
 
   private notify(): void {
