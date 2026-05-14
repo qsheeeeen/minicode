@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import path from 'path';
 import os from 'os';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { render } from 'ink';
 import { loadAllConfig } from './config.js';
@@ -28,7 +29,26 @@ if (argv.includes('--version') || argv.includes('-v')) {
   console.log(`Mini Code v${VERSION}`);
   process.exit(0);
 }
-const { modelOverride, initialPrompt, sessionName, resumeRecent, headless, permissionMode: cliPermissionMode } = parseArgs(process.argv);
+let { modelOverride, initialPrompt, sessionName, resumeRecent, headless, permissionMode: cliPermissionMode } = parseArgs(process.argv);
+
+// Support for piped input
+if (!process.stdin.isTTY) {
+  try {
+    const pipedInput = fs.readFileSync(0, 'utf-8').trim();
+    if (pipedInput) {
+      initialPrompt = initialPrompt ? `${initialPrompt}\n\n${pipedInput}` : pipedInput;
+      // Default to headless mode when piped, as TUI requires a TTY
+      if (headless === undefined) {
+        headless = true;
+      }
+    }
+  } catch (err) {
+    // Handle or ignore potential read errors from empty pipes
+  }
+}
+
+// Ensure headless is boolean for downstream
+headless = !!headless;
 
 // Get configuration
 const config = await loadAllConfig(modelOverride ?? process.env.MODEL);

@@ -9,7 +9,7 @@ describe('parseArgs', () => {
       initialPrompt: undefined,
       sessionName: undefined,
       resumeRecent: false,
-      headless: false,
+      headless: undefined,
       permissionMode: undefined,
     });
   });

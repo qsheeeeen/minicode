@@ -8,7 +8,7 @@ export interface CliArgs {
   initialPrompt?: string;
   sessionName?: string;
   resumeRecent: boolean;
-  headless: boolean;
+  headless?: boolean;
   permissionMode?: PermissionMode;
 }
 
@@ -35,7 +35,6 @@ export function parseArgs(argv: string[]): CliArgs {
       alias: 'H',
       type: 'boolean',
       description: 'Run without TUI, output to stdout (requires prompt)',
-      default: false,
     })
     .option('permission', {
       alias: 'perm',
