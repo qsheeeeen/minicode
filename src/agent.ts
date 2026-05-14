@@ -292,13 +292,15 @@ export class Agent {
       if (!blockStreaming) {
         blockStreaming = true;
         this.store.setStreaming(true);
-        this.store.appendToLastAssistantTurn({ type: 'thinking', thinking: delta } as ContentBlock);
+        this.store.appendToLastAssistantTurn({ type: 'thinking', thinking: delta.trimStart() } as ContentBlock);
       } else {
         const last = this.store.getLastBlock();
         if (last?.type === 'thinking') {
-          this.store.updateLastBlock({ thinking: (last as any).thinking + delta });
+          const currentText = (last as any).thinking;
+          const newText = currentText === '' ? delta.trimStart() : delta;
+          this.store.updateLastBlock({ thinking: currentText + newText });
         } else {
-          this.store.appendToLastAssistantTurn({ type: 'thinking', thinking: delta } as ContentBlock);
+          this.store.appendToLastAssistantTurn({ type: 'thinking', thinking: delta.trimStart() } as ContentBlock);
         }
       }
     });
@@ -307,13 +309,15 @@ export class Agent {
       if (!blockStreaming) {
         blockStreaming = true;
         this.store.setStreaming(true);
-        this.store.appendToLastAssistantTurn({ type: 'text', text: delta } as ContentBlock);
+        this.store.appendToLastAssistantTurn({ type: 'text', text: delta.trimStart() } as ContentBlock);
       } else {
         const last = this.store.getLastBlock();
         if (last?.type === 'text') {
-          this.store.updateLastBlock({ text: (last as any).text + delta });
+          const currentText = (last as any).text;
+          const newText = currentText === '' ? delta.trimStart() : delta;
+          this.store.updateLastBlock({ text: currentText + newText });
         } else {
-          this.store.appendToLastAssistantTurn({ type: 'text', text: delta } as ContentBlock);
+          this.store.appendToLastAssistantTurn({ type: 'text', text: delta.trimStart() } as ContentBlock);
         }
       }
     });

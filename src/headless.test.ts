@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 const mockRun = vi.fn();
 const mockSetEvents = vi.fn();
 const mockSetPrompter = vi.fn();
-const mockOnChange = vi.fn();
+const mockOnChange = vi.fn().mockReturnValue(() => {});
 const mockGetTurns = vi.fn().mockReturnValue([]);
 const mockGetStatuses = vi.fn().mockReturnValue([]);
 
