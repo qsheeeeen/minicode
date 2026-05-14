@@ -387,9 +387,12 @@ export class Agent {
   private async runTool(tool: ToolDef, args: Record<string, unknown>, context: ToolExecutionContext): Promise<import('./tools/index.js').ToolResult> {
     if (tool.requiresPermission) {
       const displayText = callContent(tool.name, args);
-      const allowed = await this.permissionService.check(tool.name, args, displayText);
+      const { allowed, reason } = await this.permissionService.check(tool.name, args, displayText);
       if (!allowed) {
-        throw new ToolDeniedError(tool.name, displayText);
+        if (this.permissionService.getMode() === 'auto') {
+          return { output: `Tool execution denied by auto-gate: ${reason || 'unknown reason'}` };
+        }
+        throw new ToolDeniedError(tool.name, displayText, reason);
       }
     }
     return tool.execute(args, context);
@@ -430,9 +433,9 @@ export class Agent {
         this.logger?.info({ session: this.currentSession, toolName: tool.name, toolInput: block.input }, 'Tool result');
       } catch (reason) {
         if (reason instanceof ToolDeniedError) {
-          results.push({ toolUseId: block.id, content: 'User rejected' });
+          results.push({ toolUseId: block.id, content: reason.reason });
           for (let j = i + 1; j < toolCalls.length; j++) {
-            results.push({ toolUseId: toolCalls[j].block.id, content: 'User rejected' });
+            results.push({ toolUseId: toolCalls[j].block.id, content: reason.reason });
           }
           this.store.addToolResults(results);
           throw reason;

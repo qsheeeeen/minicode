@@ -43,10 +43,10 @@ describe('PermissionService', () => {
   });
 
   describe('check', () => {
-    it('yolo always returns true', async () => {
+    it('yolo always returns allowed: true', async () => {
       const service = new PermissionService({ initialMode: 'yolo' });
       const result = await service.check('Bash', { command: 'rm -rf /' }, 'Dangerous command');
-      expect(result).toBe(true);
+      expect(result).toEqual({ allowed: true });
     });
 
     it('manual uses prompter.prompt when available', async () => {
@@ -54,25 +54,33 @@ describe('PermissionService', () => {
       const promptMock = vi.fn().mockResolvedValue('yes');
       service.setPrompter({ prompt: promptMock });
       const result = await service.check('Bash', { command: 'ls' }, 'List files');
-      expect(result).toBe(true);
+      expect(result).toEqual({ allowed: true });
       expect(promptMock).toHaveBeenCalledWith({
         message: expect.stringContaining('List files'),
         options: expect.arrayContaining([{ label: 'Yes', value: 'yes' }]),
       });
     });
 
-    it('manual denies when prompter is undefined (no UI to ask)', async () => {
+    it('manual returns allowed: false and reason when prompter is undefined (no UI to ask)', async () => {
       const service = new PermissionService({ initialMode: 'manual' });
       const result = await service.check('Bash', { command: 'ls' }, 'List files');
-      expect(result).toBe(false);
+      expect(result).toEqual({ allowed: false, reason: 'User cancelled' });
     });
 
-    it('manual returns false when prompter returns no', async () => {
+    it('manual returns allowed: false and "User rejected" when prompter returns no', async () => {
       const service = new PermissionService({ initialMode: 'manual' });
       const promptMock = vi.fn().mockResolvedValue('no');
       service.setPrompter({ prompt: promptMock });
       const result = await service.check('Bash', { command: 'ls' }, 'List files');
-      expect(result).toBe(false);
+      expect(result).toEqual({ allowed: false, reason: 'User rejected' });
+    });
+
+    it('manual returns allowed: false and "User cancelled" when prompter returns empty', async () => {
+      const service = new PermissionService({ initialMode: 'manual' });
+      const promptMock = vi.fn().mockResolvedValue('');
+      service.setPrompter({ prompt: promptMock });
+      const result = await service.check('Bash', { command: 'ls' }, 'List files');
+      expect(result).toEqual({ allowed: false, reason: 'User cancelled' });
     });
   });
 
@@ -81,13 +89,13 @@ describe('PermissionService', () => {
       vi.clearAllMocks();
     });
 
-    it('returns false when client is not set', async () => {
+    it('returns allowed: false and reason when client is not set', async () => {
       const service = new PermissionService({ initialMode: 'auto' });
       const result = await (service as any).autoDecide('Bash', { command: 'ls' });
-      expect(result).toBe(false);
+      expect(result).toEqual({ allowed: false, reason: expect.stringContaining('No LLM client') });
     });
 
-    it('returns true for "yes" response', async () => {
+    it('returns allowed: true for "yes" response', async () => {
       const mockChat = vi.fn().mockResolvedValue({
         content: [{ type: 'text', text: '  yes  ' }],
       });
@@ -96,27 +104,27 @@ describe('PermissionService', () => {
 
       const result = await (service as any).autoDecide('Read', { path: 'a.txt' });
 
-      expect(result).toBe(true);
+      expect(result).toEqual({ allowed: true });
       expect(mockChat).toHaveBeenCalledWith(
         expect.arrayContaining([expect.objectContaining({ role: 'user' })]),
         [],
-        expect.objectContaining({ model: 'claude-3', maxTokens: 50 })
+        expect.objectContaining({ model: 'claude-3', maxTokens: 100 })
       );
     });
 
-    it('returns false for "no" response', async () => {
+    it('returns allowed: false and reason for "no: <reason>" response', async () => {
       const mockChat = vi.fn().mockResolvedValue({
-        content: [{ type: 'text', text: 'no' }],
+        content: [{ type: 'text', text: 'no: this command is too dangerous' }],
       });
       const mockClient = { chat: mockChat } as unknown as AnthropicClient;
       const service = new PermissionService({ initialMode: 'auto', client: mockClient });
 
       const result = await (service as any).autoDecide('Bash', { command: 'rm -rf /' });
 
-      expect(result).toBe(false);
+      expect(result).toEqual({ allowed: false, reason: 'this command is too dangerous' });
     });
 
-    it('returns true when response includes "yes"', async () => {
+    it('returns allowed: true when response starts with "yes"', async () => {
       const mockChat = vi.fn().mockResolvedValue({
         content: [{ type: 'text', text: 'Yes, this is allowed.' }],
       });
@@ -125,10 +133,10 @@ describe('PermissionService', () => {
 
       const result = await (service as any).autoDecide('Bash', { command: 'echo hello' });
 
-      expect(result).toBe(true);
+      expect(result).toEqual({ allowed: true });
     });
 
-    it('returns false when response does not include "yes"', async () => {
+    it('returns allowed: false and parses reason when response does not start with "yes"', async () => {
       const mockChat = vi.fn().mockResolvedValue({
         content: [{ type: 'text', text: 'I think not.' }],
       });
@@ -137,27 +145,18 @@ describe('PermissionService', () => {
 
       const result = await (service as any).autoDecide('Bash', { command: 'ls' });
 
-      expect(result).toBe(false);
+      expect(result).toEqual({ allowed: false, reason: 'I think not.' });
     });
 
-    it('returns false on chat error', async () => {
+    it('returns allowed: false and error reason on chat error', async () => {
       const mockChat = vi.fn().mockRejectedValue(new Error('API error'));
       const mockClient = { chat: mockChat } as unknown as AnthropicClient;
       const service = new PermissionService({ initialMode: 'auto', client: mockClient });
 
       const result = await (service as any).autoDecide('Bash', { command: 'ls' });
 
-      expect(result).toBe(false);
-    });
-
-    it('returns false when content is empty', async () => {
-      const mockChat = vi.fn().mockResolvedValue({ content: [] });
-      const mockClient = { chat: mockChat } as unknown as AnthropicClient;
-      const service = new PermissionService({ initialMode: 'auto', client: mockClient });
-
-      const result = await (service as any).autoDecide('Bash', { command: 'ls' });
-
-      expect(result).toBe(false);
+      expect(result.allowed).toBe(false);
+      expect(result.reason).toContain('API error');
     });
   });
 });

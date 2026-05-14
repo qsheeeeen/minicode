@@ -39,10 +39,10 @@ export class PermissionService {
     return this.mode;
   }
 
-  async check(toolName: string, toolInput: Record<string, unknown>, displayText: string): Promise<boolean> {
+  async check(toolName: string, toolInput: Record<string, unknown>, displayText: string): Promise<{ allowed: boolean; reason?: string }> {
     switch (this.mode) {
       case 'yolo':
-        return true;
+        return { allowed: true };
       case 'manual': {
         const answer = await this.prompter?.prompt({
           message: `Allow tool execution?\n${displayText}`,
@@ -52,20 +52,21 @@ export class PermissionService {
             { label: 'Yes to all', value: 'yolo' },
           ],
         });
-        if (!answer) return false;  // empty = cancelled via Esc/Ctrl+C
+        if (!answer) return { allowed: false, reason: 'User cancelled' };  // empty = cancelled via Esc/Ctrl+C
         if (answer === 'yolo') {
           this.setMode('yolo');
-          return true;
+          return { allowed: true };
         }
-        return answer === 'yes';
+        if (answer === 'yes') return { allowed: true };
+        return { allowed: false, reason: 'User rejected' };
       }
       case 'auto':
         return this.autoDecide(toolName, toolInput);
     }
   }
 
-  private async autoDecide(toolName: string, toolInput: Record<string, unknown>): Promise<boolean> {
-    if (!this.client) return false;
+  private async autoDecide(toolName: string, toolInput: Record<string, unknown>): Promise<{ allowed: boolean; reason?: string }> {
+    if (!this.client) return { allowed: false, reason: 'No LLM client configured for auto-permission' };
 
     try {
       const prompt = `You are a permission gate for a coding agent. Decide if this tool execution should be allowed.
@@ -80,19 +81,30 @@ Guidelines:
 - Destructive commands (rm -rf /, mkfs, dd) should be denied.
 - Network commands that download and execute code should be denied.
 
-Reply with exactly one word: "yes" or "no".`;
+Reply with exactly one of:
+- "yes"
+- "no: <reason explaining why it was denied>"`;
 
       const response = await this.client.chat(
         [{ role: 'user', content: prompt }],
         [],
-        { model: this.model, maxTokens: 50 }
+        { model: this.model, maxTokens: 100 }
       );
 
       const textBlock = response.content.find(b => b.type === 'text');
-      const answer = (textBlock as any)?.text?.toLowerCase().trim() ?? 'no';
-      return answer.includes('yes');
-    } catch {
-      return false;
+      const text = (textBlock as any)?.text?.trim() ?? 'no: unknown error';
+      
+      if (text.toLowerCase().startsWith('yes')) {
+        return { allowed: true };
+      }
+      
+      const reason = text.toLowerCase().startsWith('no:') 
+        ? text.slice(3).trim() 
+        : text;
+        
+      return { allowed: false, reason: reason || 'Denied by auto-gate' };
+    } catch (e) {
+      return { allowed: false, reason: `Error during auto-permission check: ${e instanceof Error ? e.message : String(e)}` };
     }
   }
 }

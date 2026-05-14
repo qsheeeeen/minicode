@@ -17,8 +17,9 @@ export class ToolDeniedError extends Error {
   constructor(
     public readonly toolName: string,
     public readonly displayText: string,
+    public readonly reason: string = 'User rejected',
   ) {
-    super(`Tool execution denied: ${toolName}`);
+    super(`Tool execution denied: ${toolName} (${reason})`);
     this.name = 'ToolDeniedError';
   }
 }

@@ -58,7 +58,7 @@ export const askUserTool: ToolDef = {
     });
 
     if (!answer) {
-      throw new ToolDeniedError('AskUser', question);
+      throw new ToolDeniedError('AskUser', question, 'User cancelled the question');
     }
     return { output: `User selected: "${answer}"` };
   },
