@@ -73,6 +73,7 @@ export class Agent {
   private logger?: pino.Logger;
   private saveSessionLock: Promise<void> = Promise.resolve();
   private isCompressing: boolean = false;
+  private isRunning: boolean = false;
   private environmentContext = '';
   private systemPrompt = '';
   private resolveCommand?: (input: string) => Promise<{ handled: boolean; promptText?: string; displayContent?: string }>;
@@ -455,6 +456,8 @@ export class Agent {
   }
 
   async run(userMessage: string, opts?: { displayContent?: string }): Promise<boolean> {
+    if (this.isRunning) return false;
+
     // Resolve slash commands (e.g. /plan → expanded prompt, /clear → clear session)
     let llmText = userMessage;
     let displayOverride = opts?.displayContent;
@@ -471,6 +474,7 @@ export class Agent {
       }
     }
 
+    this.isRunning = true;
     this.store.addUserMessage(llmText, displayOverride);
     this.abortController = new AbortController();
     this.logger?.info({ session: this.currentSession, userMessage: llmText }, 'Session started');
@@ -520,6 +524,7 @@ export class Agent {
         if (!hasToolCalls) break;
       }
     } finally {
+      this.isRunning = false;
       if (this.abortController?.signal.aborted) {
         // Remove the last user message that triggered this aborted run
         const turns = this.store.getTurns();

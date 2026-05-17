@@ -139,6 +139,7 @@ function AppContent({
   const agentRef = useRef<Agent>(agent);
 
   const [autoSubmitPending, setAutoSubmitPending] = React.useState(!!initialPrompt);
+  const loadingRef = useRef(false);
 
   useMultiAgent(agentRegistry, agentRef);
   useDisplay(agent, initialSession, sessionName, resumeRecent, agentRegistry);
@@ -165,16 +166,20 @@ function AppContent({
     });
   }, [dispatch, exit]);
 
-  const handleSubmit = useCallback(async (value: string) => {
-    if (!value.trim() || !agentRef.current) return;
+  const handleSubmit = useCallback(async (value: string): Promise<boolean> => {
+    if (!value.trim() || !agentRef.current) return false;
 
+    if (loadingRef.current) return false;
+
+    loadingRef.current = true;
     dispatch({ type: 'SET_IS_LOADING', payload: true });
     try {
       const sent = await agentRef.current.run(value);
       if (!sent) {
         dispatch({ type: 'SET_IS_LOADING', payload: false });
-        return;
+        return false;
       }
+      return true;
     } catch (e) {
       if (e instanceof Error && e.message === 'Aborted') {
         agentRef.current.getStore().addStatus({ role: 'status', content: '(Aborted)', timestamp: new Date() });
@@ -183,7 +188,9 @@ function AppContent({
       } else {
         throw e;
       }
+      return false;
     } finally {
+      loadingRef.current = false;
       dispatch({ type: 'SET_IS_LOADING', payload: false });
       dispatch({ type: 'SET_STATUS', payload: '' });
     }
@@ -239,7 +246,7 @@ function AppContent({
       <Header version={version} promptFiles={promptFiles} agentRef={agentRef} />
       <MessageList />
       <ModalPrompter />
-      <InputArea agentRef={agentRef} handleSubmit={handleSubmit} />
+      <InputArea agentRef={agentRef} handleSubmit={handleSubmit} loadingRef={loadingRef} />
       <StatusBar agentRef={agentRef} />
     </Box>
   );

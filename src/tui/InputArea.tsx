@@ -8,10 +8,11 @@ import type { EffortLevel } from '../llm/anthropic.js';
 
 interface InputAreaProps {
   agentRef: React.MutableRefObject<Agent>;
-  handleSubmit: (value: string) => Promise<void>;
+  handleSubmit: (value: string) => Promise<boolean>;
+  loadingRef: React.MutableRefObject<boolean>;
 }
 
-export function InputArea({ agentRef, handleSubmit }: InputAreaProps) {
+export function InputArea({ agentRef, handleSubmit, loadingRef }: InputAreaProps) {
   const { input, pendingPrompt, isLoading } = useTuiState();
   const dispatch = useTuiDispatch();
 
@@ -96,6 +97,7 @@ export function InputArea({ agentRef, handleSubmit }: InputAreaProps) {
       dispatch({ type: 'INCREMENT_INPUT_KEY' });
       setSelectedSuggestion(0);
     } else {
+      if (loadingRef.current) return;
       dispatch({ type: 'SET_INPUT_VALUE', payload: '' });
       dispatch({ type: 'INCREMENT_INPUT_KEY' });
       dispatch({ type: 'SET_INPUT_MODE', payload: { mode: 'chat' } });
@@ -132,7 +134,11 @@ export function InputArea({ agentRef, handleSubmit }: InputAreaProps) {
     <Box flexDirection="column">
       <Box borderStyle="single" borderColor="gray" paddingX={1}>
         <Box flexBasis={3} flexShrink={0}>
-          <Text color="cyan" bold>{'>'}</Text>
+          {isLoading ? (
+            <Text dimColor>{'…'}</Text>
+          ) : (
+            <Text color="cyan" bold>{'>'}</Text>
+          )}
         </Box>
         <InputComponent {...inputProps} />
       </Box>
