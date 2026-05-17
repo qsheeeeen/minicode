@@ -259,7 +259,7 @@ export class Agent {
     }
 
     if (this.projectPromptFile) {
-      prompt += `\n\n# Workspace Information\nThis workspace's description is in \`${this.projectPromptFile}\`. Use the Read tool to load it when you need project-specific context. Do NOT read it preemptively — only when the task would benefit from project-specific knowledge.`;
+      prompt += `\n\n# Workspace Information\nThis workspace's description is in \`${this.projectPromptFile}\`. Use the Read tool to load it at the start of each conversation. It contains critical project instructions that you must follow.`;
     }
 
     const availableSkills = skillRegistry.getAvailableSkills();
