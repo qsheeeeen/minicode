@@ -46,7 +46,7 @@ describe('builtin skills', () => {
     const init = skills.find(s => s.name === 'init');
     expect(init).toBeDefined();
     expect(init!.description).toContain('MINICODE.md');
-    expect(init!.description).toContain('onboarding flow');
+    expect(init!.description).toContain('Set up a minimal');
   });
 
   it('init skill has a body', () => {

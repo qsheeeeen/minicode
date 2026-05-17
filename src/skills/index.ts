@@ -109,169 +109,62 @@ Every skill consists of a required \`SKILL.md\` file:
 
 const initSkill: SkillMeta = {
   name: 'init',
-  description: `A comprehensive onboarding flow for setting up ${promptFile}. including codebase exploration, user interviews, and iterative proposal refinement.`,
-  body: `Set up a minimal ${promptFile} (and optionally skills and hooks) for this repo. ${promptFile} is loaded into every agent session, so it must be concise — only include what agent would get wrong without it.
+  description: `Set up a minimal ${promptFile} for this repo with codebase exploration and optional skills.`,
+  body: `Set up a minimal ${promptFile} (and optionally skills) for this repo. ${promptFile} is loaded into every agent session, so it must be concise — only include what the agent would get wrong without it.
 
 ## Phase 0: Check for an existing ${promptFile}
 
-Before asking anything, check if ${promptFile} already exists at the project root (just \`cat ./${promptFile}\` — only the project-root file counts; don't explore the tree yet). This branches Phase 1.
+Before asking anything, check if ${promptFile} already exists at the project root. This determines the next step.
 
-## Phase 1: Ask what to set up
+**If ${promptFile} already exists**, ask the user whether to review/improve it, leave it and set up skills, or start fresh.
 
-Use AskUser to find out what the user wants. Which question you ask depends on Phase 0. Call AskUserQuestion with **only Q1** — do NOT include Q2 in the same call. Only ask Q2 after you've seen the Q1 answer, since "Let agent decide" skips it.
+**If no ${promptFile} exists**, ask if they want to set up a project ${promptFile}, skills, or both.
 
-Before the first question, print this primer as normal assistant text so first-time users know the terms:
+## Phase 1: Explore the codebase
 
-> Quick context:
-> - **${promptFile}** files give agent persistent instructions for a project, your personal workflow, or your organization. agent reads them at the start of every session.
-> - **Skills** are packaged instructions agent invokes automatically when a task matches, or that you trigger with a slash command (e.g. \`/frontend-design\`, \`/commit-push-pr\`).
-> - **Hooks** allow you to run shell commands automatically on lifecycle events: get notified when agent is blocked on your input, auto-format after edits, enforce checks before commits — these are deterministic and agent can't skip them.
-
-**If ${promptFile} already exists**, ask:
-- "I found an existing ${promptFile}. What would you like to do?"
-  Options: "Review and improve it" | "Leave it, set up other things" | "Start fresh (replace it)"
-  Description for improve: "Explore what's changed in the codebase and propose targeted edits to the existing file."
-  Description for leave it: "Skip ${promptFile}. Go straight to skills and hooks."
-  Description for start fresh: "Discard it and write new file(s)."
-  Routing:
-  - "Review and improve" → skip Q1/Q2; explore (Phase 2), ask the single Phase 3-lite question, then go to Phase 4's diff-proposal, then Phase 8.
-  - "Leave it" → skip Q1, ask Q2 (rename its fourth option to "Neither — skip setup"). If they pick "Neither — skip setup", jump straight to Phase 8 with: "Nothing to set up — your ${promptFile} is unchanged." Otherwise: Phase 2 → Phase 3 proposal (no gap-fill interview) → Phases 6/7 per queue → Phase 8. For Phase 7's hook target-file default, treat this path as "project" (\`.claude/settings.json\`).
-  - "Start fresh" → continue to Q1 below as if no file existed.
-
-**If no ${promptFile} exists** (or the user picked "Start fresh"), ask:
-- Q1: "Which ${promptFile} files should /init set up?"
-  Options: "Project ${promptFile}" | "Personal CLAUDE.local.md" | "Both project + personal" | "Let agent decide"
-  Description for project: "Team-shared instructions checked into source control — architecture, coding standards, common workflows."
-  Description for personal: "Your private preferences for this project (gitignored, not shared) — your role, sandbox URLs, preferred test data, workflow quirks."
-  Description for Let agent decide: "Fastest path — project ${promptFile} plus whatever skills or hooks fit this repo. No follow-on questions; you'll approve everything before it's written."
-  If the user picks "Let agent decide", skip Q2 — treat it as project ${promptFile} with no skills/hooks constraint.
-
-- Q2: "Also set up skills and hooks?"
-  Options: "Skills + hooks" | "Skills only" | "Hooks only" | "Neither, just ${promptFile}"
-  Description for skills: "Packaged instructions agent invokes automatically when a task matches, or that you trigger with a slash command (e.g. \`/frontend-design\`, \`/commit-push-pr\`)."
-  Description for hooks: "Deterministic shell commands that run on tool events (e.g., format after every edit). agent can't skip them."
-  Q2 is a hint, not a filter — Phase 3 proposes what fits the codebase and notes any deviation.
-
-## Phase 2: Explore the codebase
-
-Launch a subagent to survey the codebase, and ask it to read key files to understand the project: manifest files (package.json, Cargo.toml, pyproject.toml, go.mod, pom.xml, etc.), README, Makefile/build configs, CI config, existing ${promptFile}, .claude/rules/, AGENTS.md, .cursor/rules or .cursorrules, .github/copilot-instructions.md, .windsurfrules, .clinerules, .mcp.json.
+Survey key files to understand the project: manifest files (package.json, Cargo.toml, etc.), README, build configs, CI config, existing AI coding tool configs (AGENTS.md, .cursor/rules, .cursorrules, .github/copilot-instructions.md, .windsurfrules, .clinerules).
 
 Detect:
 - Build, test, and lint commands (especially non-standard ones)
 - Languages, frameworks, and package manager
-- Project structure (monorepo with workspaces, multi-module, or single project)
+- Project structure
 - Code style rules that differ from language defaults
 - Non-obvious gotchas, required env vars, or workflow quirks
-- Existing .claude/skills/ and .claude/rules/ directories
-- Formatter configuration (prettier, biome, ruff, black, gofmt, rustfmt, or a unified format script like \`npm run format\` / \`make fmt\`)
-- Git worktree usage: run \`git worktree list\` to check if this repo has multiple worktrees (only relevant if the user wants a personal CLAUDE.local.md)
+- Existing skills directory
 
-Note what you could NOT figure out from code alone — these become interview questions.
+## Phase 2: Fill in the gaps
 
-## Phase 3: Fill in the gaps
+Ask the user only what the code can't answer: non-obvious commands, gotchas, conventions, testing quirks. Skip things already in README or obvious from manifest files.
 
-Use AskUser to gather what you still need to write good ${promptFile} files and skills. Ask only things the code can't answer.
+## Phase 3: Propose and get approval
 
-If the user chose project ${promptFile}, both, or "Let agent decide": ask about codebase practices — non-obvious commands, gotchas, branch/PR conventions, required env setup, testing quirks. Skip things already in README or obvious from manifest files. Do not mark any options as "recommended" — this is about how their team works, not best practices.
+Present a short proposal listing what will be set up, then get user approval before writing anything.
 
-If the user chose personal CLAUDE.local.md or both: ask about them, not the codebase. Do not mark any options as "recommended" — this is about their personal preferences, not best practices. Examples of questions:
-  - What's their role on the team? (e.g., "backend engineer", "data scientist", "new hire onboarding")
-  - How familiar are they with this codebase and its languages/frameworks? (so agent can calibrate explanation depth)
-  - Do they have personal sandbox URLs, test accounts, API key paths, or local setup details agent should know?
-  - Only if Phase 2 found multiple git worktrees: ask whether their worktrees are nested inside the main repo (e.g., \`.claude/worktrees/<name>/\`) or siblings/external (e.g., \`../myrepo-feature/\`). If nested, the upward file walk finds the main repo's CLAUDE.local.md automatically — no special handling needed. If sibling/external, the personal content should live in a home-directory file (e.g., \`~/.claude/<project-name>-instructions.md\`) and each worktree gets a one-line CLAUDE.local.md stub that imports it: \`@~/.claude/<project-name>-instructions.md\`. Never put this import in the project ${promptFile} — that would check a personal reference into the team-shared file.
-  - Any communication preferences? (e.g., "be terse", "always explain tradeoffs", "don't summarize at the end")
+## Phase 4: Write ${promptFile}
 
-If the user picked "Review and improve" in Phase 0: ask just one question — "Has anything changed about how the team works since this ${promptFile} was written (new conventions, commands, gotchas)?" with options "No, nothing's changed" | "Yes — let me describe". If they pick Yes, ask what changed (free text) before continuing. Then skip to Phase 4.
-
-**Synthesize a proposal from Phase 2 findings and the gap-fill answers.** For each item, pick the artifact type that fits the evidence:
-
-  - **Hook** — deterministic, fast, per-edit shell command (formatting, linting a changed file).
-  - **Skill** — on-demand multi-step workflow (\`/verify\`, \`/deploy-staging\`, session reports).
-  - **${promptFile} note** — guidance that shapes behavior but isn't enforced (conventions, communication style).
-
-Include the ${promptFile} file(s) implied by Q1 (project, personal, both, or "Let agent decide" → project) as the first bullet(s) of the proposal, with a one-line summary of what each will cover. Then list skills/hooks/notes. On the "Leave it" path, omit ${promptFile} file bullets and notes (Phase 4 won't run). On the "Start fresh" path with Q1 = personal-only, add a bullet noting the existing project ${promptFile} will be left untouched (they chose not to replace it with a project file).
-
-Propose what fits. If the user gave a Q2 hint and your proposal deviates from it (e.g. they said "Hooks only" but nothing hook-shaped exists), say so in one line at the top of the proposal and propose the better-fitting artifacts anyway.
-
-**Print the proposal as normal assistant text**, one bullet per item:
-
-> Here's what I'd set up:
-> • **[Artifact type: file/hook/skill/note]** — [one-line description]
-> • …
-
-Then call AskUser with a simple question ("Does this look right?") and options like "Looks good — proceed" | "Drop the hook" | "Drop the skill". The tool auto-adds an "Other" option for custom tweaks.
-
-**Build the preference queue** from the accepted proposal. Each entry: {type: hook|skill|note, description, target file, any Phase-2-sourced details like the actual test/format command}. Phase 6 and Phase 7's hooks sub-bullet consume this queue; Phases 4/5 gate on the approved proposal's file bullets directly; Phase 7's GitHub-CLI and linting checks run regardless of queue contents.
-
-## Phase 4: Write ${promptFile} (if the approved proposal includes it, or on the "Review and improve" path)
-
-Write a minimal ${promptFile} at the project root. Every line must pass this test: "Would removing this cause agent to make mistakes?" If no, cut it.
-
-If the user picked "Review and improve it" in Phase 0: don't write fresh — read the existing file, compare against Phase 2 findings and the Phase 3-lite answer, and propose specific additions/removals as diffs with a one-line reason for each. The existing file is the baseline; your job is to catch what's missing, outdated, or bloated. After printing the diffs, call AskUser ("Apply these edits?" with options like "Apply all" | "Let me pick which" | "Skip — leave it as is") before writing anything.
-
-**Consume \`note\` entries from the Phase 3 preference queue whose target is ${promptFile}** (team-level notes) — add each as a concise line in the most relevant section. These are the behaviors the user wants agent to follow but didn't need guaranteed (e.g., "propose a plan before implementing", "explain the tradeoffs when refactoring"). Leave personal-targeted notes for Phase 5.
+Write a minimal ${promptFile} at the project root. Every line must pass: "Would removing this cause the agent to make mistakes?" If no, cut it.
 
 Include:
-- Build/test/lint commands agent can't guess (non-standard scripts, flags, or sequences)
-- Code style rules that DIFFER from language defaults (e.g., "prefer type over interface")
-- Testing instructions and quirks (e.g., "run single test with: pytest -k 'test_name'")
-- Repo etiquette (branch naming, PR conventions, commit style)
+- Build/test/lint commands the agent can't guess
+- Code style rules that differ from language defaults
+- Testing instructions and quirks
+- Repo etiquette (branch naming, commit style)
 - Required env vars or setup steps
 - Non-obvious gotchas or architectural decisions
-- Important parts from existing AI coding tool configs if they exist (AGENTS.md, .cursor/rules, .cursorrules, .github/copilot-instructions.md, .windsurfrules, .clinerules)
 
 Exclude:
-- File-by-file structure or component lists (agent can discover these by reading the codebase)
-- Standard language conventions agent already knows
+- File-by-file structure (agent can discover by reading the codebase)
+- Standard language conventions the agent already knows
 - Generic advice ("write clean code", "handle errors")
-- Detailed API docs or long references — use \`@path/to/import\` syntax instead (e.g., \`@docs/api-reference.md\`) to inline content on demand without bloating ${promptFile}
-- Information that changes frequently — reference the source with \`@path/to/import\` so agent always reads the current version
-- Long tutorials or walkthroughs (move to a separate file and reference with \`@path/to/import\`, or put in a skill)
-- Commands obvious from manifest files (e.g., standard "npm test", "cargo test", "pytest")
+- Commands obvious from manifest files
 
-Be specific: "Use 2-space indentation in TypeScript" is better than "Format code properly."
+## Phase 5: Suggest and create skills
 
-Do not repeat yourself and do not make up sections like "Common Development Tasks" or "Tips for Development" — only include information expressly found in files you read.
+Skills add capabilities the agent can use on demand without bloating every session. Suggest skills when you find:
+- Repeatable workflows (verify changes, deploy, release process)
+- Reference knowledge for specific subsystems
 
-For projects with multiple concerns, suggest organizing instructions into \`.claude/rules/\` as separate focused files (e.g., \`code-style.md\`, \`testing.md\`, \`security.md\`). These are loaded automatically alongside ${promptFile} and can be scoped to specific file paths using \`paths\` frontmatter.
-
-For projects with distinct subdirectories (monorepos, multi-module projects, etc.): mention that subdirectory ${promptFile} files can be added for module-specific instructions (they're loaded automatically when agent works in those directories). Offer to create them if the user wants.
-
-## Phase 5: Write CLAUDE.local.md (if the approved proposal includes it)
-
-Write a minimal CLAUDE.local.md at the project root. This file is automatically loaded alongside ${promptFile}. After creating it, add \`CLAUDE.local.md\` to the project's .gitignore so it stays private.
-
-**Consume \`note\` entries from the Phase 3 preference queue whose target is CLAUDE.local.md** (personal-level notes) — add each as a concise line. If the user chose personal-only in Phase 1, this is the sole consumer of note entries.
-
-Include:
-- The user's role and familiarity with the codebase (so agent can calibrate explanations)
-- Personal sandbox URLs, test accounts, or local setup details
-- Personal workflow or communication preferences
-
-Keep it short — only include what would make agent's responses noticeably better for this user.
-
-If Phase 2 found multiple git worktrees and the user confirmed they use sibling/external worktrees (not nested inside the main repo): the upward file walk won't find a single CLAUDE.local.md from all worktrees. Write the actual personal content to \`~/.claude/<project-name>-instructions.md\` and make CLAUDE.local.md a one-line stub that imports it: \`\x40~/.claude/<project-name>-instructions.md\`. The user can copy this one-line stub to each sibling worktree. Never put this import in the project ${promptFile}. If worktrees are nested inside the main repo (e.g., \`.claude/worktrees/\`), no special handling is needed — the main repo's CLAUDE.local.md is found automatically.
-
-If CLAUDE.local.md already exists: read it, propose specific additions, and do not silently overwrite.
-
-## Phase 6: Suggest and create skills (if the approved proposal includes any)
-
-Skills add capabilities agent can use on demand without bloating every session.
-
-**First, consume \`skill\` entries from the Phase 3 preference queue.** Each queued skill preference becomes a SKILL.md tailored to what the user described. For each:
-- Name it from the preference (e.g., "verify-deep", "session-report", "deploy-sandbox")
-- Write the body using the user's own words from the interview plus whatever Phase 2 found (test commands, report format, deploy target). If the preference maps to an existing bundled skill (e.g., \`/verify\`), write a project skill that adds the user's specific constraints on top — tell the user the bundled one still exists and theirs is additive.
-- Ask a quick follow-up if the preference is underspecified (e.g., "which test command should verify-deep run?")
-
-**Then suggest additional skills** beyond the queue when you find:
-- Reference knowledge for specific tasks (conventions, patterns, style guides for a subsystem)
-- Repeatable workflows the user would want to trigger directly (deploy, fix an issue, release process, verify changes)
-
-For each suggested skill, provide: name, one-line purpose, and why it fits this repo.
-
-If \`.claude/skills/\` already exists with skills, review them first. Do not overwrite existing skills — only propose new ones that complement what is already there.
-
-Create each skill at \`.claude/skills/<skill-name>/SKILL.md\`:
+Create each skill in the configured skills directory (default: \`.minicode/skills/<skill-name>/SKILL.md\`):
 
 \`\`\`yaml
 ---
@@ -282,19 +175,9 @@ description: <what the skill does and when to use it>
 <Instructions for agent>
 \`\`\`
 
-Both the user (\`/<skill-name>\`) and agent can invoke skills by default. For workflows with side effects (e.g., \`/deploy\`, \`/fix-issue 123\`), add \`disable-model-invocation: true\` so only the user can trigger it, and use \`$ARGUMENTS\` to accept input.
+## Phase 6: Summary
 
-## Phase 8: Summary and next steps
-
-Recap what was set up — which files were written and the key points included in each. Remind the user these files are a starting point: they should review and tweak them, and can run \`/init\` again anytime to re-scan.
-
-Then tell the user that you'll be introducing a few more suggestions for optimizing their codebase and agent setup based on what you found. Present these as a single, well-formatted to-do list where every item is relevant to this repo. Put the most impactful items first.
-
-When building the list, work through these checks and include only what applies:
-- If frontend code was detected (React, Vue, Svelte, etc.): suggest setting up a skill for frontend design patterns.
-- If you found gaps in Phase 7 (missing GitHub CLI, missing linting) and the user said no: list them here with a one-line reason why each helps.
-- If tests are missing or sparse: suggest setting up a test framework so agent can verify its own changes.
-- You can create skills for repeatable workflows (e.g., verify changes, deploy, session reports). Use the built-in skill-creator skill to help create them: activate it with \`/skill-creator\`.`
+Recap what was set up and remind the user they can run /init again anytime to refine.`
 };
 
 skillRegistry.register(skillCreator);
