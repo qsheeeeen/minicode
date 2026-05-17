@@ -194,6 +194,25 @@ describe('Agent', () => {
     });
   });
 
+  describe('isRunning guard', () => {
+    it('rejects concurrent run() calls, returns false', async () => {
+      const stream = new MockStream();
+      mockChatStream.mockReturnValueOnce(stream);
+      const agent = new Agent();
+      const run1 = agent.run('First message');
+      const run2 = agent.run('Second message');
+      await expect(run2).resolves.toBe(false);
+      stream.resolveFinal({ usage: { input_tokens: 10, output_tokens: 20 }, stop_reason: 'end_turn' });
+      await run1;
+      // After completion, new runs should work
+      const stream2 = new MockStream();
+      mockChatStream.mockReturnValueOnce(stream2);
+      const run3 = agent.run('Third message');
+      stream2.resolveFinal({ usage: { input_tokens: 10, output_tokens: 20 }, stop_reason: 'end_turn' });
+      await expect(run3).resolves.toBe(true);
+    });
+  });
+
   describe('abort', () => {
     it('aborts the current run', async () => {
       const stream = new MockStream();
