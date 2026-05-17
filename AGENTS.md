@@ -166,10 +166,3 @@ Then add to the `registerTools()` call in `src/tools/index.ts`.
 
 - Read the code to understand the structure. Allow large refactors to implement the best solution from scratch.
 - When adding or modifying config options, always update `config.example.json` with the corresponding example.
-- When using `@anthropic-ai/sdk` see API docs: https://platform.claude.com/docs/en/api/messages
-
-## Current Unstaged Changes
-
-The following files have unstaged modifications — check before committing:
-- `src/tools/ask_user.ts` — may contain active work
-- `src/tools/ask_user.test.ts` — corresponding test updates
