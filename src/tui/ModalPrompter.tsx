@@ -3,11 +3,23 @@ import { Box, Text } from 'ink';
 import { Select, MultiSelect } from '@inkjs/ui';
 import { useTuiState, useTuiDispatch } from './store.js';
 
+function alignOptions(options: Array<{ label: string; value: string; description?: string }>): Array<{ label: string; value: string }> {
+  const maxLen = Math.max(...options.map(o => o.label.length));
+  return options.map(o => ({
+    label: o.description
+      ? `${o.label.padEnd(maxLen)}  ${o.description}`
+      : o.label,
+    value: o.value,
+  }));
+}
+
 export function ModalPrompter() {
   const { pendingPrompt } = useTuiState();
   const dispatch = useTuiDispatch();
 
   if (!pendingPrompt) return null;
+
+  const aligned = alignOptions(pendingPrompt.options);
 
   return (
     <Box flexDirection="column">
@@ -21,10 +33,7 @@ export function ModalPrompter() {
         {pendingPrompt.multiSelect ? (
           <Box flexDirection="column">
             <MultiSelect
-              options={pendingPrompt.options.map(o => ({
-                label: o.description ? `${o.label} — ${o.description}` : o.label,
-                value: o.value,
-              }))}
+              options={aligned}
               onSubmit={(values) => {
                 pendingPrompt.resolve(values.join(', '));
                 dispatch({ type: 'SET_PENDING_PROMPT', payload: null });
@@ -35,10 +44,7 @@ export function ModalPrompter() {
         ) : (
           <Box flexDirection="column">
             <Select
-              options={pendingPrompt.options.map(o => ({
-                label: o.description ? `${o.label} — ${o.description}` : o.label,
-                value: o.value,
-              }))}
+              options={aligned}
               onChange={(value) => {
                 pendingPrompt.resolve(value);
                 dispatch({ type: 'SET_PENDING_PROMPT', payload: null });
