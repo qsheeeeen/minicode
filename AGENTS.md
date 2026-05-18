@@ -2,23 +2,43 @@
 
 ## Project Structure
 
-- Project skills: `.claude/skills/` (agentSkills.io format: directory with `SKILL.md`)
-- Slash commands: `src/commands/index.ts` — `handler` type for system commands, `prompt` type injects text into conversation
+Slash commands: `src/commands/index.ts` — `handler` type for system commands, `prompt` type injects text into conversation
+
+Builtin slash commands:
+- `/exit` — Exit the application
+- `/clear` — Clear all history and start a new session
+- `/compress` — Compress conversation history
+- `/effort` — Set thinking effort (low|medium|high|xhigh|max)
+- `/new [name]` — Create a new session (with optional name)
+- `/rename <name>` — Rename current session
+- `/resume [name]` — Load a session (without args: list sessions)
+- `/plan` — Turn discussion into an executable plan (prompt type)
+- `/test` — Run a smoke test of available tools (prompt type)
+- `/skills` — List available skills
+- `/model` — Switch model/provider via UI
 - Plans: auto-generated to `.claude/plans/` after `/plan` command
+- Project skills: `config.skillsDir` (default: `.minicode/skills`) — agentSkills.io format (directory with `SKILL.md`)
+
+Builtin skills (registered in `src/skills/index.ts`):
+- `/init` — Set up AGENTS.md and project skills
+- `/skill-creator` — Guide for creating effective skills
 
 ## Build & Run Commands
 
 ```bash
-npm run dev           # Run in dev mode via tsx (no build needed)
+npm run dev           # Development mode via tsx (no build needed, hot reload)
 npm run build         # Compile TypeScript to dist/
-npm run start         # Run compiled version from dist/
+npm start             # Run compiled version from dist/ (node, not tsx)
 ```
+
+**tsx dev mode gotcha:** Uses tsx for fast dev with ESM, but behaves slightly differently than compiled Node.js. Some native modules or CJS interop may differ.
 
 ## Testing
 
 ```bash
 npm test          # Run Vitest in watch mode
 npm run test:run  # Run tests once
+npm run test:run -- --coverage  # With coverage
 ```
 
 Test files are co-located with source: `src/**/*.test.ts`.
@@ -57,7 +77,7 @@ Model priority: CLI `--model` > `MODEL` env var > config `model` field.
 }
 ```
 
-When adding or modifying config options, always update `config.example.json`.
+When adding or modifying config options, always update `config.example.json` (at project root, in sync with `src/config.ts`).
 
 ## Architecture
 
@@ -72,7 +92,12 @@ src/
 ├── config.ts                # Multi-provider config loader
 ├── tui/
 │   ├── Message.tsx          # Message display component by role
-│   ├── inputs.tsx           # Input component variants
+│   ├── MessageList.tsx      # Scrollable message list
+│   ├── Header.tsx           # App header with model/session info
+│   ├── StatusBar.tsx        # Bottom status bar with token usage
+│   ├── ModalPrompter.tsx    # Modal input prompts
+│   ├── InputArea.tsx        # Main input area with mode switching
+│   ├── inputs.tsx           # Input component variants (modal, inline, password)
 │   └── tool-display.tsx     # Tool call/result rendering
 ├── commands/
 │   └── index.ts             # CommandRegistry class + builtin slash commands
