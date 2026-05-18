@@ -3,35 +3,35 @@ import { TokenManager } from './token-manager.js';
 
 describe('TokenManager', () => {
   describe('addTokens', () => {
-    it('calculates total as input only when no cache tokens', () => {
+    it('sums input and output when no cache tokens', () => {
       const tm = new TokenManager();
       tm.addTokens(1000, 200);
-      expect(tm.getTotal()).toBe(1000);
+      expect(tm.getTotal()).toBe(1200);
     });
 
     it('includes cacheCreation tokens', () => {
       const tm = new TokenManager();
       tm.addTokens(1000, 200, 500);
-      expect(tm.getTotal()).toBe(1500);
+      expect(tm.getTotal()).toBe(1700);
     });
 
     it('includes cacheRead tokens', () => {
       const tm = new TokenManager();
       tm.addTokens(1000, 200, 0, 300);
-      expect(tm.getTotal()).toBe(1300);
+      expect(tm.getTotal()).toBe(1500);
     });
 
     it('sums all token types', () => {
       const tm = new TokenManager();
       tm.addTokens(1000, 200, 500, 300);
-      expect(tm.getTotal()).toBe(1800);
+      expect(tm.getTotal()).toBe(2000);
     });
 
     it('overwrites previous total on each call', () => {
       const tm = new TokenManager();
       tm.addTokens(1000, 200);
       tm.addTokens(500, 100);
-      expect(tm.getTotal()).toBe(500);
+      expect(tm.getTotal()).toBe(600);
     });
   });
 

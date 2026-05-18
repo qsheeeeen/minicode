@@ -2,10 +2,11 @@ export class TokenManager {
   private totalTokens = 0;
   private lastShownThreshold = 0;
 
-  addTokens(input: number, _output: number, cacheCreation = 0, cacheRead = 0): void {
-    // input_tokens alone does NOT include cache tokens. The actual context size is:
-    // input_tokens + cache_creation_input_tokens + cache_read_input_tokens
-    this.totalTokens = input + cacheCreation + cacheRead;
+  addTokens(input: number, output: number, cacheCreation = 0, cacheRead = 0): void {
+    // input_tokens alone does NOT include cache tokens or output tokens.
+    // The actual context window usage is:
+    // input_tokens + output_tokens + cache_creation_input_tokens + cache_read_input_tokens
+    this.totalTokens = input + output + cacheCreation + cacheRead;
   }
 
   getTotal(): number {
