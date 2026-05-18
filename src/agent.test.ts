@@ -31,6 +31,7 @@ vi.mock('./tools/index.js', async (importOriginal) => {
         name: 'testTool',
         description: 'Test Tool',
         input_schema: { type: 'object', properties: {} },
+        requiresPermission: true,
         execute: vi.fn().mockResolvedValue({ output: 'success' }),
       });
     },
@@ -60,8 +61,15 @@ vi.mock('./services/compression-service.js', () => ({
 }));
 
 vi.mock('./services/permission.js', () => ({
-  PermissionService: vi.fn().mockImplementation(function() {
-    return { check: vi.fn().mockResolvedValue(true) };
+  PermissionService: vi.fn().mockImplementation(function(_opts?: any) {
+    let mode = 'manual';
+    return {
+      check: vi.fn().mockResolvedValue({ allowed: true }),
+      setMode: vi.fn().mockImplementation((m: string) => { mode = m; }),
+      getMode: vi.fn().mockImplementation(() => mode),
+      cycleMode: vi.fn(),
+      setPrompter: vi.fn(),
+    };
   }),
 }));
 
@@ -221,6 +229,80 @@ describe('Agent', () => {
       const runPromise = agent.run('Hello');
       agent.abort();
       await expect(runPromise).rejects.toThrow('Aborted');
+    });
+  });
+
+  describe('rejection', () => {
+    it('in manual mode, rejection stops the conversation', async () => {
+      const agent = new Agent();
+      agent.setPermissionMode('manual');
+
+      vi.mocked(agent.getPermissionService().check).mockResolvedValue({
+        allowed: false,
+        reason: 'User rejected',
+      });
+
+      const stream = new MockStream();
+      mockChatStream.mockReturnValueOnce(stream);
+
+      const runPromise = agent.run('do something');
+
+      stream.emit('contentBlock', { type: 'tool_use', id: 'call_1', name: 'testTool', input: {} });
+      stream.resolveFinal({ usage: { input_tokens: 10, output_tokens: 20 }, stop_reason: 'tool_use' });
+
+      await runPromise;
+
+      const turns = agent.getStore().getTurns();
+      expect(turns).toHaveLength(3);
+      const lastTurn = turns[2];
+      expect(lastTurn.role).toBe('user');
+      expect((lastTurn.content as any)[0].content).toBe('User rejected');
+
+      const statuses = agent.getStore().getStatuses();
+      expect(statuses.some(s => s.role === 'error' && s.content.includes('denied by user'))).toBe(true);
+    });
+
+    it('in auto mode, rejection continues the conversation', async () => {
+      const agent = new Agent();
+      agent.setPermissionMode('auto');
+
+      vi.mocked(agent.getPermissionService().check).mockResolvedValue({
+        allowed: false,
+        reason: 'too risky',
+      });
+
+      const stream1 = new MockStream();
+      const stream2 = new MockStream();
+
+      let callCount = 0;
+      mockChatStream.mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) return stream1;
+        if (callCount === 2) {
+          setImmediate(() => {
+            stream2.emit('text', 'I cannot do that because it is too risky.');
+            stream2.emit('contentBlock', { type: 'text', text: 'I cannot do that because it is too risky.' });
+            stream2.resolveFinal({ usage: { input_tokens: 5, output_tokens: 10 }, stop_reason: 'end_turn' });
+          });
+          return stream2;
+        }
+        return new MockStream();
+      });
+
+      const runPromise = agent.run('do something risky');
+
+      stream1.emit('contentBlock', { type: 'tool_use', id: 'call_1', name: 'testTool', input: {} });
+      stream1.resolveFinal({ usage: { input_tokens: 10, output_tokens: 20 }, stop_reason: 'tool_use' });
+
+      await runPromise;
+
+      const turns = agent.getStore().getTurns();
+      expect(turns).toHaveLength(4);
+      const toolResultTurn = turns[2];
+      expect((toolResultTurn.content as any)[0].content).toContain('Tool execution denied by auto-gate: too risky');
+
+      const finalTurn = turns[3];
+      expect(finalTurn.role).toBe('assistant');
     });
   });
 });
