@@ -407,6 +407,7 @@ func (a *Agent) executeTools(ctx context.Context, calls []toolCall) (denied bool
 	tc := ToolContext{
 		Config:         a.config,
 		CurrentAgentID: "1",
+		ParentRegistry: a.tools,
 	}
 
 	var results []ToolResultMsg

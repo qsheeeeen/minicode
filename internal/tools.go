@@ -20,9 +20,10 @@ func (e *ToolDeniedError) Unwrap() error { return ErrToolDenied }
 
 // ToolContext provides tools with access to shared services.
 type ToolContext struct {
-	Config         AgentConfig
-	PermissionSvc  PermissionChecker
-	CurrentAgentID string
+	Config          AgentConfig
+	PermissionSvc   PermissionChecker
+	CurrentAgentID  string
+	ParentRegistry  *ToolRegistry // for sub-agent delegation
 }
 
 // AgentConfig is the full agent configuration, shared between the agent and tools.
@@ -41,7 +42,7 @@ type AgentConfig struct {
 // PermissionChecker is the interface tools use to gate execution.
 type PermissionChecker interface {
 	Check(toolName, displayText string) (allowed bool, reason string)
-	Mode() string
+	Mode() PermissionMode
 }
 
 // ToolResult is the structured return value from a tool execution.
