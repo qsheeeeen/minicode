@@ -27,9 +27,11 @@ func main() {
 
 	// Parse flags
 	var (
-		modelOverride string
-		sessionName   string
-		resumeRecent  bool
+		modelOverride  string
+		sessionName    string
+		resumeRecent   bool
+		headlessExplicit bool
+		permissionMode string
 	)
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
@@ -45,6 +47,13 @@ func main() {
 			}
 		case "--resume":
 			resumeRecent = true
+		case "--headless", "-H":
+			headlessExplicit = true
+		case "--permission", "--perm":
+			if i+1 < len(args) {
+				permissionMode = args[i+1]
+				i++
+			}
 		}
 	}
 
@@ -144,8 +153,12 @@ func main() {
 		return handled, promptText, ""
 	})
 
-	// Permission service
-	permSvc := internal.NewPermissionService(internal.PermissionMode(resolved.PermissionMode))
+	// Permission service: CLI flag > config > default
+	permMode := internal.PermissionMode(resolved.PermissionMode)
+	if permissionMode != "" {
+		permMode = internal.PermissionMode(permissionMode)
+	}
+	permSvc := internal.NewPermissionService(permMode)
 	ag.SetPermissionSvc(permSvc)
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -172,6 +185,12 @@ func main() {
 			os.Exit(1)
 		}
 		return
+	}
+
+	// If --headless without prompt, use stdin
+	if headlessExplicit {
+		fmt.Fprintln(os.Stderr, "Error: --headless requires a prompt argument or piped input")
+		os.Exit(1)
 	}
 
 	// Interactive TUI mode
@@ -229,9 +248,9 @@ func getPrompt(args []string) string {
 		}
 		if len(a) > 0 && a[0] == '-' {
 			switch a {
-			case "--model", "-m", "--session", "-s":
+			case "--model", "-m", "--session", "-s", "--permission", "--perm":
 				i++ // skip value
-			case "--resume", "--version", "-v":
+			case "--resume", "--version", "-v", "--headless", "-H":
 				// flags without values
 			default:
 				// unknown flags — might be passed to the prompt

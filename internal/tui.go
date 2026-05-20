@@ -339,7 +339,9 @@ func (m *TUIModel) renderInput() string {
 
 func (m *TUIModel) renderStatusBar() string {
 	line1 := styleGreen.Render("Anthropic") + styleDim.Render(":") + m.modelName + styleDim.Render(" | "+m.session)
-	if m.streaming {
+	if m.err != nil {
+		line1 += styleDim.Render(" | ") + styleErrorMsg.Render("ERR: "+m.err.Error())
+	} else if m.streaming {
 		line1 += styleDim.Render(" | ") + styleMagenta.Render("streaming")
 	}
 

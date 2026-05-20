@@ -116,3 +116,29 @@ func (m *SessionManager) Rename(oldName, newName string) error {
 		filepath.Join(m.sessionsDir, newName+".json"),
 	)
 }
+
+// ProjectHash returns the md5 hash prefix identifying this project.
+func (m *SessionManager) ProjectHash() string {
+	return filepath.Base(m.sessionsDir)
+}
+
+// SessionsDir returns the full sessions directory path.
+func (m *SessionManager) SessionsDir() string {
+	return m.sessionsDir
+}
+
+// ListNames returns session names without loading their contents.
+func (m *SessionManager) ListNames() ([]string, error) {
+	_ = m.ensureDir()
+	entries, err := os.ReadDir(m.sessionsDir)
+	if err != nil {
+		return nil, nil
+	}
+	var names []string
+	for _, e := range entries {
+		if filepath.Ext(e.Name()) == ".json" {
+			names = append(names, e.Name()[:len(e.Name())-5])
+		}
+	}
+	return names, nil
+}

@@ -21,10 +21,19 @@ type Store struct {
 func NewStore() *Store { return &Store{} }
 
 // OnChange registers a callback for store mutations (single listener).
-func (s *Store) OnChange(cb ChangeCallback) {
+// Returns an unsubscribe function that removes the callback.
+func (s *Store) OnChange(cb ChangeCallback) func() {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.onChange = cb
+	s.mu.Unlock()
+	return func() {
+		s.mu.Lock()
+		if s.onChange != nil {
+			// Only clear if it's still the same callback
+			s.onChange = nil
+		}
+		s.mu.Unlock()
+	}
 }
 
 func (s *Store) notify() {

@@ -2,6 +2,7 @@ package internal
 
 import (
 	"context"
+	"fmt"
 	"os/exec"
 	"regexp"
 	"strings"
@@ -72,7 +73,8 @@ func (t *BashTool) Execute(ctx context.Context, args map[string]any, tc ToolCont
 					combined = stderr
 				}
 			}
-			return ToolResult{Output: combined}, nil
+			code := exitErr.ExitCode()
+			return ToolResult{Output: fmt.Sprintf("Exit code %d: %s", code, combined)}, nil
 		}
 		return ToolResult{Output: err.Error()}, nil
 	}
