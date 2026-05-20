@@ -5,7 +5,7 @@ import "testing"
 func TestStore_AddUserMessage(t *testing.T) {
 	s := NewStore()
 	s.AddUserMessage("hello", "")
-	turns := s.GetTurns()
+	turns := s.Turns()
 	if len(turns) != 1 {
 		t.Fatalf("expected 1 turn, got %d", len(turns))
 	}
@@ -17,7 +17,7 @@ func TestStore_AddUserMessage(t *testing.T) {
 func TestStore_AddUserMessageWithDisplay(t *testing.T) {
 	s := NewStore()
 	s.AddUserMessage("expanded prompt text", "user-facing text")
-	turns := s.GetTurns()
+	turns := s.Turns()
 	if turns[0].Display != "user-facing text" {
 		t.Errorf("expected display override, got %q", turns[0].Display)
 	}
@@ -48,7 +48,7 @@ func TestStore_AppendToAssistantTurn(t *testing.T) {
 	s.AppendToLastAssistantTurn(ContentBlock{Type: "text", Text: "first"})
 	s.AppendToLastAssistantTurn(ContentBlock{Type: "text", Text: "second"})
 
-	turns := s.GetTurns()
+	turns := s.Turns()
 	if len(turns) != 1 {
 		t.Fatalf("expected 1 turn, got %d", len(turns))
 	}
@@ -86,11 +86,11 @@ func TestStore_UpdateLastBlock(t *testing.T) {
 
 func TestStore_AddToolResults(t *testing.T) {
 	s := NewStore()
-	s.AddToolResults([]ToolResultMsg{
+	s.AddToolResults([]toolResultItem{
 		{ToolUseID: "call_1", Content: "result1"},
 		{ToolUseID: "call_2", Content: "result2"},
 	})
-	turns := s.GetTurns()
+	turns := s.Turns()
 	if len(turns) != 1 {
 		t.Fatalf("expected 1 turn, got %d", len(turns))
 	}
@@ -113,7 +113,7 @@ func TestStore_Clear(t *testing.T) {
 	s := NewStore()
 	s.AddUserMessage("hello", "")
 	s.Clear()
-	if len(s.GetTurns()) != 0 {
+	if len(s.Turns()) != 0 {
 		t.Error("expected empty turns after clear")
 	}
 }

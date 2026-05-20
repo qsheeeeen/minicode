@@ -36,8 +36,8 @@ func (s *Store) SetStreaming(v bool) {
 // IsStreaming returns whether the store is in streaming mode.
 func (s *Store) IsStreaming() bool { return s.streaming }
 
-// GetTurns returns all LLM-facing turns.
-func (s *Store) GetTurns() []MessageParam { return s.turns }
+// Turns returns all LLM-facing turns.
+func (s *Store) Turns() []MessageParam { return s.turns }
 
 // SetTurns replaces all turns (for session resume).
 func (s *Store) SetTurns(turns []MessageParam) { s.turns = turns; s.notify() }
@@ -124,14 +124,14 @@ func (s *Store) lastAssistantTurn() int {
 	return -1
 }
 
-// ToolResult represents a single tool execution result.
-type ToolResultMsg struct {
+// toolResultItem represents a single tool execution result.
+type toolResultItem struct {
 	ToolUseID string
 	Content   string
 }
 
 // AddToolResults appends a user turn containing tool_result blocks.
-func (s *Store) AddToolResults(results []ToolResultMsg) {
+func (s *Store) AddToolResults(results []toolResultItem) {
 	if len(results) == 0 {
 		return
 	}

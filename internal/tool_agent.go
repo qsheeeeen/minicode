@@ -59,7 +59,7 @@ func (t *AgentTool) Execute(ctx context.Context, args map[string]any, tc ToolCon
 	_ = ok
 
 	// Collect the sub-agent's response as the result
-	subTurns := subAgent.store.GetTurns()
+	subTurns := subAgent.store.Turns()
 	var output strings.Builder
 	for _, turn := range subTurns {
 		if turn.Role == "assistant" {

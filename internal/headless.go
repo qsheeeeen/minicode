@@ -18,7 +18,7 @@ func RunHeadless(ctx context.Context, ag *Agent, initialPrompt string) error {
 	printedResults := make(map[string]bool)
 
 	render := func(isFinal bool) {
-		turns := ag.store.GetTurns()
+		turns := ag.store.Turns()
 
 		for ti := printedTurns; ti < len(turns); ti++ {
 			turn := turns[ti]
@@ -43,7 +43,7 @@ func RunHeadless(ctx context.Context, ag *Agent, initialPrompt string) error {
 			case []any:
 				for _, raw := range c {
 					if m, ok := raw.(map[string]any); ok {
-						blocks = append(blocks, mapToCB(m))
+						blocks = append(blocks, contentBlockFromMap(m))
 					}
 				}
 			}

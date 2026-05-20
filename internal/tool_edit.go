@@ -57,12 +57,12 @@ func (t *EditTool) Execute(ctx context.Context, args map[string]any, tc ToolCont
 	return ToolResult{Output: fmt.Sprintf("Edited %s (%s)\n%s", filePath, diff.header, diff.body)}, nil
 }
 
-type diffRes struct {
+type diffResult struct {
 	header string
 	body   string
 }
 
-func diffLines(oldText, newText string) diffRes {
+func diffLines(oldText, newText string) diffResult {
 	oldLines := splitLines(oldText)
 	newLines := splitLines(newText)
 
@@ -99,7 +99,7 @@ func diffLines(oldText, newText string) diffRes {
 		}
 	}
 
-	return diffRes{
+	return diffResult{
 		header: fmt.Sprintf("-%d/+%d lines", removed, added),
 		body:   strings.Join(bodyLines, "\n"),
 	}

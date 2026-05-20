@@ -410,7 +410,7 @@ func (a *Agent) executeTools(ctx context.Context, calls []toolCall) (denied bool
 		ParentRegistry: a.tools,
 	}
 
-	var results []ToolResultMsg
+	var results []toolResultItem
 	for _, call := range calls {
 		args, _ := call.Block.Input.(map[string]any)
 		if args == nil {
@@ -421,17 +421,17 @@ func (a *Agent) executeTools(ctx context.Context, calls []toolCall) (denied bool
 		if execErr != nil {
 			var deniedErr *ToolDeniedError
 			if errors.As(execErr, &deniedErr) {
-				results = append(results, ToolResultMsg{ToolUseID: call.Block.ID, Content: deniedErr.Reason})
+				results = append(results, toolResultItem{ToolUseID: call.Block.ID, Content: deniedErr.Reason})
 				for _, remaining := range calls[len(results):] {
-					results = append(results, ToolResultMsg{ToolUseID: remaining.Block.ID, Content: deniedErr.Reason})
+					results = append(results, toolResultItem{ToolUseID: remaining.Block.ID, Content: deniedErr.Reason})
 				}
 				a.store.AddToolResults(results)
 				return true, nil
 			}
-			results = append(results, ToolResultMsg{ToolUseID: call.Block.ID, Content: fmt.Sprintf("Error: %s", execErr.Error())})
+			results = append(results, toolResultItem{ToolUseID: call.Block.ID, Content: fmt.Sprintf("Error: %s", execErr.Error())})
 			continue
 		}
-		results = append(results, ToolResultMsg{ToolUseID: call.Block.ID, Content: result.Output})
+		results = append(results, toolResultItem{ToolUseID: call.Block.ID, Content: result.Output})
 	}
 
 	a.store.AddToolResults(results)

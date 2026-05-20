@@ -242,7 +242,7 @@ func (c *Client) streamSSE(ctx context.Context, messages []MessageParam, tools [
 			}
 		case "content_block_start":
 			if cb, ok := raw["content_block"].(map[string]any); ok {
-				evt.Block = mapToCB(cb)
+				evt.Block = contentBlockFromMap(cb)
 			}
 		case "message_delta":
 			if u, ok := raw["usage"].(map[string]any); ok {
@@ -258,7 +258,7 @@ func (c *Client) streamSSE(ctx context.Context, messages []MessageParam, tools [
 	}
 }
 
-func mapToCB(m map[string]any) ContentBlock {
+func contentBlockFromMap(m map[string]any) ContentBlock {
 	cb := ContentBlock{}
 	if t, ok := m["type"].(string); ok {
 		cb.Type = t
