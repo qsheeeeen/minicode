@@ -76,12 +76,11 @@ func main() {
 		return
 	}
 
-	// Interactive mode (TUI in M4)
-	fmt.Printf("minicode [Go] — model: %s\n", ag.Model())
-	fmt.Println("(interactive TUI coming in M4)")
-
-	<-ctx.Done()
-	fmt.Println("\nGoodbye.")
+	// Interactive TUI mode
+	if err := internal.RunTUI(ag); err != nil {
+		fmt.Fprintf(os.Stderr, "TUI error: %s\n", err)
+		os.Exit(1)
+	}
 }
 
 func registerAllTools(ag *internal.Agent, cfg internal.AgentConfig) {
