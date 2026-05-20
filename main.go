@@ -125,7 +125,8 @@ func main() {
 	registerAllTools(ag, cfg, skills)
 
 	// Permission service
-	_ = internal.NewPermissionService(internal.PermissionMode(resolved.PermissionMode))
+	permSvc := internal.NewPermissionService(internal.PermissionMode(resolved.PermissionMode))
+	ag.SetPermissionSvc(permSvc)
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()

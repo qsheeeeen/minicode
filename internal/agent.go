@@ -37,6 +37,7 @@ type Agent struct {
 	tools     *ToolRegistry
 	session   *SessionManager
 	skills    *SkillRegistry
+	permSvc   PermissionChecker
 
 	sessionName string
 	logger      *slog.Logger
@@ -91,6 +92,15 @@ func (a *Agent) ToolRegistry() *ToolRegistry { return a.tools }
 
 // SetSkills sets the skill registry for tool context.
 func (a *Agent) SetSkills(skills *SkillRegistry) { a.skills = skills }
+
+// PermissionSvc returns the current permission service.
+func (a *Agent) PermissionSvc() PermissionChecker { return a.permSvc }
+
+// SetPermissionSvc sets the permission service.
+func (a *Agent) SetPermissionSvc(p PermissionChecker) { a.permSvc = p }
+
+// ContextLength returns the configured context length.
+func (a *Agent) ContextLength() int { return a.config.ContextLength }
 
 // SessionName returns the current session identifier.
 func (a *Agent) SessionName() string { return a.sessionName }
@@ -171,6 +181,9 @@ func (a *Agent) Run(ctx context.Context, userMessage string) (bool, error) {
 		a.isRunning = false
 		a.mu.Unlock()
 	}()
+
+	a.store.SetStreaming(true)
+	defer a.store.SetStreaming(false)
 
 	ctx, cancel := context.WithCancel(ctx)
 	a.mu.Lock()
@@ -275,6 +288,8 @@ type toolCall struct {
 }
 
 func (a *Agent) handleStream(ctx context.Context, toolDefs []LLMTool) (*LLMMessage, []toolCall, bool, error) {
+	a.store.StartAssistantTurn()
+
 	ch, err := a.client.ChatStream(ctx, a.store.ToLLMMessages(), toolDefs, ChatOptions{
 		Model:  a.config.Model,
 		System: a.systemPrompt,
@@ -403,6 +418,7 @@ func (a *Agent) executeTools(ctx context.Context, calls []toolCall) (denied bool
 
 	tc := ToolContext{
 		Config:         a.config,
+		PermissionSvc:  a.permSvc,
 		CurrentAgentID: "1",
 		ParentRegistry: a.tools,
 		Skills:         a.skills,

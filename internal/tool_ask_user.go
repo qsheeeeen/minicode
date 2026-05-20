@@ -9,16 +9,10 @@ import (
 // AskUserTool asks the user a question with predefined options.
 type AskUserTool struct {
 	promptFn func(question string, options []AskOption, multiSelect bool) string
-}
+	}
 
-// AskOption is a single option presented to the user.
-type AskOption struct {
-	Label       string `json:"label"`
-	Description string `json:"description"`
-}
-
-// NewAskUserTool creates an AskUserTool.
-func NewAskUserTool(promptFn func(question string, options []AskOption, multiSelect bool) string) *AskUserTool {
+	// NewAskUserTool creates an AskUserTool.
+	func NewAskUserTool(promptFn func(question string, options []AskOption, multiSelect bool) string) *AskUserTool {
 	return &AskUserTool{promptFn: promptFn}
 }
 

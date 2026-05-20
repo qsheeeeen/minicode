@@ -18,6 +18,12 @@ type ToolDeniedError struct {
 func (e *ToolDeniedError) Error() string { return "tool denied: " + e.ToolName + " (" + e.Reason + ")" }
 func (e *ToolDeniedError) Unwrap() error { return ErrToolDenied }
 
+// AskOption is a single option presented to the user.
+type AskOption struct {
+	Label       string
+	Description string
+}
+
 // ToolContext provides tools with access to shared services.
 type ToolContext struct {
 	Config          AgentConfig
@@ -46,6 +52,7 @@ type AgentConfig struct {
 type PermissionChecker interface {
 	Check(toolName, displayText string) (allowed bool, reason string)
 	Mode() PermissionMode
+	CycleMode() PermissionMode
 }
 
 // ToolResult is the structured return value from a tool execution.
