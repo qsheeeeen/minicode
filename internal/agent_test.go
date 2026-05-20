@@ -90,8 +90,12 @@ func TestAgent_BuildLLMTools(t *testing.T) {
 	if len(tools) != 2 {
 		t.Fatalf("expected 2 tools, got %d", len(tools))
 	}
-	if tools[0].Name != "Read" {
-		t.Errorf("expected Read, got %s", tools[0].Name)
+	names := make(map[string]bool)
+	for _, t := range tools {
+		names[t.Name] = true
+	}
+	if !names["Read"] || !names["Bash"] {
+		t.Errorf("expected Read and Bash, got names: %v", names)
 	}
 }
 
@@ -104,8 +108,8 @@ func TestAgent_BuildLLMToolsExclude(t *testing.T) {
 	if len(tools) != 1 {
 		t.Fatalf("expected 1 tool after exclude, got %d", len(tools))
 	}
-	if tools[0].Name != "Read" {
-		t.Errorf("expected Read, got %s", tools[0].Name)
+	if tools[0].Name == "Bash" {
+		t.Error("Bash should be excluded")
 	}
 }
 

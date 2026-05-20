@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -74,6 +75,7 @@ func NewTUIModel(ag *Agent, registry *AgentRegistry) *TUIModel {
 	ta.Placeholder = "Type your message... (Ctrl+O: switch agent, Ctrl+C: quit)"
 	ta.ShowLineNumbers = false
 	ta.SetHeight(3)
+	ta.Focus()
 
 	vp := viewport.New(80, 20)
 
@@ -102,7 +104,7 @@ func NewTUIModel(ag *Agent, registry *AgentRegistry) *TUIModel {
 
 // Init is the Bubble Tea Init function.
 func (m *TUIModel) Init() tea.Cmd {
-	return tea.Batch(textarea.Blink, m.waitForAgent)
+	return textarea.Blink
 }
 
 // Update is the Bubble Tea Update function.
@@ -136,7 +138,7 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					// handled via agentDoneMsg
 				}
 			}()
-			return m, m.waitForAgent
+			return m, m.pollAgent()
 
 		case tea.KeyCtrlO:
 			// Multi-agent switching: cycle through registered agents
@@ -166,7 +168,7 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.messages = msg.messages
 		m.viewport.SetContent(m.renderMessages())
 		m.viewport.GotoBottom()
-		return m, m.waitForAgent
+		return m, m.pollAgent()
 
 	case agentDoneMsg:
 		m.streaming = false
@@ -298,10 +300,11 @@ func (m *TUIModel) renderMessages() string {
 	return strings.Join(lines, "\n") + "\n"
 }
 
-func (m *TUIModel) waitForAgent() tea.Msg {
-	// Poll for new messages while agent is running
-	msgs := m.agent.Store().ToDisplayMessages()
-	return agentStreamMsg{messages: msgs}
+func (m *TUIModel) pollAgent() tea.Cmd {
+	return tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg {
+		msgs := m.agent.Store().ToDisplayMessages()
+		return agentStreamMsg{messages: msgs}
+	})
 }
 
 // ---- Helpers ----
