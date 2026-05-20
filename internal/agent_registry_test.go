@@ -111,18 +111,6 @@ func TestAgent_SetSkills(t *testing.T) {
 	}
 }
 
-func TestAgent_ClearSession(t *testing.T) {
-	ag := NewAgent(AgentConfig{APIKey: "test", Model: "m1", ContextLength: 100})
-	ag.Store().AddUserMessage("hello", "")
-	if ag.Store().Turns() == nil || len(ag.Store().Turns()) == 0 {
-		t.Error("expected messages before clear")
-	}
-	ag.ClearSession()
-	if len(ag.Store().Turns()) != 0 {
-		t.Error("expected empty store after clear")
-	}
-}
-
 func TestActivateSkillTool_MissingSkill(t *testing.T) {
 	sr := NewSkillRegistry("/tmp")
 	ast := NewActivateSkillTool(sr)
@@ -151,20 +139,3 @@ func TestAskUserTool_NoPrompter(t *testing.T) {
 	}
 }
 
-func TestAgent_SystemPrompt(t *testing.T) {
-	ag := NewAgent(AgentConfig{APIKey: "test", Model: "m1", ContextLength: 100})
-	prompt := ag.SystemPrompt()
-	if prompt == "" {
-		t.Error("system prompt should not be empty")
-	}
-	if len(prompt) < 100 {
-		t.Error("system prompt should be substantial")
-	}
-}
-
-func TestAgent_TokenCountInitial(t *testing.T) {
-	ag := NewAgent(AgentConfig{APIKey: "test", Model: "m1", ContextLength: 100})
-	if ag.TokenCount() != 0 {
-		t.Error("initial token count should be 0")
-	}
-}

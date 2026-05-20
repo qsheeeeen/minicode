@@ -1,57 +1,119 @@
 package internal
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
-func TestPermissionService_ManualMode(t *testing.T) {
-	ps := NewPermissionService(PermManual)
-	allowed, reason := ps.Check("Write", "Write /tmp/test.txt")
-	if allowed {
-		t.Error("manual mode without promptFn should deny")
-	}
-	if reason == "" {
-		t.Error("expected a reason for denial")
+func TestPermissionService_GetMode(t *testing.T) {
+	ps := NewPermissionService(PermYolo)
+	if ps.Mode() != PermYolo {
+		t.Errorf("expected yolo, got %s", ps.Mode())
 	}
 }
 
-func TestPermissionService_YoloMode(t *testing.T) {
+func TestPermissionService_SetMode(t *testing.T) {
+	ps := NewPermissionService(PermManual)
+	ps.SetMode(PermAuto)
+	if ps.Mode() != PermAuto {
+		t.Errorf("expected auto, got %s", ps.Mode())
+	}
+}
+
+func TestPermissionService_CycleManualToYolo(t *testing.T) {
+	ps := NewPermissionService(PermManual)
+	if ps.CycleMode() != PermYolo {
+		t.Error("expected yolo after cycle from manual")
+	}
+}
+
+func TestPermissionService_CycleYoloToAuto(t *testing.T) {
+	ps := NewPermissionService(PermYolo)
+	if ps.CycleMode() != PermAuto {
+		t.Error("expected auto after cycle from yolo")
+	}
+}
+
+func TestPermissionService_CycleAutoToManual(t *testing.T) {
+	ps := NewPermissionService(PermAuto)
+	if ps.CycleMode() != PermManual {
+		t.Error("expected manual after cycle from auto")
+	}
+}
+
+func TestPermissionService_CycleThroughAll(t *testing.T) {
+	ps := NewPermissionService(PermManual)
+	ps.CycleMode()
+	ps.CycleMode()
+	if ps.CycleMode() != PermManual {
+		t.Error("expected manual after full cycle")
+	}
+}
+
+func TestPermissionService_YoloAlwaysAllowed(t *testing.T) {
 	ps := NewPermissionService(PermYolo)
 	allowed, _ := ps.Check("Write", "Write /tmp/test.txt")
 	if !allowed {
-		t.Error("yolo mode should allow all")
+		t.Error("yolo should allow all")
+	}
+	// Even dangerous commands
+	allowed2, _ := ps.Check("Bash", "rm -rf /")
+	if !allowed2 {
+		t.Error("yolo should allow even dangerous commands")
 	}
 }
 
-func TestPermissionService_CycleMode(t *testing.T) {
-	ps := NewPermissionService(PermManual)
-	if ps.Mode() != PermManual {
-		t.Error("expected manual")
-	}
-	ps.CycleMode()
-	if ps.Mode() != PermYolo {
-		t.Error("expected yolo after cycle")
-	}
-	ps.CycleMode()
-	if ps.Mode() != PermAuto {
-		t.Error("expected auto after 2 cycles")
-	}
-	ps.CycleMode()
-	if ps.Mode() != PermManual {
-		t.Error("expected manual after 3 cycles")
-	}
-}
-
-func TestPermissionService_ManualWithPrompt(t *testing.T) {
+func TestPermissionService_ManualWithPromptYes(t *testing.T) {
 	ps := NewPermissionService(PermManual)
 	ps.SetPromptFn(func(displayText string) string {
 		return "yes"
 	})
 	allowed, _ := ps.Check("Write", "Write /tmp/test.txt")
 	if !allowed {
-		t.Error("manual mode with 'yes' prompt should allow")
+		t.Error("manual with 'yes' should allow")
 	}
 }
 
-func TestPermissionService_ManualWithYoloPrompt(t *testing.T) {
+func TestPermissionService_ManualWithoutPrompter(t *testing.T) {
+	ps := NewPermissionService(PermManual)
+	allowed, reason := ps.Check("Write", "Write /tmp/test.txt")
+	if allowed {
+		t.Error("manual without prompter should deny")
+	}
+	if reason == "" {
+		t.Error("should have reason")
+	}
+}
+
+func TestPermissionService_ManualPromptReturnsNo(t *testing.T) {
+	ps := NewPermissionService(PermManual)
+	ps.SetPromptFn(func(displayText string) string {
+		return "no"
+	})
+	allowed, reason := ps.Check("Write", "Write /tmp/test.txt")
+	if allowed {
+		t.Error("'no' should deny")
+	}
+	if reason != "User rejected" {
+		t.Errorf("expected 'User rejected', got %q", reason)
+	}
+}
+
+func TestPermissionService_ManualPromptReturnsEmpty(t *testing.T) {
+	ps := NewPermissionService(PermManual)
+	ps.SetPromptFn(func(displayText string) string {
+		return ""
+	})
+	allowed, reason := ps.Check("Write", "Write /tmp/test.txt")
+	if allowed {
+		t.Error("empty/cancel should deny")
+	}
+	if reason != "User cancelled" {
+		t.Errorf("expected 'User cancelled', got %q", reason)
+	}
+}
+
+func TestPermissionService_ManualPromptYoloSwitchesMode(t *testing.T) {
 	ps := NewPermissionService(PermManual)
 	ps.SetPromptFn(func(displayText string) string {
 		return "yolo"
@@ -62,16 +124,58 @@ func TestPermissionService_ManualWithYoloPrompt(t *testing.T) {
 	}
 }
 
-func TestPermissionService_ManualWithDeny(t *testing.T) {
+func TestPermissionService_AutoModeAllowRead(t *testing.T) {
+	ps := NewPermissionService(PermAuto)
+	allowed, _ := ps.Check("Read", "Read file.txt")
+	if !allowed {
+		t.Error("auto mode should allow Read tool")
+	}
+}
+
+func TestPermissionService_AutoModeDenyWrite(t *testing.T) {
+	ps := NewPermissionService(PermAuto)
+	allowed, reason := ps.Check("Write", "Write file.txt")
+	if allowed {
+		t.Error("auto mode should deny Write (not in allowlist)")
+	}
+	if reason == "" {
+		t.Error("denial should have reason")
+	}
+}
+
+func TestPermissionService_AutoModeDenyBash(t *testing.T) {
+	ps := NewPermissionService(PermAuto)
+	// Bash is in isReadTool allowlist
+	allowed, _ := ps.Check("Bash", "echo hello")
+	if !allowed {
+		t.Error("Bash should be allowed in auto mode (in isReadTool)")
+	}
+}
+
+func TestPermissionService_AutoModeDenyEdit(t *testing.T) {
+	ps := NewPermissionService(PermAuto)
+	allowed, _ := ps.Check("Edit", "Edit file.txt")
+	if allowed {
+		t.Error("Edit should not be in isReadTool")
+	}
+}
+
+func TestPermissionService_InterfaceCheck(t *testing.T) {
+	var ps PermissionChecker = NewPermissionService(PermManual)
+	if ps == nil {
+		t.Error("PermissionService should implement PermissionChecker")
+	}
+}
+
+func TestPermissionService_DisplayTextPassed(t *testing.T) {
+	var receivedText string
 	ps := NewPermissionService(PermManual)
 	ps.SetPromptFn(func(displayText string) string {
-		return "no"
+		receivedText = displayText
+		return "yes"
 	})
-	allowed, reason := ps.Check("Write", "Write /tmp/test.txt")
-	if allowed {
-		t.Error("'no' answer should deny")
-	}
-	if reason != "User rejected" {
-		t.Errorf("unexpected reason: %s", reason)
+	ps.Check("Bash", "echo 'hello world'")
+	if !strings.Contains(receivedText, "echo") {
+		t.Errorf("display text not passed to prompter: %q", receivedText)
 	}
 }

@@ -40,8 +40,7 @@ type Agent struct {
 
 	sessionName string
 	logger      *slog.Logger
-	totalTokens int
-	threshold   int
+	tokenMgr    *TokenManager
 
 	mu            sync.Mutex
 	cancelFunc    context.CancelFunc
@@ -68,6 +67,7 @@ func NewAgent(cfg AgentConfig) *Agent {
 		store:       NewStore(),
 		tools:       NewToolRegistry(),
 		session:     NewSessionManager(),
+		tokenMgr:    NewTokenManager(),
 		logger:      slog.New(slog.NewTextHandler(os.Stderr, nil)),
 		sessionName: fmt.Sprintf("session-%d", time.Now().UnixMilli()),
 	}
@@ -100,9 +100,7 @@ func (a *Agent) Model() string { return a.config.Model }
 
 // TokenCount returns the current total token count.
 func (a *Agent) TokenCount() int {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return a.totalTokens
+	return a.tokenMgr.Total()
 }
 
 // SetSession sets the session name.
@@ -154,7 +152,7 @@ func (a *Agent) saveSession() {
 	_ = a.session.Save(a.sessionName, &SessionData{
 		Model:       a.config.Model,
 		Messages:    toAnySlice(a.store.ToLLMMessages()),
-		TotalTokens: a.TokenCount(),
+		TotalTokens: a.tokenMgr.Total(),
 	})
 }
 
@@ -233,10 +231,7 @@ func (a *Agent) Abort() {
 // ClearSession resets the conversation.
 func (a *Agent) ClearSession() {
 	a.store.Clear()
-	a.mu.Lock()
-	a.totalTokens = 0
-	a.threshold = 0
-	a.mu.Unlock()
+	a.tokenMgr.Reset()
 	if a.onTokenUpdate != nil {
 		a.onTokenUpdate(0)
 	}
@@ -264,12 +259,10 @@ func (a *Agent) LoadSession(name string) error {
 		}
 	}
 	a.store.SetTurns(turns)
-	a.mu.Lock()
-	a.totalTokens = data.TotalTokens
-	a.threshold = 0
-	a.mu.Unlock()
+	a.tokenMgr.Reset()
+	a.tokenMgr.Add(data.TotalTokens, 0, 0, 0)
 	if a.onTokenUpdate != nil {
-		a.onTokenUpdate(data.TotalTokens)
+		a.onTokenUpdate(a.tokenMgr.Total())
 	}
 	return nil
 }
@@ -445,26 +438,21 @@ func (a *Agent) executeTools(ctx context.Context, calls []toolCall) (denied bool
 }
 
 func (a *Agent) processTokenUsage(usage *LLMUsage) {
-	a.mu.Lock()
-	input := usage.InputTokens + usage.CacheCreationInputTokens + usage.CacheReadInputTokens
-	a.totalTokens += input + usage.OutputTokens
-	total := a.totalTokens
-	lastThreshold := a.threshold
-	a.mu.Unlock()
+	a.tokenMgr.Add(usage.InputTokens, usage.OutputTokens, usage.CacheCreationInputTokens, usage.CacheReadInputTokens)
+	total := a.tokenMgr.Total()
+	lastThreshold := a.tokenMgr.LastShownThreshold()
 
 	if a.onTokenUpdate != nil {
 		a.onTokenUpdate(total)
 	}
 
-	ratio := float64(total) / float64(a.config.ContextLength)
+	ratio := a.tokenMgr.Ratio(a.config.ContextLength)
 	pct := int(ratio * 100)
 
 	for _, t := range []int{25, 50, 75, 90} {
 		if pct >= t && lastThreshold < t {
 			a.store.AddStatus(RoleStatus, fmt.Sprintf("[%d%% context]", pct))
-			a.mu.Lock()
-			a.threshold = t
-			a.mu.Unlock()
+			a.tokenMgr.SetLastShownThreshold(t)
 			break
 		}
 	}
