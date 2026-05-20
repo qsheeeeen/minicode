@@ -39,8 +39,9 @@ type LLMMessage struct {
 
 // StreamEvent represents a parsed SSE event from the streaming endpoint.
 type StreamEvent struct {
-	Type  string       // "thinking", "text", "content_block_start", "content_block_stop", "message_delta"
-	Delta string       // for thinking/text deltas
+	Type  string       // "thinking", "text", "input_json_delta", "content_block_start", "content_block_stop", "message_delta"
+	Index int          // block index (for input_json_delta and content_block events)
+	Delta string       // for thinking/text/input_json deltas
 	Block ContentBlock // for content_block_start
 	Usage *LLMUsage    // for message_delta
 	Error error
@@ -218,6 +219,9 @@ func (c *Client) streamSSE(ctx context.Context, messages []MessageParam, tools [
 
 		evtType, _ := raw["type"].(string)
 		evt := StreamEvent{Type: evtType}
+		if idx, ok := raw["index"].(float64); ok {
+			evt.Index = int(idx)
+		}
 
 		switch evtType {
 		case "content_block_delta":
@@ -230,6 +234,9 @@ func (c *Client) streamSSE(ctx context.Context, messages []MessageParam, tools [
 					case "text_delta":
 						evt.Type = "text"
 						evt.Delta, _ = delta["text"].(string)
+					case "input_json_delta":
+						evt.Type = "input_json_delta"
+						evt.Delta, _ = delta["partial_json"].(string)
 					}
 				}
 			}

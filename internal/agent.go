@@ -2,11 +2,13 @@ package internal
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"os"
 	"os/exec"
+	"strings"
 	"sync"
 	"time"
 )
@@ -288,6 +290,14 @@ func (a *Agent) handleStream(ctx context.Context, toolDefs []LLMTool) (*LLMMessa
 	var hasToolCalls bool
 	var totalUsage *LLMUsage
 
+	// Track tool_use blocks by index for input JSON accumulation
+	type pendingTool struct {
+		block  ContentBlock
+		tool   Tool
+		jsonBuf strings.Builder
+	}
+	pendingTools := make(map[int]*pendingTool)
+
 	for evt := range ch {
 		if evt.Error != nil {
 			return nil, nil, false, evt.Error
@@ -312,20 +322,49 @@ func (a *Agent) handleStream(ctx context.Context, toolDefs []LLMTool) (*LLMMessa
 			switch evt.Block.Type {
 			case "tool_use":
 				hasToolCalls = true
-				block := ContentBlock{
-					Type:  "tool_use",
-					ID:    evt.Block.ID,
-					Name:  evt.Block.Name,
-					Input: evt.Block.Input,
-				}
-				a.store.AppendToLastAssistantTurn(block)
 				if t, ok := a.tools.Get(evt.Block.Name); ok {
-					toolCalls = append(toolCalls, toolCall{Block: evt.Block, Tool: t})
+					pt := &pendingTool{
+						block: ContentBlock{
+							Type: "tool_use",
+							ID:   evt.Block.ID,
+							Name: evt.Block.Name,
+						},
+						tool: t,
+					}
+					pendingTools[evt.Index] = pt
+					toolCalls = append(toolCalls, toolCall{Block: pt.block, Tool: t})
 				}
 			case "text":
 				a.store.AppendToLastAssistantTurn(ContentBlock{Type: "text", Text: evt.Block.Text})
 			case "thinking":
 				a.store.AppendToLastAssistantTurn(ContentBlock{Type: "thinking", Thinking: evt.Block.Thinking})
+			}
+		case "input_json_delta":
+			if pt, ok := pendingTools[evt.Index]; ok {
+				pt.jsonBuf.WriteString(evt.Delta)
+			}
+		case "content_block_stop":
+			if pt, ok := pendingTools[evt.Index]; ok {
+				// Parse accumulated JSON as input
+				if pt.jsonBuf.Len() > 0 {
+					var input map[string]any
+					if err := json.Unmarshal([]byte(pt.jsonBuf.String()), &input); err == nil {
+						pt.block.Input = input
+					}
+				}
+				if pt.block.Input == nil {
+					pt.block.Input = map[string]any{}
+				}
+				// Update the toolCall with the completed block
+				for i := range toolCalls {
+					if toolCalls[i].Block.ID == pt.block.ID {
+						toolCalls[i].Block = pt.block
+						break
+					}
+				}
+				// Append to store
+				a.store.AppendToLastAssistantTurn(pt.block)
+				delete(pendingTools, evt.Index)
 			}
 		case "message_delta":
 			if evt.Usage != nil {
