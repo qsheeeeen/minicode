@@ -52,6 +52,9 @@ type Agent struct {
 	onTokenUpdate  func(total int)
 	onStatusUpdate func(role, content string)
 
+	// Command resolver (slash commands like /plan, /clear)
+	resolveCommand func(input string) (handled bool, promptText string, displayContent string)
+
 	environmentContext string
 	systemPrompt       string
 }
@@ -91,7 +94,12 @@ func (a *Agent) Store() *Store { return a.store }
 func (a *Agent) ToolRegistry() *ToolRegistry { return a.tools }
 
 // SetSkills sets the skill registry for tool context.
-func (a *Agent) SetSkills(skills *SkillRegistry) { a.skills = skills }
+func (a *Agent) SetSkills(skills *SkillRegistry) { a.skills = skills; a.refreshSystemPrompt() }
+
+// SetCommandResolver sets the slash command resolver.
+func (a *Agent) SetCommandResolver(fn func(input string) (handled bool, promptText string, displayContent string)) {
+	a.resolveCommand = fn
+}
 
 // PermissionSvc returns the current permission service.
 func (a *Agent) PermissionSvc() PermissionChecker { return a.permSvc }
@@ -150,8 +158,22 @@ func (a *Agent) refreshSystemPrompt() {
 		prompt += "\n\n# Additional Instructions\n" + a.config.UserPrompt
 	}
 	if a.config.ProjectPromptFile != "" {
-		prompt += fmt.Sprintf("\n\n# Workspace Information\nThis workspace's description is in `%s`.", a.config.ProjectPromptFile)
+		prompt += fmt.Sprintf("\n\n# Workspace Information\nThis workspace's description is in `%s`. Use the Read tool to load it at the start of each conversation. It contains critical project instructions that you must follow.", a.config.ProjectPromptFile)
 	}
+
+	// Inject available skills
+	if a.skills != nil {
+		available := a.skills.List()
+		if len(available) > 0 {
+			prompt += "\n\n<available_skills>\n"
+			for _, sk := range available {
+				prompt += fmt.Sprintf("  <skill>\n    <name>%s</name>\n    <description>%s</description>\n  </skill>\n", sk.Name, sk.Description)
+			}
+			prompt += "</available_skills>\n"
+			prompt += "\nTo activate a skill and receive its detailed instructions, use the ActivateSkill tool with the skill's name.\n"
+		}
+	}
+
 	a.systemPrompt = prompt
 }
 
@@ -191,7 +213,23 @@ func (a *Agent) Run(ctx context.Context, userMessage, displayContent string) (bo
 	a.mu.Unlock()
 	defer cancel()
 
-	a.store.AddUserMessage(userMessage, displayContent)
+	// Resolve slash commands
+	llmText := userMessage
+	display := displayContent
+	if a.resolveCommand != nil {
+		handled, expanded, disp := a.resolveCommand(userMessage)
+		if handled {
+			if expanded != "" {
+				llmText = expanded
+				display = disp
+			} else {
+				// Handler command executed (e.g. /clear) — nothing to send to LLM
+				return false, nil
+			}
+		}
+	}
+
+	a.store.AddUserMessage(llmText, display)
 
 	for {
 		if err := ctx.Err(); err != nil {
@@ -218,6 +256,11 @@ func (a *Agent) Run(ctx context.Context, userMessage, displayContent string) (bo
 		if denied {
 			a.store.AddStatus(RoleError, "Tool execution was denied by user")
 			break
+		}
+
+		// Trigger compression if over threshold
+		if a.tokenMgr.ShouldCompress(a.config.ContextLength, a.config.CompressionThresholdRatio) {
+			go a.compress(ctx)
 		}
 
 		if hasTools {
@@ -472,6 +515,51 @@ func (a *Agent) processTokenUsage(usage *LLMUsage) {
 			break
 		}
 	}
+}
+
+func (a *Agent) compress(ctx context.Context) error {
+	a.mu.Lock()
+	if a.isCompressing {
+		a.mu.Unlock()
+		return nil
+	}
+	a.isCompressing = true
+	a.mu.Unlock()
+
+	defer func() {
+		a.mu.Lock()
+		a.isCompressing = false
+		a.mu.Unlock()
+	}()
+
+	turns := a.store.Turns()
+	const keepRecent = 10
+	if len(turns) <= keepRecent+2 {
+		a.store.AddStatus(RoleStatus, "(Not enough messages to compress)")
+		return nil
+	}
+
+	a.store.AddStatus(RoleStatus,
+		fmt.Sprintf("(Compressing %d messages, %d tokens...)", len(turns)-keepRecent, a.tokenMgr.Total()))
+
+	// Keep most recent turns intact; insert summary of older ones
+	recent := make([]MessageParam, keepRecent)
+	copy(recent, turns[len(turns)-keepRecent:])
+	summary := MessageParam{
+		Role:    "user",
+		Content: fmt.Sprintf("[Compressed %d earlier messages]", len(turns)-keepRecent),
+	}
+	compressed := []MessageParam{summary}
+	compressed = append(compressed, recent...)
+
+	a.store.Replace(compressed)
+	a.tokenMgr.Reset()
+
+	if a.onTokenUpdate != nil {
+		a.onTokenUpdate(0)
+	}
+	a.store.AddStatus(RoleStatus, fmt.Sprintf("(Compressed to %d turns)", len(compressed)))
+	return nil
 }
 
 func mustCwd() string {

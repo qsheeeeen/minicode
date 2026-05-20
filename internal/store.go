@@ -215,6 +215,15 @@ func (s *Store) AddStatus(role DisplayRole, content string) {
 	s.notify()
 }
 
+// Statuses returns a copy of the stored status messages.
+func (s *Store) Statuses() []StatusMessage {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	cpy := make([]StatusMessage, len(s.statuses))
+	copy(cpy, s.statuses)
+	return cpy
+}
+
 // ToDisplayMessages converts current state to render-ready DisplayMessages.
 func (s *Store) ToDisplayMessages() []DisplayMessage {
 	s.mu.RLock()

@@ -188,6 +188,17 @@ func RunHeadless(ctx context.Context, ag *Agent, initialPrompt, displayPrompt st
 				}
 			}
 		}
+
+		// Print any new status/error messages
+		printedStatus := make(map[int]bool)
+		for _, s := range ag.Store().Statuses() {
+			if !printedStatus[s.TurnIndex] {
+				printedStatus[s.TurnIndex] = true
+				if s.Role == RoleError {
+					fmt.Fprintf(os.Stderr, "[error] %s\n", s.Content)
+				}
+			}
+		}
 	}
 
 	ag.OnDisplayChange(func() { render(false) })

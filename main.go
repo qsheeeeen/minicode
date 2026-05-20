@@ -124,6 +124,17 @@ func main() {
 
 	registerAllTools(ag, cfg, skills)
 
+	// Wire command resolver into agent (for TUI slash command support)
+	ag.SetCommandResolver(func(input string) (handled bool, promptText string, displayContent string) {
+		cmdCtx := internal.CommandContext{
+			Agent:   ag,
+			ExitFn:  func() { os.Exit(0) },
+			ClearFn: ag.ClearSession,
+		}
+		handled, promptText = cmdReg.ParseAndExecute(input, cmdCtx)
+		return handled, promptText, ""
+	})
+
 	// Permission service
 	permSvc := internal.NewPermissionService(internal.PermissionMode(resolved.PermissionMode))
 	ag.SetPermissionSvc(permSvc)

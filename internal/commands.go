@@ -1,5 +1,10 @@
 package internal
 
+import (
+	"fmt"
+	"time"
+)
+
 // CommandKind distinguishes handler commands from prompt-expanding commands.
 type CommandKind string
 
@@ -22,10 +27,17 @@ type Command struct {
 
 // CommandContext provides commands with access to the application.
 type CommandContext struct {
-	Agent      *Agent
-	ClearFn    func()
-	SetModelFn func(modelSpec string)
-	ExitFn     func()
+	Agent         *Agent
+	ClearFn       func()
+	SetModelFn    func(modelSpec string)
+	ExitFn        func()
+	SetSessionFn  func(name string)
+	CompressFn    func()
+	SetEffortFn   func(effort string)
+	ListSkillsFn  func() []string
+	ListSessionsFn func() []SessionInfo
+	LoadSessionFn func(name string) error
+	RenameSessionFn func(oldName, newName string)
 }
 
 // CommandRegistry holds registered slash commands.
@@ -122,6 +134,74 @@ func RegisterBuiltinCommands(r *CommandRegistry) {
 	r.Register(&Command{Name: "test", Description: "Run a smoke test of available tools", Kind: CmdPrompt,
 		Prompt: func(args []string) string {
 			return "Run a quick smoke test: verify you can use Read, Write, Edit, and Bash tools. Report which ones work."
+		},
+	})
+	r.Register(&Command{Name: "compress", Description: "Compress conversation history", Kind: CmdHandler,
+		Handler: func(args []string, ctx CommandContext) bool {
+			if ctx.CompressFn != nil {
+				ctx.CompressFn()
+			}
+			return true
+		},
+	})
+	r.Register(&Command{Name: "effort", Description: "Set thinking effort (low|medium|high|xhigh|max)", Kind: CmdHandler,
+		Handler: func(args []string, ctx CommandContext) bool {
+			if len(args) > 0 && ctx.SetEffortFn != nil {
+				ctx.SetEffortFn(args[0])
+			}
+			return true
+		},
+	})
+	r.Register(&Command{Name: "new", Description: "Create a new session", Kind: CmdHandler,
+		Handler: func(args []string, ctx CommandContext) bool {
+			name := "session-" + fmt.Sprint(time.Now().UnixMilli())
+			if len(args) > 0 {
+				name = args[0]
+			}
+			if ctx.ClearFn != nil {
+				ctx.ClearFn()
+			}
+			if ctx.SetSessionFn != nil {
+				ctx.SetSessionFn(name)
+			}
+			return true
+		},
+	})
+	r.Register(&Command{Name: "rename", Description: "Rename current session", Kind: CmdHandler,
+		Handler: func(args []string, ctx CommandContext) bool {
+			if len(args) > 0 && ctx.RenameSessionFn != nil {
+				oldName := ctx.Agent.SessionName()
+				ctx.RenameSessionFn(oldName, args[0])
+				if ctx.SetSessionFn != nil {
+					ctx.SetSessionFn(args[0])
+				}
+			}
+			return true
+		},
+	})
+	r.Register(&Command{Name: "resume", Description: "Load a session (without args: list sessions)", Kind: CmdHandler,
+		Handler: func(args []string, ctx CommandContext) bool {
+			if len(args) > 0 && ctx.LoadSessionFn != nil {
+				if err := ctx.LoadSessionFn(args[0]); err != nil {
+					return true
+				}
+			}
+			// Listing sessions is handled externally (TUI switches input mode)
+			return true
+		},
+	})
+	r.Register(&Command{Name: "skills", Description: "List available skills", Kind: CmdHandler,
+		Handler: func(args []string, ctx CommandContext) bool {
+			if ctx.ListSkillsFn != nil {
+				ctx.ListSkillsFn()
+			}
+			return true
+		},
+	})
+	r.Register(&Command{Name: "model", Description: "Switch model/provider via UI", Kind: CmdHandler,
+		Handler: func(args []string, ctx CommandContext) bool {
+			// Model switching is handled externally (TUI shows model select)
+			return true
 		},
 	})
 }

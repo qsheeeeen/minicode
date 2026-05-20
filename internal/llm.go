@@ -98,6 +98,7 @@ type chatRequest struct {
 	Messages  []MessageParam `json:"messages"`
 	Tools     []LLMTool      `json:"tools,omitempty"`
 	Stream    bool           `json:"stream"`
+	Thinking  map[string]any `json:"thinking,omitempty"`
 }
 
 func (c *Client) send(ctx context.Context, messages []MessageParam, tools []LLMTool, opts ChatOptions, stream bool) (*LLMMessage, error) {
@@ -117,6 +118,7 @@ func (c *Client) send(ctx context.Context, messages []MessageParam, tools []LLMT
 		Messages:  messages,
 		Tools:     tools,
 		Stream:    stream,
+		Thinking:  map[string]any{"type": "adaptive"},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("marshal request: %w", err)
@@ -165,6 +167,7 @@ func (c *Client) streamSSE(ctx context.Context, messages []MessageParam, tools [
 		Messages:  messages,
 		Tools:     tools,
 		Stream:    true,
+		Thinking:  map[string]any{"type": "adaptive"},
 	})
 	if err != nil {
 		ch <- StreamEvent{Error: fmt.Errorf("marshal request: %w", err)}
