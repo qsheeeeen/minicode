@@ -18,7 +18,8 @@ type AskUserTool struct {
 
 func (t *AskUserTool) Name() string             { return "AskUser" }
 func (t *AskUserTool) Description() string      { return "Ask the user a question with predefined options." }
-func (t *AskUserTool) RequiresPermission() bool { return false }
+func (t *AskUserTool) RequiresPermission() bool    { return false }
+func (t *AskUserTool) Requires() []ToolRequirement { return nil }
 
 func (t *AskUserTool) InputSchema() map[string]any {
 	return map[string]any{

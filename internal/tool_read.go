@@ -13,7 +13,8 @@ func NewReadTool() *ReadTool { return &ReadTool{} }
 
 func (t *ReadTool) Name() string             { return "Read" }
 func (t *ReadTool) Description() string      { return "Read the contents of a file. Supports text files. Defaults to first 2000 lines. Use offset/limit for large files." }
-func (t *ReadTool) RequiresPermission() bool { return false }
+func (t *ReadTool) RequiresPermission() bool    { return false }
+func (t *ReadTool) Requires() []ToolRequirement { return nil }
 
 func (t *ReadTool) InputSchema() map[string]any {
 	return map[string]any{

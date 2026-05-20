@@ -17,7 +17,8 @@ func NewSetModelTool(setModelFn func(modelSpec string) error) *SetModelTool {
 
 func (t *SetModelTool) Name() string             { return "SetModel" }
 func (t *SetModelTool) Description() string      { return "Switch the current conversation to the model mapped to a tier. Looks up config tiers and switches both the running agent and persisted config." }
-func (t *SetModelTool) RequiresPermission() bool { return false }
+func (t *SetModelTool) RequiresPermission() bool    { return false }
+func (t *SetModelTool) Requires() []ToolRequirement { return nil }
 
 func (t *SetModelTool) InputSchema() map[string]any {
 	return map[string]any{

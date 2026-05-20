@@ -14,7 +14,8 @@ func NewWriteTool() *WriteTool { return &WriteTool{} }
 
 func (t *WriteTool) Name() string             { return "Write" }
 func (t *WriteTool) Description() string      { return "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories." }
-func (t *WriteTool) RequiresPermission() bool { return true }
+func (t *WriteTool) RequiresPermission() bool    { return true }
+func (t *WriteTool) Requires() []ToolRequirement { return nil }
 
 func (t *WriteTool) InputSchema() map[string]any {
 	return map[string]any{

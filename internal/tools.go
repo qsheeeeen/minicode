@@ -60,6 +60,20 @@ type ToolResult struct {
 	Output string
 }
 
+// ToolRequirement declares a service dependency for tool registration.
+type ToolRequirement string
+
+const (
+	ReqAgentRegistry ToolRequirement = "agentRegistry"
+	ReqSkillRegistry ToolRequirement = "skillRegistry"
+)
+
+// ToolAvailability tracks which optional services are present.
+type ToolAvailability struct {
+	AgentRegistry bool
+	SkillRegistry bool
+}
+
 // Tool is the interface every tool must implement.
 type Tool interface {
 	Name() string
@@ -67,6 +81,7 @@ type Tool interface {
 	InputSchema() map[string]any
 	Execute(ctx context.Context, args map[string]any, tc ToolContext) (ToolResult, error)
 	RequiresPermission() bool
+	Requires() []ToolRequirement
 }
 
 // ToolRegistry holds registered tools and provides lookup.

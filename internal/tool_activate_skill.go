@@ -17,7 +17,8 @@ func NewActivateSkillTool(skills *SkillRegistry) *ActivateSkillTool {
 
 func (t *ActivateSkillTool) Name() string             { return "ActivateSkill" }
 func (t *ActivateSkillTool) Description() string      { return "Loads the full instructions of a skill by name. Returns the skill's instructions wrapped in <activated_skill> tags." }
-func (t *ActivateSkillTool) RequiresPermission() bool { return false }
+func (t *ActivateSkillTool) RequiresPermission() bool     { return false }
+func (t *ActivateSkillTool) Requires() []ToolRequirement  { return []ToolRequirement{ReqSkillRegistry} }
 
 func (t *ActivateSkillTool) InputSchema() map[string]any {
 	return map[string]any{

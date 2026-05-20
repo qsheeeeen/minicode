@@ -154,3 +154,42 @@ func split2(s, sep string) [2]string {
 	parts[0] = s
 	return parts
 }
+
+// SetModel persists a model specifier to config.json.
+func SetModel(modelSpec string) error {
+	cfg, err := LoadConfig()
+	if err != nil {
+		return err
+	}
+	cfg.Model = modelSpec
+	return writeConfig(cfg)
+}
+
+// SetTier persists a tier mapping to config.json.
+func SetTier(tier, modelSpec string) error {
+	cfg, err := LoadConfig()
+	if err != nil {
+		return err
+	}
+	if cfg.Tiers == nil {
+		cfg.Tiers = make(map[string]string)
+	}
+	cfg.Tiers[tier] = modelSpec
+	return writeConfig(cfg)
+}
+
+func writeConfig(cfg *Config) error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	dir := filepath.Join(home, ".minicode")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(dir, "config.json"), data, 0o644)
+}

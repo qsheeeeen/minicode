@@ -54,6 +54,14 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Load global prompt from ~/.minicode/AGENTS.md
+	userPrompt := ""
+	if home, err := os.UserHomeDir(); err == nil {
+		if data, err := os.ReadFile(home + "/.minicode/AGENTS.md"); err == nil {
+			userPrompt = string(data)
+		}
+	}
+
 	cfg := internal.AgentConfig{
 		APIKey:                    resolved.Model.APIKey,
 		BaseURL:                   resolved.Model.BaseURL,
@@ -61,6 +69,7 @@ func main() {
 		ContextLength:             resolved.Model.ContextLength,
 		CompressionThresholdRatio: resolved.CompressionThreshold,
 		ProjectPromptFile:         resolved.PromptFile,
+		UserPrompt:                userPrompt,
 	}
 
 	ag := internal.NewAgent(cfg)
@@ -174,14 +183,40 @@ func main() {
 }
 
 func registerAllTools(ag *internal.Agent, cfg internal.AgentConfig, skills *internal.SkillRegistry) {
-	ag.ToolRegistry().Register(internal.NewReadTool())
-	ag.ToolRegistry().Register(internal.NewWriteTool())
-	ag.ToolRegistry().Register(internal.NewEditTool())
-	ag.ToolRegistry().Register(internal.NewBashTool())
-	ag.ToolRegistry().Register(internal.NewSubAgentTool(cfg))
-	ag.ToolRegistry().Register(internal.NewActivateSkillTool(skills))
-	ag.ToolRegistry().Register(internal.NewAskUserTool(nil))
-	ag.ToolRegistry().Register(internal.NewSetModelTool(nil))
+	avail := internal.ToolAvailability{
+		AgentRegistry: true, // always available
+		SkillRegistry: skills != nil,
+	}
+
+	allTools := []internal.Tool{
+		internal.NewReadTool(),
+		internal.NewWriteTool(),
+		internal.NewEditTool(),
+		internal.NewBashTool(),
+		internal.NewSubAgentTool(cfg),
+		internal.NewActivateSkillTool(skills),
+		internal.NewAskUserTool(nil),
+		internal.NewSetModelTool(nil),
+	}
+
+	for _, tool := range allTools {
+		skip := false
+		for _, req := range tool.Requires() {
+			switch req {
+			case internal.ReqAgentRegistry:
+				if !avail.AgentRegistry {
+					skip = true
+				}
+			case internal.ReqSkillRegistry:
+				if !avail.SkillRegistry {
+					skip = true
+				}
+			}
+		}
+		if !skip {
+			ag.ToolRegistry().Register(tool)
+		}
+	}
 }
 
 func getPrompt(args []string) string {

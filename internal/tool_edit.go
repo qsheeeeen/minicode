@@ -15,7 +15,8 @@ func NewEditTool() *EditTool { return &EditTool{} }
 
 func (t *EditTool) Name() string             { return "Edit" }
 func (t *EditTool) Description() string      { return "Edit a file by replacing exact text. The oldText must match exactly (including whitespace). Use this for precise, surgical edits." }
-func (t *EditTool) RequiresPermission() bool { return true }
+func (t *EditTool) RequiresPermission() bool    { return true }
+func (t *EditTool) Requires() []ToolRequirement { return nil }
 
 func (t *EditTool) InputSchema() map[string]any {
 	return map[string]any{
@@ -66,37 +67,72 @@ func diffLines(oldText, newText string) diffResult {
 	oldLines := splitLines(oldText)
 	newLines := splitLines(newText)
 
-	removed, added := 0, 0
-	var bodyLines []string
+	// Build LCS diff hunks
+	type hunkLine struct {
+		kind    rune // ' ' context, '-' removed, '+' added
+		oldNum  int
+		newNum  int
+		content string
+	}
 
+	// Simple longest common subsequence based diff
+	var result []hunkLine
 	i, j := 0, 0
 	for i < len(oldLines) || j < len(newLines) {
-		if i < len(oldLines) && j < len(newLines) {
-			if oldLines[i] == newLines[j] {
-				bodyLines = append(bodyLines, fmt.Sprintf("    %s", oldLines[i]))
-				i++
-				j++
-			} else {
-				if i < len(oldLines) {
-					bodyLines = append(bodyLines, fmt.Sprintf("%4d - %s", i+1, oldLines[i]))
-					removed++
-					i++
-				}
-				if j < len(newLines) {
-					bodyLines = append(bodyLines, fmt.Sprintf("%4d + %s", j+1, newLines[j]))
-					added++
-					j++
-				}
-			}
+		if i < len(oldLines) && j < len(newLines) && oldLines[i] == newLines[j] {
+			result = append(result, hunkLine{' ', i + 1, j + 1, oldLines[i]})
+			i++
+			j++
+		} else if i < len(oldLines) && j < len(newLines) {
+			// Changed line
+			result = append(result, hunkLine{'-', i + 1, 0, oldLines[i]})
+			result = append(result, hunkLine{'+', 0, j + 1, newLines[j]})
+			i++
+			j++
 		} else if i < len(oldLines) {
-			bodyLines = append(bodyLines, fmt.Sprintf("%4d - %s", i+1, oldLines[i]))
-			removed++
+			result = append(result, hunkLine{'-', i + 1, 0, oldLines[i]})
 			i++
 		} else {
-			bodyLines = append(bodyLines, fmt.Sprintf("%4d + %s", j+1, newLines[j]))
-			added++
+			result = append(result, hunkLine{'+', 0, j + 1, newLines[j]})
 			j++
 		}
+	}
+
+	// Format with context (show 3 context lines around changes)
+	removed, added := 0, 0
+	var bodyLines []string
+	lastPrinted := -4 // ensure separator before first hunk
+
+	for idx := 0; idx < len(result); idx++ {
+		line := result[idx]
+		if line.kind == ' ' {
+			// Check if this context line is within 3 lines of a change
+			show := false
+			for d := -3; d <= 3; d++ {
+				if idx+d >= 0 && idx+d < len(result) && result[idx+d].kind != ' ' {
+					show = true
+					break
+				}
+			}
+			if !show {
+				continue
+			}
+			if idx-lastPrinted > 4 {
+				bodyLines = append(bodyLines, "...")
+			}
+		}
+
+		switch line.kind {
+		case ' ':
+			bodyLines = append(bodyLines, fmt.Sprintf("%4d   %s", line.newNum, line.content))
+		case '-':
+			bodyLines = append(bodyLines, fmt.Sprintf("%4d - %s", line.oldNum, line.content))
+			removed++
+		case '+':
+			bodyLines = append(bodyLines, fmt.Sprintf("%4d + %s", line.newNum, line.content))
+			added++
+		}
+		lastPrinted = idx
 	}
 
 	return diffResult{

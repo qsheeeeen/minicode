@@ -18,13 +18,19 @@ var permCycle = []PermissionMode{PermManual, PermYolo, PermAuto}
 
 // PermissionService controls tool execution gating.
 type PermissionService struct {
-	mode  PermissionMode
-	promptFn func(displayText string) string // for manual mode in TUI; nil = deny
+	mode         PermissionMode
+	promptFn     func(displayText string) string // for manual mode in TUI; nil = deny
+	autoDecideFn func(toolName string, toolInput map[string]any) (allowed bool, reason string) // LLM-based gating
 }
 
 // NewPermissionService creates a permission service.
 func NewPermissionService(mode PermissionMode) *PermissionService {
 	return &PermissionService{mode: mode}
+}
+
+// SetAutoDecide sets the LLM-based auto-decide function.
+func (p *PermissionService) SetAutoDecide(fn func(toolName string, toolInput map[string]any) (allowed bool, reason string)) {
+	p.autoDecideFn = fn
 }
 
 // Mode returns the current permission mode.
@@ -72,7 +78,10 @@ func (p *PermissionService) Check(toolName, displayText string) (allowed bool, r
 		// In headless mode, deny by default
 		return false, fmt.Sprintf("Tool %s denied in headless mode. Use --permission yolo", toolName)
 	case PermAuto:
-		// Auto mode requires an LLM client for gating; for now, allow read tools, deny others
+		if p.autoDecideFn != nil {
+			return p.autoDecideFn(toolName, nil)
+		}
+		// Fallback when no LLM client: allow read operations, deny destructive ones
 		if isReadTool(toolName) {
 			return true, ""
 		}
