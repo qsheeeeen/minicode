@@ -63,19 +63,7 @@ func ToDisplayMessages(turns []MessageParam, statuses []StatusMessage, streaming
 	results := make(map[string]string)
 	for _, turn := range turns {
 		if turn.Role == "user" {
-			if blocks, ok := turn.Content.([]any); ok {
-				for _, b := range blocks {
-					if block, ok := b.(map[string]any); ok {
-						if block["type"] == "tool_result" {
-							if c, ok := block["content"].(string); ok {
-								if id, ok := block["tool_use_id"].(string); ok {
-									results[id] = c
-								}
-							}
-						}
-					}
-				}
-			}
+			extractResults(turn.Content, results)
 		}
 	}
 
@@ -192,4 +180,27 @@ func mapToContentBlock(m map[string]any) ContentBlock {
 		cb.Content = v
 	}
 	return cb
+}
+
+func extractResults(content any, results map[string]string) {
+	switch c := content.(type) {
+	case []ContentBlock:
+		for _, block := range c {
+			if block.Type == "tool_result" {
+				results[block.ToolUseID] = block.Content
+			}
+		}
+	case []any:
+		for _, b := range c {
+			if block, ok := b.(map[string]any); ok {
+				if block["type"] == "tool_result" {
+					if content, ok := block["content"].(string); ok {
+						if id, ok := block["tool_use_id"].(string); ok {
+							results[id] = content
+						}
+					}
+				}
+			}
+		}
+	}
 }
