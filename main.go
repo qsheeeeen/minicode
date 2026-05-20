@@ -12,14 +12,39 @@ import (
 	"minicode/internal"
 )
 
+const version = "0.1.0 (Go)"
+
 func main() {
-	// Resolve model from CLI arg, env var, or config file
-	modelOverride := ""
 	args := os.Args[1:]
+
+	// Handle --version / -v early
+	for _, a := range args {
+		if a == "--version" || a == "-v" {
+			fmt.Printf("minicode v%s\n", version)
+			return
+		}
+	}
+
+	// Parse flags
+	var (
+		modelOverride string
+		sessionName   string
+		resumeRecent  bool
+	)
 	for i := 0; i < len(args); i++ {
-		if (args[i] == "--model" || args[i] == "-m") && i+1 < len(args) {
-			modelOverride = args[i+1]
-			i++
+		switch args[i] {
+		case "--model", "-m":
+			if i+1 < len(args) {
+				modelOverride = args[i+1]
+				i++
+			}
+		case "--session", "-s":
+			if i+1 < len(args) {
+				sessionName = args[i+1]
+				i++
+			}
+		case "--resume":
+			resumeRecent = true
 		}
 	}
 
@@ -40,12 +65,26 @@ func main() {
 
 	ag := internal.NewAgent(cfg)
 
+	// Handle session resume
+	sm := internal.NewSessionManager()
+	if sessionName != "" {
+		if data, err := sm.Get(sessionName); err == nil && data != nil {
+			_ = ag.LoadSession(sessionName)
+		} else {
+			ag.SetSession(sessionName)
+		}
+	} else if resumeRecent {
+		if name, err := sm.MostRecent(); err == nil && name != "" {
+			_ = ag.LoadSession(name)
+		}
+	}
+
 	// Load project skills
 	skills := internal.NewSkillRegistry(resolved.SkillsDir)
 	_ = skills.LoadSkills()
 	ag.SetSkills(skills)
 
-	// Set up command registry (before skill-as-command registration)
+	// Set up command registry
 	cmdReg := internal.NewCommandRegistry()
 	internal.RegisterBuiltinCommands(cmdReg)
 
@@ -57,7 +96,7 @@ func main() {
 		name := sk.Name
 		desc := sk.Description
 		body := globalSkills.GetBody(name)
-		if body != "" && cmdReg != nil {
+		if body != "" {
 			cmdReg.Register(&internal.Command{
 				Name: name, Description: desc, Kind: internal.CmdPrompt,
 				Prompt: func(args []string) string {
@@ -66,14 +105,11 @@ func main() {
 			})
 		}
 	}
-
-	// Register project skills as slash commands too
 	for _, sk := range skills.List() {
 		name := sk.Name
 		desc := sk.Description
 		body := skills.GetBody(name)
-		if body != "" && cmdReg != nil {
-			// Check for name conflicts with builtin commands
+		if body != "" {
 			if _, exists := cmdReg.Get(name); exists {
 				continue
 			}
@@ -88,9 +124,8 @@ func main() {
 
 	registerAllTools(ag, cfg, skills)
 
-	// Set up permission service
-	permSvc := internal.NewPermissionService(internal.PermissionMode(resolved.PermissionMode))
-	_ = permSvc
+	// Permission service
+	_ = internal.NewPermissionService(internal.PermissionMode(resolved.PermissionMode))
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
@@ -118,7 +153,8 @@ func main() {
 	}
 
 	// Interactive TUI mode
-	if err := internal.RunTUI(ag); err != nil {
+	registry := internal.NewAgentRegistry(ag)
+	if err := internal.RunTUI(ag, registry); err != nil {
 		fmt.Fprintf(os.Stderr, "TUI error: %s\n", err)
 		os.Exit(1)
 	}
@@ -144,8 +180,14 @@ func getPrompt(args []string) string {
 			break
 		}
 		if len(a) > 0 && a[0] == '-' {
-			if a == "--model" || a == "-m" || a == "--session" || a == "-s" {
-				i++
+			switch a {
+			case "--model", "-m", "--session", "-s":
+				i++ // skip value
+			case "--resume", "--version", "-v":
+				// flags without values
+			default:
+				// unknown flags — might be passed to the prompt
+				positional = append(positional, a)
 			}
 			continue
 		}

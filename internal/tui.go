@@ -46,9 +46,10 @@ type permResolveMsg struct {
 
 // TUIModel is the top-level Bubble Tea model.
 type TUIModel struct {
-	agent    *Agent
-	viewport viewport.Model
-	input    textarea.Model
+	agent         *Agent
+	agentRegistry *AgentRegistry
+	viewport      viewport.Model
+	input         textarea.Model
 
 	messages   []DisplayMessage
 	streaming  bool
@@ -57,9 +58,9 @@ type TUIModel struct {
 	session    string
 
 	// Permission prompt state
-	permPending   bool
-	permText      string
-	permOptions   []string
+	permPending bool
+	permText    string
+	permOptions []string
 
 	width  int
 	height int
@@ -68,7 +69,7 @@ type TUIModel struct {
 }
 
 // NewTUIModel creates the TUI model.
-func NewTUIModel(ag *Agent) *TUIModel {
+func NewTUIModel(ag *Agent, registry *AgentRegistry) *TUIModel {
 	ta := textarea.New()
 	ta.Placeholder = "Type your message... (Ctrl+O: switch agent, Ctrl+C: quit)"
 	ta.ShowLineNumbers = false
@@ -77,12 +78,13 @@ func NewTUIModel(ag *Agent) *TUIModel {
 	vp := viewport.New(80, 20)
 
 	m := &TUIModel{
-		agent:     ag,
-		viewport:  vp,
-		input:     ta,
-		modelName: ag.Model(),
-		session:   ag.SessionName(),
-		messages:  ag.Store().ToDisplayMessages(),
+		agent:         ag,
+		agentRegistry: registry,
+		viewport:      vp,
+		input:         ta,
+		modelName:     ag.Model(),
+		session:       ag.SessionName(),
+		messages:      ag.Store().ToDisplayMessages(),
 	}
 
 	ag.OnDisplayChange(func() {
@@ -137,7 +139,18 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.waitForAgent
 
 		case tea.KeyCtrlO:
-			// Multi-agent switching (stub — single agent for now)
+			// Multi-agent switching: cycle through registered agents
+			if m.agentRegistry != nil && len(m.agentRegistry.List()) > 1 {
+				next := m.agentRegistry.NextActive()
+				if next != nil {
+					m.agent = next
+					m.messages = next.Store().ToDisplayMessages()
+					m.modelName = next.Model()
+					m.session = next.SessionName()
+					m.viewport.SetContent(m.renderMessages())
+					m.viewport.GotoBottom()
+				}
+			}
 			return m, nil
 
 		default:
@@ -307,8 +320,8 @@ func truncate(s string, maxLen int) string {
 // ---- TUI entry point ----
 
 // RunTUI starts the interactive Bubble Tea terminal UI.
-func RunTUI(ag *Agent) error {
-	m := NewTUIModel(ag)
+func RunTUI(ag *Agent, registry *AgentRegistry) error {
+	m := NewTUIModel(ag, registry)
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	_, err := p.Run()
 	return err
