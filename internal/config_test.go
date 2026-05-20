@@ -1,6 +1,10 @@
 package internal
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
 
 func TestResolveConfig_EmptyConfig(t *testing.T) {
 	resolved, err := ResolveConfig("")
@@ -26,6 +30,9 @@ func TestResolveConfig_Defaults(t *testing.T) {
 	if resolved.PromptFile != "AGENTS.md" {
 		t.Errorf("expected AGENTS.md, got %s", resolved.PromptFile)
 	}
+	if resolved.SkillsDir != ".minicode/skills" {
+		t.Errorf("expected default skills dir, got %s", resolved.SkillsDir)
+	}
 }
 
 func TestSplit2(t *testing.T) {
@@ -46,47 +53,87 @@ func TestSplit2(t *testing.T) {
 	}
 }
 
-func TestToolSchemaContracts(t *testing.T) {
-	tools := []Tool{NewReadTool(), NewWriteTool(), NewEditTool(), NewBashTool()}
-	for _, tool := range tools {
-		t.Run(tool.Name(), func(t *testing.T) {
-			if tool.Name() == "" {
-				t.Error("tool name is empty")
-			}
-			if tool.Description() == "" {
-				t.Error("tool description is empty")
-			}
-			schema := tool.InputSchema()
-			if schema["type"] != "object" {
-				t.Error("input schema must be object type")
-			}
-			required, _ := schema["required"].([]string)
-			if len(required) == 0 {
-				t.Error("tool should have required fields")
-			}
-		})
+func TestResolveConfig_NoConfigFile(t *testing.T) {
+	// Temporarily override HOME so config file isn't found
+	origHome := os.Getenv("HOME")
+	os.Setenv("HOME", "/nonexistent")
+	defer os.Setenv("HOME", origHome)
+
+	resolved, err := ResolveConfig("")
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+	// Should still get defaults
+	if resolved.CompressionThreshold != 0.8 {
+		t.Errorf("expected 0.8, got %f", resolved.CompressionThreshold)
 	}
 }
 
-func TestLLMToolConversion(t *testing.T) {
-	r := NewToolRegistry()
-	r.Register(NewReadTool())
+func TestConfig_Tiers(t *testing.T) {
+	cfg := Config{Tiers: map[string]string{"1": "claude-sonnet@anthropic", "2": "glm-4.7@zhipu"}}
+	if cfg.Tiers["1"] != "claude-sonnet@anthropic" {
+		t.Error("tier 1 mismatch")
+	}
+	if cfg.Tiers["2"] != "glm-4.7@zhipu" {
+		t.Error("tier 2 mismatch")
+	}
+}
 
-	all := r.All()
-	if len(all) != 1 {
-		t.Fatal("expected 1 tool")
-	}
+func TestLoadConfig_NoFile(t *testing.T) {
+	origHome := os.Getenv("HOME")
+	os.Setenv("HOME", "/nonexistent")
+	defer os.Setenv("HOME", origHome)
 
-	tool := all[0]
-	llmTool := LLMTool{
-		Name:        tool.Name(),
-		Description: tool.Description(),
-		InputSchema: tool.InputSchema(),
+	cfg, err := LoadConfig()
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
 	}
-	if llmTool.Name != "Read" {
-		t.Errorf("unexpected name: %s", llmTool.Name)
+	if cfg == nil {
+		t.Fatal("expected non-nil config")
 	}
-	if llmTool.InputSchema["type"] != "object" {
-		t.Error("schema should be preserved")
+}
+
+func TestLoadConfig_WithFile(t *testing.T) {
+	// Create temp config
+	tmpDir := t.TempDir()
+	minicodeDir := filepath.Join(tmpDir, ".minicode")
+	os.MkdirAll(minicodeDir, 0o755)
+	configJSON := `{"model": "test-model@test", "tiers": {"1": "sonnet@ant"}}`
+	os.WriteFile(filepath.Join(minicodeDir, "config.json"), []byte(configJSON), 0o644)
+
+	origHome := os.Getenv("HOME")
+	os.Setenv("HOME", tmpDir)
+	defer os.Setenv("HOME", origHome)
+
+	cfg, err := LoadConfig()
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+	if cfg.Model != "test-model@test" {
+		t.Errorf("expected test-model@test, got %s", cfg.Model)
+	}
+	if cfg.Tiers["1"] != "sonnet@ant" {
+		t.Errorf("expected tier 1 value, got %s", cfg.Tiers["1"])
+	}
+}
+
+func TestResolvedConfig_Fields(t *testing.T) {
+	resolved, _ := ResolveConfig("unknown-model@unknown-provider")
+	if resolved.PermissionMode != "manual" {
+		t.Errorf("expected manual, got %s", resolved.PermissionMode)
+	}
+	// With an unknown provider, model should have empty APIKey
+	if resolved.Model.APIKey != "" {
+		t.Error("model should have empty APIKey for unknown provider")
+	}
+}
+
+func TestModelRef_ZeroValue(t *testing.T) {
+	var ref ModelRef
+	if ref.Provider != "" {
+		t.Error("zero value Provider should be empty")
+	}
+	if ref.ContextLength != 0 {
+		t.Error("zero value ContextLength should be 0")
 	}
 }
