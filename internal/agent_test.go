@@ -174,7 +174,7 @@ func TestAgent_IsRunningGuard(t *testing.T) {
 	// Run with a context that's already cancelled should return immediately
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	ok, err := ag.Run(ctx, "test")
+	ok, err := ag.Run(ctx, "test", "")
 	if err != nil {
 		t.Logf("expected error from cancelled context: %s", err)
 	}

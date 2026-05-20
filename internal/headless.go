@@ -8,7 +8,7 @@ import (
 )
 
 // RunHeadless executes the agent in headless (non-TUI) mode, streaming output to stdout.
-func RunHeadless(ctx context.Context, ag *Agent, initialPrompt string) error {
+func RunHeadless(ctx context.Context, ag *Agent, initialPrompt, displayPrompt string) error {
 	// Track what has already been printed for incremental rendering
 	printedTurns := 0
 	printedBlocks := make(map[int]int)      // turnIndex → blocks printed
@@ -25,8 +25,14 @@ func RunHeadless(ctx context.Context, ag *Agent, initialPrompt string) error {
 			isLastTurn := ti == len(turns)-1
 
 			if turn.Role == "user" {
-				if s, ok := turn.Content.(string); ok {
-					fmt.Fprintf(os.Stdout, "[user]\n%s\n\n", strings.TrimSpace(s))
+				content := ""
+				if turn.Display != "" {
+					content = turn.Display
+				} else if s, ok := turn.Content.(string); ok {
+					content = s
+				}
+				if content != "" {
+					fmt.Fprintf(os.Stdout, "[user]\n%s\n\n", strings.TrimSpace(content))
 				}
 				printedTurns = ti + 1
 				continue
@@ -186,7 +192,7 @@ func RunHeadless(ctx context.Context, ag *Agent, initialPrompt string) error {
 
 	ag.OnDisplayChange(func() { render(false) })
 
-	ok, err := ag.Run(ctx, initialPrompt)
+	ok, err := ag.Run(ctx, initialPrompt, displayPrompt)
 	if err != nil {
 		return err
 	}

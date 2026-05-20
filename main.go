@@ -133,6 +133,7 @@ func main() {
 
 	prompt := getPrompt(args)
 	if prompt != "" {
+		originalPrompt := prompt
 		cmdCtx := internal.CommandContext{
 			Agent:   ag,
 			ExitFn:  func() { os.Exit(0) },
@@ -146,7 +147,7 @@ func main() {
 			}
 		}
 
-		if err := internal.RunHeadless(ctx, ag, prompt); err != nil {
+		if err := internal.RunHeadless(ctx, ag, prompt, originalPrompt); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %s\n", err)
 			os.Exit(1)
 		}
@@ -155,7 +156,7 @@ func main() {
 
 	// Interactive TUI mode
 	registry := internal.NewAgentRegistry(ag)
-	if err := internal.RunTUI(ag, registry); err != nil {
+	if err := internal.RunTUI(ag, registry, cmdReg); err != nil {
 		fmt.Fprintf(os.Stderr, "TUI error: %s\n", err)
 		os.Exit(1)
 	}

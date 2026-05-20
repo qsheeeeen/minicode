@@ -167,7 +167,7 @@ func (a *Agent) saveSession() {
 }
 
 // Run executes one user message through the agent loop.
-func (a *Agent) Run(ctx context.Context, userMessage string) (bool, error) {
+func (a *Agent) Run(ctx context.Context, userMessage, displayContent string) (bool, error) {
 	a.mu.Lock()
 	if a.isRunning {
 		a.mu.Unlock()
@@ -191,7 +191,7 @@ func (a *Agent) Run(ctx context.Context, userMessage string) (bool, error) {
 	a.mu.Unlock()
 	defer cancel()
 
-	a.store.AddUserMessage(userMessage, "")
+	a.store.AddUserMessage(userMessage, displayContent)
 
 	for {
 		if err := ctx.Err(); err != nil {

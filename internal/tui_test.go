@@ -19,7 +19,7 @@ func newTestAgent() *Agent {
 func TestTUIModel_Init(t *testing.T) {
 	ag := newTestAgent()
 	reg := NewAgentRegistry(ag)
-	m := NewTUIModel(ag, reg)
+	m := NewTUIModel(ag, reg, nil)
 
 	cmd := m.Init()
 	if cmd == nil {
@@ -30,7 +30,7 @@ func TestTUIModel_Init(t *testing.T) {
 func TestTUIModel_ViewBeforeReady(t *testing.T) {
 	ag := newTestAgent()
 	reg := NewAgentRegistry(ag)
-	m := NewTUIModel(ag, reg)
+	m := NewTUIModel(ag, reg, nil)
 
 	view := m.View()
 	if view == "" {
@@ -41,7 +41,7 @@ func TestTUIModel_ViewBeforeReady(t *testing.T) {
 func TestTUIModel_ViewAfterReady(t *testing.T) {
 	ag := newTestAgent()
 	reg := NewAgentRegistry(ag)
-	m := NewTUIModel(ag, reg)
+	m := NewTUIModel(ag, reg, nil)
 
 	// Simulate WindowSizeMsg to make the model ready
 	_, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
@@ -59,7 +59,7 @@ func TestTUIModel_ViewAfterReady(t *testing.T) {
 func TestTUIModel_KeyTypeUpdatesInput(t *testing.T) {
 	ag := newTestAgent()
 	reg := NewAgentRegistry(ag)
-	m := NewTUIModel(ag, reg)
+	m := NewTUIModel(ag, reg, nil)
 
 	// Make ready
 	_, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
@@ -78,7 +78,7 @@ func TestTUIModel_KeyTypeUpdatesInput(t *testing.T) {
 func TestTUIModel_EnterSendsMessage(t *testing.T) {
 	ag := newTestAgent()
 	reg := NewAgentRegistry(ag)
-	m := NewTUIModel(ag, reg)
+	m := NewTUIModel(ag, reg, nil)
 
 	_, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 
@@ -96,7 +96,7 @@ func TestTUIModel_EnterSendsMessage(t *testing.T) {
 func TestTUIModel_CtrlCQuits(t *testing.T) {
 	ag := newTestAgent()
 	reg := NewAgentRegistry(ag)
-	m := NewTUIModel(ag, reg)
+	m := NewTUIModel(ag, reg, nil)
 
 	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
 	if cmd == nil {
@@ -107,7 +107,7 @@ func TestTUIModel_CtrlCQuits(t *testing.T) {
 func TestTUIModel_EnterEmptySkips(t *testing.T) {
 	ag := newTestAgent()
 	reg := NewAgentRegistry(ag)
-	m := NewTUIModel(ag, reg)
+	m := NewTUIModel(ag, reg, nil)
 
 	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	// Empty input should not start agent
@@ -119,7 +119,7 @@ func TestTUIModel_EnterEmptySkips(t *testing.T) {
 func TestTUIModel_StreamingBlocksInput(t *testing.T) {
 	ag := newTestAgent()
 	reg := NewAgentRegistry(ag)
-	m := NewTUIModel(ag, reg)
+	m := NewTUIModel(ag, reg, nil)
 
 	_, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m.streaming = true
@@ -135,7 +135,7 @@ func TestTUIModel_StreamingBlocksInput(t *testing.T) {
 func TestTUIModel_AgentDoneClearsStreaming(t *testing.T) {
 	ag := newTestAgent()
 	reg := NewAgentRegistry(ag)
-	m := NewTUIModel(ag, reg)
+	m := NewTUIModel(ag, reg, nil)
 
 	m.streaming = true
 	_, _ = m.Update(agentDoneMsg{err: nil})
@@ -148,7 +148,7 @@ func TestTUIModel_AgentDoneClearsStreaming(t *testing.T) {
 func TestTUIModel_HandlePermKey(t *testing.T) {
 	ag := newTestAgent()
 	reg := NewAgentRegistry(ag)
-	m := NewTUIModel(ag, reg)
+	m := NewTUIModel(ag, reg, nil)
 
 	m.permPending = true
 	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
@@ -168,7 +168,7 @@ func TestTUIModel_MultiAgentSwitch(t *testing.T) {
 	reg := NewAgentRegistry(ag1)
 	reg.Add(ag2)
 
-	m := NewTUIModel(ag1, reg)
+	m := NewTUIModel(ag1, reg, nil)
 	_, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	// Ctrl+O to switch agent
@@ -183,7 +183,7 @@ func TestTUIModel_MultiAgentSwitch(t *testing.T) {
 func TestTUIModel_SingleAgentNoSwitch(t *testing.T) {
 	ag := newTestAgent()
 	reg := NewAgentRegistry(ag)
-	m := NewTUIModel(ag, reg)
+	m := NewTUIModel(ag, reg, nil)
 
 	_, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlO})
 	// Should remain unchanged
@@ -195,7 +195,7 @@ func TestTUIModel_SingleAgentNoSwitch(t *testing.T) {
 func TestTUIModel_RenderMessages(t *testing.T) {
 	ag := newTestAgent()
 	reg := NewAgentRegistry(ag)
-	m := NewTUIModel(ag, reg)
+	m := NewTUIModel(ag, reg, nil)
 
 	// Empty state
 	rendered := m.renderMessages()
@@ -220,7 +220,7 @@ func TestTUIModel_RenderMessages(t *testing.T) {
 func TestTUIModel_RenderHeader(t *testing.T) {
 	ag := newTestAgent()
 	reg := NewAgentRegistry(ag)
-	m := NewTUIModel(ag, reg)
+	m := NewTUIModel(ag, reg, nil)
 	m.modelName = "test-model"
 	m.session = "test-session"
 
@@ -233,7 +233,7 @@ func TestTUIModel_RenderHeader(t *testing.T) {
 func TestTUIModel_RenderStatusBar(t *testing.T) {
 	ag := newTestAgent()
 	reg := NewAgentRegistry(ag)
-	m := NewTUIModel(ag, reg)
+	m := NewTUIModel(ag, reg, nil)
 	m.width = 120
 	m.tokenCount = 42
 
@@ -246,7 +246,7 @@ func TestTUIModel_RenderStatusBar(t *testing.T) {
 func TestTUIModel_RenderInput(t *testing.T) {
 	ag := newTestAgent()
 	reg := NewAgentRegistry(ag)
-	m := NewTUIModel(ag, reg)
+	m := NewTUIModel(ag, reg, nil)
 
 	// Normal mode
 	inp := m.renderInput()
@@ -275,7 +275,7 @@ func TestTUIModel_RenderInput(t *testing.T) {
 func TestTUIModel_DisplayCallback(t *testing.T) {
 	ag := newTestAgent()
 	reg := NewAgentRegistry(ag)
-	m := NewTUIModel(ag, reg)
+	m := NewTUIModel(ag, reg, nil)
 
 	// Simulate agent adding a message
 	ag.Store().AddUserMessage("test message", "")
@@ -300,7 +300,7 @@ func TestTruncate(t *testing.T) {
 func TestTUIModel_FullCycle(t *testing.T) {
 	ag := newTestAgent()
 	reg := NewAgentRegistry(ag)
-	m := NewTUIModel(ag, reg)
+	m := NewTUIModel(ag, reg, nil)
 
 	// 1. Init returns a command
 	cmd := m.Init()
@@ -336,7 +336,7 @@ func TestRunTUI_BuildsProgram(t *testing.T) {
 
 	// We can't actually run the program in tests (needs TTY),
 	// but we can verify the model is created correctly
-	m := NewTUIModel(ag, reg)
+	m := NewTUIModel(ag, reg, nil)
 	if m == nil {
 		t.Error("NewTUIModel should not return nil")
 	}
@@ -348,7 +348,7 @@ func TestTUIModel_AgentRunWithCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // immediately cancel
 
-	ok, err := ag.Run(ctx, "test")
+	ok, err := ag.Run(ctx, "test", "")
 	if ok {
 		// Run should return false or have an error for cancelled context
 		t.Log("run returned ok=true with cancelled context")

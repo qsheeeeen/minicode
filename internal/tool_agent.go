@@ -49,7 +49,7 @@ func (t *SubAgentTool) Execute(ctx context.Context, args map[string]any, tc Tool
 		subAgent.tools.Register(tool)
 	}
 
-	ok, err := subAgent.Run(ctx, prompt)
+	ok, err := subAgent.Run(ctx, prompt, "")
 	if err != nil {
 		return ToolResult{Output: fmt.Sprintf("Sub-agent error: %s", err.Error())}, nil
 	}

@@ -57,6 +57,7 @@ type TUIModel struct {
 	program       *tea.Program
 	agent         *Agent
 	agentRegistry *AgentRegistry
+	cmdReg        *CommandRegistry
 	viewport      viewport.Model
 	input         textarea.Model
 
@@ -78,7 +79,7 @@ type TUIModel struct {
 }
 
 // NewTUIModel creates the TUI model.
-func NewTUIModel(ag *Agent, registry *AgentRegistry) *TUIModel {
+func NewTUIModel(ag *Agent, registry *AgentRegistry, cmdReg *CommandRegistry) *TUIModel {
 	ta := textarea.New()
 	ta.Placeholder = "Type your message... (Ctrl+O: switch agent, Ctrl+C: quit)"
 	ta.ShowLineNumbers = false
@@ -90,6 +91,7 @@ func NewTUIModel(ag *Agent, registry *AgentRegistry) *TUIModel {
 	m := &TUIModel{
 		agent:         ag,
 		agentRegistry: registry,
+		cmdReg:        cmdReg,
 		viewport:      vp,
 		input:         ta,
 		modelName:     ag.Model(),
@@ -152,12 +154,38 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			m.input.Reset()
-			// Check for commands
-			if len(input) > 0 && input[0] == '/' {
-				// For now, just send as-is (commands handled in agent resolver)
+
+			cmdInput := input
+			promptText := input
+			isHandled := false
+			isPrompt := false
+
+			if len(input) > 0 && input[0] == '/' && m.cmdReg != nil {
+				ctx := CommandContext{
+					Agent: m.agent,
+					ExitFn: func() {
+						if m.program != nil {
+							m.program.Quit()
+						}
+					},
+					ClearFn: m.agent.ClearSession,
+				}
+				handled, expanded := m.cmdReg.ParseAndExecute(input, ctx)
+				if handled {
+					isHandled = true
+					if expanded != "" {
+						isPrompt = true
+						promptText = expanded
+					}
+				}
 			}
+
+			if isHandled && !isPrompt {
+				return m, nil
+			}
+
 			cmd := func() tea.Msg {
-				_, err := m.agent.Run(context.Background(), input)
+				_, err := m.agent.Run(context.Background(), promptText, cmdInput)
 				if err != nil && err.Error() == "context canceled" {
 					err = nil
 				}
@@ -438,8 +466,8 @@ func truncate(s string, maxLen int) string {
 // ---- TUI entry point ----
 
 // RunTUI starts the interactive Bubble Tea terminal UI.
-func RunTUI(ag *Agent, registry *AgentRegistry) error {
-	m := NewTUIModel(ag, registry)
+func RunTUI(ag *Agent, registry *AgentRegistry, cmdReg *CommandRegistry) error {
+	m := NewTUIModel(ag, registry, cmdReg)
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	m.program = p
 	_, err := p.Run()
