@@ -1,5 +1,4 @@
-// Package llm provides the Anthropic API client wrapper.
-package llm
+package internal
 
 import (
 	"bufio"
@@ -12,52 +11,38 @@ import (
 	"strings"
 )
 
-// MessageParam mirrors the Anthropic API message format.
-type MessageParam struct {
-	Role    string `json:"role"`
-	Content any    `json:"content"`
-}
+// ---- LLM API types ----
 
-// Tool definition for the Anthropic API.
-type Tool struct {
+// LLMTool is a tool definition sent to the API.
+type LLMTool struct {
 	Name        string         `json:"name"`
 	Description string         `json:"description"`
 	InputSchema map[string]any `json:"input_schema"`
 }
 
-// ContentBlock is a single block in an assistant response.
-type ContentBlock struct {
-	Type      string         `json:"type"`
-	Text      string         `json:"text,omitempty"`
-	Thinking  string         `json:"thinking,omitempty"`
-	ID        string         `json:"id,omitempty"`
-	Name      string         `json:"name,omitempty"`
-	Input     map[string]any `json:"input,omitempty"`
-}
-
-// Usage tracks token consumption.
-type Usage struct {
+// LLMUsage tracks token consumption from the API response.
+type LLMUsage struct {
 	InputTokens              int `json:"input_tokens"`
 	OutputTokens             int `json:"output_tokens"`
 	CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
 	CacheReadInputTokens     int `json:"cache_read_input_tokens"`
 }
 
-// Message is the top-level Anthropic API response.
-type Message struct {
-	ID      string        `json:"id"`
+// LLMMessage is the top-level API response.
+type LLMMessage struct {
+	ID      string         `json:"id"`
 	Content []ContentBlock `json:"content"`
-	Model   string        `json:"model"`
-	Role    string        `json:"role"`
-	Usage   *Usage        `json:"usage,omitempty"`
+	Model   string         `json:"model"`
+	Role    string         `json:"role"`
+	Usage   *LLMUsage      `json:"usage,omitempty"`
 }
 
 // StreamEvent represents a parsed SSE event from the streaming endpoint.
 type StreamEvent struct {
-	Type  string       // "thinking", "text", "content_block_start", "content_block_stop", "message_stop"
+	Type  string       // "thinking", "text", "content_block_start", "content_block_stop", "message_delta"
 	Delta string       // for thinking/text deltas
 	Block ContentBlock // for content_block_start
-	Usage *Usage       // for message_stop
+	Usage *LLMUsage    // for message_delta
 	Error error
 }
 
@@ -66,11 +51,12 @@ type ChatOptions struct {
 	Model     string
 	MaxTokens int
 	System    string
-	Signal    <-chan struct{} // equivalent to AbortSignal
+	Signal    <-chan struct{}
 }
 
-// Client wraps the Anthropic Messages API.
-// Currently uses direct HTTP; will be replaced with the official Go SDK.
+// ---- Client ----
+
+// Client wraps the Anthropic Messages API via direct HTTP.
 type Client struct {
 	apiKey  string
 	baseURL string
@@ -89,26 +75,13 @@ func NewClient(apiKey, baseURL string) *Client {
 	}
 }
 
-// chatRequest is the JSON body sent to the Messages API.
-type chatRequest struct {
-	Model     string         `json:"model"`
-	MaxTokens int            `json:"max_tokens"`
-	System    string         `json:"system,omitempty"`
-	Messages  []MessageParam `json:"messages"`
-	Tools     []Tool         `json:"tools,omitempty"`
-	Stream    bool           `json:"stream"`
-}
-
 // Chat sends a non-streaming request and returns the complete response.
-func (c *Client) Chat(ctx context.Context, messages []MessageParam, tools []Tool, opts ChatOptions) (*Message, error) {
+func (c *Client) Chat(ctx context.Context, messages []MessageParam, tools []LLMTool, opts ChatOptions) (*LLMMessage, error) {
 	return c.send(ctx, messages, tools, opts, false)
 }
 
 // ChatStream sends a streaming request and returns a channel of events.
-func (c *Client) ChatStream(ctx context.Context, messages []MessageParam, tools []Tool, opts ChatOptions) (<-chan StreamEvent, error) {
-	// We use a goroutine that reads SSE and pumps events.
-	// The standard Anthropic Go SDK would handle this natively; this is a minimal
-	// implementation that will be replaced when we pull in the official SDK.
+func (c *Client) ChatStream(ctx context.Context, messages []MessageParam, tools []LLMTool, opts ChatOptions) (<-chan StreamEvent, error) {
 	ch := make(chan StreamEvent, 64)
 	go func() {
 		defer close(ch)
@@ -117,7 +90,16 @@ func (c *Client) ChatStream(ctx context.Context, messages []MessageParam, tools 
 	return ch, nil
 }
 
-func (c *Client) send(ctx context.Context, messages []MessageParam, tools []Tool, opts ChatOptions, stream bool) (*Message, error) {
+type chatRequest struct {
+	Model     string         `json:"model"`
+	MaxTokens int            `json:"max_tokens"`
+	System    string         `json:"system,omitempty"`
+	Messages  []MessageParam `json:"messages"`
+	Tools     []LLMTool      `json:"tools,omitempty"`
+	Stream    bool           `json:"stream"`
+}
+
+func (c *Client) send(ctx context.Context, messages []MessageParam, tools []LLMTool, opts ChatOptions, stream bool) (*LLMMessage, error) {
 	model := opts.Model
 	if model == "" {
 		model = "claude-sonnet-4-5"
@@ -127,16 +109,14 @@ func (c *Client) send(ctx context.Context, messages []MessageParam, tools []Tool
 		maxTokens = 8192
 	}
 
-	body := chatRequest{
+	payload, err := json.Marshal(chatRequest{
 		Model:     model,
 		MaxTokens: maxTokens,
 		System:    opts.System,
 		Messages:  messages,
 		Tools:     tools,
 		Stream:    stream,
-	}
-
-	payload, err := json.Marshal(body)
+	})
 	if err != nil {
 		return nil, fmt.Errorf("marshal request: %w", err)
 	}
@@ -160,15 +140,14 @@ func (c *Client) send(ctx context.Context, messages []MessageParam, tools []Tool
 		return nil, fmt.Errorf("api error %d: %s", resp.StatusCode, string(b))
 	}
 
-	var msg Message
+	var msg LLMMessage
 	if err := json.NewDecoder(resp.Body).Decode(&msg); err != nil {
 		return nil, fmt.Errorf("decode response: %w", err)
 	}
 	return &msg, nil
 }
 
-func (c *Client) streamSSE(ctx context.Context, messages []MessageParam, tools []Tool, opts ChatOptions, ch chan<- StreamEvent) {
-	// Build a streaming request
+func (c *Client) streamSSE(ctx context.Context, messages []MessageParam, tools []LLMTool, opts ChatOptions, ch chan<- StreamEvent) {
 	model := opts.Model
 	if model == "" {
 		model = "claude-sonnet-4-5"
@@ -178,16 +157,14 @@ func (c *Client) streamSSE(ctx context.Context, messages []MessageParam, tools [
 		maxTokens = 8192
 	}
 
-	body := chatRequest{
+	payload, err := json.Marshal(chatRequest{
 		Model:     model,
 		MaxTokens: maxTokens,
 		System:    opts.System,
 		Messages:  messages,
 		Tools:     tools,
 		Stream:    true,
-	}
-
-	payload, err := json.Marshal(body)
+	})
 	if err != nil {
 		ch <- StreamEvent{Error: fmt.Errorf("marshal request: %w", err)}
 		return
@@ -234,41 +211,39 @@ func (c *Client) streamSSE(ctx context.Context, messages []MessageParam, tools [
 			return
 		}
 
-		var event StreamEvent
 		var raw map[string]any
 		if err := json.Unmarshal([]byte(data), &raw); err != nil {
 			continue
 		}
 
 		evtType, _ := raw["type"].(string)
-		event.Type = evtType
+		evt := StreamEvent{Type: evtType}
 
 		switch evtType {
 		case "content_block_delta":
-			delta, _ := raw["delta"].(map[string]any)
-			if dt, ok := delta["type"].(string); ok {
-				switch dt {
-				case "thinking_delta":
-					event.Type = "thinking"
-					event.Delta, _ = delta["thinking"].(string)
-				case "text_delta":
-					event.Type = "text"
-					event.Delta, _ = delta["text"].(string)
+			if delta, ok := raw["delta"].(map[string]any); ok {
+				if dt, ok := delta["type"].(string); ok {
+					switch dt {
+					case "thinking_delta":
+						evt.Type = "thinking"
+						evt.Delta, _ = delta["thinking"].(string)
+					case "text_delta":
+						evt.Type = "text"
+						evt.Delta, _ = delta["text"].(string)
+					}
 				}
 			}
 		case "content_block_start":
 			if cb, ok := raw["content_block"].(map[string]any); ok {
-				event.Block = mapToBlock(cb)
+				evt.Block = mapToCB(cb)
 			}
-		case "content_block_stop":
-			// index is in raw["index"]; we don't need it for display
 		case "message_delta":
 			if u, ok := raw["usage"].(map[string]any); ok {
-				event.Usage = mapToUsage(u)
+				evt.Usage = mapToLLMUsage(u)
 			}
 		}
 
-		ch <- event
+		ch <- evt
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -276,7 +251,7 @@ func (c *Client) streamSSE(ctx context.Context, messages []MessageParam, tools [
 	}
 }
 
-func mapToBlock(m map[string]any) ContentBlock {
+func mapToCB(m map[string]any) ContentBlock {
 	cb := ContentBlock{}
 	if t, ok := m["type"].(string); ok {
 		cb.Type = t
@@ -299,8 +274,8 @@ func mapToBlock(m map[string]any) ContentBlock {
 	return cb
 }
 
-func mapToUsage(m map[string]any) *Usage {
-	u := &Usage{}
+func mapToLLMUsage(m map[string]any) *LLMUsage {
+	u := &LLMUsage{}
 	if v, ok := m["input_tokens"].(float64); ok {
 		u.InputTokens = int(v)
 	}

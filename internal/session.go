@@ -1,5 +1,4 @@
-// Package session handles persistence of conversation sessions to disk.
-package session
+package internal
 
 import (
 	"crypto/md5"
@@ -11,8 +10,8 @@ import (
 	"time"
 )
 
-// Data contains the serialisable session state.
-type Data struct {
+// SessionData contains the serialisable session state.
+type SessionData struct {
 	Model       string `json:"model"`
 	Messages    []any  `json:"messages"`
 	TotalTokens int    `json:"totalTokens"`
@@ -20,40 +19,37 @@ type Data struct {
 	UpdatedAt   string `json:"updatedAt"`
 }
 
-// Info is summary metadata for a saved session.
-type Info struct {
+// SessionInfo is summary metadata for a saved session.
+type SessionInfo struct {
 	Name      string
 	UpdatedAt string
 }
 
-// Manager persists sessions to ~/.minicode/sessions/<projectHash>/.
-type Manager struct {
+// SessionManager persists sessions to ~/.minicode/sessions/<projectHash>/.
+type SessionManager struct {
 	sessionsDir string
 }
 
-// NewManager creates a session manager for the current working directory.
-func NewManager() *Manager {
+// NewSessionManager creates a session manager for the current working directory.
+func NewSessionManager() *SessionManager {
 	cwd, _ := os.Getwd()
 	hash := fmt.Sprintf("%x", md5.Sum([]byte(cwd)))[:12]
 	home, _ := os.UserHomeDir()
-	return &Manager{
+	return &SessionManager{
 		sessionsDir: filepath.Join(home, ".minicode", "sessions", hash),
 	}
 }
 
-func (m *Manager) ensureDir() error {
-	return os.MkdirAll(m.sessionsDir, 0o755)
-}
+func (m *SessionManager) ensureDir() error { return os.MkdirAll(m.sessionsDir, 0o755) }
 
 // List returns all saved sessions sorted by update time (newest first).
-func (m *Manager) List() ([]Info, error) {
+func (m *SessionManager) List() ([]SessionInfo, error) {
 	_ = m.ensureDir()
 	entries, err := os.ReadDir(m.sessionsDir)
 	if err != nil {
 		return nil, nil
 	}
-
-	var sessions []Info
+	var sessions []SessionInfo
 	for _, e := range entries {
 		if filepath.Ext(e.Name()) != ".json" {
 			continue
@@ -61,17 +57,15 @@ func (m *Manager) List() ([]Info, error) {
 		name := e.Name()[:len(e.Name())-5]
 		data, err := m.Get(name)
 		if err == nil && data != nil {
-			sessions = append(sessions, Info{Name: name, UpdatedAt: data.UpdatedAt})
+			sessions = append(sessions, SessionInfo{Name: name, UpdatedAt: data.UpdatedAt})
 		}
 	}
-	sort.Slice(sessions, func(i, j int) bool {
-		return sessions[i].UpdatedAt > sessions[j].UpdatedAt
-	})
+	sort.Slice(sessions, func(i, j int) bool { return sessions[i].UpdatedAt > sessions[j].UpdatedAt })
 	return sessions, nil
 }
 
 // MostRecent returns the name of the most recently updated session.
-func (m *Manager) MostRecent() (string, error) {
+func (m *SessionManager) MostRecent() (string, error) {
 	sessions, err := m.List()
 	if err != nil || len(sessions) == 0 {
 		return "", err
@@ -80,14 +74,13 @@ func (m *Manager) MostRecent() (string, error) {
 }
 
 // Get loads a named session.
-func (m *Manager) Get(name string) (*Data, error) {
+func (m *SessionManager) Get(name string) (*SessionData, error) {
 	_ = m.ensureDir()
-	path := filepath.Join(m.sessionsDir, name+".json")
-	b, err := os.ReadFile(path)
+	b, err := os.ReadFile(filepath.Join(m.sessionsDir, name+".json"))
 	if err != nil {
 		return nil, err
 	}
-	var data Data
+	var data SessionData
 	if err := json.Unmarshal(b, &data); err != nil {
 		return nil, err
 	}
@@ -95,31 +88,31 @@ func (m *Manager) Get(name string) (*Data, error) {
 }
 
 // Save persists session data.
-func (m *Manager) Save(name string, data *Data) error {
+func (m *SessionManager) Save(name string, data *SessionData) error {
 	_ = m.ensureDir()
 	now := time.Now().Format(time.RFC3339)
 	data.UpdatedAt = now
 	if data.CreatedAt == "" {
 		data.CreatedAt = now
 	}
-	path := filepath.Join(m.sessionsDir, name+".json")
 	b, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, b, 0o644)
+	return os.WriteFile(filepath.Join(m.sessionsDir, name+".json"), b, 0o644)
 }
 
 // Delete removes a saved session.
-func (m *Manager) Delete(name string) error {
+func (m *SessionManager) Delete(name string) error {
 	_ = m.ensureDir()
 	return os.Remove(filepath.Join(m.sessionsDir, name+".json"))
 }
 
 // Rename renames a session file.
-func (m *Manager) Rename(oldName, newName string) error {
+func (m *SessionManager) Rename(oldName, newName string) error {
 	_ = m.ensureDir()
-	oldPath := filepath.Join(m.sessionsDir, oldName+".json")
-	newPath := filepath.Join(m.sessionsDir, newName+".json")
-	return os.Rename(oldPath, newPath)
+	return os.Rename(
+		filepath.Join(m.sessionsDir, oldName+".json"),
+		filepath.Join(m.sessionsDir, newName+".json"),
+	)
 }

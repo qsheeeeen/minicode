@@ -1,20 +1,15 @@
-// Package messages provides the two-layer message model:
-// LLM-facing (MessageParam, ContentBlock — matching Anthropic API shapes)
-// Display-facing (DisplayMessage — for TUI rendering)
-package messages
+// Package internal implements the core of minicode: types, LLM client, tools, agent loop, and session persistence.
+package internal
 
 import "time"
 
-// ---- LLM-layer types (mirror Anthropic SDK) ----
+// ---- LLM-layer types (Anthropic API format) ----
 
-// MessageParam is an LLM-facing message in Anthropic API format.
+// MessageParam is an LLM-facing message.
 type MessageParam struct {
-	Role    string `json:"role"` // "user" | "assistant"
-	Content any    `json:"content"` // string (user) or []ContentBlock (assistant)
-
-	// _display is a user-facing override (not sent to LLM).
-	// When set, toLLMMessages strips it; toDisplayMessages uses it.
-	Display string `json:"_display,omitempty"`
+	Role    string `json:"role"`
+	Content any    `json:"content"`
+	Display string `json:"_display,omitempty"` // user-facing override, stripped before LLM call
 }
 
 // ContentBlock is a single block in an assistant message or a tool result.
@@ -25,11 +20,11 @@ type ContentBlock struct {
 	ID        string `json:"id,omitempty"`
 	Name      string `json:"name,omitempty"`
 	Input     any    `json:"input,omitempty"`
-	ToolUseID string `json:"tool_use_id,omitempty"` // for tool_result blocks
-	Content   string `json:"content,omitempty"`     // for tool_result blocks
+	ToolUseID string `json:"tool_use_id,omitempty"`
+	Content   string `json:"content,omitempty"`
 }
 
-// ---- Display-layer types (for TUI) ----
+// ---- Display-layer types ----
 
 // DisplayRole categorises a display message for rendering.
 type DisplayRole string
@@ -45,14 +40,14 @@ const (
 
 // DisplayMessage is a render-ready message for the TUI.
 type DisplayMessage struct {
-	Role        DisplayRole       `json:"role"`
-	Content     string            `json:"content"`
-	IsStreaming bool              `json:"isStreaming,omitempty"`
-	ToolName    string            `json:"name,omitempty"`  // RoleTool
-	ToolInput   map[string]any    `json:"input,omitempty"` // RoleTool
-	ToolOutput  string            `json:"output,omitempty"` // RoleTool
-	SlotID      string            `json:"slotId,omitempty"` // RoleTool
-	Timestamp   *time.Time        `json:"timestamp,omitempty"`
+	Role        DisplayRole  `json:"role"`
+	Content     string       `json:"content"`
+	IsStreaming bool         `json:"isStreaming,omitempty"`
+	ToolName    string       `json:"name,omitempty"`
+	ToolInput   map[string]any `json:"input,omitempty"`
+	ToolOutput  string       `json:"output,omitempty"`
+	SlotID      string       `json:"slotId,omitempty"`
+	Timestamp   *time.Time   `json:"timestamp,omitempty"`
 }
 
 // StatusMessage is a UI-only message (not sent to LLM).
@@ -65,7 +60,6 @@ type StatusMessage struct {
 
 // ToDisplayMessages converts LLM turns + statuses into render-ready DisplayMessages.
 func ToDisplayMessages(turns []MessageParam, statuses []StatusMessage, streaming bool) []DisplayMessage {
-	// Build result map from tool_result blocks
 	results := make(map[string]string)
 	for _, turn := range turns {
 		if turn.Role == "user" {
@@ -85,15 +79,12 @@ func ToDisplayMessages(turns []MessageParam, statuses []StatusMessage, streaming
 		}
 	}
 
-	// Index statuses by turnIndex
 	byTurnIndex := make(map[int][]StatusMessage)
 	for _, s := range statuses {
 		byTurnIndex[s.TurnIndex] = append(byTurnIndex[s.TurnIndex], s)
 	}
 
 	var display []DisplayMessage
-
-	// Statuses at index 0 come before all turns
 	for _, s := range byTurnIndex[0] {
 		display = append(display, statusToDisplay(s))
 	}
@@ -135,11 +126,11 @@ func ToDisplayMessages(turns []MessageParam, statuses []StatusMessage, streaming
 						input = map[string]any{}
 					}
 					display = append(display, DisplayMessage{
-						Role:      RoleTool,
-						ToolName:  block.Name,
-						ToolInput: input,
+						Role:       RoleTool,
+						ToolName:   block.Name,
+						ToolInput:  input,
 						ToolOutput: results[block.ID],
-						SlotID:    block.ID,
+						SlotID:     block.ID,
 					})
 				}
 			}
@@ -149,14 +140,12 @@ func ToDisplayMessages(turns []MessageParam, statuses []StatusMessage, streaming
 		}
 	}
 
-	// Any unmatched statuses (turnIndex > len(turns))
 	for _, s := range statuses {
 		if s.TurnIndex > len(turns) {
 			display = append(display, statusToDisplay(s))
 		}
 	}
 
-	// Mark last non-empty text/thinking as streaming
 	if streaming {
 		for i := len(display) - 1; i >= 0; i-- {
 			m := &display[i]
