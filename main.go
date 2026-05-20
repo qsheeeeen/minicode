@@ -39,22 +39,64 @@ func main() {
 	}
 
 	ag := internal.NewAgent(cfg)
-	registerAllTools(ag, cfg)
+
+	// Load project skills
+	skills := internal.NewSkillRegistry(resolved.SkillsDir)
+	_ = skills.LoadSkills()
+	ag.SetSkills(skills)
+
+	// Set up command registry (before skill-as-command registration)
+	cmdReg := internal.NewCommandRegistry()
+	internal.RegisterBuiltinCommands(cmdReg)
+
+	// Load global skills and register as slash commands
+	home, _ := os.UserHomeDir()
+	globalSkills := internal.NewSkillRegistry(home + "/.minicode/skills")
+	_ = globalSkills.LoadSkills()
+	for _, sk := range globalSkills.List() {
+		name := sk.Name
+		desc := sk.Description
+		body := globalSkills.GetBody(name)
+		if body != "" && cmdReg != nil {
+			cmdReg.Register(&internal.Command{
+				Name: name, Description: desc, Kind: internal.CmdPrompt,
+				Prompt: func(args []string) string {
+					return "<activated_skill name=\"" + name + "\">\n<instructions>\n" + body + "\n</instructions>\n</activated_skill>"
+				},
+			})
+		}
+	}
+
+	// Register project skills as slash commands too
+	for _, sk := range skills.List() {
+		name := sk.Name
+		desc := sk.Description
+		body := skills.GetBody(name)
+		if body != "" && cmdReg != nil {
+			// Check for name conflicts with builtin commands
+			if _, exists := cmdReg.Get(name); exists {
+				continue
+			}
+			cmdReg.Register(&internal.Command{
+				Name: name, Description: desc, Kind: internal.CmdPrompt,
+				Prompt: func(args []string) string {
+					return "<activated_skill name=\"" + name + "\">\n<instructions>\n" + body + "\n</instructions>\n</activated_skill>"
+				},
+			})
+		}
+	}
+
+	registerAllTools(ag, cfg, skills)
 
 	// Set up permission service
 	permSvc := internal.NewPermissionService(internal.PermissionMode(resolved.PermissionMode))
 	_ = permSvc
-
-	// Set up command registry
-	cmdReg := internal.NewCommandRegistry()
-	internal.RegisterBuiltinCommands(cmdReg)
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
 	prompt := getPrompt(args)
 	if prompt != "" {
-		// Check if it's a slash command in headless
 		cmdCtx := internal.CommandContext{
 			Agent:   ag,
 			ExitFn:  func() { os.Exit(0) },
@@ -64,7 +106,6 @@ func main() {
 			if expanded != "" {
 				prompt = expanded
 			} else {
-				// Handler command executed directly (e.g. /exit)
 				return
 			}
 		}
@@ -83,12 +124,15 @@ func main() {
 	}
 }
 
-func registerAllTools(ag *internal.Agent, cfg internal.AgentConfig) {
+func registerAllTools(ag *internal.Agent, cfg internal.AgentConfig, skills *internal.SkillRegistry) {
 	ag.ToolRegistry().Register(internal.NewReadTool())
 	ag.ToolRegistry().Register(internal.NewWriteTool())
 	ag.ToolRegistry().Register(internal.NewEditTool())
 	ag.ToolRegistry().Register(internal.NewBashTool())
-	ag.ToolRegistry().Register(internal.NewAgentTool(cfg))
+	ag.ToolRegistry().Register(internal.NewSubAgentTool(cfg))
+	ag.ToolRegistry().Register(internal.NewActivateSkillTool(skills))
+	ag.ToolRegistry().Register(internal.NewAskUserTool(nil))
+	ag.ToolRegistry().Register(internal.NewSetModelTool(nil))
 }
 
 func getPrompt(args []string) string {

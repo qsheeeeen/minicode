@@ -36,6 +36,7 @@ type Agent struct {
 	store     *Store
 	tools     *ToolRegistry
 	session   *SessionManager
+	skills    *SkillRegistry
 
 	sessionName string
 	logger      *slog.Logger
@@ -87,6 +88,9 @@ func (a *Agent) Store() *Store { return a.store }
 
 // ToolRegistry returns the tool registry.
 func (a *Agent) ToolRegistry() *ToolRegistry { return a.tools }
+
+// SetSkills sets the skill registry for tool context.
+func (a *Agent) SetSkills(skills *SkillRegistry) { a.skills = skills }
 
 // SessionName returns the current session identifier.
 func (a *Agent) SessionName() string { return a.sessionName }
@@ -408,6 +412,8 @@ func (a *Agent) executeTools(ctx context.Context, calls []toolCall) (denied bool
 		Config:         a.config,
 		CurrentAgentID: "1",
 		ParentRegistry: a.tools,
+		Skills:         a.skills,
+		SetModelFn:     a.SetModel,
 	}
 
 	var results []toolResultItem

@@ -22,6 +22,7 @@ type ModelInfo struct {
 type Config struct {
 	Providers           map[string]ProviderConfig `json:"providers"`
 	Model               string                    `json:"model"`
+	Tiers               map[string]string         `json:"tiers"`
 	CompressionThreshold float64                  `json:"compressionThreshold"`
 	Thinking            bool                      `json:"thinking"`
 	PromptFile          string                    `json:"promptFile"`

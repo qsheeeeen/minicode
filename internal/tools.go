@@ -23,7 +23,10 @@ type ToolContext struct {
 	Config          AgentConfig
 	PermissionSvc   PermissionChecker
 	CurrentAgentID  string
-	ParentRegistry  *ToolRegistry // for sub-agent delegation
+	ParentRegistry  *ToolRegistry   // for sub-agent delegation
+	Skills          *SkillRegistry  // for skill activation
+	SetModelFn      func(model, apiKey, baseURL string, contextLength int) // for model switching
+	AskUserFn       func(question string, options []AskOption, multiSelect bool) string
 }
 
 // AgentConfig is the full agent configuration, shared between the agent and tools.

@@ -6,21 +6,21 @@ import (
 	"strings"
 )
 
-// AgentTool delegates work to a sub-agent (specialised LLM instance).
-type AgentTool struct {
+// SubAgentTool delegates work to a sub-agent (specialised LLM instance).
+type SubAgentTool struct {
 	parentConfig AgentConfig
 }
 
-// NewAgentTool creates an AgentTool.
-func NewAgentTool(parentConfig AgentConfig) *AgentTool {
-	return &AgentTool{parentConfig: parentConfig}
+// NewSubAgentTool creates a SubAgentTool.
+func NewSubAgentTool(parentConfig AgentConfig) *SubAgentTool {
+	return &SubAgentTool{parentConfig: parentConfig}
 }
 
-func (t *AgentTool) Name() string             { return "Agent" }
-func (t *AgentTool) Description() string      { return "Launch a new agent to handle complex, multi-step tasks." }
-func (t *AgentTool) RequiresPermission() bool { return false }
+func (t *SubAgentTool) Name() string             { return "SubAgent" }
+func (t *SubAgentTool) Description() string      { return "Launch a new agent to handle complex, multi-step tasks." }
+func (t *SubAgentTool) RequiresPermission() bool { return false }
 
-func (t *AgentTool) InputSchema() map[string]any {
+func (t *SubAgentTool) InputSchema() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
@@ -31,34 +31,30 @@ func (t *AgentTool) InputSchema() map[string]any {
 	}
 }
 
-func (t *AgentTool) Execute(ctx context.Context, args map[string]any, tc ToolContext) (ToolResult, error) {
+func (t *SubAgentTool) Execute(ctx context.Context, args map[string]any, tc ToolContext) (ToolResult, error) {
 	prompt, _ := args["prompt"].(string)
 	description, _ := args["description"].(string)
 	if prompt == "" {
 		return ToolResult{Output: "Error: prompt is required"}, nil
 	}
 
-	// Create a sub-agent with the same config but no tools (to avoid recursion)
 	subCfg := t.parentConfig
-	subCfg.ExcludeTools = nil // sub-agents get all tools too for now
+	subCfg.ExcludeTools = nil
 
 	subAgent := NewAgent(subCfg)
-	// Copy tools from parent
 	for _, tool := range tc.ParentRegistry.All() {
-		if tool.Name() == "Agent" {
-			continue // Don't allow recursive agent spawning
+		if tool.Name() == "SubAgent" {
+			continue
 		}
 		subAgent.tools.Register(tool)
 	}
 
-	// Run the sub-agent with the prompt
 	ok, err := subAgent.Run(ctx, prompt)
 	if err != nil {
 		return ToolResult{Output: fmt.Sprintf("Sub-agent error: %s", err.Error())}, nil
 	}
 	_ = ok
 
-	// Collect the sub-agent's response as the result
 	subTurns := subAgent.store.Turns()
 	var output strings.Builder
 	for _, turn := range subTurns {
