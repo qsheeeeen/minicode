@@ -162,12 +162,12 @@ func TestTUIModel_RenderAllRoles(t *testing.T) {
 		{Role: domain.RoleUser, Content: "hi"},
 		{Role: domain.RoleThinking, Content: "let me think"},
 		{Role: domain.RoleText, Content: "response", IsStreaming: true},
-		{Role: domain.RoleTool, ToolName: "Read", ToolOutput: "content"},
+		{Role: domain.RoleTool, ToolName: "Bash", ToolOutput: "command output"},
 		{Role: domain.RoleStatus, Content: "done"},
 		{Role: domain.RoleError, Content: "oops"},
 	}
 	rendered := m.renderMessages()
-	for _, expect := range []string{"hi", "think", "response", "Read", "content", "done", "oops"} {
+	for _, expect := range []string{"hi", "think", "response", "Bash", "command output", "done", "oops"} {
 		if !strings.Contains(rendered, expect) {
 			t.Errorf("renderMessages missing %q", expect)
 		}

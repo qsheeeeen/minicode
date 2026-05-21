@@ -260,6 +260,11 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.agent.Abort()
 			return m, tea.Quit
 
+		case tea.KeyTab:
+			if p := m.agent.PermissionSvc(); p != nil {
+				p.CycleMode()
+			}
+
 		case tea.KeyEsc:
 			if m.streaming {
 				m.agent.Abort()
@@ -522,32 +527,52 @@ func (m *TUIModel) renderInput() string {
 	}
 
 	if m.askPending {
-		var lines []string
-		lines = append(lines, styleYellow.Render("? ")+m.askQuestion)
+		// Yellow round border for question (matches TS)
+		questionBox := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("3")).Padding(0, 1).Render(m.askQuestion)
+
+		// Align option labels to same width
+		maxLabel := 0
+		for _, opt := range m.askOptions {
+			if len(opt.Label) > maxLabel {
+				maxLabel = len(opt.Label)
+			}
+		}
+		var optLines []string
 		for i, opt := range m.askOptions {
 			arrow := "  "
-			style := styleDim
+			label := styleDim.Render(opt.Label)
 			if i == m.askCurrent {
 				arrow = styleInputArrow.Render("> ")
-				style = styleHeaderCyan
+				label = styleHeaderCyan.Render(opt.Label)
 			}
-			checked := " "
-			if m.askMulti && m.askSelected[i] {
-				checked = "x"
-			}
-			prefix := arrow
+			marker := ""
 			if m.askMulti {
-				prefix += "[" + checked + "] "
+				chk := " "
+				if m.askSelected[i] {
+					chk = "x"
+				}
+				marker = "[" + chk + "] "
 			}
-			line := fmt.Sprintf("%s%s %s", prefix, style.Render(opt.Label), styleDim.Render(opt.Description))
-			lines = append(lines, line)
+			padded := opt.Label + strings.Repeat(" ", maxLabel-len(opt.Label))
+			desc := ""
+			if opt.Description != "" {
+				desc = "  " + styleDim.Render(opt.Description)
+			}
+			optLines = append(optLines, fmt.Sprintf("%s%s%s%s", arrow, marker, label, desc))
+			_ = padded
 		}
 		footer := styleDim.Render("↑↓ navigate")
 		if m.askMulti {
 			footer += styleDim.Render("  Space toggle")
 		}
-		footer += styleDim.Render("  Enter accept")
-		return strings.Join(lines, "\n") + "\n " + footer
+		footer += styleDim.Render("  Enter accept  Esc cancel")
+
+		// Gray single border for options (matches TS)
+		selectBox := lipgloss.NewStyle().Border(lipgloss.NormalBorder()).BorderForeground(lipgloss.Color("8")).Padding(0, 1).Render(
+			strings.Join(optLines, "\n") + "\n" + footer,
+		)
+
+		return questionBox + "\n" + selectBox
 	}
 
 	prefix := styleInputArrow.Render("> ")
@@ -621,11 +646,15 @@ func (m *TUIModel) renderStatusBar() string {
 
 func (m *TUIModel) renderMessages() string {
 	if len(m.messages) == 0 {
-		return "No messages yet. Type something to start.\n"
+		return "\n\n" + styleDim.Render("Type a message to start...") + "\n"
 	}
 
 	var lines []string
 	for _, msg := range m.messages {
+		// Match TS filtering: tool always, status only if (not applicable in Go), others only if content
+		if msg.Role != domain.RoleTool && msg.Role != domain.RoleStatus && msg.Role != domain.RoleError && msg.Content == "" {
+			continue
+		}
 		switch msg.Role {
 		case domain.RoleUser:
 			lines = append(lines, styleUserBg.Render(strings.TrimSpace(msg.Content)))
@@ -660,7 +689,11 @@ func (m *TUIModel) renderMessages() string {
 
 			lines = append(lines, styleToolCall.Render(call))
 			if msg.ToolOutput != "" {
-				if msg.ToolName == "Edit" {
+				// Read summarises: "Read N lines, M chars" (matches TS)
+				if msg.ToolName == "Read" {
+					nl := strings.Count(msg.ToolOutput, "\n") + 1
+					lines = append(lines, styleDim.Render(fmt.Sprintf("Read %d lines, %d chars", nl, len(msg.ToolOutput))))
+				} else if msg.ToolName == "Edit" {
 					for _, line := range strings.Split(msg.ToolOutput, "\n") {
 						if strings.Contains(line, " + ") {
 							lines = append(lines, styleGreen.Render(line))
@@ -685,7 +718,14 @@ func (m *TUIModel) renderMessages() string {
 			lines = append(lines, "")
 		}
 	}
-	return strings.Join(lines, "\n") + "\n"
+	result := strings.Join(lines, "\n") + "\n"
+
+	// Multi-agent switch hint (matches TS)
+	if len(m.sessions) > 1 {
+		result += styleYellow.Render("Ctrl+O: switch agent") + "\n"
+	}
+
+	return result
 }
 
 // ---- Helpers ----
