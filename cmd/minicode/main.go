@@ -1,0 +1,177 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"os"
+	"os/signal"
+	"strings"
+	"syscall"
+
+	"github.com/spf13/cobra"
+	"minicode/internal/agent"
+	"minicode/internal/config"
+	"minicode/internal/domain"
+	"minicode/internal/skills"
+	"minicode/internal/storage"
+	"minicode/internal/tools"
+	"minicode/internal/ui"
+)
+
+var (
+	modelOverride  string
+	sessionName    string
+	resumeRecent   bool
+	permissionMode string
+)
+
+func main() {
+	rootCmd := &cobra.Command{
+		Use:   "minicode [prompt]",
+		Short: "Mini Code - Interactive CLI Programming Agent",
+		Args:  cobra.MaximumNArgs(1),
+		Run:   run,
+	}
+
+	rootCmd.Flags().StringVarP(&modelOverride, "model", "m", "", "Override model (model@provider)")
+	rootCmd.Flags().StringVarP(&sessionName, "session", "s", "", "Session name to load/save")
+	rootCmd.Flags().BoolVarP(&resumeRecent, "resume", "r", false, "Resume the most recent session")
+	rootCmd.Flags().StringVarP(&permissionMode, "permission", "p", "", "Permission mode (manual, yolo, auto)")
+
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+func run(cmd *cobra.Command, args []string) {
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+
+	resolved, err := config.Resolve(modelOverride)
+	if err != nil || (resolved != nil && resolved.Model.APIKey == "") {
+		fmt.Fprintln(os.Stderr, "Error: No valid model configuration found. Run with --model to specify one or check ~/.minicode/config.json")
+		os.Exit(1)
+	}
+
+	// Load global prompt
+	userPrompt := ""
+	if home, err := os.UserHomeDir(); err == nil {
+		if data, err := os.ReadFile(home + "/.minicode/AGENTS.md"); err == nil {
+			userPrompt = string(data)
+		}
+	}
+
+	if permissionMode != "" {
+		resolved.PermissionMode = permissionMode
+	}
+
+	cfg := domain.AgentConfig{
+		APIKey:                    resolved.Model.APIKey,
+		BaseURL:                   resolved.Model.BaseURL,
+		Model:                     resolved.Model.Model,
+		ContextLength:             resolved.Model.ContextLength,
+		CompressionThresholdRatio: resolved.CompressionThreshold,
+		ThinkingEnabled:           resolved.Thinking.Enabled,
+		ThinkingBudget:            resolved.Thinking.BudgetTokens,
+		Effort:                    resolved.Thinking.Effort,
+		ProjectPromptFile:         resolved.PromptFile,
+		UserPrompt:                userPrompt,
+	}
+
+	ag := agent.NewAgent(cfg)
+
+	// Load project skills
+	skRegistry := skills.NewSkillRegistry(resolved.SkillsDir)
+	registerBuiltinSkills(skRegistry, resolved.PromptFile)
+	_ = skRegistry.LoadSkills()
+	ag.SetSkills(skRegistry)
+
+	// Session management
+	sm := storage.NewSessionManager()
+	if sessionName != "" {
+		if err := ag.LoadSession(sessionName); err != nil {
+			ag.SetSession(sessionName)
+		}
+	} else if resumeRecent {
+		if name, err := sm.MostRecent(); err == nil && name != "" {
+			_ = ag.LoadSession(name)
+		}
+	}
+
+	// Tools
+	registry := ag.ToolRegistry()
+	registry.Register(tools.NewReadTool())
+	registry.Register(tools.NewWriteTool())
+	registry.Register(tools.NewEditTool())
+	registry.Register(tools.NewBashTool())
+	registry.Register(tools.NewAskUserTool())
+	registry.Register(tools.NewActivateSkillTool())
+	registry.Register(tools.NewSubAgentTool(cfg))
+	registry.Register(tools.NewSetModelTool())
+
+	// Permission service
+	permSvc := tools.NewPermissionService(domain.PermissionMode(resolved.PermissionMode))
+	ag.SetPermissionSvc(permSvc)
+
+	// Commands
+	cmdReg := ui.NewCommandRegistry()
+	cmdReg.RegisterBuiltins()
+	ag.SetCommandResolver(func(input string) (handled bool, promptText string, displayContent string) {
+		ctx := ui.CommandContext{
+			Agent:   ag,
+			ExitFn:  func() { os.Exit(0) },
+			ClearFn: ag.ClearSession,
+		}
+		handled, expanded := cmdReg.ParseAndExecute(input, ctx)
+		return handled, expanded, input
+	})
+
+	prompt := ""
+	if len(args) > 0 {
+		prompt = args[0]
+	} else {
+		// check for piped input
+		stat, _ := os.Stdin.Stat()
+		if (stat.Mode() & os.ModeCharDevice) == 0 {
+			data, _ := io.ReadAll(os.Stdin)
+			if len(data) > 0 {
+				prompt = strings.TrimSpace(string(data))
+			}
+		}
+	}
+
+	if prompt != "" {
+		if err := ui.RunHeadless(ctx, ag, prompt, prompt); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %s\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	// Interactive TUI
+	agentReg := agent.NewAgentRegistry(ag)
+	ag.SetRegistry(agentReg)
+
+	if err := ui.RunTUI(ag, agentReg, cmdReg); err != nil {
+		fmt.Fprintf(os.Stderr, "TUI error: %s\n", err)
+		os.Exit(1)
+	}
+}
+
+func registerBuiltinSkills(r *skills.SkillRegistry, promptFile string) {
+	r.RegisterBuiltin(`---
+name: skill-creator
+description: "Guide for creating effective skills. This skill should be used when users want to create a new skill (or update an existing skill) that extends minicode's capabilities with specialized knowledge, workflows, or tool integrations."
+---
+# Skill Creator Guide
+
+This skill provides guidance for creating effective skills in minicode using the agentskills.io format.`)
+
+	r.RegisterBuiltin(fmt.Sprintf(`---
+name: init
+description: "Set up a minimal %s for this repo with codebase exploration and optional skills."
+---
+Set up a minimal %s (and optionally skills) for this repo.`, promptFile, promptFile))
+}
