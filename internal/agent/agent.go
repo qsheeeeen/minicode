@@ -21,7 +21,7 @@ import (
 
 // Agent orchestrates the conversation loop.
 type Agent struct {
-	client    *llm.Client
+	client    llm.Client
 	config    domain.AgentConfig
 	store     *Store
 	tools     *tools.ToolRegistry
@@ -247,7 +247,7 @@ func (a *Agent) Run(ctx context.Context, userMessage, displayContent string) (bo
 		}
 
 		toolDefs := a.buildLLMTools()
-		_, toolCalls, hasTools, err := a.handleStream(ctx, toolDefs)
+		toolCalls, hasTools, err := a.handleStream(ctx, toolDefs)
 		if err != nil {
 			if errors.Is(err, context.Canceled) || err.Error() == "context canceled" {
 				runErr = err
@@ -332,18 +332,17 @@ type toolCall struct {
 	Tool  tools.Tool
 }
 
-func (a *Agent) handleStream(ctx context.Context, toolDefs []llm.Tool) (*llm.Message, []toolCall, bool, error) {
+func (a *Agent) handleStream(ctx context.Context, toolDefs []llm.Tool) ([]toolCall, bool, error) {
 	a.store.StartAssistantTurn()
 
 	ch, err := a.client.ChatStream(ctx, a.store.ToLLMMessages(), toolDefs, llm.ChatOptions{
 		Model:           a.config.Model,
 		System:          a.systemPrompt,
 		ThinkingEnabled: a.config.ThinkingEnabled,
-		ThinkingBudget:  a.config.ThinkingBudget,
-		Effort:          a.config.Effort,
+		ThinkingBudget:  int64(a.config.ThinkingBudget),
 	})
 	if err != nil {
-		return nil, nil, false, err
+		return nil, false, err
 	}
 
 	var toolCalls []toolCall
@@ -360,7 +359,7 @@ func (a *Agent) handleStream(ctx context.Context, toolDefs []llm.Tool) (*llm.Mes
 
 	for evt := range ch {
 		if evt.Error != nil {
-			return nil, nil, false, evt.Error
+			return nil, false, evt.Error
 		}
 
 		switch evt.Type {
@@ -440,7 +439,7 @@ func (a *Agent) handleStream(ctx context.Context, toolDefs []llm.Tool) (*llm.Mes
 		a.processTokenUsage(totalUsage)
 	}
 
-	return nil, toolCalls, hasToolCalls, nil
+	return toolCalls, hasToolCalls, nil
 }
 
 func (a *Agent) buildLLMTools() []llm.Tool {
