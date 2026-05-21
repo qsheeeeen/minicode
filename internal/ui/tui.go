@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/progress"
+	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
@@ -72,6 +74,8 @@ type TUIModel struct {
 	cmdReg        *CommandRegistry
 	viewport      viewport.Model
 	input         textarea.Model
+	spinner       spinner.Model
+	prog          progress.Model
 
 	messages   []domain.DisplayMessage
 	streaming  bool
@@ -118,12 +122,20 @@ func NewTUIModel(ag *agent.Agent, registry *agent.AgentRegistry, cmdReg *Command
 
 	vp := viewport.New(80, 20)
 
+	sp := spinner.New()
+	sp.Spinner = spinner.Dot
+	sp.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("5"))
+
+	pg := progress.New(progress.WithDefaultGradient())
+
 	m := &TUIModel{
 		agent:         ag,
 		agentRegistry: registry,
 		cmdReg:        cmdReg,
 		viewport:      vp,
 		input:         ta,
+		spinner:       sp,
+		prog:          pg,
 		modelName:     ag.Model(),
 		session:       ag.SessionName(),
 		messages:      ToDisplayMessages(ag.Store().Turns(), ag.Store().Statuses(), ag.Store().IsStreaming()),
@@ -187,7 +199,7 @@ func NewTUIModel(ag *agent.Agent, registry *agent.AgentRegistry, cmdReg *Command
 
 // Init is the Bubble Tea Init function.
 func (m *TUIModel) Init() tea.Cmd {
-	return textarea.Blink
+	return tea.Batch(textarea.Blink, m.spinner.Tick)
 }
 
 // Update is the Bubble Tea Update function.
@@ -395,7 +407,13 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.viewport.Width = msg.Width - 4
 		m.viewport.Height = msg.Height - headerHeight - footerHeight
 		m.input.SetWidth(msg.Width - 4)
+		m.prog.Width = msg.Width - 20
 		m.ready = true
+
+	case spinner.TickMsg:
+		var cmd tea.Cmd
+		m.spinner, cmd = m.spinner.Update(msg)
+		cmds = append(cmds, cmd)
 	}
 
 	var cmd tea.Cmd
@@ -534,7 +552,7 @@ func (m *TUIModel) renderInput() string {
 
 	prefix := styleInputArrow.Render("> ")
 	if m.streaming {
-		prefix = styleDim.Render("… ")
+		prefix = m.spinner.View() + " "
 	}
 
 	inputView := prefix + m.input.View()
@@ -580,13 +598,6 @@ func (m *TUIModel) renderStatusBar() string {
 		pct = 100
 	}
 
-	barWidth := 20
-	filled := int((pct / 100) * float64(barWidth))
-	if filled > barWidth {
-		filled = barWidth
-	}
-	bar := strings.Repeat("█", filled) + strings.Repeat("░", barWidth-filled)
-
 	permMode := "manual"
 	if p := m.agent.PermissionSvc(); p != nil {
 		permMode = string(p.Mode())
@@ -600,7 +611,7 @@ func (m *TUIModel) renderStatusBar() string {
 	}
 
 	line2 := styleDim.Render(fmt.Sprintf("%d/%d ", m.tokenCount, ctxLen)) +
-		bar +
+		m.prog.ViewAs(pct/100) +
 		styleDim.Render(fmt.Sprintf(" %d%% │ ", int(pct))) +
 		modeColor.Render(permMode) +
 		styleDim.Render(" (Shift+Tab)")
