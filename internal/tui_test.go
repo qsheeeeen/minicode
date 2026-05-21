@@ -166,7 +166,7 @@ func TestTUIModel_MultiAgentSwitch(t *testing.T) {
 	ag2.SetSession("session-2")
 
 	reg := NewAgentRegistry(ag1)
-	reg.Add(ag2)
+	reg.Register(&AgentSession{ID: "2", Agent: ag2})
 
 	m := NewTUIModel(ag1, reg, nil)
 	_, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})

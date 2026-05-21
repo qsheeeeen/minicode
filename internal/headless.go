@@ -2,6 +2,7 @@ package internal
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -9,6 +10,12 @@ import (
 
 // RunHeadless executes the agent in headless (non-TUI) mode, streaming output to stdout.
 func RunHeadless(ctx context.Context, ag *Agent, initialPrompt, displayPrompt string) error {
+	// Set non-interactive prompter for headless mode
+	ag.SetAskUserFn(func(question string, options []AskOption, multi bool) string {
+		fmt.Fprintf(os.Stderr, "[headless] AskUser tool skipped: %s\n", question)
+		return ""
+	})
+
 	// Track what has already been printed for incremental rendering
 	printedTurns := 0
 	printedBlocks := make(map[int]int)      // turnIndex → blocks printed
@@ -16,6 +23,7 @@ func RunHeadless(ctx context.Context, ag *Agent, initialPrompt, displayPrompt st
 	finalizedBlocks := make(map[string]bool)
 	printedToolUses := make(map[string]bool)
 	printedResults := make(map[string]bool)
+	printedStatus := make(map[int]bool)
 
 	render := func(isFinal bool) {
 		turns := ag.store.Turns()
@@ -136,7 +144,15 @@ func RunHeadless(ctx context.Context, ag *Agent, initialPrompt, displayPrompt st
 									for _, raw := range rc {
 										if rb, ok := raw.(map[string]any); ok {
 											if rb["type"] == "tool_result" && rb["tool_use_id"] == block.ID {
-												c, _ := rb["content"].(string)
+												var c string
+												switch cv := rb["content"].(type) {
+												case string:
+													c = cv
+												default:
+													if data, err := json.Marshal(cv); err == nil {
+														c = string(data)
+													}
+												}
 												for _, line := range strings.Split(c, "\n") {
 													if line != "" {
 														fmt.Fprintf(os.Stdout, "       %s\n", line)
@@ -190,10 +206,10 @@ func RunHeadless(ctx context.Context, ag *Agent, initialPrompt, displayPrompt st
 		}
 
 		// Print any new status/error messages
-		printedStatus := make(map[int]bool)
 		for _, s := range ag.Store().Statuses() {
-			if !printedStatus[s.TurnIndex] {
-				printedStatus[s.TurnIndex] = true
+			statusKey := s.TurnIndex*1000000 + int(s.Timestamp.Unix())%1000000
+			if !printedStatus[statusKey] {
+				printedStatus[statusKey] = true
 				if s.Role == RoleError {
 					fmt.Fprintf(os.Stderr, "[error] %s\n", s.Content)
 				}
@@ -216,14 +232,9 @@ func jsonString(v any) string {
 	if v == nil {
 		return "{}"
 	}
-	switch val := v.(type) {
-	case map[string]any:
-		parts := make([]string, 0, len(val))
-		for k, vv := range val {
-			parts = append(parts, fmt.Sprintf("%q:%v", k, vv))
-		}
-		return "{" + strings.Join(parts, ", ") + "}"
-	default:
+	data, err := json.Marshal(v)
+	if err != nil {
 		return fmt.Sprintf("%v", v)
 	}
+	return string(data)
 }

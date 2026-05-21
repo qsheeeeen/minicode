@@ -56,7 +56,7 @@ func (p *PermissionService) SetPromptFn(fn func(displayText string) string) {
 }
 
 // Check implements the PermissionChecker interface.
-func (p *PermissionService) Check(toolName, displayText string) (allowed bool, reason string) {
+func (p *PermissionService) Check(toolName, displayText string, toolInput map[string]any) (allowed bool, reason string) {
 	switch p.mode {
 	case PermYolo:
 		return true, ""
@@ -79,19 +79,19 @@ func (p *PermissionService) Check(toolName, displayText string) (allowed bool, r
 		return false, fmt.Sprintf("Tool %s denied in headless mode. Use --permission yolo", toolName)
 	case PermAuto:
 		if p.autoDecideFn != nil {
-			return p.autoDecideFn(toolName, nil)
+			return p.autoDecideFn(toolName, toolInput)
 		}
 		// Fallback when no LLM client: allow read operations, deny destructive ones
 		if isReadTool(toolName) {
 			return true, ""
 		}
-		return false, fmt.Sprintf("Auto-gate denied: %s", toolName)
+		return false, fmt.Sprintf("Auto-gate denied: %s (non-read tool)", toolName)
 	}
 	return false, "unknown mode"
 }
 
 func isReadTool(name string) bool {
-	return strings.EqualFold(name, "Read") || strings.EqualFold(name, "Bash")
+	return strings.EqualFold(name, "Read")
 }
 
 // Ensure PermissionService implements PermissionChecker.

@@ -49,10 +49,13 @@ type StreamEvent struct {
 
 // ChatOptions contains optional parameters for a chat request.
 type ChatOptions struct {
-	Model     string
-	MaxTokens int
-	System    string
-	Signal    <-chan struct{}
+	Model           string
+	MaxTokens       int
+	System          string
+	ThinkingEnabled bool
+	ThinkingBudget  int
+	Effort          string
+	Signal          <-chan struct{}
 }
 
 // ---- Client ----
@@ -92,34 +95,52 @@ func (c *Client) ChatStream(ctx context.Context, messages []MessageParam, tools 
 }
 
 type chatRequest struct {
-	Model     string         `json:"model"`
-	MaxTokens int            `json:"max_tokens"`
-	System    string         `json:"system,omitempty"`
-	Messages  []MessageParam `json:"messages"`
-	Tools     []LLMTool      `json:"tools,omitempty"`
-	Stream    bool           `json:"stream"`
-	Thinking  map[string]any `json:"thinking,omitempty"`
+	Model        string         `json:"model"`
+	MaxTokens    int            `json:"max_tokens"`
+	System       string         `json:"system,omitempty"`
+	Messages     []MessageParam `json:"messages"`
+	Tools        []LLMTool      `json:"tools,omitempty"`
+	Stream       bool           `json:"stream"`
+	Thinking     map[string]any `json:"thinking,omitempty"`
+	OutputConfig map[string]any `json:"output_config,omitempty"`
 }
 
 func (c *Client) send(ctx context.Context, messages []MessageParam, tools []LLMTool, opts ChatOptions, stream bool) (*LLMMessage, error) {
 	model := opts.Model
 	if model == "" {
-		model = "claude-sonnet-4-5"
+		model = "claude-3-7-sonnet-20250219"
 	}
 	maxTokens := opts.MaxTokens
 	if maxTokens == 0 {
 		maxTokens = 8192
 	}
 
-	payload, err := json.Marshal(chatRequest{
+	creq := chatRequest{
 		Model:     model,
 		MaxTokens: maxTokens,
 		System:    opts.System,
 		Messages:  messages,
 		Tools:     tools,
 		Stream:    stream,
-		Thinking:  map[string]any{"type": "adaptive"},
-	})
+	}
+
+	if opts.ThinkingEnabled {
+		budget := opts.ThinkingBudget
+		if budget == 0 {
+			budget = 4096
+		}
+		creq.Thinking = map[string]any{
+			"type":          "enabled",
+			"budget_tokens": budget,
+		}
+		if opts.Effort != "" {
+			creq.OutputConfig = map[string]any{
+				"effort": opts.Effort,
+			}
+		}
+	}
+
+	payload, err := json.Marshal(creq)
 	if err != nil {
 		return nil, fmt.Errorf("marshal request: %w", err)
 	}
@@ -153,22 +174,39 @@ func (c *Client) send(ctx context.Context, messages []MessageParam, tools []LLMT
 func (c *Client) streamSSE(ctx context.Context, messages []MessageParam, tools []LLMTool, opts ChatOptions, ch chan<- StreamEvent) {
 	model := opts.Model
 	if model == "" {
-		model = "claude-sonnet-4-5"
+		model = "claude-3-7-sonnet-20250219"
 	}
 	maxTokens := opts.MaxTokens
 	if maxTokens == 0 {
 		maxTokens = 8192
 	}
 
-	payload, err := json.Marshal(chatRequest{
+	creq := chatRequest{
 		Model:     model,
 		MaxTokens: maxTokens,
 		System:    opts.System,
 		Messages:  messages,
 		Tools:     tools,
 		Stream:    true,
-		Thinking:  map[string]any{"type": "adaptive"},
-	})
+	}
+
+	if opts.ThinkingEnabled {
+		budget := opts.ThinkingBudget
+		if budget == 0 {
+			budget = 4096
+		}
+		creq.Thinking = map[string]any{
+			"type":          "enabled",
+			"budget_tokens": budget,
+		}
+		if opts.Effort != "" {
+			creq.OutputConfig = map[string]any{
+				"effort": opts.Effort,
+			}
+		}
+	}
+
+	payload, err := json.Marshal(creq)
 	if err != nil {
 		ch <- StreamEvent{Error: fmt.Errorf("marshal request: %w", err)}
 		return
@@ -227,6 +265,12 @@ func (c *Client) streamSSE(ctx context.Context, messages []MessageParam, tools [
 		}
 
 		switch evtType {
+		case "message_start":
+			if msg, ok := raw["message"].(map[string]any); ok {
+				if u, ok := msg["usage"].(map[string]any); ok {
+					evt.Usage = mapToLLMUsage(u)
+				}
+			}
 		case "content_block_delta":
 			if delta, ok := raw["delta"].(map[string]any); ok {
 				if dt, ok := delta["type"].(string); ok {

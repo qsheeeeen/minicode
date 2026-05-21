@@ -257,3 +257,13 @@ func (s *Store) Replace(turns []MessageParam) {
 	s.mu.Unlock()
 	s.notify()
 }
+
+// Pop removes the last turn from the store.
+func (s *Store) Pop() {
+	s.mu.Lock()
+	if len(s.turns) > 0 {
+		s.turns = s.turns[:len(s.turns)-1]
+	}
+	s.mu.Unlock()
+	s.notify()
+}

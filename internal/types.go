@@ -1,7 +1,10 @@
 // Package internal implements the core of minicode: types, LLM client, tools, agent loop, and session persistence.
 package internal
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 // ---- LLM-layer types (Anthropic API format) ----
 
@@ -194,9 +197,16 @@ func extractResults(content any, results map[string]string) {
 		for _, b := range c {
 			if block, ok := b.(map[string]any); ok {
 				if block["type"] == "tool_result" {
-					if content, ok := block["content"].(string); ok {
-						if id, ok := block["tool_use_id"].(string); ok {
-							results[id] = content
+					id, _ := block["tool_use_id"].(string)
+					if id == "" {
+						continue
+					}
+					switch v := block["content"].(type) {
+					case string:
+						results[id] = v
+					default:
+						if data, err := json.Marshal(v); err == nil {
+							results[id] = string(data)
 						}
 					}
 				}

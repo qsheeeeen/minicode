@@ -52,12 +52,12 @@ func TestPermissionService_CycleThroughAll(t *testing.T) {
 
 func TestPermissionService_YoloAlwaysAllowed(t *testing.T) {
 	ps := NewPermissionService(PermYolo)
-	allowed, _ := ps.Check("Write", "Write /tmp/test.txt")
+	allowed, _ := ps.Check("Write", "Write /tmp/test.txt", nil)
 	if !allowed {
 		t.Error("yolo should allow all")
 	}
 	// Even dangerous commands
-	allowed2, _ := ps.Check("Bash", "rm -rf /")
+	allowed2, _ := ps.Check("Bash", "rm -rf /", nil)
 	if !allowed2 {
 		t.Error("yolo should allow even dangerous commands")
 	}
@@ -68,7 +68,7 @@ func TestPermissionService_ManualWithPromptYes(t *testing.T) {
 	ps.SetPromptFn(func(displayText string) string {
 		return "yes"
 	})
-	allowed, _ := ps.Check("Write", "Write /tmp/test.txt")
+	allowed, _ := ps.Check("Write", "Write /tmp/test.txt", nil)
 	if !allowed {
 		t.Error("manual with 'yes' should allow")
 	}
@@ -76,7 +76,7 @@ func TestPermissionService_ManualWithPromptYes(t *testing.T) {
 
 func TestPermissionService_ManualWithoutPrompter(t *testing.T) {
 	ps := NewPermissionService(PermManual)
-	allowed, reason := ps.Check("Write", "Write /tmp/test.txt")
+	allowed, reason := ps.Check("Write", "Write /tmp/test.txt", nil)
 	if allowed {
 		t.Error("manual without prompter should deny")
 	}
@@ -90,7 +90,7 @@ func TestPermissionService_ManualPromptReturnsNo(t *testing.T) {
 	ps.SetPromptFn(func(displayText string) string {
 		return "no"
 	})
-	allowed, reason := ps.Check("Write", "Write /tmp/test.txt")
+	allowed, reason := ps.Check("Write", "Write /tmp/test.txt", nil)
 	if allowed {
 		t.Error("'no' should deny")
 	}
@@ -104,7 +104,7 @@ func TestPermissionService_ManualPromptReturnsEmpty(t *testing.T) {
 	ps.SetPromptFn(func(displayText string) string {
 		return ""
 	})
-	allowed, reason := ps.Check("Write", "Write /tmp/test.txt")
+	allowed, reason := ps.Check("Write", "Write /tmp/test.txt", nil)
 	if allowed {
 		t.Error("empty/cancel should deny")
 	}
@@ -118,7 +118,7 @@ func TestPermissionService_ManualPromptYoloSwitchesMode(t *testing.T) {
 	ps.SetPromptFn(func(displayText string) string {
 		return "yolo"
 	})
-	ps.Check("Write", "Write /tmp/test.txt")
+	ps.Check("Write", "Write /tmp/test.txt", nil)
 	if ps.Mode() != PermYolo {
 		t.Error("'yolo' answer should switch mode to yolo")
 	}
@@ -126,7 +126,7 @@ func TestPermissionService_ManualPromptYoloSwitchesMode(t *testing.T) {
 
 func TestPermissionService_AutoModeAllowRead(t *testing.T) {
 	ps := NewPermissionService(PermAuto)
-	allowed, _ := ps.Check("Read", "Read file.txt")
+	allowed, _ := ps.Check("Read", "Read file.txt", nil)
 	if !allowed {
 		t.Error("auto mode should allow Read tool")
 	}
@@ -134,7 +134,7 @@ func TestPermissionService_AutoModeAllowRead(t *testing.T) {
 
 func TestPermissionService_AutoModeDenyWrite(t *testing.T) {
 	ps := NewPermissionService(PermAuto)
-	allowed, reason := ps.Check("Write", "Write file.txt")
+	allowed, reason := ps.Check("Write", "Write file.txt", nil)
 	if allowed {
 		t.Error("auto mode should deny Write (not in allowlist)")
 	}
@@ -145,16 +145,16 @@ func TestPermissionService_AutoModeDenyWrite(t *testing.T) {
 
 func TestPermissionService_AutoModeDenyBash(t *testing.T) {
 	ps := NewPermissionService(PermAuto)
-	// Bash is in isReadTool allowlist
-	allowed, _ := ps.Check("Bash", "echo hello")
-	if !allowed {
-		t.Error("Bash should be allowed in auto mode (in isReadTool)")
+	// Bash is NOT in isReadTool allowlist anymore for security
+	allowed, _ := ps.Check("Bash", "echo hello", nil)
+	if allowed {
+		t.Error("Bash should be denied in auto mode by default fallback")
 	}
 }
 
 func TestPermissionService_AutoModeDenyEdit(t *testing.T) {
 	ps := NewPermissionService(PermAuto)
-	allowed, _ := ps.Check("Edit", "Edit file.txt")
+	allowed, _ := ps.Check("Edit", "Edit file.txt", nil)
 	if allowed {
 		t.Error("Edit should not be in isReadTool")
 	}
@@ -174,7 +174,7 @@ func TestPermissionService_DisplayTextPassed(t *testing.T) {
 		receivedText = displayText
 		return "yes"
 	})
-	ps.Check("Bash", "echo 'hello world'")
+	ps.Check("Bash", "echo 'hello world'", nil)
 	if !strings.Contains(receivedText, "echo") {
 		t.Errorf("display text not passed to prompter: %q", receivedText)
 	}

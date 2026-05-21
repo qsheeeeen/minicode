@@ -44,10 +44,18 @@ type agentDoneMsg struct {
 
 type permPromptMsg struct {
 	displayText string
+	resolve     chan string
 }
 
-type permResolveMsg struct {
-	answer string
+type sessionUpdateMsg struct {
+	sessions []AgentSession
+}
+
+type askPromptMsg struct {
+	question string
+	options  []AskOption
+	multi    bool
+	resolve  chan string
 }
 
 // ---- Model ----
@@ -67,10 +75,28 @@ type TUIModel struct {
 	modelName  string
 	session    string
 
+	// Hierarchical sessions
+	sessions []AgentSession
+	activeID string
+
+	// Autocomplete state
+	suggestions []Command
+	selectedIdx int
+
 	// Permission prompt state
 	permPending bool
 	permText    string
 	permOptions []string
+	permResolve chan string // to return the answer
+
+	// Generic prompter state (AskUser tool)
+	askPending  bool
+	askQuestion string
+	askOptions  []AskOption
+	askMulti    bool
+	askSelected []bool      // for multiselect
+	askCurrent  int         // current hover index
+	askResolve  chan string // to return the answer
 
 	width  int
 	height int
@@ -99,6 +125,7 @@ func NewTUIModel(ag *Agent, registry *AgentRegistry, cmdReg *CommandRegistry) *T
 		messages:      ag.Store().ToDisplayMessages(),
 		streaming:     ag.Store().IsStreaming(),
 		tokenCount:    ag.TokenCount(),
+		activeID:      ag.ID(),
 	}
 
 	ag.OnDisplayChange(func() {
@@ -113,6 +140,44 @@ func NewTUIModel(ag *Agent, registry *AgentRegistry, cmdReg *CommandRegistry) *T
 		}
 	})
 
+	ag.SetAskUserFn(func(question string, options []AskOption, multi bool) string {
+		ch := make(chan string)
+		if m.program != nil {
+			m.program.Send(askPromptMsg{
+				question: question,
+				options:  options,
+				multi:     multi,
+				resolve:  ch,
+			})
+		} else {
+			return ""
+		}
+		return <-ch
+	})
+
+	if registry != nil {
+		m.sessions = registry.List()
+		registry.OnUpdate(func(sessions []AgentSession) {
+			if m.program != nil {
+				m.program.Send(sessionUpdateMsg{sessions: sessions})
+			}
+		})
+	}
+
+	if p := ag.PermissionSvc(); p != nil {
+		if ps, ok := p.(*PermissionService); ok {
+			ps.SetPromptFn(func(displayText string) string {
+				ch := make(chan string)
+				if m.program != nil {
+					m.program.Send(permPromptMsg{displayText: displayText, resolve: ch})
+				} else {
+					return "no"
+				}
+				return <-ch
+			})
+		}
+	}
+
 	return m
 }
 
@@ -126,9 +191,52 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
+	case sessionUpdateMsg:
+		m.sessions = msg.sessions
+		return m, nil
+
+	case permPromptMsg:
+		m.permPending = true
+		m.permText = msg.displayText
+		m.permResolve = msg.resolve
+		return m, nil
+
+	case askPromptMsg:
+		m.askPending = true
+		m.askQuestion = msg.question
+		m.askOptions = msg.options
+		m.askMulti = msg.multi
+		m.askSelected = make([]bool, len(msg.options))
+		m.askCurrent = 0
+		m.askResolve = msg.resolve
+		return m, nil
+
 	case tea.KeyMsg:
 		if m.permPending {
 			return m.handlePermKey(msg)
+		}
+		if m.askPending {
+			return m.handleAskKey(msg)
+		}
+
+		if len(m.suggestions) > 0 {
+			switch msg.Type {
+			case tea.KeyTab:
+				m.input.SetValue("/" + m.suggestions[m.selectedIdx].Name + " ")
+				m.suggestions = nil
+				m.selectedIdx = 0
+				return m, nil
+			case tea.KeyUp:
+				m.selectedIdx = (m.selectedIdx - 1 + len(m.suggestions)) % len(m.suggestions)
+				return m, nil
+			case tea.KeyDown:
+				m.selectedIdx = (m.selectedIdx + 1) % len(m.suggestions)
+				return m, nil
+			case tea.KeyEsc:
+				m.suggestions = nil
+				m.selectedIdx = 0
+				return m, nil
+			}
 		}
 
 		switch msg.Type {
@@ -154,6 +262,8 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			m.input.Reset()
+			m.suggestions = nil
+			m.selectedIdx = 0
 
 			cmdInput := input
 			promptText := input
@@ -195,10 +305,11 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case tea.KeyCtrlO:
 			// Multi-agent switching: cycle through registered agents
-			if m.agentRegistry != nil && len(m.agentRegistry.List()) > 1 {
+			if m.agentRegistry != nil && len(m.sessions) > 1 {
 				next := m.agentRegistry.NextActive()
 				if next != nil {
 					m.agent = next
+					m.activeID = next.ID()
 					m.messages = next.Store().ToDisplayMessages()
 					m.streaming = next.Store().IsStreaming()
 					m.tokenCount = next.TokenCount()
@@ -228,6 +339,26 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				var cmd tea.Cmd
 				m.input, cmd = m.input.Update(msg)
 				cmds = append(cmds, cmd)
+
+				// Update suggestions
+				val := m.input.Value()
+				if len(val) > 0 && val[0] == '/' && m.cmdReg != nil {
+					partial := strings.ToLower(val[1:])
+					all := m.cmdReg.List()
+					var filtered []Command
+					for _, c := range all {
+						if strings.HasPrefix(strings.ToLower(c.Name), partial) {
+							filtered = append(filtered, c)
+						}
+					}
+					m.suggestions = filtered
+					if m.selectedIdx >= len(m.suggestions) {
+						m.selectedIdx = 0
+					}
+				} else {
+					m.suggestions = nil
+					m.selectedIdx = 0
+				}
 			}
 		}
 
@@ -270,17 +401,58 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
+func (m *TUIModel) handleAskKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.Type {
+	case tea.KeyUp:
+		m.askCurrent = (m.askCurrent - 1 + len(m.askOptions)) % len(m.askOptions)
+	case tea.KeyDown:
+		m.askCurrent = (m.askCurrent + 1) % len(m.askOptions)
+	case tea.KeySpace:
+		if m.askMulti {
+			m.askSelected[m.askCurrent] = !m.askSelected[m.askCurrent]
+		}
+	case tea.KeyEnter:
+		var result string
+		if m.askMulti {
+			var selected []string
+			for i, s := range m.askSelected {
+				if s {
+					selected = append(selected, m.askOptions[i].Label)
+				}
+			}
+			result = strings.Join(selected, ",")
+		} else {
+			result = m.askOptions[m.askCurrent].Label
+		}
+		m.askPending = false
+		if m.askResolve != nil {
+			m.askResolve <- result
+		}
+	case tea.KeyEsc:
+		m.askPending = false
+		if m.askResolve != nil {
+			m.askResolve <- ""
+		}
+	}
+	return m, nil
+}
+
 func (m *TUIModel) handlePermKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	var res string
 	switch msg.String() {
 	case "y":
-		m.permPending = false
-		return m, func() tea.Msg { return permResolveMsg{answer: "yes"} }
+		res = "yes"
 	case "n", "esc":
-		m.permPending = false
-		return m, func() tea.Msg { return permResolveMsg{answer: "no"} }
+		res = "no"
 	case "a":
-		m.permPending = false
-		return m, func() tea.Msg { return permResolveMsg{answer: "yolo"} }
+		res = "yolo"
+	default:
+		return m, nil
+	}
+
+	m.permPending = false
+	if m.permResolve != nil {
+		m.permResolve <- res
 	}
 	return m, nil
 }
@@ -306,8 +478,8 @@ func (m *TUIModel) View() string {
 
 func (m *TUIModel) renderHeader() string {
 	var agentStr string
-	if m.agentRegistry != nil && len(m.agentRegistry.List()) > 1 {
-		indicator := m.activeAgentId()
+	if len(m.sessions) > 1 {
+		indicator := m.activeID
 		if indicator == "1" {
 			indicator = "M"
 		}
@@ -319,8 +491,7 @@ func (m *TUIModel) renderHeader() string {
 }
 
 func (m *TUIModel) activeAgentId() string {
-	// For now just return M or active ID if available
-	return "M"
+	return m.activeID
 }
 
 func (m *TUIModel) renderInput() string {
@@ -328,13 +499,64 @@ func (m *TUIModel) renderInput() string {
 		return styleToolCall.Render(fmt.Sprintf("[Permission] %s [y=yes / n=no / a=yes to all]", m.permText))
 	}
 
+	if m.askPending {
+		var lines []string
+		lines = append(lines, styleYellow.Render("? ")+m.askQuestion)
+		for i, opt := range m.askOptions {
+			arrow := "  "
+			style := styleDim
+			if i == m.askCurrent {
+				arrow = styleInputArrow.Render("> ")
+				style = styleHeaderCyan
+			}
+			checked := " "
+			if m.askMulti && m.askSelected[i] {
+				checked = "x"
+			}
+			prefix := arrow
+			if m.askMulti {
+				prefix += "[" + checked + "] "
+			}
+			line := fmt.Sprintf("%s%s %s", prefix, style.Render(opt.Label), styleDim.Render(opt.Description))
+			lines = append(lines, line)
+		}
+		footer := styleDim.Render("↑↓ navigate")
+		if m.askMulti {
+			footer += styleDim.Render("  Space toggle")
+		}
+		footer += styleDim.Render("  Enter accept")
+		return strings.Join(lines, "\n") + "\n " + footer
+	}
+
 	prefix := styleInputArrow.Render("> ")
 	if m.streaming {
 		prefix = styleDim.Render("… ")
 	}
 
-	content := prefix + m.input.View()
-	return styleInputBorder.Width(m.width - 2).Render(content)
+	inputView := prefix + m.input.View()
+	mainInput := styleInputBorder.Width(m.width - 2).Render(inputView)
+
+	if len(m.suggestions) > 0 && !m.streaming {
+		var lines []string
+		for i, s := range m.suggestions {
+			arrow := "  "
+			style := styleDim
+			if i == m.selectedIdx {
+				arrow = styleInputArrow.Render("> ")
+				style = styleHeaderCyan
+			}
+			desc := s.Description
+			if idx := strings.Index(desc, "\n"); idx != -1 {
+				desc = desc[:idx]
+			}
+			line := fmt.Sprintf("%s%s %s", arrow, style.Render("/"+s.Name), styleDim.Render(desc))
+			lines = append(lines, line)
+		}
+		suggestions := "\n" + strings.Join(lines, "\n") + "\n " + styleDim.Render("↑↓ navigate  Tab accept")
+		return mainInput + suggestions
+	}
+
+	return mainInput
 }
 
 func (m *TUIModel) renderStatusBar() string {
@@ -425,10 +647,9 @@ func (m *TUIModel) renderMessages() string {
 			if msg.ToolOutput != "" {
 				if msg.ToolName == "Edit" {
 					for _, line := range strings.Split(msg.ToolOutput, "\n") {
-						trimmed := strings.TrimSpace(line)
-						if len(trimmed) > 0 && trimmed[0] == '+' {
+						if strings.Contains(line, " + ") {
 							lines = append(lines, styleGreen.Render(line))
-						} else if len(trimmed) > 0 && trimmed[0] == '-' {
+						} else if strings.Contains(line, " - ") {
 							lines = append(lines, styleRed.Render(line))
 						} else {
 							lines = append(lines, styleDim.Render(line))

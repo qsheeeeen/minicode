@@ -38,6 +38,9 @@ type Agent struct {
 	session   *SessionManager
 	skills    *SkillRegistry
 	permSvc   PermissionChecker
+	askUserFn func(question string, options []AskOption, multiSelect bool) string
+	registry  *AgentRegistry
+	id        string
 
 	sessionName string
 	logger      *slog.Logger
@@ -74,6 +77,7 @@ func NewAgent(cfg AgentConfig) *Agent {
 		tokenMgr:    NewTokenManager(),
 		logger:      slog.New(slog.NewTextHandler(os.Stderr, nil)),
 		sessionName: fmt.Sprintf("session-%d", time.Now().UnixMilli()),
+		id:          "1",
 	}
 
 	a.refreshEnvironment()
@@ -106,6 +110,20 @@ func (a *Agent) PermissionSvc() PermissionChecker { return a.permSvc }
 
 // SetPermissionSvc sets the permission service.
 func (a *Agent) SetPermissionSvc(p PermissionChecker) { a.permSvc = p }
+
+// ID returns the agent identifier.
+func (a *Agent) ID() string { return a.id }
+
+// SetID sets the agent identifier.
+func (a *Agent) SetID(id string) { a.id = id }
+
+// SetRegistry sets the agent registry.
+func (a *Agent) SetRegistry(r *AgentRegistry) { a.registry = r }
+
+// SetAskUserFn sets the callback for the AskUser tool.
+func (a *Agent) SetAskUserFn(fn func(question string, options []AskOption, multiSelect bool) string) {
+	a.askUserFn = fn
+}
 
 // ContextLength returns the configured context length.
 func (a *Agent) ContextLength() int { return a.config.ContextLength }
@@ -231,22 +249,26 @@ func (a *Agent) Run(ctx context.Context, userMessage, displayContent string) (bo
 
 	a.store.AddUserMessage(llmText, display)
 
+	runErr := (error)(nil)
 	for {
 		if err := ctx.Err(); err != nil {
-			return true, err
+			runErr = err
+			break
 		}
 
 		toolDefs := a.buildLLMTools()
 		_, toolCalls, hasTools, err := a.handleStream(ctx, toolDefs)
 		if err != nil {
-			if errors.Is(err, context.Canceled) {
-				return true, nil
+			if errors.Is(err, context.Canceled) || err.Error() == "context canceled" {
+				runErr = err
+				break
 			}
 			return true, err
 		}
 
 		if err := ctx.Err(); err != nil {
-			return true, nil
+			runErr = err
+			break
 		}
 
 		denied, err := a.executeTools(ctx, toolCalls)
@@ -254,7 +276,6 @@ func (a *Agent) Run(ctx context.Context, userMessage, displayContent string) (bo
 			return true, err
 		}
 		if denied {
-			a.store.AddStatus(RoleError, "Tool execution was denied by user")
 			break
 		}
 
@@ -269,6 +290,11 @@ func (a *Agent) Run(ctx context.Context, userMessage, displayContent string) (bo
 		if !hasTools {
 			break
 		}
+	}
+
+	if runErr != nil && (errors.Is(runErr, context.Canceled) || runErr.Error() == "context canceled") {
+		// Cleanup: remove the last user message that triggered this aborted run
+		a.store.Pop()
 	}
 
 	a.saveSession()
@@ -334,8 +360,11 @@ func (a *Agent) handleStream(ctx context.Context, toolDefs []LLMTool) (*LLMMessa
 	a.store.StartAssistantTurn()
 
 	ch, err := a.client.ChatStream(ctx, a.store.ToLLMMessages(), toolDefs, ChatOptions{
-		Model:  a.config.Model,
-		System: a.systemPrompt,
+		Model:           a.config.Model,
+		System:          a.systemPrompt,
+		ThinkingEnabled: a.config.ThinkingEnabled,
+		ThinkingBudget:  a.config.ThinkingBudget,
+		Effort:          a.config.Effort,
 	})
 	if err != nil {
 		return nil, nil, false, err
@@ -377,18 +406,18 @@ func (a *Agent) handleStream(ctx context.Context, toolDefs []LLMTool) (*LLMMessa
 			switch evt.Block.Type {
 			case "tool_use":
 				hasToolCalls = true
+				pt := &pendingTool{
+					block: ContentBlock{
+						Type: "tool_use",
+						ID:   evt.Block.ID,
+						Name: evt.Block.Name,
+					},
+				}
 				if t, ok := a.tools.Get(evt.Block.Name); ok {
-					pt := &pendingTool{
-						block: ContentBlock{
-							Type: "tool_use",
-							ID:   evt.Block.ID,
-							Name: evt.Block.Name,
-						},
-						tool: t,
-					}
-					pendingTools[evt.Index] = pt
+					pt.tool = t
 					toolCalls = append(toolCalls, toolCall{Block: pt.block, Tool: t})
 				}
+				pendingTools[evt.Index] = pt
 			case "text":
 				a.store.AppendToLastAssistantTurn(ContentBlock{Type: "text", Text: evt.Block.Text})
 			case "thinking":
@@ -420,6 +449,9 @@ func (a *Agent) handleStream(ctx context.Context, toolDefs []LLMTool) (*LLMMessa
 				// Append to store
 				a.store.AppendToLastAssistantTurn(pt.block)
 				delete(pendingTools, evt.Index)
+				a.saveSession()
+			} else {
+				a.saveSession()
 			}
 		case "message_delta":
 			if evt.Usage != nil {
@@ -462,30 +494,47 @@ func (a *Agent) executeTools(ctx context.Context, calls []toolCall) (denied bool
 	tc := ToolContext{
 		Config:         a.config,
 		PermissionSvc:  a.permSvc,
-		CurrentAgentID: "1",
+		AskUserFn:      a.askUserFn,
+		CurrentAgentID: a.id,
 		ParentRegistry: a.tools,
+		AgentRegistry:  a.registry,
 		Skills:         a.skills,
 		SetModelFn:     a.SetModel,
 	}
 
 	var results []toolResultItem
-	for _, call := range calls {
+	for i, call := range calls {
 		args, _ := call.Block.Input.(map[string]any)
 		if args == nil {
 			args = map[string]any{}
 		}
 
-		result, execErr := call.Tool.Execute(ctx, args, tc)
-		if execErr != nil {
-			var deniedErr *ToolDeniedError
-			if errors.As(execErr, &deniedErr) {
-				results = append(results, toolResultItem{ToolUseID: call.Block.ID, Content: deniedErr.Reason})
-				for _, remaining := range calls[len(results):] {
-					results = append(results, toolResultItem{ToolUseID: remaining.Block.ID, Content: deniedErr.Reason})
+		// Permission Check
+		if call.Tool.RequiresPermission() && tc.PermissionSvc != nil {
+			displayText := fmt.Sprintf("%s(%v)", call.Tool.Name(), args)
+			allowed, reason := tc.PermissionSvc.Check(call.Tool.Name(), displayText, args)
+			if !allowed {
+				if tc.PermissionSvc.Mode() == PermAuto {
+					results = append(results, toolResultItem{
+						ToolUseID: call.Block.ID,
+						Content:   fmt.Sprintf("Tool execution denied by auto-gate: %s", reason),
+					})
+					continue
+				}
+
+				// Manual denial: stop execution and report
+				results = append(results, toolResultItem{ToolUseID: call.Block.ID, Content: reason})
+				for j := i + 1; j < len(calls); j++ {
+					results = append(results, toolResultItem{ToolUseID: calls[j].Block.ID, Content: reason})
 				}
 				a.store.AddToolResults(results)
+				a.store.AddStatus(RoleError, fmt.Sprintf("Tool %q was denied by user", call.Tool.Name()))
 				return true, nil
 			}
+		}
+
+		result, execErr := call.Tool.Execute(ctx, args, tc)
+		if execErr != nil {
 			results = append(results, toolResultItem{ToolUseID: call.Block.ID, Content: fmt.Sprintf("Error: %s", execErr.Error())})
 			continue
 		}

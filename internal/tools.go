@@ -30,6 +30,7 @@ type ToolContext struct {
 	PermissionSvc   PermissionChecker
 	CurrentAgentID  string
 	ParentRegistry  *ToolRegistry   // for sub-agent delegation
+	AgentRegistry   *AgentRegistry  // for process tracking
 	Skills          *SkillRegistry  // for skill activation
 	SetModelFn      func(model, apiKey, baseURL string, contextLength int) // for model switching
 	AskUserFn       func(question string, options []AskOption, multiSelect bool) string
@@ -43,6 +44,8 @@ type AgentConfig struct {
 	ContextLength             int
 	CompressionThresholdRatio float64
 	ThinkingEnabled           bool
+	ThinkingBudget            int
+	Effort                    string
 	UserPrompt                string
 	ProjectPromptFile         string
 	ExcludeTools              []string
@@ -50,7 +53,7 @@ type AgentConfig struct {
 
 // PermissionChecker is the interface tools use to gate execution.
 type PermissionChecker interface {
-	Check(toolName, displayText string) (allowed bool, reason string)
+	Check(toolName, displayText string, toolInput map[string]any) (allowed bool, reason string)
 	Mode() PermissionMode
 	CycleMode() PermissionMode
 }

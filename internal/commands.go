@@ -2,6 +2,7 @@ package internal
 
 import (
 	"fmt"
+	"sort"
 	"time"
 )
 
@@ -59,6 +60,18 @@ func (r *CommandRegistry) Register(cmd *Command) {
 func (r *CommandRegistry) Get(name string) (*Command, bool) {
 	cmd, ok := r.commands[name]
 	return cmd, ok
+}
+
+// List returns all registered commands, sorted by name.
+func (r *CommandRegistry) List() []Command {
+	var list []Command
+	for _, cmd := range r.commands {
+		list = append(list, *cmd)
+	}
+	sort.Slice(list, func(i, j int) bool {
+		return list[i].Name < list[j].Name
+	})
+	return list
 }
 
 // ParseAndExecute checks if input starts with "/" and executes the matching command.

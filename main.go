@@ -77,6 +77,9 @@ func main() {
 		Model:                     resolved.Model.Model,
 		ContextLength:             resolved.Model.ContextLength,
 		CompressionThresholdRatio: resolved.CompressionThreshold,
+		ThinkingEnabled:           resolved.Thinking.Enabled,
+		ThinkingBudget:            resolved.Thinking.BudgetTokens,
+		Effort:                    resolved.Thinking.Effort,
 		ProjectPromptFile:         resolved.PromptFile,
 		UserPrompt:                userPrompt,
 	}
@@ -99,6 +102,48 @@ func main() {
 
 	// Load project skills
 	skills := internal.NewSkillRegistry(resolved.SkillsDir)
+	skills.RegisterBuiltin(`---
+name: skill-creator
+description: "Guide for creating effective skills. This skill should be used when users want to create a new skill (or update an existing skill) that extends minicode's capabilities with specialized knowledge, workflows, or tool integrations."
+---
+# Skill Creator Guide
+
+This skill provides guidance for creating effective skills in minicode using the agentskills.io format.
+
+## About Skills
+Skills are modular, self-contained packages that extend the agent's capabilities. They use a "progressive disclosure" model to keep the agent's context footprint small, only loading full instructions when a specific skill is activated.
+
+## Structure
+Every skill consists of a required SKILL.md file:
+- Frontmatter (YAML): Contains name and description fields. This is used for discovery.
+- Body (Markdown): Instructions and guidance for using the skill.
+
+## Steps
+1. Create a directory for the skill (e.g., ~/.minicode/skills/my-skill).
+2. Add a SKILL.md file in that directory.
+3. Write the frontmatter with name and description.
+4. Write the body with clear, concise instructions for the agent to follow.`)
+
+	skills.RegisterBuiltin(fmt.Sprintf(`---
+name: init
+description: "Set up a minimal %s for this repo with codebase exploration and optional skills."
+---
+Set up a minimal %s (and optionally skills) for this repo. %s is loaded into every agent session, so it must be concise — only include what the agent would get wrong without it.
+
+## Phase 0: Check for an existing %s
+Before asking anything, check if %s already exists at the project root. This determines the next step.
+
+## Phase 1: Explore the codebase
+Detect: Build, test, lint commands, Project structure, Code style rules, Non-obvious gotchas.
+
+## Phase 2: Fill in the gaps
+Ask user for info not in code.
+
+## Phase 3: Propose and get approval
+## Phase 4: Write %s
+## Phase 5: Suggest and create skills
+## Phase 6: Summary`, resolved.PromptFile, resolved.PromptFile, resolved.PromptFile, resolved.PromptFile, resolved.PromptFile, resolved.PromptFile))
+
 	_ = skills.LoadSkills()
 	ag.SetSkills(skills)
 

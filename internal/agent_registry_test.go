@@ -13,11 +13,11 @@ func TestAgentRegistry_New(t *testing.T) {
 	}
 }
 
-func TestAgentRegistry_AddAndList(t *testing.T) {
+func TestAgentRegistry_RegisterAndList(t *testing.T) {
 	ag1 := NewAgent(AgentConfig{APIKey: "test", Model: "m1", ContextLength: 100})
 	ag2 := NewAgent(AgentConfig{APIKey: "test", Model: "m2", ContextLength: 100})
 	r := NewAgentRegistry(ag1)
-	r.Add(ag2)
+	r.Register(&AgentSession{ID: "2", Agent: ag2})
 
 	list := r.List()
 	if len(list) != 2 {
@@ -29,7 +29,7 @@ func TestAgentRegistry_NextActive(t *testing.T) {
 	ag1 := NewAgent(AgentConfig{APIKey: "test", Model: "m1", ContextLength: 100})
 	ag2 := NewAgent(AgentConfig{APIKey: "test", Model: "m2", ContextLength: 100})
 	r := NewAgentRegistry(ag1)
-	r.Add(ag2)
+	r.Register(&AgentSession{ID: "2", Agent: ag2})
 
 	if r.Active() != ag1 {
 		t.Error("expected ag1 active")
@@ -51,8 +51,8 @@ func TestAgentRegistry_NextActiveSingleAgent(t *testing.T) {
 	ag := NewAgent(AgentConfig{APIKey: "test", Model: "m1", ContextLength: 100})
 	r := NewAgentRegistry(ag)
 	next := r.NextActive()
-	if next != ag {
-		t.Error("single agent should cycle to itself")
+	if next != nil {
+		t.Error("single agent should not cycle")
 	}
 }
 
@@ -105,7 +105,6 @@ func TestAgent_SetSkills(t *testing.T) {
 	ag := NewAgent(AgentConfig{APIKey: "test", Model: "m1", ContextLength: 100})
 	sr := NewSkillRegistry("/tmp")
 	ag.SetSkills(sr)
-	// Verify skills is set (indirectly via the Skills field added to ToolContext during executeTools)
 	if ag.skills != sr {
 		t.Error("skills should be set")
 	}
@@ -138,4 +137,3 @@ func TestAskUserTool_NoPrompter(t *testing.T) {
 		t.Errorf("expected prompter error, got %s", result.Output)
 	}
 }
-

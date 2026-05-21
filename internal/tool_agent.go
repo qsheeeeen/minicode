@@ -57,7 +57,15 @@ func (t *SubAgentTool) Execute(ctx context.Context, args map[string]any, tc Tool
 		}
 	}
 
+	subID := "2"
+	if tc.AgentRegistry != nil {
+		subID = tc.AgentRegistry.AllocateSubID()
+	}
+
 	subAgent := NewAgent(subCfg)
+	subAgent.SetID(subID)
+	subAgent.SetRegistry(tc.AgentRegistry)
+
 	for _, tool := range tc.ParentRegistry.All() {
 		if tool.Name() == "SubAgent" {
 			continue
@@ -65,8 +73,30 @@ func (t *SubAgentTool) Execute(ctx context.Context, args map[string]any, tc Tool
 		subAgent.tools.Register(tool)
 	}
 
+	session := &AgentSession{
+		ID:       subID,
+		Type:     AgentSub,
+		Agent:    subAgent,
+		Status:   StatusRunning,
+		Task:     task,
+		ParentID: tc.CurrentAgentID,
+	}
+
+	if tc.AgentRegistry != nil {
+		tc.AgentRegistry.Register(session)
+	}
+
+	// Notify parent
+	ag := tc.AgentRegistry.Active() // naive way to get current agent; ideally we'd pass parent pointer
+	if ag != nil {
+		ag.store.AddStatus(RoleStatus, fmt.Sprintf("[Agent #%s started: %s]", subID, task))
+	}
+
 	ok, err := subAgent.Run(ctx, task, "")
 	if err != nil {
+		if tc.AgentRegistry != nil {
+			tc.AgentRegistry.UpdateStatus(subID, StatusError, err.Error())
+		}
 		return ToolResult{Output: fmt.Sprintf("Sub-agent error: %s", err.Error())}, nil
 	}
 	_ = ok
@@ -74,28 +104,36 @@ func (t *SubAgentTool) Execute(ctx context.Context, args map[string]any, tc Tool
 	// Extract final response from sub-agent turns
 	subTurns := subAgent.store.Turns()
 	finalText := extractFinalResponse(subTurns)
+	
+	summary := ""
 	if finalText != "" {
-		return ToolResult{Output: finalText}, nil
-	}
-
-	// Fallback: summary with tool call count
-	toolCalls := 0
-	for _, turn := range subTurns {
-		if turn.Role == "assistant" {
-			if blocks, ok := turn.Content.([]ContentBlock); ok {
-				for _, b := range blocks {
-					if b.Type == "tool_use" {
-						toolCalls++
+		summary = finalText
+	} else {
+		// Fallback: summary with tool call count
+		toolCalls := 0
+		for _, turn := range subTurns {
+			if turn.Role == "assistant" {
+				if blocks, ok := turn.Content.([]ContentBlock); ok {
+					for _, b := range blocks {
+						if b.Type == "tool_use" {
+							toolCalls++
+						}
 					}
 				}
 			}
 		}
+		summary = fmt.Sprintf("%d operations", toolCalls)
+		if toolCalls == 0 {
+			summary = "Task completed"
+		}
+		summary = fmt.Sprintf("(Sub-agent completed: %s)", summary)
 	}
-	summary := fmt.Sprintf("%d operations", toolCalls)
-	if toolCalls == 0 {
-		summary = "Task completed"
+
+	if tc.AgentRegistry != nil {
+		tc.AgentRegistry.UpdateStatus(subID, StatusCompleted, summary)
 	}
-	return ToolResult{Output: fmt.Sprintf("(Sub-agent completed: %s)", summary)}, nil
+
+	return ToolResult{Output: summary}, nil
 }
 
 func extractFinalResponse(turns []MessageParam) string {

@@ -24,16 +24,23 @@ type Config struct {
 	Model               string                    `json:"model"`
 	Tiers               map[string]string         `json:"tiers"`
 	CompressionThreshold float64                  `json:"compressionThreshold"`
-	Thinking            bool                      `json:"thinking"`
+	Thinking            ConfigThinking            `json:"thinking"`
 	PromptFile          string                    `json:"promptFile"`
 	PermissionMode      string                    `json:"permissionMode"`
 	SkillsDir           string                    `json:"skillsDir"`
+}
+
+type ConfigThinking struct {
+	Enabled      bool   `json:"enabled"`
+	BudgetTokens int    `json:"budgetTokens"`
+	Effort       string `json:"effort"`
 }
 
 // ResolvedConfig is the final runtime configuration after resolution.
 type ResolvedConfig struct {
 	Model               ModelRef
 	CompressionThreshold float64
+	Thinking            ConfigThinking
 	PromptFile          string
 	PermissionMode      string
 	SkillsDir           string
@@ -84,12 +91,16 @@ func ResolveConfig(specOverride string) (*ResolvedConfig, error) {
 
 	resolved := &ResolvedConfig{
 		CompressionThreshold: cfg.CompressionThreshold,
+		Thinking:             cfg.Thinking,
 		PromptFile:           cfg.PromptFile,
 		PermissionMode:       cfg.PermissionMode,
 		SkillsDir:            cfg.SkillsDir,
 	}
 	if resolved.CompressionThreshold == 0 {
 		resolved.CompressionThreshold = 0.8
+	}
+	if resolved.Thinking.BudgetTokens == 0 {
+		resolved.Thinking.BudgetTokens = 4096
 	}
 	if resolved.PromptFile == "" {
 		resolved.PromptFile = "AGENTS.md"
@@ -175,6 +186,16 @@ func SetTier(tier, modelSpec string) error {
 		cfg.Tiers = make(map[string]string)
 	}
 	cfg.Tiers[tier] = modelSpec
+	return writeConfig(cfg)
+}
+
+// SetEffort persists the effort level to config.json.
+func SetEffort(effort string) error {
+	cfg, err := LoadConfig()
+	if err != nil {
+		return err
+	}
+	cfg.Thinking.Effort = effort
 	return writeConfig(cfg)
 }
 
