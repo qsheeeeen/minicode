@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/help"
+	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textarea"
@@ -46,6 +48,12 @@ type tokenUpdateMsg struct {
 
 type agentDoneMsg struct {
 	err error
+}
+
+type setModeMsg struct {
+	mode  string
+	title string
+	items []list.Item
 }
 
 type permPromptMsg struct {
@@ -105,6 +113,11 @@ type TUIModel struct {
 	askSelected []bool      // for multiselect
 	askCurrent  int         // current hover index
 	askResolve  chan string // to return the answer
+
+	// Select mode: uses bubbles/list
+	selectList  list.Model
+	selectMode  string // effort-select, session-list, model-select
+	help        help.Model
 
 	width  int
 	height int
@@ -233,6 +246,21 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if m.askPending {
 			return m.handleAskKey(msg)
+		}
+		if m.selectMode != "" {
+			switch msg.Type {
+			case tea.KeyEsc:
+				m.clearMode()
+				return m, nil
+			case tea.KeyEnter:
+				if i, ok := m.selectList.SelectedItem().(list.DefaultItem); ok {
+					m.handleSelectChoice(i.Title())
+				}
+				return m, nil
+			}
+			var cmd tea.Cmd
+			m.selectList, cmd = m.selectList.Update(msg)
+			return m, cmd
 		}
 
 		if len(m.suggestions) > 0 {
@@ -575,6 +603,11 @@ func (m *TUIModel) renderInput() string {
 		return questionBox + "\n" + selectBox
 	}
 
+	// Mode: select UI using bubbles/list
+	if m.selectMode != "" {
+		return m.selectList.View()
+	}
+
 	prefix := styleInputArrow.Render("> ")
 	if m.streaming {
 		prefix = m.spinner.View() + " "
@@ -726,6 +759,44 @@ func (m *TUIModel) renderMessages() string {
 	}
 
 	return result
+}
+
+// setMode initializes a bubbles/list for a select mode.
+func (m *TUIModel) setMode(mode string, title string, items []list.Item) {
+	// Create item delegate with simple rendering
+	delegate := list.NewDefaultDelegate()
+	delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.Foreground(lipgloss.Color("6"))
+	delegate.Styles.SelectedDesc = delegate.Styles.SelectedDesc.Foreground(lipgloss.Color("6"))
+
+	l := list.New(items, delegate, m.width-4, m.height-8)
+	l.SetShowTitle(true)
+	l.Title = title
+	l.SetShowHelp(true)
+	l.SetShowStatusBar(false)
+	l.SetFilteringEnabled(false)
+	l.Styles.Title = styleHeaderCyan
+
+	m.selectList = l
+	m.selectMode = mode
+}
+
+func (m *TUIModel) clearMode() {
+	m.selectMode = ""
+	m.selectList = list.Model{}
+}
+
+func (m *TUIModel) handleSelectChoice(val string) {
+	switch m.selectMode {
+	case "effort-select":
+		// Set effort on agent
+		m.clearMode()
+	case "session-list":
+		m.clearMode()
+		m.input.SetValue("/resume " + val)
+	case "model-select":
+		// model tier selected — would need wizard, simplified for now
+		m.clearMode()
+	}
 }
 
 // ---- Helpers ----
