@@ -249,7 +249,7 @@ func (a *Agent) Run(ctx context.Context, userMessage, displayContent string) (bo
 		toolDefs := a.buildLLMTools()
 		toolCalls, hasTools, err := a.handleStream(ctx, toolDefs)
 		if err != nil {
-			if errors.Is(err, context.Canceled) || err.Error() == "context canceled" {
+			if errors.Is(err, context.Canceled) {
 				runErr = err
 				break
 			}

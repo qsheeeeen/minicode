@@ -97,7 +97,7 @@ func run(cmd *cobra.Command, args []string) {
 		}
 	} else if resumeRecent {
 		if name, err := sm.MostRecent(); err == nil && name != "" {
-			_ = ag.LoadSession(name)
+			_ = ag.LoadSession(name) // best-effort: session may not exist
 		}
 	}
 
