@@ -28,10 +28,11 @@ var (
 
 func main() {
 	rootCmd := &cobra.Command{
-		Use:   "minicode [prompt]",
-		Short: "Mini Code - Interactive CLI Programming Agent",
-		Args:  cobra.MaximumNArgs(1),
-		Run:   run,
+		Use:     "minicode [prompt]",
+		Short:   "Mini Code - Interactive CLI Programming Agent",
+		Version: "0.1.0 (Go)",
+		Args:    cobra.MaximumNArgs(1),
+		Run:     run,
 	}
 
 	rootCmd.Flags().StringVarP(&modelOverride, "model", "m", "", "Override model (model@provider)")
