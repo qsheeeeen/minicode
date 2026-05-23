@@ -23,6 +23,13 @@ func TestResolveConfig_EmptyConfig(t *testing.T) {
 }
 
 func TestResolveConfig_Defaults(t *testing.T) {
+	origHome := os.Getenv("HOME")
+	os.Setenv("HOME", "/nonexistent")
+	defer os.Setenv("HOME", origHome)
+
+	// Need fresh viper since we changed HOME
+	resetViper()
+
 	resolved, _ := Resolve("")
 	if resolved.CompressionThreshold != 0.8 {
 		t.Errorf("expected 0.8, got %f", resolved.CompressionThreshold)
