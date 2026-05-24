@@ -545,6 +545,9 @@ func (a *Agent) executeTools(ctx context.Context, calls []toolCall) (denied bool
 }
 
 func (a *Agent) processTokenUsage(usage *domain.Usage) {
+	if usage == nil {
+		return
+	}
 	a.tokenMgr.Add(usage.InputTokens, usage.OutputTokens, usage.CacheCreationInputTokens, usage.CacheReadInputTokens)
 	total := a.tokenMgr.Total()
 	lastThreshold := a.tokenMgr.LastShownThreshold()

@@ -15,7 +15,7 @@ import (
 func RunHeadless(ctx context.Context, ag *agent.Agent, initialPrompt, displayPrompt string) error {
 	// Set non-interactive prompter for headless mode
 	ag.SetAskUserFn(func(question string, options []domain.AskOption, multi bool) string {
-		fmt.Fprintf(os.Stderr, "[headless] AskUser tool skipped: %s\n", question)
+		fmt.Fprintf(os.Stderr, "[Denied: AskUser not available in headless mode] -- use --permission yolo or auto\n")
 		return ""
 	})
 

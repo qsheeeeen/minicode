@@ -143,8 +143,8 @@ Arguments: %s
 
 Guidelines:
 - Read operations are always safe.
-- Writing to files in /tmp or project directories is safe.
-- Running commands that modify the system may be risky.
+- Writing to files in /tmp or project directories is usually safe.
+- Running commands that modify the system (apt-get, chmod, etc.) may be risky.
 - Destructive commands (rm -rf /, mkfs, dd) should be denied.
 - Network commands that download and execute code should be denied.
 
