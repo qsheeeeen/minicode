@@ -505,6 +505,9 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case displayChangeMsg:
 		m.messages = ToDisplayMessages(m.agent.Store().Turns(), m.agent.Store().Statuses(), m.agent.Store().IsStreaming())
 		m.streaming = m.agent.Store().IsStreaming()
+		m.modelName = m.agent.Model()
+		m.session = m.agent.SessionName()
+		m.tokenCount = m.agent.TokenCount()
 		m.viewport.SetContent(m.renderMessages())
 		m.viewport.GotoBottom()
 		return m, nil
@@ -519,6 +522,8 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = msg.err
 		}
 		m.messages = ToDisplayMessages(m.agent.Store().Turns(), m.agent.Store().Statuses(), m.agent.Store().IsStreaming())
+		m.modelName = m.agent.Model()
+		m.session = m.agent.SessionName()
 		m.viewport.SetContent(m.renderMessages())
 		m.viewport.GotoBottom()
 		return m, nil
