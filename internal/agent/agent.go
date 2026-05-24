@@ -90,6 +90,12 @@ func (a *Agent) ToolRegistry() *tools.ToolRegistry { return a.tools }
 // SetSkills sets the skill registry for tool context.
 func (a *Agent) SetSkills(sr *skills.SkillRegistry) { a.skills = sr; a.refreshSystemPrompt() }
 
+// Skills returns the skill registry.
+func (a *Agent) Skills() *skills.SkillRegistry { return a.skills }
+
+// Compress triggers conversation compression (public wrapper).
+func (a *Agent) Compress() { go a.compress(context.Background()) }
+
 // SetCommandResolver sets the slash command resolver.
 func (a *Agent) SetCommandResolver(fn func(input string) (handled bool, promptText string, displayContent string)) {
 	a.resolveCommand = fn

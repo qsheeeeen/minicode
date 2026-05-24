@@ -15,7 +15,9 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"minicode/internal/agent"
+	"minicode/internal/config"
 	"minicode/internal/domain"
+	"minicode/internal/storage"
 	"minicode/internal/tools"
 )
 
@@ -240,6 +242,10 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.askResolve = msg.resolve
 		return m, nil
 
+	case setModeMsg:
+		m.setMode(msg.mode, msg.title, msg.items)
+		return m, nil
+
 	case tea.KeyMsg:
 		if m.permPending {
 			return m.handlePermKey(msg)
@@ -285,13 +291,11 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		switch msg.Type {
 		case tea.KeyCtrlC:
-			m.agent.Abort()
-			return m, tea.Quit
-
-		case tea.KeyTab:
-			if p := m.agent.PermissionSvc(); p != nil {
-				p.CycleMode()
+			if m.streaming {
+				m.agent.Abort()
+				return m, nil
 			}
+			return m, tea.Quit
 
 		case tea.KeyEsc:
 			if m.streaming {
@@ -328,6 +332,83 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						}
 					},
 					ClearFn: m.agent.ClearSession,
+					CompressFn: func() {
+						m.agent.Compress()
+					},
+					SetSessionFn: func(name string) {
+						m.session = name
+						m.agent.SetSession(name)
+					},
+					ListSkillsFn: func() string {
+						if sk := m.agent.Skills(); sk != nil {
+							infos := sk.List()
+							if len(infos) == 0 {
+								return "No skills loaded"
+							}
+							var names []string
+							for _, info := range infos {
+								names = append(names, info.Name+": "+info.Description)
+							}
+							return strings.Join(names, "\n")
+						}
+						return "No skills loaded"
+					},
+					SetSelectModeFn: func(mode, title string, items []list.Item) {
+						if m.program != nil {
+							m.program.Send(setModeMsg{mode: mode, title: title, items: items})
+						}
+					},
+					SetInputValueFn: func(value string) {
+						m.input.SetValue(value)
+					},
+					SetStatusFn: func(content string) {
+						m.agent.Store().AddStatus(domain.RoleStatus, content)
+					},
+					GetConfigFn: func() *config.Config {
+						cfg, _ := config.Load()
+						return cfg
+					},
+					LoadSessionFn: func(name string) {
+						if err := m.agent.LoadSession(name); err != nil {
+							m.agent.Store().AddStatus(domain.RoleError, fmt.Sprintf("Session not found: %s", name))
+							return
+						}
+						m.session = name
+						m.messages = ToDisplayMessages(m.agent.Store().Turns(), m.agent.Store().Statuses(), m.agent.Store().IsStreaming())
+						m.tokenCount = m.agent.TokenCount()
+						m.viewport.SetContent(m.renderMessages())
+						m.viewport.GotoBottom()
+						m.agent.Store().AddStatus(domain.RoleStatus, fmt.Sprintf("Loaded session: %s", name))
+					},
+					ListSessionsFn: func() string {
+						sm := storage.NewSessionManager()
+						sessions := sm.List()
+						var items []list.Item
+						for _, s := range sessions {
+							items = append(items, listItem{title: s.Name, desc: s.Timestamp.Format("2006-01-02 15:04")})
+						}
+						if len(items) == 0 {
+							m.agent.Store().AddStatus(domain.RoleStatus, "No sessions found")
+							return ""
+						}
+						if m.program != nil {
+							m.program.Send(setModeMsg{mode: "session-list", title: "Sessions:", items: items})
+						}
+						return ""
+					},
+					RenameSessionFn: func(oldName, newName string) error {
+						sm := storage.NewSessionManager()
+						if err := sm.Rename(oldName, newName); err != nil {
+							return err
+						}
+						m.session = newName
+						m.agent.SetSession(newName)
+						return nil
+					},
+					SessionInfos: func() []storage.SessionInfo {
+						sm := storage.NewSessionManager()
+						return sm.List()
+					}(),
 				}
 				handled, expanded := m.cmdReg.ParseAndExecute(input, ctx)
 				if handled {
@@ -800,6 +881,16 @@ func (m *TUIModel) handleSelectChoice(val string) {
 }
 
 // ---- Helpers ----
+
+// listItem implements list.DefaultItem for use with bubbles/list selections.
+type listItem struct {
+	title string
+	desc  string
+}
+
+func (i listItem) Title() string       { return i.title }
+func (i listItem) Description() string { return i.desc }
+func (i listItem) FilterValue() string { return i.title }
 
 func truncate(s string, maxLen int) string {
 	lines := strings.Split(s, "\n")

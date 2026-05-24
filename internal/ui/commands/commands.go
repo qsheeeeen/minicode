@@ -5,7 +5,10 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/list"
 	"minicode/internal/agent"
+	"minicode/internal/config"
+	"minicode/internal/storage"
 )
 
 // Kind distinguishes handler commands from prompt-expanding commands.
@@ -36,6 +39,13 @@ type Context struct {
 	ListSessionsFn   func() string
 	LoadSessionFn    func(name string)
 	RenameSessionFn  func(oldName, newName string) error
+	// Interactive select-mode support (TUI only)
+	SetSelectModeFn func(mode, title string, items []list.Item)
+	SetInputValueFn func(value string)
+	SubmitFn        func(input string)
+	SetStatusFn     func(content string)
+	GetConfigFn     func() *config.Config
+	SessionInfos    []storage.SessionInfo
 }
 
 // Registry holds registered slash commands.
