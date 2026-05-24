@@ -51,8 +51,10 @@ func (t *SetModelTool) Execute(ctx context.Context, args map[string]any, tc Tool
 		return domain.ToolResult{Output: fmt.Sprintf("Tier %s updated to %s, but resolution failed (check your API keys).", tier, modelSpec)}, nil
 	}
 
-	// If this tier is currently active, we could update it immediately
-	// but for now we just return success.
+	// If this tier is currently active, update the running agent immediately
+	if tc.SetModelFn != nil {
+		tc.SetModelFn(resolved.Model.Model, resolved.Model.APIKey, resolved.Model.BaseURL, resolved.Model.ContextLength)
+	}
 	return domain.ToolResult{
 		Output: fmt.Sprintf("Successfully mapped Tier %s to %s (%s)", tier, modelSpec, resolved.Model.Model),
 	}, nil
