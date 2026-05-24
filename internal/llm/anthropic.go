@@ -152,6 +152,14 @@ func (c Client) ChatStream(ctx context.Context, messages []domain.MessageParam, 
 
 	go func() {
 		defer close(ch)
+		send := func(evt StreamEvent) bool {
+			select {
+			case ch <- evt:
+				return true
+			case <-ctx.Done():
+				return false
+			}
+		}
 		for stream.Next() {
 			select {
 			case <-ctx.Done():
@@ -176,29 +184,41 @@ func (c Client) ChatStream(ctx context.Context, messages []domain.MessageParam, 
 					block.Name = cb.Name
 					block.Input = cb.Input
 				}
-				ch <- StreamEvent{Type: "content_block_start", Index: int(variant.Index), Block: block}
+				if !send(StreamEvent{Type: "content_block_start", Index: int(variant.Index), Block: block}) {
+					return
+				}
 
 			case anthropic.ContentBlockDeltaEvent:
 				switch variant.Delta.Type {
 				case "thinking_delta":
-					ch <- StreamEvent{Type: "thinking", Index: int(variant.Index), Delta: variant.Delta.Thinking}
+					if !send(StreamEvent{Type: "thinking", Index: int(variant.Index), Delta: variant.Delta.Thinking}) {
+						return
+					}
 				case "text_delta":
-					ch <- StreamEvent{Type: "text", Index: int(variant.Index), Delta: variant.Delta.Text}
+					if !send(StreamEvent{Type: "text", Index: int(variant.Index), Delta: variant.Delta.Text}) {
+						return
+					}
 				case "input_json_delta":
-					ch <- StreamEvent{Type: "input_json_delta", Index: int(variant.Index), Delta: variant.Delta.PartialJSON}
+					if !send(StreamEvent{Type: "input_json_delta", Index: int(variant.Index), Delta: variant.Delta.PartialJSON}) {
+						return
+					}
 				}
 
 			case anthropic.ContentBlockStopEvent:
-				ch <- StreamEvent{Type: "content_block_stop", Index: int(variant.Index)}
+				if !send(StreamEvent{Type: "content_block_stop", Index: int(variant.Index)}) {
+					return
+				}
 
 			case anthropic.MessageDeltaEvent:
-				ch <- StreamEvent{
+				if !send(StreamEvent{
 					Type:  "message_delta",
 					Usage: &domain.Usage{OutputTokens: int(variant.Usage.OutputTokens)},
+				}) {
+					return
 				}
 
 			case anthropic.MessageStartEvent:
-				ch <- StreamEvent{
+				if !send(StreamEvent{
 					Type: "message_start",
 					Usage: &domain.Usage{
 						InputTokens:              int(variant.Message.Usage.InputTokens),
@@ -206,6 +226,8 @@ func (c Client) ChatStream(ctx context.Context, messages []domain.MessageParam, 
 						CacheCreationInputTokens: int(variant.Message.Usage.CacheCreationInputTokens),
 						CacheReadInputTokens:     int(variant.Message.Usage.CacheReadInputTokens),
 					},
+				}) {
+					return
 				}
 
 			default:
@@ -213,7 +235,7 @@ func (c Client) ChatStream(ctx context.Context, messages []domain.MessageParam, 
 			}
 		}
 		if err := stream.Err(); err != nil {
-			ch <- StreamEvent{Error: err}
+			send(StreamEvent{Error: err})
 		}
 	}()
 
