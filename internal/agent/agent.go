@@ -129,7 +129,11 @@ func (a *Agent) SessionName() string { return a.sessionName }
 
 // Model returns the current model name.
 func (a *Agent) Model() string     { return a.config.Model }
+// Provider returns the current LLM provider name.
 func (a *Agent) Provider() string { return a.config.Provider }
+
+// SetEffort updates the thinking effort level.
+func (a *Agent) SetEffort(effort string) { a.config.Effort = effort }
 
 // TokenCount returns the current total token count.
 func (a *Agent) TokenCount() int {
@@ -631,7 +635,7 @@ func (f *agentFactory) Create(cfg domain.AgentConfig) any {
 	return ag
 }
 
-func (f *agentFactory) Run(ag any, ctx context.Context, task string) error {
+func (f *agentFactory) Run(ctx context.Context, ag any, task string) error {
 	agent := ag.(*Agent)
 	_, err := agent.Run(ctx, task, "")
 	return err

@@ -44,7 +44,7 @@ type AgentSessionManager interface {
 // AgentFactory allows tools to create new agent instances.
 type AgentFactory interface {
 	Create(cfg domain.AgentConfig) any
-	Run(agent any, ctx context.Context, task string) error
+	Run(ctx context.Context, agent any, task string) error
 	GetTurns(agent any) []domain.MessageParam
 }
 

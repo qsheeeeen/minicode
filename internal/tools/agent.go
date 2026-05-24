@@ -75,7 +75,7 @@ func (t *SubAgentTool) Execute(ctx context.Context, args map[string]any, tc Tool
 		tc.AgentRegistry.Register(subID, subAgent, task, tc.CurrentAgentID)
 	}
 
-	err := tc.AgentFactory.Run(subAgent, ctx, task)
+	err := tc.AgentFactory.Run(ctx, subAgent, task)
 	if err != nil {
 		if tc.AgentRegistry != nil {
 			tc.AgentRegistry.UpdateStatus(subID, "error", err.Error())

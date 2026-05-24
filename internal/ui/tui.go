@@ -938,6 +938,7 @@ func (m *TUIModel) handleSelectChoice(val string) {
 	switch m.selectMode {
 	case "effort-select":
 		config.SetEffort(val)
+		m.agent.SetEffort(val)
 		m.agent.Store().AddStatus(domain.RoleStatus, fmt.Sprintf("Effort set to: %s", val))
 		m.clearMode()
 	case "session-list":

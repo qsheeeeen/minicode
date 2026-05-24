@@ -13,6 +13,9 @@ func registerEffort(r *Registry) {
 			valid := map[string]bool{"low": true, "medium": true, "high": true, "xhigh": true, "max": true}
 			if len(args) > 0 && valid[args[0]] {
 				config.SetEffort(args[0])
+				if ctx.Agent != nil {
+					ctx.Agent.SetEffort(args[0])
+				}
 				if ctx.SetStatusFn != nil {
 					ctx.SetStatusFn(fmt.Sprintf("Effort set to: %s", args[0]))
 				}
