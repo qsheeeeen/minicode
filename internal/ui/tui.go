@@ -900,7 +900,16 @@ func (m *TUIModel) handleSelectChoice(val string) {
 		m.clearMode()
 	case "session-list":
 		m.clearMode()
-		m.input.SetValue("/resume " + val)
+		if err := m.agent.LoadSession(val); err != nil {
+			m.agent.Store().AddStatus(domain.RoleError, fmt.Sprintf("Session not found: %s", val))
+			break
+		}
+		m.session = val
+		m.messages = ToDisplayMessages(m.agent.Store().Turns(), m.agent.Store().Statuses(), m.agent.Store().IsStreaming())
+		m.tokenCount = m.agent.TokenCount()
+		m.viewport.SetContent(m.renderMessages())
+		m.viewport.GotoBottom()
+		m.agent.Store().AddStatus(domain.RoleStatus, fmt.Sprintf("Loaded session: %s", val))
 	case "model-select":
 		// model tier selected — would need wizard, simplified for now
 		m.clearMode()
