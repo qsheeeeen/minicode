@@ -792,9 +792,17 @@ func (m *TUIModel) renderMessages() string {
 					parts = append(parts, fmt.Sprintf("limit: %.0f", limit))
 				}
 				call = fmt.Sprintf("Read(%s)", strings.Join(parts, ", "))
-			} else if msg.ToolName == "Write" || msg.ToolName == "Edit" {
+			} else if msg.ToolName == "Write" {
 				path, _ := msg.ToolInput["path"].(string)
-				call = fmt.Sprintf("%s(%s)", msg.ToolName, path)
+				content, _ := msg.ToolInput["content"].(string)
+				lines := 0
+				if content != "" {
+					lines = len(strings.Split(content, "\n"))
+				}
+				call = fmt.Sprintf("Write(%s, %d lines)", path, lines)
+			} else if msg.ToolName == "Edit" {
+				path, _ := msg.ToolInput["path"].(string)
+				call = fmt.Sprintf("Edit(%s)", path)
 			} else if msg.ToolName == "Bash" {
 				cmd, _ := msg.ToolInput["command"].(string)
 				call = fmt.Sprintf("Bash(%s)", cmd)
