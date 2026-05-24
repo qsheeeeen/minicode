@@ -2,6 +2,7 @@ package ui
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -437,7 +438,7 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			cmd := func() tea.Msg {
 				_, err := m.agent.Run(context.Background(), promptText, cmdInput)
-				if err != nil && err.Error() == "context canceled" {
+				if err != nil && errors.Is(err, context.Canceled) {
 					err = nil
 				}
 				return agentDoneMsg{err: err}

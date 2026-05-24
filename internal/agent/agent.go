@@ -299,7 +299,7 @@ func (a *Agent) Run(ctx context.Context, userMessage, displayContent string) (bo
 		}
 	}
 
-	if runErr != nil && (errors.Is(runErr, context.Canceled) || runErr.Error() == "context canceled") {
+	if runErr != nil && errors.Is(runErr, context.Canceled) {
 		// Cleanup: remove the last user message that triggered this aborted run
 		a.store.Pop()
 	}
