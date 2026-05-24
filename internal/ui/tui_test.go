@@ -15,7 +15,7 @@ func newTestModel() *TUIModel {
 	cfg := domain.AgentConfig{APIKey: "test", Model: "test-model", ContextLength: 100000}
 	ag := agent.NewAgent(cfg)
 	reg := agent.NewAgentRegistry(ag)
-	return NewTUIModel(ag, reg, NewCommandRegistry())
+	return NewTUIModel(ag, reg, NewCommandRegistry(), nil)
 }
 
 func TestTUIModel_Init(t *testing.T) {
@@ -109,7 +109,7 @@ func TestTUIModel_AgentSwitch(t *testing.T) {
 	reg := agent.NewAgentRegistry(ag1)
 	reg.Register("2", ag2, "test task", "1")
 
-	m := NewTUIModel(ag1, reg, NewCommandRegistry())
+	m := NewTUIModel(ag1, reg, NewCommandRegistry(), nil)
 	m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m.Update(tea.KeyMsg{Type: tea.KeyCtrlO})
 	if m.agent != ag2 {
@@ -120,7 +120,7 @@ func TestTUIModel_AgentSwitch(t *testing.T) {
 func TestTUIModel_SingleAgentNoSwitch(t *testing.T) {
 	ag := agent.NewAgent(domain.AgentConfig{APIKey: "test", Model: "m1", ContextLength: 100})
 	reg := agent.NewAgentRegistry(ag)
-	m := NewTUIModel(ag, reg, NewCommandRegistry())
+	m := NewTUIModel(ag, reg, NewCommandRegistry(), nil)
 	m.Update(tea.KeyMsg{Type: tea.KeyCtrlO})
 	if m.agent != ag {
 		t.Error("single agent should not switch")
@@ -179,7 +179,7 @@ func TestTUIModel_FullEnterCycle(t *testing.T) {
 	ag.ToolRegistry().Register(tools.NewBashTool())
 	reg := agent.NewAgentRegistry(ag)
 
-	m := NewTUIModel(ag, reg, NewCommandRegistry())
+	m := NewTUIModel(ag, reg, NewCommandRegistry(), nil)
 	m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	m.input.SetValue("echo hello")

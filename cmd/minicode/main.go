@@ -33,7 +33,7 @@ func main() {
 	rootCmd := &cobra.Command{
 		Use:     "minicode [prompt]",
 		Short:   "Mini Code - Interactive CLI Programming Agent",
-		Version: "0.1.0 (Go)",
+		Version: ui.Version,
 		Args:    cobra.MaximumNArgs(1),
 		Run:     run,
 	}
@@ -61,9 +61,11 @@ func run(cmd *cobra.Command, args []string) {
 
 	// Load global prompt
 	userPrompt := ""
+	promptFiles := []string{}
 	if home, err := os.UserHomeDir(); err == nil {
 		if data, err := os.ReadFile(home + "/.minicode/AGENTS.md"); err == nil {
 			userPrompt = string(data)
+			promptFiles = append(promptFiles, "AGENTS.md")
 		}
 	}
 
@@ -82,6 +84,13 @@ func run(cmd *cobra.Command, args []string) {
 		Effort:                    resolved.Thinking.Effort,
 		ProjectPromptFile:         resolved.PromptFile,
 		UserPrompt:                userPrompt,
+	}
+
+	// Check for project prompt file
+	if resolved.PromptFile != "" {
+		if _, err := os.Stat(resolved.PromptFile); err == nil {
+			promptFiles = append(promptFiles, resolved.PromptFile)
+		}
 	}
 
 	ag := agent.NewAgent(cfg)
@@ -202,7 +211,7 @@ Reply with exactly one of:
 	agentReg := agent.NewAgentRegistry(ag)
 	ag.SetRegistry(agentReg)
 
-	if err := ui.RunTUI(ag, agentReg, cmdReg); err != nil {
+	if err := ui.RunTUI(ag, agentReg, cmdReg, promptFiles); err != nil {
 		fmt.Fprintf(os.Stderr, "TUI error: %s\n", err)
 		os.Exit(1)
 	}

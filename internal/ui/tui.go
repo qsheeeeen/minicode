@@ -23,6 +23,9 @@ import (
 
 // ---- Styles ----
 
+// Version is the application version, set at build time via ldflags.
+var Version = "0.1.0"
+
 var (
 	styleHeaderCyan = lipgloss.NewStyle().Foreground(lipgloss.Color("6")).Bold(true)  // cyan
 	styleDim        = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))             // grey/dim
@@ -125,6 +128,8 @@ type TUIModel struct {
 	modelWizardEditTier string
 	modelWizardProvider string
 
+	promptFiles []string
+
 	width  int
 	height int
 	ready  bool
@@ -132,7 +137,7 @@ type TUIModel struct {
 }
 
 // NewTUIModel creates the TUI model.
-func NewTUIModel(ag *agent.Agent, registry *agent.AgentRegistry, cmdReg *CommandRegistry) *TUIModel {
+func NewTUIModel(ag *agent.Agent, registry *agent.AgentRegistry, cmdReg *CommandRegistry, promptFiles []string) *TUIModel {
 	ta := textarea.New()
 	ta.Placeholder = "Type your message... (Ctrl+O: switch agent, Ctrl+C: quit)"
 	ta.ShowLineNumbers = false
@@ -161,6 +166,7 @@ func NewTUIModel(ag *agent.Agent, registry *agent.AgentRegistry, cmdReg *Command
 		streaming:     ag.Store().IsStreaming(),
 		tokenCount:    ag.TokenCount(),
 		activeID:      ag.ID(),
+		promptFiles:   promptFiles,
 	}
 
 	ag.OnDisplayChange(func() {
@@ -626,7 +632,10 @@ func (m *TUIModel) renderHeader() string {
 		agentStr = "\n" + styleHeaderCyan.Render(fmt.Sprintf("[%s]", indicator))
 	}
 
-	line1 := styleHeaderCyan.Render("Mini Code") + styleDim.Render(" v0.1.0 (Go)")
+	line1 := styleHeaderCyan.Render("Mini Code") + styleDim.Render(" v"+Version)
+	if len(m.promptFiles) > 0 {
+		line1 += styleDim.Render(" | " + strings.Join(m.promptFiles, ", "))
+	}
 	return line1 + agentStr + "\n"
 }
 
@@ -1067,8 +1076,8 @@ func truncate(s string, maxLen int) string {
 // ---- TUI entry point ----
 
 // RunTUI starts the interactive Bubble Tea terminal UI.
-func RunTUI(ag *agent.Agent, registry *agent.AgentRegistry, cmdReg *CommandRegistry) error {
-	m := NewTUIModel(ag, registry, cmdReg)
+func RunTUI(ag *agent.Agent, registry *agent.AgentRegistry, cmdReg *CommandRegistry, promptFiles []string) error {
+	m := NewTUIModel(ag, registry, cmdReg, promptFiles)
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	m.program = p
 	_, err := p.Run()
