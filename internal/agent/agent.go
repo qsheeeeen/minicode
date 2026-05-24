@@ -517,13 +517,23 @@ func (a *Agent) executeTools(ctx context.Context, calls []toolCall) (denied bool
 					results = append(results, toolResultItem{ToolUseID: calls[j].Block.ID, Content: reason})
 				}
 				a.store.AddToolResults(results)
-				a.store.AddStatus(domain.RoleError, fmt.Sprintf("Tool %q was denied by user", call.Tool.Name()))
+				a.store.AddStatus(domain.RoleError, fmt.Sprintf(`Tool "%s" was denied by user`, call.Tool.Name()))
 				return true, nil
 			}
 		}
 
 		result, execErr := call.Tool.Execute(ctx, args, tc)
 		if execErr != nil {
+			if de, ok := execErr.(*tools.ToolDeniedError); ok {
+				// Tool was denied by user (e.g. AskUser cancelled): stop remaining
+				results = append(results, toolResultItem{ToolUseID: call.Block.ID, Content: de.Reason})
+				for j := i + 1; j < len(calls); j++ {
+					results = append(results, toolResultItem{ToolUseID: calls[j].Block.ID, Content: de.Reason})
+				}
+				a.store.AddToolResults(results)
+				a.store.AddStatus(domain.RoleError, fmt.Sprintf(`Tool "%s" was denied by user`, call.Tool.Name()))
+				return true, nil
+			}
 			results = append(results, toolResultItem{ToolUseID: call.Block.ID, Content: fmt.Sprintf("Error: %s", execErr.Error())})
 			continue
 		}

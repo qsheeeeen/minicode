@@ -56,6 +56,6 @@ func (t *SetModelTool) Execute(ctx context.Context, args map[string]any, tc Tool
 		tc.SetModelFn(modelSpec, resolved.Model.APIKey, resolved.Model.BaseURL, resolved.Model.ContextLength)
 	}
 	return domain.ToolResult{
-		Output: fmt.Sprintf("Successfully mapped Tier %s to %s (%s)", tier, modelSpec, resolved.Model.Model),
+		Output: fmt.Sprintf("Switched to tier %s: %s", tier, modelSpec),
 	}, nil
 }

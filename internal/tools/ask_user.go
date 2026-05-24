@@ -66,5 +66,11 @@ func (t *AskUserTool) Execute(ctx context.Context, args map[string]any, tc ToolC
 	}
 
 	answer := tc.AskUserFn(question, options, multiSelect)
+	if answer == "" {
+		return domain.ToolResult{}, &ToolDeniedError{
+			ToolName: "AskUser",
+			Reason:   "User cancelled the question",
+		}
+	}
 	return domain.ToolResult{Output: answer}, nil
 }

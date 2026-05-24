@@ -80,7 +80,7 @@ func (t *SubAgentTool) Execute(ctx context.Context, args map[string]any, tc Tool
 		if tc.AgentRegistry != nil {
 			tc.AgentRegistry.UpdateStatus(subID, "error", err.Error())
 		}
-		return domain.ToolResult{Output: fmt.Sprintf("Sub-agent error: %s", err.Error())}, nil
+		return domain.ToolResult{Output: fmt.Sprintf("Agent #%s failed: %s", subID, err.Error())}, nil
 	}
 
 	// Extract final response from sub-agent turns
@@ -108,7 +108,6 @@ func (t *SubAgentTool) Execute(ctx context.Context, args map[string]any, tc Tool
 		if toolCalls == 0 {
 			summary = "Task completed"
 		}
-		summary = fmt.Sprintf("(Sub-agent completed: %s)", summary)
 	}
 
 	if tc.AgentRegistry != nil {
