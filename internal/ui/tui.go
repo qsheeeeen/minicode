@@ -118,8 +118,12 @@ type TUIModel struct {
 
 	// Select mode: uses bubbles/list
 	selectList  list.Model
-	selectMode  string // effort-select, session-list, model-select
+	selectMode  string // effort-select, session-list, model-tier, ...
 	help        help.Model
+
+	// Model wizard state machine
+	modelWizardEditTier string
+	modelWizardProvider string
 
 	width  int
 	height int
@@ -910,10 +914,131 @@ func (m *TUIModel) handleSelectChoice(val string) {
 		m.viewport.SetContent(m.renderMessages())
 		m.viewport.GotoBottom()
 		m.agent.Store().AddStatus(domain.RoleStatus, fmt.Sprintf("Loaded session: %s", val))
-	case "model-select":
-		// model tier selected — would need wizard, simplified for now
-		m.clearMode()
+	case "model-tier":
+		m.handleModelTier(val)
+	case "model-edit-tier":
+		m.handleModelEditTier(val)
+	case "model-provider":
+		m.handleModelProvider(val)
+	case "model-model":
+		m.handleModelSelect(val)
 	}
+}
+
+// ---- Model wizard handlers ----
+
+func (m *TUIModel) handleModelTier(val string) {
+	if val == "_edit_" {
+		cfg, _ := config.Load()
+		tiers := cfg.Tiers
+		if tiers == nil {
+			tiers = map[string]string{}
+		}
+		var items []list.Item
+		for _, t := range []string{"1", "2", "3"} {
+			label := tiers[t]
+			if label == "" {
+				label = "(unset)"
+			}
+			items = append(items, listItem{title: t, desc: fmt.Sprintf("Tier %s -> %s", t, label)})
+		}
+		m.setMode("model-edit-tier", "Edit which tier?", items)
+		return
+	}
+	// Direct tier selection: parse the model specifier and apply
+	cfg, _ := config.Load()
+	tier := extractTierFromLabel(val)
+	if tier == "" {
+		return
+	}
+	spec := ""
+	if cfg.Tiers != nil {
+		spec = cfg.Tiers[tier]
+	}
+	if spec == "" {
+		return
+	}
+	applyModelSpec(m, spec)
+	m.clearMode()
+}
+
+func (m *TUIModel) handleModelEditTier(val string) {
+	m.modelWizardEditTier = val
+	cfg, _ := config.Load()
+	var items []list.Item
+	for k, p := range cfg.Providers {
+		if p.APIKey != "" {
+			items = append(items, listItem{title: k, desc: p.BaseURL})
+		}
+	}
+	if len(items) == 0 {
+		m.agent.Store().AddStatus(domain.RoleError, "No configured providers found")
+		m.clearMode()
+		return
+	}
+	m.setMode("model-provider", fmt.Sprintf("Provider for Tier %s:", val), items)
+}
+
+func (m *TUIModel) handleModelProvider(val string) {
+	m.modelWizardProvider = val
+	cfg, _ := config.Load()
+	provider := cfg.Providers[val]
+	var items []list.Item
+	for modelName := range provider.Models {
+		items = append(items, listItem{title: modelName, desc: ""})
+	}
+	if len(items) == 0 {
+		m.agent.Store().AddStatus(domain.RoleError, fmt.Sprintf("No models configured for %s", val))
+		m.clearMode()
+		return
+	}
+	m.setMode("model-model", fmt.Sprintf("Model for Tier %s @%s:", m.modelWizardEditTier, val), items)
+}
+
+func (m *TUIModel) handleModelSelect(modelName string) {
+	spec := modelName + "@" + m.modelWizardProvider
+	config.SetTier(m.modelWizardEditTier, spec)
+	applyModelSpec(m, spec)
+	m.agent.Store().AddStatus(domain.RoleStatus, fmt.Sprintf("Tier %s -> %s", m.modelWizardEditTier, spec))
+	m.clearMode()
+}
+
+func extractTierFromLabel(label string) string {
+	// Label format: "Tier N -> model@provider"
+	if len(label) < 5 || label[:5] != "Tier " {
+		return ""
+	}
+	rest := label[5:]
+	for i, c := range rest {
+		if c == ' ' {
+			return rest[:i]
+		}
+	}
+	return rest
+}
+
+func applyModelSpec(m *TUIModel, spec string) {
+	cfg, _ := config.Load()
+	parts := strings.SplitN(spec, "@", 2)
+	modelName := parts[0]
+	providerName := ""
+	if len(parts) > 1 {
+		providerName = parts[1]
+	}
+	if providerName == "" {
+		for k := range cfg.Providers {
+			providerName = k
+			break
+		}
+	}
+	provider := cfg.Providers[providerName]
+	contextLen := 0
+	if info, ok := provider.Models[modelName]; ok {
+		contextLen = info.ContextLength
+	}
+	m.agent.SetModel(modelName, provider.APIKey, provider.BaseURL, contextLen)
+	config.SetModel(spec)
+	m.modelName = modelName
 }
 
 // ---- Helpers ----
