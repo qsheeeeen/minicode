@@ -784,7 +784,14 @@ func (m *TUIModel) renderMessages() string {
 			var call string
 			if msg.ToolName == "Read" {
 				path, _ := msg.ToolInput["path"].(string)
-				call = fmt.Sprintf("Read(%s)", path)
+				parts := []string{path}
+				if offset, ok := msg.ToolInput["offset"].(float64); ok && offset > 0 {
+					parts = append(parts, fmt.Sprintf("offset: %.0f", offset))
+				}
+				if limit, ok := msg.ToolInput["limit"].(float64); ok && limit > 0 {
+					parts = append(parts, fmt.Sprintf("limit: %.0f", limit))
+				}
+				call = fmt.Sprintf("Read(%s)", strings.Join(parts, ", "))
 			} else if msg.ToolName == "Write" || msg.ToolName == "Edit" {
 				path, _ := msg.ToolInput["path"].(string)
 				call = fmt.Sprintf("%s(%s)", msg.ToolName, path)
