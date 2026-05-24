@@ -171,6 +171,8 @@ func NewTUIModel(ag *agent.Agent, registry *agent.AgentRegistry, cmdReg *Command
 		promptFiles:   promptFiles,
 	}
 
+	m.viewport.SetContent(m.renderMessages())
+
 	ag.OnDisplayChange(func() {
 		if m.program != nil {
 			m.program.Send(displayChangeMsg{})
@@ -522,6 +524,7 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.streaming = false
 		if msg.err != nil {
 			m.err = msg.err
+			m.agent.Store().AddStatus(domain.RoleError, msg.err.Error())
 		}
 		m.messages = ToDisplayMessages(m.agent.Store().Turns(), m.agent.Store().Statuses(), m.agent.Store().IsStreaming())
 		m.modelName = m.agent.Model()
@@ -621,12 +624,7 @@ func (m *TUIModel) View() string {
 	input := m.renderInput()
 	status := m.renderStatusBar()
 
-	return lipgloss.JoinVertical(lipgloss.Left,
-		header,
-		viewport,
-		input,
-		status,
-	)
+	return header + viewport + input + status
 }
 
 func (m *TUIModel) renderHeader() string {
@@ -741,10 +739,10 @@ func (m *TUIModel) renderInput() string {
 			lines = append(lines, line)
 		}
 		suggestions := "\n" + strings.Join(lines, "\n") + "\n " + styleDim.Render("↑↓ navigate  Tab accept")
-		return mainInput + suggestions
+		return mainInput + suggestions + "\n"
 	}
 
-	return mainInput
+	return mainInput + "\n"
 }
 
 func formatNumber(n int) string {
@@ -798,7 +796,7 @@ func (m *TUIModel) renderStatusBar() string {
 		modeColor.Render(permMode) +
 		styleDim.Render(" (Shift+Tab)")
 
-	return line1 + "\n" + line2
+	return line1 + "\n" + line2 + "\n"
 }
 
 func (m *TUIModel) renderMessages() string {

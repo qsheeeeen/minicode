@@ -128,7 +128,8 @@ func (a *Agent) ContextLength() int { return a.config.ContextLength }
 func (a *Agent) SessionName() string { return a.sessionName }
 
 // Model returns the current model name.
-func (a *Agent) Model() string     { return a.config.Model }
+func (a *Agent) Model() string { return a.config.Model }
+
 // Provider returns the current LLM provider name.
 func (a *Agent) Provider() string { return a.config.Provider }
 
@@ -359,6 +360,7 @@ func (a *Agent) handleStream(ctx context.Context, toolDefs []llm.Tool) ([]toolCa
 		ThinkingBudget:  int64(a.config.ThinkingBudget),
 	})
 	if err != nil {
+		a.logger.Error("stream request failed", "error", err)
 		return nil, false, err
 	}
 
@@ -376,6 +378,7 @@ func (a *Agent) handleStream(ctx context.Context, toolDefs []llm.Tool) ([]toolCa
 
 	for evt := range ch {
 		if evt.Error != nil {
+			a.logger.Error("stream event error", "error", evt.Error)
 			return nil, false, evt.Error
 		}
 
