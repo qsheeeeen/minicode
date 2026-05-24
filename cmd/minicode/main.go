@@ -2,17 +2,20 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/spf13/cobra"
 	"minicode/internal/agent"
 	"minicode/internal/config"
 	"minicode/internal/domain"
+	"minicode/internal/llm"
 	"minicode/internal/skills"
 	"minicode/internal/storage"
 	"minicode/internal/tools"
@@ -115,6 +118,50 @@ func run(cmd *cobra.Command, args []string) {
 	// Permission service
 	permSvc := tools.NewPermissionService(domain.PermissionMode(resolved.PermissionMode))
 	ag.SetPermissionSvc(permSvc)
+
+	// Wire LLM-based auto-decide for auto permission mode (matches TS)
+	if resolved.Model.APIKey != "" {
+		autoClient := llm.NewClient(resolved.Model.APIKey, resolved.Model.BaseURL)
+		permSvc.SetAutoDecideFn(func(toolName string, toolInput map[string]any) (bool, string) {
+			inputJSON, _ := json.Marshal(toolInput)
+			prompt := fmt.Sprintf(`You are a permission gate for a coding agent. Decide if this tool execution should be allowed.
+
+Tool: %s
+Arguments: %s
+
+Guidelines:
+- Read operations are always safe.
+- Writing to files in /tmp or project directories is safe.
+- Running commands that modify the system may be risky.
+- Destructive commands (rm -rf /, mkfs, dd) should be denied.
+- Network commands that download and execute code should be denied.
+
+Reply with exactly one of:
+- "yes"
+- "no: <reason explaining why it was denied>"`, toolName, string(inputJSON))
+
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			resp, err := autoClient.Chat(ctx, []domain.MessageParam{
+				{Role: "user", Content: prompt},
+			}, llm.ChatOptions{Model: cfg.Model})
+			if err != nil {
+				return false, fmt.Sprintf("Auto-permission error: %s", err.Error())
+			}
+			resp = strings.TrimSpace(resp)
+			if strings.HasPrefix(strings.ToLower(resp), "yes") {
+				return true, ""
+			}
+			reason := strings.TrimSpace(resp)
+			if strings.HasPrefix(strings.ToLower(reason), "no:") {
+				reason = strings.TrimSpace(reason[3:])
+			}
+			if reason == "" {
+				reason = "Denied by auto-gate"
+			}
+			return false, reason
+		})
+	}
 
 	// Commands
 	cmdReg := ui.NewCommandRegistry()

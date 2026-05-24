@@ -50,6 +50,47 @@ func NewClient(apiKey, baseURL string) Client {
 	return Client{sdk: anthropic.NewClient(opts...)}
 }
 
+// Chat sends a non-streaming request and returns the first text content block.
+func (c Client) Chat(ctx context.Context, messages []domain.MessageParam, opts ChatOptions) (string, error) {
+	if opts.Model == "" {
+		opts.Model = "claude-sonnet-4-5"
+	}
+	if opts.MaxTokens == 0 {
+		opts.MaxTokens = 100
+	}
+
+	params := anthropic.MessageNewParams{
+		Model:     anthropic.Model(opts.Model),
+		MaxTokens: opts.MaxTokens,
+	}
+
+	if opts.System != "" {
+		params.System = []anthropic.TextBlockParam{{Text: opts.System}}
+	}
+
+	sdkMsgs := make([]anthropic.MessageParam, len(messages))
+	for i, m := range messages {
+		role := anthropic.MessageParamRoleUser
+		if m.Role == "assistant" {
+			role = anthropic.MessageParamRoleAssistant
+		}
+		sdkMsgs[i] = anthropic.MessageParam{Role: role, Content: toSDKContent(m.Content)}
+	}
+	params.Messages = sdkMsgs
+
+	msg, err := c.sdk.Messages.New(ctx, params)
+	if err != nil {
+		return "", err
+	}
+
+	for _, block := range msg.Content {
+		if block.Type == "text" {
+			return block.Text, nil
+		}
+	}
+	return "", nil
+}
+
 // ChatStream sends a streaming request and returns a channel of events.
 func (c Client) ChatStream(ctx context.Context, messages []domain.MessageParam, tools []Tool, opts ChatOptions) (<-chan StreamEvent, error) {
 	if opts.Model == "" {
