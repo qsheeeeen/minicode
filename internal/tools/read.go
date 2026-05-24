@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"minicode/internal/domain"
 )
@@ -38,6 +39,21 @@ func (t *ReadTool) Execute(ctx context.Context, args map[string]any, tc ToolCont
 		return domain.ToolResult{Output: "Error: path is required"}, nil
 	}
 
+	_, hasOffset := args["offset"]
+	_, hasLimit := args["limit"]
+
+	// Without offset or limit, read entire file (matches TS behavior)
+	if !hasOffset && !hasLimit {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return domain.ToolResult{Output: err.Error()}, nil
+		}
+		content := string(data)
+		nl := strings.Count(content, "\n") + 1
+		return domain.ToolResult{Output: fmt.Sprintf("%s\nRead %d lines, %d chars", content, nl, len(content))}, nil
+	}
+
+	// With offset/limit: byte-based seek/read for precise control
 	file, err := os.Open(path)
 	if err != nil {
 		return domain.ToolResult{Output: err.Error()}, nil
@@ -73,7 +89,7 @@ func (t *ReadTool) Execute(ctx context.Context, args map[string]any, tc ToolCont
 	}
 
 	content := string(buf[:n])
-	res := fmt.Sprintf("Content of %s (offset %d, %d bytes read):\n---\n%s\n---", path, offset, n, content)
+	res := fmt.Sprintf("%s\nRead %d chars starting at offset %d", content, n, offset)
 	if offset+n < int(stat.Size()) {
 		res += fmt.Sprintf("\n(Note: File has %d more bytes. Use offset %d to read more.)", int(stat.Size())-(offset+n), offset+n)
 	}
