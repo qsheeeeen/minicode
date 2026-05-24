@@ -26,6 +26,7 @@ var (
 	modelOverride  string
 	sessionName    string
 	resumeRecent   bool
+	headless       bool
 	permissionMode string
 )
 
@@ -41,6 +42,7 @@ func main() {
 	rootCmd.Flags().StringVarP(&modelOverride, "model", "m", "", "Override model (model@provider)")
 	rootCmd.Flags().StringVarP(&sessionName, "session", "s", "", "Session name to load/save")
 	rootCmd.Flags().BoolVarP(&resumeRecent, "resume", "r", false, "Resume the most recent session")
+	rootCmd.Flags().BoolVarP(&headless, "headless", "H", false, "Run without TUI, output to stdout")
 	rootCmd.Flags().StringVarP(&permissionMode, "permission", "p", "", "Permission mode (manual, yolo, auto)")
 
 	if err := rootCmd.Execute(); err != nil {
@@ -81,7 +83,7 @@ func run(cmd *cobra.Command, args []string) {
 		ContextLength:             resolved.Model.ContextLength,
 		CompressionThresholdRatio: resolved.CompressionThreshold,
 		ThinkingEnabled:           resolved.Thinking.Enabled,
-		ThinkingBudget:            resolved.Thinking.BudgetTokens,
+		ThinkingBudget:            8192,
 		Effort:                    resolved.Thinking.Effort,
 		ProjectPromptFile:         resolved.PromptFile,
 		UserPrompt:                userPrompt,
@@ -200,7 +202,12 @@ Reply with exactly one of:
 		}
 	}
 
-	if prompt != "" {
+	if headless && prompt == "" {
+		fmt.Fprintln(os.Stderr, "Error: --headless requires a prompt argument")
+		os.Exit(1)
+	}
+
+	if prompt != "" || headless {
 		if err := ui.RunHeadless(ctx, ag, prompt, prompt); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %s\n", err)
 			os.Exit(1)

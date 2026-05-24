@@ -3,6 +3,7 @@ package ui
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/help"
@@ -628,20 +629,29 @@ func (m *TUIModel) View() string {
 }
 
 func (m *TUIModel) renderHeader() string {
+	line1 := styleHeaderCyan.Render("Mini Code") + styleDim.Render(" v"+Version)
+	if len(m.promptFiles) > 0 {
+		line1 += styleDim.Render(" | " + strings.Join(m.promptFiles, ", "))
+	}
+
 	var agentStr string
 	if len(m.sessions) > 1 {
 		indicator := m.activeID
 		if indicator == "1" {
 			indicator = "M"
 		}
-		agentStr = "\n" + styleHeaderCyan.Render(fmt.Sprintf("[%s]", indicator))
+		agentStr = styleHeaderCyan.Render(fmt.Sprintf("[%s]", indicator))
 	}
 
-	line1 := styleHeaderCyan.Render("Mini Code") + styleDim.Render(" v"+Version)
-	if len(m.promptFiles) > 0 {
-		line1 += styleDim.Render(" | " + strings.Join(m.promptFiles, ", "))
+	// Calculate right alignment
+	leftWidth := lipgloss.Width(line1)
+	rightWidth := lipgloss.Width(agentStr)
+	spaces := m.width - leftWidth - rightWidth - 2 // -2 for padding
+	if spaces < 1 {
+		spaces = 1
 	}
-	return line1 + agentStr + "\n"
+
+	return " " + line1 + strings.Repeat(" ", spaces) + agentStr + " \n\n"
 }
 
 func (m *TUIModel) activeAgentId() string {
@@ -736,6 +746,18 @@ func (m *TUIModel) renderInput() string {
 	return mainInput
 }
 
+func formatNumber(n int) string {
+	in := strconv.Itoa(n)
+	var out []byte
+	for i := 0; i < len(in); i++ {
+		if i > 0 && (len(in)-i)%3 == 0 {
+			out = append(out, ',')
+		}
+		out = append(out, in[i])
+	}
+	return string(out)
+}
+
 func (m *TUIModel) renderStatusBar() string {
 	provider := m.agent.Provider()
 	if provider == "" {
@@ -769,7 +791,7 @@ func (m *TUIModel) renderStatusBar() string {
 		modeColor = styleHeaderCyan
 	}
 
-	line2 := styleDim.Render(fmt.Sprintf("%d/%d ", m.tokenCount, ctxLen)) +
+	line2 := styleDim.Render(fmt.Sprintf("%s/%s ", formatNumber(m.tokenCount), formatNumber(ctxLen))) +
 		m.prog.ViewAs(pct/100) +
 		styleDim.Render(fmt.Sprintf(" %d%% │ ", int(pct))) +
 		modeColor.Render(permMode) +

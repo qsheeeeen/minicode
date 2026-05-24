@@ -2,8 +2,6 @@ package tools
 
 import (
 	"context"
-	"fmt"
-	"io"
 	"os"
 	"strings"
 
@@ -39,59 +37,37 @@ func (t *ReadTool) Execute(ctx context.Context, args map[string]any, tc ToolCont
 		return domain.ToolResult{Output: "Error: path is required"}, nil
 	}
 
-	_, hasOffset := args["offset"]
-	_, hasLimit := args["limit"]
-
-	// Without offset or limit, read entire file (matches TS behavior)
-	if !hasOffset && !hasLimit {
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return domain.ToolResult{Output: err.Error()}, nil
-		}
-		content := string(data)
-		nl := strings.Count(content, "\n") + 1
-		return domain.ToolResult{Output: fmt.Sprintf("%s\nRead %d lines, %d chars", content, nl, len(content))}, nil
-	}
-
-	// With offset/limit: byte-based seek/read for precise control
-	file, err := os.Open(path)
-	if err != nil {
-		return domain.ToolResult{Output: err.Error()}, nil
-	}
-	defer file.Close()
-
-	stat, err := file.Stat()
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return domain.ToolResult{Output: err.Error()}, nil
 	}
 
-	offset := 0
-	if v, ok := args["offset"].(float64); ok {
-		offset = int(v)
-	}
-	limit := 50000 // default 50k chars
-	if v, ok := args["limit"].(float64); ok {
-		limit = int(v)
+	content := string(data)
+	lines := strings.Split(content, "\n")
+
+	start := 0
+	if offset, ok := args["offset"].(float64); ok && offset > 0 {
+		start = int(offset) - 1
 	}
 
-	if offset > int(stat.Size()) {
-		return domain.ToolResult{Output: fmt.Sprintf("Error: offset %d is beyond file size %d", offset, stat.Size())}, nil
+	end := len(lines)
+	if limit, ok := args["limit"].(float64); ok {
+		end = start + int(limit)
 	}
 
-	if _, err := file.Seek(int64(offset), io.SeekStart); err != nil {
-		return domain.ToolResult{Output: err.Error()}, nil
+	if start < 0 {
+		start = 0
+	}
+	if start > len(lines) {
+		start = len(lines)
+	}
+	if end < start {
+		end = start
+	}
+	if end > len(lines) {
+		end = len(lines)
 	}
 
-	buf := make([]byte, limit)
-	n, err := file.Read(buf)
-	if err != nil && err != io.EOF {
-		return domain.ToolResult{Output: err.Error()}, nil
-	}
-
-	content := string(buf[:n])
-	res := fmt.Sprintf("%s\nRead %d chars starting at offset %d", content, n, offset)
-	if offset+n < int(stat.Size()) {
-		res += fmt.Sprintf("\n(Note: File has %d more bytes. Use offset %d to read more.)", int(stat.Size())-(offset+n), offset+n)
-	}
-	return domain.ToolResult{Output: res}, nil
+	result := strings.Join(lines[start:end], "\n")
+	return domain.ToolResult{Output: result}, nil
 }

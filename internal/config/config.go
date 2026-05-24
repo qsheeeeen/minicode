@@ -22,9 +22,8 @@ type ModelInfo struct {
 
 // ThinkingConfig holds configuration for thinking models.
 type ThinkingConfig struct {
-	Enabled      bool   `mapstructure:"enabled"`
-	BudgetTokens int    `mapstructure:"budgetTokens"`
-	Effort       string `mapstructure:"effort"`
+	Enabled bool   `mapstructure:"enabled"`
+	Effort  string `mapstructure:"effort"`
 }
 
 // Config is the top-level configuration (~/.minicode/config.json).
@@ -33,7 +32,8 @@ type Config struct {
 	Model                string                    `mapstructure:"model"`
 	Tiers                map[string]string         `mapstructure:"tiers"`
 	CompressionThreshold float64                   `mapstructure:"compressionThreshold"`
-	Thinking             ThinkingConfig            `mapstructure:"thinking"`
+	Thinking             bool                      `mapstructure:"thinking"`
+	Effort               string                    `mapstructure:"effort"`
 	PromptFile           string                    `mapstructure:"promptFile"`
 	PermissionMode       string                    `mapstructure:"permissionMode"`
 	SkillsDir            string                    `mapstructure:"skillsDir"`
@@ -79,7 +79,6 @@ func resetViper() {
 	v.SetDefault("promptFile", "AGENTS.md")
 	v.SetDefault("permissionMode", "manual")
 	v.SetDefault("skillsDir", ".minicode/skills")
-	v.SetDefault("thinking.budgetTokens", 4096)
 }
 
 // Load reads the config file.
@@ -114,10 +113,13 @@ func Resolve(specOverride string) (*ResolvedConfig, error) {
 
 	resolved := &ResolvedConfig{
 		CompressionThreshold: cfg.CompressionThreshold,
-		Thinking:             cfg.Thinking,
-		PromptFile:           cfg.PromptFile,
-		PermissionMode:       cfg.PermissionMode,
-		SkillsDir:            cfg.SkillsDir,
+		Thinking: ThinkingConfig{
+			Enabled: cfg.Thinking,
+			Effort:  cfg.Effort,
+		},
+		PromptFile:     cfg.PromptFile,
+		PermissionMode: cfg.PermissionMode,
+		SkillsDir:      cfg.SkillsDir,
 	}
 
 	if spec == "" {
