@@ -1,6 +1,9 @@
 package commands
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 func registerClear(r *Registry) {
 	r.Register(&Command{Name: "clear", Description: "Clear all history and start a new session", Kind: Handler,
@@ -8,9 +11,8 @@ func registerClear(r *Registry) {
 			if ctx.ClearFn != nil {
 				ctx.ClearFn()
 			}
-			if ctx.Agent != nil {
-				newSession := fmt.Sprintf("session-%d", 0) // simplified: TS uses Date.now()
-				ctx.Agent.SetSession(newSession)
+			if ctx.SetSessionFn != nil {
+				ctx.SetSessionFn(fmt.Sprintf("session-%d", time.Now().UnixMilli()))
 			}
 			return true
 		},

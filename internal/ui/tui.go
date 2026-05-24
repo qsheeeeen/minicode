@@ -675,13 +675,11 @@ func (m *TUIModel) renderInput() string {
 				}
 				marker = "[" + chk + "] "
 			}
-			padded := opt.Label + strings.Repeat(" ", maxLabel-len(opt.Label))
 			desc := ""
 			if opt.Description != "" {
 				desc = "  " + styleDim.Render(opt.Description)
 			}
 			optLines = append(optLines, fmt.Sprintf("%s%s%s%s", arrow, marker, label, desc))
-			_ = padded
 		}
 		footer := styleDim.Render("↑↓ navigate")
 		if m.askMulti {

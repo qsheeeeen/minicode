@@ -1,6 +1,9 @@
 package commands
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 func registerNew(r *Registry) {
 	r.Register(&Command{Name: "new", Description: "Create a new session", Kind: Handler,
@@ -10,7 +13,7 @@ func registerNew(r *Registry) {
 				name = args[0]
 			}
 			if name == "" {
-				name = fmt.Sprintf("session-%d", 0) // simplified
+				name = fmt.Sprintf("session-%d", time.Now().UnixMilli())
 			}
 			if ctx.ClearFn != nil {
 				ctx.ClearFn()
