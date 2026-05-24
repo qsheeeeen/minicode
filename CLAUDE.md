@@ -18,13 +18,15 @@ go run ./cmd/minicode -s my-session     # Named session
 go run ./cmd/minicode -r                # Resume recent session
 ```
 
-## Test (Go)
+## Test & Lint (Go)
 
 ```bash
 go test ./...                           # All tests
 go test ./internal/tools -run TestRead  # Single package, filtered
 go test ./... -cover                    # With coverage
 go test ./... -v -count=1               # Verbose, no cache
+go vet ./...                            # Static analysis
+go mod tidy                            # Prune dependencies
 ```
 
 ## Build & Run (TypeScript, reference only)
@@ -61,9 +63,10 @@ internal/
 ├── ui/
 │   ├── tui.go                # Bubble Tea TUI (textarea, viewport, list, spinner, progress, help)
 │   ├── headless.go           # Incremental stdout renderer
-│   ├── commands.go           # Type aliases re-exporting from ui/commands/
-│   └── commands/             # One file per slash command + Registry + 24 tests
-└── config/                   # (duplicate path, deprecated — use internal/config/)
+│   ├── commands.go           # Re-exports Command/Context/Kind/Registry types from ui/commands/
+│   ├── tui_test.go           # TUI integration tests
+│   ├── display_test.go       # Display adapter tests
+│   └── commands/             # One file per slash command + Registry + tests
 ```
 
 ### Core Flow
@@ -111,9 +114,29 @@ internal/
 
 Model resolution: CLI `-m` > `MODEL` env > config `model` field.
 
+## Logging
+
+Go standard library `log/slog` with `TextHandler` writing to `os.Stderr`. Each `Agent` carries a `*slog.Logger` field (initialized in `NewAgent`, `internal/agent/agent.go:68`). The logger is wired but not yet used in the current code — use `a.logger.Info("msg", "key", val)` for structured log output.
+
+TypeScript reference: `src/utils/logger.ts` uses pino for session-scoped logging.
+
 ## TUI Dependencies
 
 Uses 6 Charmbracelet Bubbles components: `textarea`, `viewport`, `spinner`, `progress`, `list`, `help`. Styles via `lipgloss`. The TUI aligns with the TS Ink/React reference for visual layout, keyboard shortcuts, and message rendering.
+
+## Verification Protocol
+
+After implementing any feature or fix, self-test in headless mode before marking complete:
+
+```bash
+go run ./cmd/minicode -H "<prompt that exercises the change>"
+```
+
+Headless mode exposes bugs that TUI doesn't (e.g., `Store.toLLMMessages()` skipping `tool_call` blocks without assistant text). Always verify output is correct.
+
+## Plan Generation
+
+The `/plan` slash command generates executable plans written to `.claude/plans/` in the project root.
 
 ## Naming Conventions
 

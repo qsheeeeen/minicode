@@ -32,8 +32,8 @@ type Config struct {
 	Model                string                    `mapstructure:"model"`
 	Tiers                map[string]string         `mapstructure:"tiers"`
 	CompressionThreshold float64                   `mapstructure:"compressionThreshold"`
-	Thinking             bool                      `mapstructure:"thinking"`
-	Effort               string                    `mapstructure:"effort"`
+	Thinking             ThinkingConfig            `mapstructure:"thinking"`
+	Effort               string                    `mapstructure:"effort"` // legacy: top-level effort, now nested under thinking
 	PromptFile           string                    `mapstructure:"promptFile"`
 	PermissionMode       string                    `mapstructure:"permissionMode"`
 	SkillsDir            string                    `mapstructure:"skillsDir"`
@@ -114,8 +114,8 @@ func Resolve(specOverride string) (*ResolvedConfig, error) {
 	resolved := &ResolvedConfig{
 		CompressionThreshold: cfg.CompressionThreshold,
 		Thinking: ThinkingConfig{
-			Enabled: cfg.Thinking,
-			Effort:  cfg.Effort,
+			Enabled: cfg.Thinking.Enabled,
+			Effort:  coalesce(cfg.Thinking.Effort, cfg.Effort),
 		},
 		PromptFile:     cfg.PromptFile,
 		PermissionMode: cfg.PermissionMode,
@@ -176,6 +176,13 @@ func split2(s, sep string) [2]string {
 	return parts
 }
 
+func coalesce(a, b string) string {
+	if a != "" {
+		return a
+	}
+	return b
+}
+
 // SetModel persists a model specifier.
 func SetModel(modelSpec string) error {
 	v.Set("model", modelSpec)
@@ -208,5 +215,11 @@ func write() error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
+
+	// Ensure all existing config values are loaded before writing,
+	// otherwise WriteConfigAs will overwrite the file with only
+	// defaults and the single modified key.
+	v.ReadInConfig()
+
 	return v.WriteConfigAs(filepath.Join(dir, "config.json"))
 }

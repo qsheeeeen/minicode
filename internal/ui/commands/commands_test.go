@@ -105,6 +105,9 @@ func TestCompress(t *testing.T) {
 }
 
 func TestEffort_ValidArg(t *testing.T) {
+	// Isolate from real ~/.minicode/config.json
+	t.Setenv("HOME", t.TempDir())
+
 	r := NewRegistry()
 	r.RegisterBuiltins()
 	handled, _ := r.ParseAndExecute("/effort high", Context{})
