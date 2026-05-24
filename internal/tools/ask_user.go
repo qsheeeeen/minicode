@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"fmt"
 
 	"minicode/internal/domain"
 )
@@ -72,5 +73,5 @@ func (t *AskUserTool) Execute(ctx context.Context, args map[string]any, tc ToolC
 			Reason:   "User cancelled the question",
 		}
 	}
-	return domain.ToolResult{Output: answer}, nil
+	return domain.ToolResult{Output: fmt.Sprintf(`User selected: "%s"`, answer)}, nil
 }

@@ -14,6 +14,9 @@ func registerClear(r *Registry) {
 			if ctx.SetSessionFn != nil {
 				ctx.SetSessionFn(fmt.Sprintf("session-%d", time.Now().UnixMilli()))
 			}
+			if ctx.SetStatusFn != nil {
+				ctx.SetStatusFn("(Cleared)")
+			}
 			return true
 		},
 	})

@@ -49,5 +49,5 @@ func (t *WriteTool) Execute(ctx context.Context, args map[string]any, tc ToolCon
 		return domain.ToolResult{Output: err.Error()}, nil
 	}
 
-	return domain.ToolResult{Output: fmt.Sprintf("Successfully wrote %d bytes to %s", len(content), path)}, nil
+	return domain.ToolResult{Output: fmt.Sprintf("Wrote %s", path)}, nil
 }
