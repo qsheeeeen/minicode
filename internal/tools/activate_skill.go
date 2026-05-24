@@ -40,12 +40,12 @@ func (t *ActivateSkillTool) Execute(ctx context.Context, args map[string]any, tc
 		return domain.ToolResult{Output: "Error: No skill registry available"}, nil
 	}
 
-	body := tc.Skills.GetBody(name)
+	body := tc.Skills.Body(name)
 	if body == "" {
-		return domain.ToolResult{Output: fmt.Sprintf("Error: Skill %q not found or has no body", name)}, nil
+		return domain.ToolResult{Output: fmt.Sprintf("Error: Skill '%s' not found.", name)}, nil
 	}
 
 	return domain.ToolResult{
-		Output: fmt.Sprintf("<activated_skill name=%q>\n%s\n</activated_skill>", name, body),
+		Output: fmt.Sprintf("<activated_skill name=\"%s\">\n<instructions>\n%s\n</instructions>\n</activated_skill>", name, body),
 	}, nil
 }

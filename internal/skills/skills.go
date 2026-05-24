@@ -83,8 +83,8 @@ func (r *SkillRegistry) List() []SkillInfo {
 	return r.skills
 }
 
-// GetBody returns the full body (markdown after frontmatter) of a skill.
-func (r *SkillRegistry) GetBody(name string) string {
+// Body returns the full body (markdown after frontmatter) of a skill.
+func (r *SkillRegistry) Body(name string) string {
 	// Check builtins
 	if body, ok := r.builtins[name]; ok {
 		_, content := r.splitFrontmatter(body)

@@ -161,7 +161,7 @@ func (a *Agent) SetModel(modelSpec, apiKey, baseURL string, contextLength int) {
 }
 
 func (a *Agent) refreshEnvironment() {
-	ctx := fmt.Sprintf("Working directory: %s\n", mustCwd())
+	ctx := fmt.Sprintf("Working directory: %s\n", getCwd())
 	out, err := exec.Command("git", "status").CombinedOutput()
 	if err == nil {
 		ctx += "\n" + string(out) + "\n"
@@ -613,7 +613,7 @@ func (a *Agent) compress(ctx context.Context) error {
 	return nil
 }
 
-func mustCwd() string {
+func getCwd() string {
 	if cwd, err := os.Getwd(); err == nil {
 		return cwd
 	}

@@ -2,7 +2,7 @@ package storage
 
 import (
 	"encoding/json"
-	"fmt"
+	"errors"
 	"os"
 	"path/filepath"
 	"sort"
@@ -60,7 +60,7 @@ func (s *SessionManager) Save(name string, data *SessionData) error {
 // Get restores session data from a JSON file.
 func (s *SessionManager) Get(name string) (*SessionData, error) {
 	if s.dir == "" {
-		return nil, fmt.Errorf("session directory not found")
+		return nil, errors.New("session directory not found")
 	}
 	path := filepath.Join(s.dir, name+".json")
 	file, err := os.Open(path)
@@ -106,7 +106,7 @@ func (s *SessionManager) List() []SessionInfo {
 func (s *SessionManager) MostRecent() (string, error) {
 	list := s.List()
 	if len(list) == 0 {
-		return "", fmt.Errorf("no sessions found")
+		return "", errors.New("no sessions found")
 	}
 	return list[0].Name, nil
 }

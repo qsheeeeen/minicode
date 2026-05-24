@@ -141,8 +141,8 @@ func ContentBlockFromMap(m map[string]any) ContentBlock {
 	return cb
 }
 
-// JsonString converts any value to a JSON string.
-func JsonString(v any) string {
+// JSONString converts any value to a JSON string.
+func JSONString(v any) string {
 	if v == nil {
 		return "{}"
 	}
