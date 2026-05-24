@@ -128,7 +128,8 @@ func (a *Agent) ContextLength() int { return a.config.ContextLength }
 func (a *Agent) SessionName() string { return a.sessionName }
 
 // Model returns the current model name.
-func (a *Agent) Model() string { return a.config.Model }
+func (a *Agent) Model() string     { return a.config.Model }
+func (a *Agent) Provider() string { return a.config.Provider }
 
 // TokenCount returns the current total token count.
 func (a *Agent) TokenCount() int {
@@ -139,8 +140,14 @@ func (a *Agent) TokenCount() int {
 func (a *Agent) SetSession(name string) { a.sessionName = name }
 
 // SetModel updates the model and recreates the LLM client.
-func (a *Agent) SetModel(model, apiKey, baseURL string, contextLength int) {
-	a.config.Model = model
+func (a *Agent) SetModel(modelSpec, apiKey, baseURL string, contextLength int) {
+	// Parse model@provider format
+	if idx := strings.Index(modelSpec, "@"); idx >= 0 {
+		a.config.Model = modelSpec[:idx]
+		a.config.Provider = modelSpec[idx+1:]
+	} else {
+		a.config.Model = modelSpec
+	}
 	if apiKey != "" {
 		a.config.APIKey = apiKey
 	}

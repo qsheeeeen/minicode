@@ -77,6 +77,7 @@ func run(cmd *cobra.Command, args []string) {
 		APIKey:                    resolved.Model.APIKey,
 		BaseURL:                   resolved.Model.BaseURL,
 		Model:                     resolved.Model.Model,
+		Provider:                  resolved.Model.Provider,
 		ContextLength:             resolved.Model.ContextLength,
 		CompressionThresholdRatio: resolved.CompressionThreshold,
 		ThinkingEnabled:           resolved.Thinking.Enabled,

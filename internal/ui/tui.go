@@ -139,7 +139,7 @@ type TUIModel struct {
 // NewTUIModel creates the TUI model.
 func NewTUIModel(ag *agent.Agent, registry *agent.AgentRegistry, cmdReg *CommandRegistry, promptFiles []string) *TUIModel {
 	ta := textarea.New()
-	ta.Placeholder = "Type your message... (Ctrl+O: switch agent, Ctrl+C: quit)"
+	ta.Placeholder = "Type a message or /command..."
 	ta.ShowLineNumbers = false
 	ta.SetHeight(3)
 	ta.Focus()
@@ -737,7 +737,11 @@ func (m *TUIModel) renderInput() string {
 }
 
 func (m *TUIModel) renderStatusBar() string {
-	line1 := styleGreen.Render("Anthropic") + styleDim.Render(":") + m.modelName + styleDim.Render(" | "+m.session)
+	provider := m.agent.Provider()
+	if provider == "" {
+		provider = "unknown"
+	}
+	line1 := styleGreen.Render(provider) + styleDim.Render(":") + m.modelName + styleDim.Render(" | "+m.session)
 	if m.err != nil {
 		line1 += styleDim.Render(" | ") + styleErrorMsg.Render("ERR: "+m.err.Error())
 	} else if m.streaming {
@@ -1048,7 +1052,7 @@ func applyModelSpec(m *TUIModel, spec string) {
 	if info, ok := provider.Models[modelName]; ok {
 		contextLen = info.ContextLength
 	}
-	m.agent.SetModel(modelName, provider.APIKey, provider.BaseURL, contextLen)
+	m.agent.SetModel(spec, provider.APIKey, provider.BaseURL, contextLen)
 	config.SetModel(spec)
 	m.modelName = modelName
 }

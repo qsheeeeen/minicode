@@ -54,6 +54,7 @@ type AgentConfig struct {
 	APIKey                    string
 	BaseURL                   string
 	Model                     string
+	Provider                  string
 	ContextLength             int
 	CompressionThresholdRatio float64
 	ThinkingEnabled           bool
