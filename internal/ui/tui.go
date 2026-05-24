@@ -812,6 +812,15 @@ func (m *TUIModel) renderMessages() string {
 					task = task[:30] + "..."
 				}
 				call = fmt.Sprintf("SubAgent(%s)", task)
+			} else if msg.ToolName == "ActivateSkill" {
+				name, _ := msg.ToolInput["name"].(string)
+				call = fmt.Sprintf("ActivateSkill(%s)", name)
+			} else if msg.ToolName == "AskUser" {
+				question, _ := msg.ToolInput["question"].(string)
+				call = fmt.Sprintf("AskUser(%q)", question)
+			} else if msg.ToolName == "SetModel" {
+				tier, _ := msg.ToolInput["tier"].(string)
+				call = fmt.Sprintf("SetModel(Tier %s)", tier)
 			} else {
 				call = fmt.Sprintf("%s(%v)", msg.ToolName, msg.ToolInput)
 			}
@@ -822,6 +831,8 @@ func (m *TUIModel) renderMessages() string {
 				if msg.ToolName == "Read" {
 					nl := strings.Count(msg.ToolOutput, "\n") + 1
 					lines = append(lines, styleDim.Render(fmt.Sprintf("Read %d lines, %d chars", nl, len(msg.ToolOutput))))
+				} else if msg.ToolName == "ActivateSkill" {
+					lines = append(lines, styleDim.Render("Loaded"))
 				} else if msg.ToolName == "Edit" {
 					for _, line := range strings.Split(msg.ToolOutput, "\n") {
 						if strings.Contains(line, " + ") {
