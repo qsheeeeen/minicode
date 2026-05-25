@@ -121,7 +121,7 @@ func RunHeadless(ctx context.Context, ag *agent.Agent, initialPrompt, displayPro
 				case "tool_use":
 					if !printedToolUses[block.ID] {
 						printedToolUses[block.ID] = true
-						fmt.Fprintf(os.Stdout, "[tool] %s(%s)\n", block.Name, domain.JSONString(block.Input))
+						fmt.Fprintf(os.Stdout, "[tool]\n%s(%s)\n\n", block.Name, domain.JSONString(block.Input))
 
 						// Scan subsequent turns for matching tool_result
 						for rti := ti + 1; rti < len(turns); rti++ {
@@ -214,7 +214,7 @@ func RunHeadless(ctx context.Context, ag *agent.Agent, initialPrompt, displayPro
 			if !printedStatus[statusKey] {
 				printedStatus[statusKey] = true
 				if s.Role == domain.RoleError {
-					fmt.Fprintf(os.Stderr, "[error] %s\n", s.Content)
+					fmt.Fprintf(os.Stderr, "[error]\n%s\n\n", s.Content)
 				}
 			}
 		}
