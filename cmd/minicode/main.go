@@ -21,6 +21,7 @@ import (
 	"minicode/internal/storage"
 	"minicode/internal/tools"
 	"minicode/internal/ui"
+	"minicode/internal/ui/tui"
 )
 
 var (
@@ -35,7 +36,7 @@ func main() {
 	rootCmd := &cobra.Command{
 		Use:     "minicode [prompt]",
 		Short:   "Mini Code - Interactive CLI Programming Agent",
-		Version: ui.Version,
+		Version: tui.Version,
 		Args:    cobra.MaximumNArgs(1),
 		Run:     run,
 	}
@@ -231,7 +232,7 @@ Reply with exactly one of:
 	agentReg := agent.NewAgentRegistry(ag)
 	ag.SetRegistry(agentReg)
 
-	if err := ui.RunTUI(ag, agentReg, cmdReg, promptFiles); err != nil {
+	if err := tui.RunTUI(ag, agentReg, cmdReg, promptFiles); err != nil {
 		fmt.Fprintf(os.Stderr, "TUI error: %s\n", err)
 		os.Exit(1)
 	}

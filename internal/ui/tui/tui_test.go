@@ -1,4 +1,4 @@
-package ui
+package tui
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"minicode/internal/agent"
+	icmd "minicode/internal/commands"
 	"minicode/internal/domain"
 	"minicode/internal/tools"
 )
