@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/bubbles/list"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	icmd "minicode/internal/commands"
 	"minicode/internal/config"
@@ -50,6 +51,28 @@ func (sel *SelectModel) clearMode() {
 }
 
 func (sel *SelectModel) active() bool { return sel.mode != "" }
+
+// Update handles list navigation. Returns the selected value on Enter,
+// or an empty string if Esc was pressed (selection cancelled).
+func (sel *SelectModel) Update(msg tea.KeyMsg) (consumed bool, selected string, cmd tea.Cmd) {
+	if !sel.active() {
+		return false, "", nil
+	}
+	switch msg.Type {
+	case tea.KeyEsc:
+		sel.clearMode()
+		return true, "", nil
+	case tea.KeyEnter:
+		if i, ok := sel.list.SelectedItem().(list.DefaultItem); ok {
+			sel.clearMode()
+			return true, i.Title(), nil
+		}
+		return true, "", nil
+	}
+	var c tea.Cmd
+	sel.list, c = sel.list.Update(msg)
+	return true, "", c
+}
 
 // ---- Model wizard helpers ----
 

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"minicode/internal/config"
@@ -36,20 +35,14 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Batch(cmds...)
 		}
 
-		if m.Select.active() {
-			switch msg.Type {
-			case tea.KeyEsc:
-				m.Select.clearMode()
-				return m, nil
-			case tea.KeyEnter:
-				if i, ok := m.Select.list.SelectedItem().(list.DefaultItem); ok {
-					m.handleSelectChoice(i.Title())
-				}
-				return m, nil
+		if selConsumed, selVal, selCmd := m.Select.Update(msg); selConsumed {
+			if selVal != "" {
+				m.handleSelectChoice(selVal)
 			}
-			var cmd tea.Cmd
-			m.Select.list, cmd = m.Select.list.Update(msg)
-			return m, cmd
+			if selCmd != nil {
+				return m, selCmd
+			}
+			return m, nil
 		}
 
 		switch msg.Type {
@@ -132,14 +125,7 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case displayChangeMsg:
-		m.Viewport.messages = ToDisplayMessages(m.agent.Store().Turns(), m.agent.Store().Statuses(), m.agent.Store().IsStreaming())
-		m.Input.streaming = m.agent.Store().IsStreaming()
-		m.Status.streaming = m.Input.streaming
-		m.Status.modelName = m.agent.Model()
-		m.Status.session = m.agent.SessionName()
-		m.Status.tokenCount = m.agent.TokenCount()
-		m.Viewport.viewport.SetContent(m.Viewport.Render())
-		m.Viewport.viewport.GotoBottom()
+		m.syncState()
 		return m, nil
 
 	case tokenUpdateMsg:
@@ -153,11 +139,7 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.Status.err = msg.err
 			m.agent.Store().AddStatus(domain.RoleError, msg.err.Error())
 		}
-		m.Viewport.messages = ToDisplayMessages(m.agent.Store().Turns(), m.agent.Store().Statuses(), m.agent.Store().IsStreaming())
-		m.Status.modelName = m.agent.Model()
-		m.Status.session = m.agent.SessionName()
-		m.Viewport.viewport.SetContent(m.Viewport.Render())
-		m.Viewport.viewport.GotoBottom()
+		m.syncState()
 		return m, nil
 
 	case tea.WindowSizeMsg:
@@ -180,6 +162,18 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	cmds = append(cmds, cmd)
 
 	return m, tea.Batch(cmds...)
+}
+
+// syncState refreshes all sub-models from the agent's current state.
+func (m *TUIModel) syncState() {
+	m.Viewport.messages = ToDisplayMessages(m.agent.Store().Turns(), m.agent.Store().Statuses(), m.agent.Store().IsStreaming())
+	m.Input.streaming = m.agent.Store().IsStreaming()
+	m.Status.streaming = m.Input.streaming
+	m.Status.modelName = m.agent.Model()
+	m.Status.session = m.agent.SessionName()
+	m.Status.tokenCount = m.agent.TokenCount()
+	m.Viewport.viewport.SetContent(m.Viewport.Render())
+	m.Viewport.viewport.GotoBottom()
 }
 
 // handleSelectChoice dispatches a selection from the bubbles/list UI.
