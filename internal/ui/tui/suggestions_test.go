@@ -35,12 +35,14 @@ func TestSuggestionsNavigation(t *testing.T) {
 		{Name: "exit"},
 	})
 	s.Down()
-	if s.selectedIdx != 1 {
-		t.Error("down should move to second item")
+	s.Down()
+	// Third item should be selected
+	if item, ok := s.list.SelectedItem().(sugItem); !ok || item.name != "exit" {
+		t.Errorf("down x2 should select 'exit', got %v", item)
 	}
 	s.Up()
-	if s.selectedIdx != 0 {
-		t.Error("up should move back to first")
+	if item, ok := s.list.SelectedItem().(sugItem); !ok || item.name != "model" {
+		t.Errorf("up should select 'model', got %v", item)
 	}
 }
 

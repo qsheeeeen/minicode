@@ -1,9 +1,7 @@
 package tui
 
 import (
-	"fmt"
-	"strings"
-
+	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"minicode/internal/domain"
@@ -11,13 +9,11 @@ import (
 
 // AskUserPrompt shown when the agent asks the user a question.
 type AskUserPrompt struct {
-	pending   bool
-	question  string
-	options   []domain.AskOption
-	multi     bool
-	selected  []bool
-	current   int
-	resolve   chan string
+	pending  bool
+	question string
+	multi    bool
+	list     list.Model
+	resolve  chan string
 }
 
 func (a *AskUserPrompt) IsActive() bool { return a.pending }
@@ -25,11 +21,29 @@ func (a *AskUserPrompt) IsActive() bool { return a.pending }
 func (a *AskUserPrompt) Activate(question string, options []domain.AskOption, multi bool, resolve chan string) {
 	a.pending = true
 	a.question = question
-	a.options = options
 	a.multi = multi
-	a.selected = make([]bool, len(options))
-	a.current = 0
 	a.resolve = resolve
+
+	items := make([]list.Item, len(options))
+	for i, opt := range options {
+		items[i] = askItem{label: opt.Label, desc: opt.Description}
+	}
+
+	d := list.NewDefaultDelegate()
+	d.Styles.SelectedTitle = d.Styles.SelectedTitle.Foreground(lipgloss.Color("6"))
+	d.Styles.SelectedDesc = d.Styles.SelectedDesc.Foreground(lipgloss.Color("8"))
+
+	h := len(options) + 3
+	if h < 5 {
+		h = 5
+	}
+	l := list.New(items, d, 60, h)
+	l.SetShowHelp(false)
+	l.SetShowStatusBar(false)
+	l.SetShowTitle(false)
+	l.SetFilteringEnabled(false)
+	l.KeyMap.Quit.Unbind()
+	a.list = l
 }
 
 func (a *AskUserPrompt) Update(msg tea.KeyMsg) (handled bool) {
@@ -37,30 +51,12 @@ func (a *AskUserPrompt) Update(msg tea.KeyMsg) (handled bool) {
 		return false
 	}
 	switch msg.Type {
-	case tea.KeyUp:
-		a.current = (a.current - 1 + len(a.options)) % len(a.options)
-	case tea.KeyDown:
-		a.current = (a.current + 1) % len(a.options)
-	case tea.KeySpace:
-		if a.multi {
-			a.selected[a.current] = !a.selected[a.current]
-		}
 	case tea.KeyEnter:
-		var result string
-		if a.multi {
-			var sel []string
-			for i, s := range a.selected {
-				if s {
-					sel = append(sel, a.options[i].Label)
-				}
+		if item, ok := a.list.SelectedItem().(askItem); ok {
+			a.pending = false
+			if a.resolve != nil {
+				a.resolve <- item.label
 			}
-			result = strings.Join(sel, ",")
-		} else {
-			result = a.options[a.current].Label
-		}
-		a.pending = false
-		if a.resolve != nil {
-			a.resolve <- result
 		}
 		return true
 	case tea.KeyEsc:
@@ -70,57 +66,36 @@ func (a *AskUserPrompt) Update(msg tea.KeyMsg) (handled bool) {
 		}
 		return true
 	}
-	return false
+	var cmd tea.Cmd
+	a.list, cmd = a.list.Update(msg)
+	_ = cmd
+	return true
 }
 
 func (a *AskUserPrompt) View(width int) string {
 	if !a.pending {
 		return ""
 	}
-
-	// Question box with yellow rounded border
 	qBorder := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("3")).
 		Padding(0, 1)
 	questionBox := qBorder.Render(a.question)
 
-	// Options list
-	var optLines []string
-	for i, opt := range a.options {
-		marker := "  "
-		label := styleDim.Render(opt.Label)
-		if i == a.current {
-			marker = styleInputArrow.Render(">")
-			label = styleHeaderCyan.Render(opt.Label)
-		}
-		if a.multi {
-			chk := " "
-			if a.selected[i] {
-				chk = "x"
-			}
-			marker = "[" + chk + "]"
-		}
-		desc := ""
-		if opt.Description != "" {
-			desc = "  " + styleDim.Render(opt.Description)
-		}
-		optLines = append(optLines, fmt.Sprintf("%s %s%s", marker, label, desc))
-	}
-
-	// Footer
-	footer := styleDim.Render("↑↓ navigate")
-	if a.multi {
-		footer += styleDim.Render("  Space toggle")
-	}
-	footer += styleDim.Render("  Enter accept  Esc cancel")
-
-	// Options box with gray border
 	oBorder := lipgloss.NewStyle().
 		Border(lipgloss.NormalBorder()).
 		BorderForeground(lipgloss.Color("8")).
 		Padding(0, 1)
-	optionsBox := oBorder.Render(strings.Join(optLines, "\n") + "\n" + footer)
 
-	return questionBox + "\n" + optionsBox
+	hint := "↑↓ navigate  Enter accept  Esc cancel"
+	return questionBox + "\n" + oBorder.Render(a.list.View()+"\n"+styleDim.Render(hint))
 }
+
+type askItem struct {
+	label string
+	desc  string
+}
+
+func (i askItem) Title() string       { return i.label }
+func (i askItem) Description() string { return i.desc }
+func (i askItem) FilterValue() string { return i.label }

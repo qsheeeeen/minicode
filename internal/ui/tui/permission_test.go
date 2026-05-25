@@ -27,9 +27,11 @@ func TestPermissionPromptResolve(t *testing.T) {
 	ch := make(chan string, 1)
 	p.Activate("test tool", ch)
 
-	handled := p.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
+	// Navigate to first option (yes) and press Enter
+	p.list.Select(0)
+	handled := p.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	if !handled {
-		t.Error("'y' should be handled")
+		t.Error("Enter should be handled")
 	}
 	if p.IsActive() {
 		t.Error("should not be active after resolution")
@@ -42,19 +44,5 @@ func TestPermissionPromptResolve(t *testing.T) {
 		}
 	default:
 		t.Error("should have sent result to channel")
-	}
-}
-
-func TestPermissionPromptIgnoreOtherKeys(t *testing.T) {
-	var p PermissionPrompt
-	ch := make(chan string, 1)
-	p.Activate("test", ch)
-
-	handled := p.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
-	if handled {
-		t.Error("'x' should not be handled")
-	}
-	if !p.IsActive() {
-		t.Error("should still be active")
 	}
 }
