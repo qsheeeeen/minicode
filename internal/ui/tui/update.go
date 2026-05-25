@@ -20,28 +20,20 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case permPromptMsg:
-		m.Input.permPending = true
-		m.Input.permText = msg.displayText
-		m.Input.permResolve = msg.resolve
+		m.Input.Perm.Activate(msg.displayText, msg.resolve)
 		return m, nil
 
 	case askPromptMsg:
-		m.Input.askPending = true
-		m.Input.askQuestion = msg.question
-		m.Input.askOptions = msg.options
-		m.Input.askMulti = msg.multi
-		m.Input.askSelected = make([]bool, len(msg.options))
-		m.Input.askCurrent = 0
-		m.Input.askResolve = msg.resolve
+		m.Input.Ask.Activate(msg.question, msg.options, msg.multi, msg.resolve)
 		return m, nil
 
 	case tea.KeyMsg:
-		if m.Input.permPending {
-			m.Input.handlePermKey(msg)
+		if m.Input.Perm.Active() {
+			m.Input.Perm.Update(msg)
 			return m, nil
 		}
-		if m.Input.askPending {
-			m.Input.handleAskKey(msg)
+		if m.Input.Ask.Active() {
+			m.Input.Ask.Update(msg)
 			return m, nil
 		}
 		if m.Select.active() {
@@ -60,22 +52,20 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 
-		if len(m.Input.suggestions) > 0 {
+		if m.Input.Suggest.Active() {
 			switch msg.Type {
 			case tea.KeyTab:
-				m.Input.textarea.SetValue("/" + m.Input.suggestions[m.Input.selectedIdx].Name + " ")
-				m.Input.suggestions = nil
-				m.Input.selectedIdx = 0
+				m.Input.textarea.SetValue(m.Input.Suggest.Accept(m.Input.textarea.Value()))
+				m.Input.Suggest.Clear()
 				return m, nil
 			case tea.KeyUp:
-				m.Input.selectedIdx = (m.Input.selectedIdx - 1 + len(m.Input.suggestions)) % len(m.Input.suggestions)
+				m.Input.Suggest.Up()
 				return m, nil
 			case tea.KeyDown:
-				m.Input.selectedIdx = (m.Input.selectedIdx + 1) % len(m.Input.suggestions)
+				m.Input.Suggest.Down()
 				return m, nil
 			case tea.KeyEsc:
-				m.Input.suggestions = nil
-				m.Input.selectedIdx = 0
+				m.Input.Suggest.Clear()
 				return m, nil
 			}
 		}
@@ -106,8 +96,7 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			m.Input.textarea.Reset()
-			m.Input.suggestions = nil
-			m.Input.selectedIdx = 0
+			m.Input.Suggest.Clear()
 
 			cmdInput := input
 			promptText := input
@@ -158,8 +147,6 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, cmd
 
-			return m, nil
-
 		default:
 			if !m.Input.streaming {
 				var cmd tea.Cmd
@@ -176,13 +163,9 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							filtered = append(filtered, c)
 						}
 					}
-					m.Input.suggestions = filtered
-					if m.Input.selectedIdx >= len(m.Input.suggestions) {
-						m.Input.selectedIdx = 0
-					}
+					m.Input.Suggest.Set(filtered)
 				} else {
-					m.Input.suggestions = nil
-					m.Input.selectedIdx = 0
+					m.Input.Suggest.Clear()
 				}
 			}
 		}

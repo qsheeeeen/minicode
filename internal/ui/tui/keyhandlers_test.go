@@ -8,10 +8,10 @@ import (
 
 func TestPermissionPrompt(t *testing.T) {
 	m := newTestModel()
-	m.Input.permPending = true
-	m.Input.permText = "Allow Bash?"
+	m.Input.Perm.pending = true
+	m.Input.Perm.text = "Allow Bash?"
 	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
-	if m.Input.permPending {
+	if m.Input.Perm.pending {
 		t.Error("perm should resolve after 'y'")
 	}
 }

@@ -31,10 +31,10 @@ func TestRenderInputStreaming(t *testing.T) {
 
 func TestRenderInputPermission(t *testing.T) {
 	m := newTestModel()
-	m.Input.permPending = true
-	m.Input.permText = "Allow Bash?"
+	m.Input.Perm.pending = true
+	m.Input.Perm.text = "Allow Bash?"
 	out := m.Input.View(m.width)
-	if !strings.Contains(out, "[Permission]") {
+	if !strings.Contains(out, "Permission Required") {
 		t.Error("permPending should show permission prompt")
 	}
 }
