@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"minicode/internal/agent"
 	icmd "minicode/internal/commands"
 	"minicode/internal/config"
 )
@@ -20,6 +21,8 @@ type SelectModel struct {
 	// Model wizard state machine
 	wizardEditTier string
 	wizardProvider string
+
+	agent *agent.Agent // set by TUIModel after construction
 }
 
 // setMode initializes a bubbles/list for a select mode.
