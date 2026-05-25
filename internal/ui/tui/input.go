@@ -3,7 +3,6 @@ package tui
 import (
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textarea"
-	tea "github.com/charmbracelet/bubbletea"
 )
 
 // InputModel is the composite input area. It delegates to sub-components
@@ -16,18 +15,6 @@ type InputModel struct {
 	Perm    PermissionPrompt
 	Ask     AskUserPrompt
 	Suggest Suggestions
-}
-
-// handleKey routes a key message through active sub-components.
-// Returns (handled, quit).
-func (in *InputModel) handleKey(msg tea.KeyMsg) (handled bool, shouldQuit bool) {
-	if in.Perm.Active() {
-		return in.Perm.Update(msg), false
-	}
-	if in.Ask.Active() {
-		return in.Ask.Update(msg), false
-	}
-	return false, false
 }
 
 // View renders the input area. Delegates to sub-components when active.
