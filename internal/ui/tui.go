@@ -17,6 +17,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"minicode/internal/agent"
+	icmd "minicode/internal/commands"
 	"minicode/internal/config"
 	"minicode/internal/domain"
 	"minicode/internal/storage"
@@ -55,12 +56,6 @@ type tokenUpdateMsg struct {
 
 type agentDoneMsg struct {
 	err error
-}
-
-type setModeMsg struct {
-	mode  string
-	title string
-	items []list.Item
 }
 
 type permPromptMsg struct {
@@ -256,10 +251,6 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.askResolve = msg.resolve
 		return m, nil
 
-	case setModeMsg:
-		m.setMode(msg.mode, msg.title, msg.items)
-		return m, nil
-
 	case tea.KeyMsg:
 		if m.permPending {
 			return m.handlePermKey(msg)
@@ -336,100 +327,34 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			promptText := input
 			isHandled := false
 			isPrompt := false
-
 			if len(input) > 0 && input[0] == '/' && m.cmdReg != nil {
-				ctx := CommandContext{
-					Agent: m.agent,
-					ExitFn: func() {
-						if m.program != nil {
-							m.program.Quit()
-						}
-					},
-					ClearFn: m.agent.ClearSession,
-					CompressFn: func() {
-						m.agent.Compress()
-					},
-					SetSessionFn: func(name string) {
-						m.session = name
-						m.agent.SetSession(name)
-					},
-					ListSkillsFn: func() string {
-						if sk := m.agent.Skills(); sk != nil {
-							infos := sk.List()
-							if len(infos) == 0 {
-								return "No skills loaded"
-							}
-							var names []string
-							for _, info := range infos {
-								names = append(names, info.Name+": "+info.Description)
-							}
-							return strings.Join(names, "\n")
-						}
-						return "No skills loaded"
-					},
-					SetSelectModeFn: func(mode, title string, items []list.Item) {
-						if m.program != nil {
-							m.program.Send(setModeMsg{mode: mode, title: title, items: items})
-						}
-					},
-					SetInputValueFn: func(value string) {
-						m.input.SetValue(value)
-					},
-					SetStatusFn: func(content string) {
-						m.agent.Store().AddStatus(domain.RoleStatus, content)
-					},
-					GetConfigFn: func() *config.Config {
-						cfg, _ := config.Load()
-						return cfg
-					},
-					LoadSessionFn: func(name string) {
-						if err := m.agent.LoadSession(name); err != nil {
-							m.agent.Store().AddStatus(domain.RoleError, fmt.Sprintf("Session not found: %s", name))
-							return
-						}
-						m.session = name
-						m.messages = ToDisplayMessages(m.agent.Store().Turns(), m.agent.Store().Statuses(), m.agent.Store().IsStreaming())
-						m.tokenCount = m.agent.TokenCount()
-						m.viewport.SetContent(m.renderMessages())
-						m.viewport.GotoBottom()
-						m.agent.Store().AddStatus(domain.RoleStatus, fmt.Sprintf("Loaded session: %s", name))
-					},
-					ListSessionsFn: func() string {
-						sm := storage.NewSessionManager()
-						sessions := sm.List()
-						var items []list.Item
-						for _, s := range sessions {
-							items = append(items, listItem{title: s.Name, desc: s.Timestamp.Format("2006-01-02 15:04")})
-						}
-						if len(items) == 0 {
-							m.agent.Store().AddStatus(domain.RoleStatus, "No sessions found")
-							return ""
-						}
-						if m.program != nil {
-							m.program.Send(setModeMsg{mode: "session-list", title: "Sessions:", items: items})
-						}
-						return ""
-					},
-					RenameSessionFn: func(oldName, newName string) error {
-						sm := storage.NewSessionManager()
-						if err := sm.Rename(oldName, newName); err != nil {
-							return err
-						}
-						m.session = newName
-						m.agent.SetSession(newName)
-						return nil
-					},
-					SessionInfos: func() []storage.SessionInfo {
-						sm := storage.NewSessionManager()
-						return sm.List()
-					}(),
+				cfg, _ := config.Load()
+				cmdCtx := icmd.Context{
+					Agent:    m.agent,
+					Config:   cfg,
+					Sessions: storage.NewSessionManager().List(),
 				}
-				handled, expanded := m.cmdReg.ParseAndExecute(input, ctx)
+				handled, result, expanded := m.cmdReg.ParseAndExecute(input, cmdCtx)
 				if handled {
 					isHandled = true
 					if expanded != "" {
 						isPrompt = true
 						promptText = expanded
+					} else if result != nil {
+						switch r := result.(type) {
+						case icmd.ExitResult:
+							return m, tea.Quit
+						case icmd.StatusResult:
+							if r.IsError {
+								m.agent.Store().AddStatus(domain.RoleError, r.Message)
+							} else {
+								m.agent.Store().AddStatus(domain.RoleStatus, r.Message)
+							}
+						case icmd.SelectResult:
+							m.setMode(r.Mode, r.Title, r.Items)
+						case icmd.SetInputResult:
+							m.input.SetValue(r.Value)
+						}
 					}
 				}
 			}
@@ -912,13 +837,18 @@ func (m *TUIModel) renderMessages() string {
 }
 
 // setMode initializes a bubbles/list for a select mode.
-func (m *TUIModel) setMode(mode string, title string, items []list.Item) {
-	// Create item delegate with simple rendering
+func (m *TUIModel) setMode(mode string, title string, items []icmd.SelectItem) {
+	// Convert SelectItems to list.DefaultItem for the bubbles list component
+	listItems := make([]list.Item, len(items))
+	for i, it := range items {
+		listItems[i] = listItem{title: it.Label, desc: it.Description}
+	}
+
 	delegate := list.NewDefaultDelegate()
 	delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.Foreground(lipgloss.Color("6"))
 	delegate.Styles.SelectedDesc = delegate.Styles.SelectedDesc.Foreground(lipgloss.Color("6"))
 
-	l := list.New(items, delegate, m.width-4, m.height-8)
+	l := list.New(listItems, delegate, m.width-4, m.height-8)
 	l.SetShowTitle(true)
 	l.Title = title
 	l.SetShowHelp(true)
@@ -974,26 +904,22 @@ func (m *TUIModel) handleModelTier(val string) {
 		if tiers == nil {
 			tiers = map[string]string{}
 		}
-		var items []list.Item
+		var items []icmd.SelectItem
 		for _, t := range []string{"1", "2", "3"} {
 			label := tiers[t]
 			if label == "" {
 				label = "(unset)"
 			}
-			items = append(items, listItem{title: t, desc: fmt.Sprintf("Tier %s -> %s", t, label)})
+			items = append(items, icmd.SelectItem{Value: t, Label: t, Description: fmt.Sprintf("Tier %s -> %s", t, label)})
 		}
 		m.setMode("model-edit-tier", "Edit which tier?", items)
 		return
 	}
-	// Direct tier selection: parse the model specifier and apply
+	// val is the tier number ("1", "2", "3") directly
 	cfg, _ := config.Load()
-	tier := extractTierFromLabel(val)
-	if tier == "" {
-		return
-	}
 	spec := ""
 	if cfg.Tiers != nil {
-		spec = cfg.Tiers[tier]
+		spec = cfg.Tiers[val]
 	}
 	if spec == "" {
 		return
@@ -1005,10 +931,10 @@ func (m *TUIModel) handleModelTier(val string) {
 func (m *TUIModel) handleModelEditTier(val string) {
 	m.modelWizardEditTier = val
 	cfg, _ := config.Load()
-	var items []list.Item
+	var items []icmd.SelectItem
 	for k, p := range cfg.Providers {
 		if p.APIKey != "" {
-			items = append(items, listItem{title: k, desc: p.BaseURL})
+			items = append(items, icmd.SelectItem{Value: k, Label: k, Description: p.BaseURL})
 		}
 	}
 	if len(items) == 0 {
@@ -1023,9 +949,9 @@ func (m *TUIModel) handleModelProvider(val string) {
 	m.modelWizardProvider = val
 	cfg, _ := config.Load()
 	provider := cfg.Providers[val]
-	var items []list.Item
+	var items []icmd.SelectItem
 	for modelName := range provider.Models {
-		items = append(items, listItem{title: modelName, desc: ""})
+		items = append(items, icmd.SelectItem{Value: modelName, Label: modelName})
 	}
 	if len(items) == 0 {
 		m.agent.Store().AddStatus(domain.RoleError, fmt.Sprintf("No models configured for %s", val))
@@ -1041,20 +967,6 @@ func (m *TUIModel) handleModelSelect(modelName string) {
 	applyModelSpec(m, spec)
 	m.agent.Store().AddStatus(domain.RoleStatus, fmt.Sprintf("Tier %s -> %s", m.modelWizardEditTier, spec))
 	m.clearMode()
-}
-
-func extractTierFromLabel(label string) string {
-	// Label format: "Tier N -> model@provider"
-	if len(label) < 5 || label[:5] != "Tier " {
-		return ""
-	}
-	rest := label[5:]
-	for i, c := range rest {
-		if c == ' ' {
-			return rest[:i]
-		}
-	}
-	return rest
 }
 
 func applyModelSpec(m *TUIModel, spec string) {

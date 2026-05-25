@@ -13,6 +13,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"minicode/internal/agent"
+	"minicode/internal/commands"
 	"minicode/internal/config"
 	"minicode/internal/domain"
 	"minicode/internal/llm"
@@ -177,15 +178,26 @@ Reply with exactly one of:
 
 	// Commands
 	cmdReg := ui.NewCommandRegistry()
-	cmdReg.RegisterBuiltins()
 	ag.SetCommandResolver(func(input string) (handled bool, promptText string, displayContent string) {
-		ctx := ui.CommandContext{
-			Agent:   ag,
-			ExitFn:  func() { os.Exit(0) },
-			ClearFn: ag.ClearSession,
+		cfg, _ := config.Load()
+		handled, result, expanded := cmdReg.ParseAndExecute(input, commands.Context{
+			Agent:  ag,
+			Config: cfg,
+		})
+		if !handled {
+			return false, "", input
 		}
-		handled, expanded := cmdReg.ParseAndExecute(input, ctx)
-		return handled, expanded, input
+		if expanded != "" {
+			return true, expanded, input
+		}
+		// Handler command: process result
+		switch r := result.(type) {
+		case commands.ExitResult:
+			os.Exit(0)
+		case commands.StatusResult:
+			ag.Store().AddStatus(domain.RoleStatus, r.Message)
+		}
+		return true, "", input
 	})
 
 	prompt := ""

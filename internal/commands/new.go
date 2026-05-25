@@ -7,7 +7,7 @@ import (
 
 func registerNew(r *Registry) {
 	r.Register(&Command{Name: "new", Description: "Create a new session", Kind: Handler,
-		Handler: func(args []string, ctx Context) bool {
+		Handler: func(args []string, ctx Context) (Result, error) {
 			name := ""
 			if len(args) > 0 {
 				name = args[0]
@@ -15,13 +15,11 @@ func registerNew(r *Registry) {
 			if name == "" {
 				name = fmt.Sprintf("session-%d", time.Now().UnixMilli())
 			}
-			if ctx.ClearFn != nil {
-				ctx.ClearFn()
+			if ctx.Agent != nil {
+				ctx.Agent.ClearSession()
+				ctx.Agent.SetSession(name)
 			}
-			if ctx.SetSessionFn != nil {
-				ctx.SetSessionFn(name)
-			}
-			return true
+			return HandledResult{}, nil
 		},
 	})
 }

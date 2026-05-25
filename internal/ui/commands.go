@@ -1,14 +1,14 @@
 package ui
 
 import (
-	"minicode/internal/ui/commands"
+	"minicode/internal/commands"
 )
 
-// Re-export types from the commands sub-package for backward compatibility.
+// Re-export types from the commands package for backward compatibility.
 type (
-	Command        = commands.Command
-	CommandContext = commands.Context
-	CommandKind    = commands.Kind
+	Command         = commands.Command
+	CommandContext  = commands.Context
+	CommandKind     = commands.Kind
 	CommandRegistry = commands.Registry
 )
 
