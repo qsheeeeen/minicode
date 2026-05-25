@@ -624,7 +624,9 @@ func (m *TUIModel) View() string {
 	input := m.renderInput()
 	status := m.renderStatusBar()
 
-	return header + viewport + input + status
+	// viewport.View() does NOT end with \n, so add one to prevent
+	// input from concatenating onto the last padded viewport line.
+	return header + viewport + "\n" + input + status
 }
 
 func (m *TUIModel) renderHeader() string {
@@ -796,7 +798,7 @@ func (m *TUIModel) renderStatusBar() string {
 		modeColor.Render(permMode) +
 		styleDim.Render(" (Shift+Tab)")
 
-	return line1 + "\n" + line2 + "\n"
+	return line1 + "\n" + line2
 }
 
 func (m *TUIModel) renderMessages() string {
