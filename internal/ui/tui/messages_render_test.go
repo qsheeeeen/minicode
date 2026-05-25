@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"strings"
 	"testing"
 
 	"minicode/internal/agent"
@@ -46,5 +47,23 @@ func TestToDisplayMessages_Status(t *testing.T) {
 	}
 	if msgs[1].Role != domain.RoleStatus {
 		t.Errorf("expected status role, got %s", msgs[1].Role)
+	}
+}
+
+func TestRenderAllRoles(t *testing.T) {
+	m := newTestModel()
+	m.messages = []domain.DisplayMessage{
+		{Role: domain.RoleUser, Content: "hi"},
+		{Role: domain.RoleThinking, Content: "let me think"},
+		{Role: domain.RoleText, Content: "response", IsStreaming: true},
+		{Role: domain.RoleTool, ToolName: "Bash", ToolOutput: "command output"},
+		{Role: domain.RoleStatus, Content: "done"},
+		{Role: domain.RoleError, Content: "oops"},
+	}
+	rendered := m.renderMessages()
+	for _, expect := range []string{"hi", "think", "response", "Bash", "command output", "done", "oops"} {
+		if !strings.Contains(rendered, expect) {
+			t.Errorf("renderMessages missing %q", expect)
+		}
 	}
 }
