@@ -28,14 +28,14 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
-		if m.Input.Perm.Active() {
-			m.Input.Perm.Update(msg)
-			return m, nil
+		consumed, inputCmd := m.Input.Update(msg, m.cmdReg)
+		if inputCmd != nil {
+			cmds = append(cmds, inputCmd)
 		}
-		if m.Input.Ask.Active() {
-			m.Input.Ask.Update(msg)
-			return m, nil
+		if consumed {
+			return m, tea.Batch(cmds...)
 		}
+
 		if m.Select.active() {
 			switch msg.Type {
 			case tea.KeyEsc:
@@ -50,24 +50,6 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			var cmd tea.Cmd
 			m.Select.list, cmd = m.Select.list.Update(msg)
 			return m, cmd
-		}
-
-		if m.Input.Suggest.Active() {
-			switch msg.Type {
-			case tea.KeyTab:
-				m.Input.textarea.SetValue(m.Input.Suggest.Accept(m.Input.textarea.Value()))
-				m.Input.Suggest.Clear()
-				return m, nil
-			case tea.KeyUp:
-				m.Input.Suggest.Up()
-				return m, nil
-			case tea.KeyDown:
-				m.Input.Suggest.Down()
-				return m, nil
-			case tea.KeyEsc:
-				m.Input.Suggest.Clear()
-				return m, nil
-			}
 		}
 
 		switch msg.Type {
@@ -147,27 +129,6 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, cmd
 
-		default:
-			if !m.Input.streaming {
-				var cmd tea.Cmd
-				m.Input.textarea, cmd = m.Input.textarea.Update(msg)
-				cmds = append(cmds, cmd)
-
-				val := m.Input.textarea.Value()
-				if len(val) > 0 && val[0] == '/' && m.cmdReg != nil {
-					partial := strings.ToLower(val[1:])
-					all := m.cmdReg.List()
-					var filtered []icmd.Command
-					for _, c := range all {
-						if strings.HasPrefix(strings.ToLower(c.Name), partial) {
-							filtered = append(filtered, c)
-						}
-					}
-					m.Input.Suggest.Set(filtered)
-				} else {
-					m.Input.Suggest.Clear()
-				}
-			}
 		}
 
 	case displayChangeMsg:
