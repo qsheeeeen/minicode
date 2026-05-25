@@ -3,37 +3,126 @@ package tui
 import (
 	"fmt"
 	"strings"
+
+	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/bubbles/textarea"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	icmd "minicode/internal/commands"
+	"minicode/internal/domain"
 )
 
-func (m *TUIModel) renderInput() string {
-	if m.permPending {
-		return styleToolCall.Render(fmt.Sprintf("[Permission] %s [y=yes / n=no / a=yes to all]", m.permText))
+// InputModel holds the state for the bottom input area.
+type InputModel struct {
+	textarea  textarea.Model
+	spinner   spinner.Model
+	streaming bool
+
+	// Permission prompt
+	permPending bool
+	permText    string
+	permResolve chan string
+
+	// AskUser prompt
+	askPending  bool
+	askQuestion string
+	askOptions  []domain.AskOption
+	askMulti    bool
+	askSelected []bool
+	askCurrent  int
+	askResolve  chan string
+
+	// Command autocomplete
+	suggestions []icmd.Command
+	selectedIdx int
+}
+
+// handlePermKey processes a keypress during permission prompt.
+func (in *InputModel) handlePermKey(msg tea.KeyMsg) (resolved bool) {
+	var res string
+	switch msg.String() {
+	case "y":
+		res = "yes"
+	case "n", "esc":
+		res = "no"
+	case "a":
+		res = "yolo"
+	default:
+		return false
+	}
+	in.permPending = false
+	if in.permResolve != nil {
+		in.permResolve <- res
+	}
+	return true
+}
+
+// handleAskKey processes a keypress during ask-user prompt.
+func (in *InputModel) handleAskKey(msg tea.KeyMsg) (resolved bool) {
+	switch msg.Type {
+	case tea.KeyUp:
+		in.askCurrent = (in.askCurrent - 1 + len(in.askOptions)) % len(in.askOptions)
+	case tea.KeyDown:
+		in.askCurrent = (in.askCurrent + 1) % len(in.askOptions)
+	case tea.KeySpace:
+		if in.askMulti {
+			in.askSelected[in.askCurrent] = !in.askSelected[in.askCurrent]
+		}
+	case tea.KeyEnter:
+		var result string
+		if in.askMulti {
+			var selected []string
+			for i, s := range in.askSelected {
+				if s {
+					selected = append(selected, in.askOptions[i].Label)
+				}
+			}
+			result = strings.Join(selected, ",")
+		} else {
+			result = in.askOptions[in.askCurrent].Label
+		}
+		in.askPending = false
+		if in.askResolve != nil {
+			in.askResolve <- result
+		}
+		return true
+	case tea.KeyEsc:
+		in.askPending = false
+		if in.askResolve != nil {
+			in.askResolve <- ""
+		}
+		return true
+	}
+	return false
+}
+
+// View renders the input area.
+func (in *InputModel) View(width int) string {
+	if in.permPending {
+		return styleToolCall.Render(fmt.Sprintf("[Permission] %s [y=yes / n=no / a=yes to all]", in.permText))
 	}
 
-	if m.askPending {
-		// Yellow round border for question (matches TS)
-		questionBox := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("3")).Padding(0, 1).Render(m.askQuestion)
+	if in.askPending {
+		questionBox := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("3")).Padding(0, 1).Render(in.askQuestion)
 
-		// Align option labels to same width
 		maxLabel := 0
-		for _, opt := range m.askOptions {
+		for _, opt := range in.askOptions {
 			if len(opt.Label) > maxLabel {
 				maxLabel = len(opt.Label)
 			}
 		}
 		var optLines []string
-		for i, opt := range m.askOptions {
+		for i, opt := range in.askOptions {
 			arrow := "  "
 			label := styleDim.Render(opt.Label)
-			if i == m.askCurrent {
+			if i == in.askCurrent {
 				arrow = styleInputArrow.Render("> ")
 				label = styleHeaderCyan.Render(opt.Label)
 			}
 			marker := ""
-			if m.askMulti {
+			if in.askMulti {
 				chk := " "
-				if m.askSelected[i] {
+				if in.askSelected[i] {
 					chk = "x"
 				}
 				marker = "[" + chk + "] "
@@ -45,38 +134,31 @@ func (m *TUIModel) renderInput() string {
 			optLines = append(optLines, fmt.Sprintf("%s%s%s%s", arrow, marker, label, desc))
 		}
 		footer := styleDim.Render("↑↓ navigate")
-		if m.askMulti {
+		if in.askMulti {
 			footer += styleDim.Render("  Space toggle")
 		}
 		footer += styleDim.Render("  Enter accept  Esc cancel")
 
-		// Gray single border for options (matches TS)
 		selectBox := lipgloss.NewStyle().Border(lipgloss.NormalBorder()).BorderForeground(lipgloss.Color("8")).Padding(0, 1).Render(
 			strings.Join(optLines, "\n") + "\n" + footer,
 		)
-
 		return questionBox + "\n" + selectBox
 	}
 
-	// Mode: select UI using bubbles/list
-	if m.selectMode != "" {
-		return m.selectList.View()
-	}
-
 	prefix := styleInputArrow.Render("> ")
-	if m.streaming {
-		prefix = m.spinner.View() + " "
+	if in.streaming {
+		prefix = in.spinner.View() + " "
 	}
 
-	inputView := prefix + m.input.View()
-	mainInput := styleInputBorder.Width(m.width - 2).Render(inputView)
+	inputView := prefix + in.textarea.View()
+	mainInput := styleInputBorder.Width(width - 2).Render(inputView)
 
-	if len(m.suggestions) > 0 && !m.streaming {
+	if len(in.suggestions) > 0 && !in.streaming {
 		var lines []string
-		for i, s := range m.suggestions {
+		for i, s := range in.suggestions {
 			arrow := "  "
 			style := styleDim
-			if i == m.selectedIdx {
+			if i == in.selectedIdx {
 				arrow = styleInputArrow.Render("> ")
 				style = styleHeaderCyan
 			}

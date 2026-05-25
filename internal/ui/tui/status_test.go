@@ -29,7 +29,7 @@ func TestFormatNumber(t *testing.T) {
 func TestRenderStatusBar(t *testing.T) {
 	m := newTestModel()
 	m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-	s := m.renderStatusBar()
+	s := m.Status.View(m.agent, m.width)
 	if !strings.Contains(s, "test-model") {
 		t.Error("status bar should contain model name")
 	}
@@ -44,8 +44,9 @@ func TestRenderStatusBar(t *testing.T) {
 func TestRenderStatusBarStreaming(t *testing.T) {
 	m := newTestModel()
 	m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-	m.streaming = true
-	s := m.renderStatusBar()
+	m.Input.streaming = true
+	m.Status.streaming = true
+	s := m.Status.View(m.agent, m.width)
 	if !strings.Contains(s, "streaming") {
 		t.Error("status bar should show 'streaming' when active")
 	}
@@ -54,8 +55,8 @@ func TestRenderStatusBarStreaming(t *testing.T) {
 func TestRenderStatusBarError(t *testing.T) {
 	m := newTestModel()
 	m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-	m.err = errors.New("test error")
-	s := m.renderStatusBar()
+	m.Status.err = errors.New("test error")
+	s := m.Status.View(m.agent, m.width)
 	if !strings.Contains(s, "ERR") {
 		t.Error("status bar should show ERR when error is set")
 	}

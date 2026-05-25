@@ -15,23 +15,23 @@ func TestSetModeAndClear(t *testing.T) {
 		{Value: "a", Label: "Option A"},
 		{Value: "b", Label: "Option B", Description: "desc"},
 	}
-	m.setMode("test-mode", "Pick one:", items)
-	if m.selectMode != "test-mode" {
-		t.Errorf("selectMode should be 'test-mode', got %q", m.selectMode)
+	m.Select.setMode("test-mode", "Pick one:", items, m.width, m.height)
+	if m.Select.mode != "test-mode" {
+		t.Errorf("selectMode should be 'test-mode', got %q", m.Select.mode)
 	}
 
-	m.clearMode()
-	if m.selectMode != "" {
-		t.Errorf("selectMode should be empty after clear, got %q", m.selectMode)
+	m.Select.clearMode()
+	if m.Select.mode != "" {
+		t.Errorf("selectMode should be empty after clear, got %q", m.Select.mode)
 	}
 }
 
 func TestHandleSelectChoiceEffort(t *testing.T) {
 	m := newTestModel()
 	m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-	m.selectMode = "effort-select"
+	m.Select.mode = "effort-select"
 	m.handleSelectChoice("high")
-	if m.selectMode != "" {
+	if m.Select.mode != "" {
 		t.Error("effort-select should clear mode after choice")
 	}
 }

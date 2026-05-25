@@ -6,12 +6,15 @@ func (m *TUIModel) View() string {
 		return "Initializing...\n"
 	}
 
-	header := m.renderHeader()
-	viewport := m.viewport.View()
-	input := m.renderInput()
-	status := m.renderStatusBar()
+	header := m.Header.View(m.width)
+	viewport := m.Viewport.viewport.View()
+	input := m.Input.View(m.width)
+	status := m.Status.View(m.agent, m.width)
 
-	// viewport.View() does NOT end with \n, so add one to prevent
-	// input from concatenating onto the last padded viewport line.
+	// When select mode is active, input area shows the list instead
+	if m.Select.active() {
+		input = m.Select.list.View()
+	}
+
 	return header + viewport + "\n" + input + status
 }

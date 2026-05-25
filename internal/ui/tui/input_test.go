@@ -10,11 +10,11 @@ import (
 func TestRenderInputNormal(t *testing.T) {
 	m := newTestModel()
 	m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-	in := m.renderInput()
-	if !strings.Contains(in, "Type a message") {
+	out := m.Input.View(m.width)
+	if !strings.Contains(out, "Type a message") {
 		t.Error("renderInput should contain placeholder")
 	}
-	if !strings.Contains(in, ">") {
+	if !strings.Contains(out, ">") {
 		t.Error("renderInput should contain arrow prompt")
 	}
 }
@@ -22,19 +22,19 @@ func TestRenderInputNormal(t *testing.T) {
 func TestRenderInputStreaming(t *testing.T) {
 	m := newTestModel()
 	m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-	m.streaming = true
-	in := m.renderInput()
-	if strings.Contains(in, "> Type a message") {
+	m.Input.streaming = true
+	out := m.Input.View(m.width)
+	if strings.Contains(out, "> Type a message") {
 		t.Error("streaming input should show spinner, not arrow")
 	}
 }
 
 func TestRenderInputPermission(t *testing.T) {
 	m := newTestModel()
-	m.permPending = true
-	m.permText = "Allow Bash?"
-	in := m.renderInput()
-	if !strings.Contains(in, "[Permission]") {
+	m.Input.permPending = true
+	m.Input.permText = "Allow Bash?"
+	out := m.Input.View(m.width)
+	if !strings.Contains(out, "[Permission]") {
 		t.Error("permPending should show permission prompt")
 	}
 }
@@ -42,9 +42,8 @@ func TestRenderInputPermission(t *testing.T) {
 func TestRenderInputSelectMode(t *testing.T) {
 	m := newTestModel()
 	m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-	m.selectMode = "effort-select"
-	in := m.renderInput()
-	if strings.Contains(in, "Type a message") {
-		t.Error("selectMode should replace input with list view")
+	m.Select.mode = "effort-select"
+	if !m.Select.active() {
+		t.Error("selectMode should be active")
 	}
 }

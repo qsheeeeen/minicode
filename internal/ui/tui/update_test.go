@@ -18,10 +18,10 @@ func TestTextInput(t *testing.T) {
 	for _, r := range "hello" {
 		m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
 	}
-	if !strings.Contains(m.input.Value(), "hello") {
-		t.Errorf("expected 'hello' in input, got %q", m.input.Value())
+	if !strings.Contains(m.Input.textarea.Value(), "hello") {
+		t.Errorf("expected 'hello' in input, got %q", m.Input.textarea.Value())
 	}
-	if !m.input.Focused() {
+	if !m.Input.textarea.Focused() {
 		t.Error("textarea should be focused")
 	}
 }
@@ -36,18 +36,18 @@ func TestEnterEmpty(t *testing.T) {
 
 func TestAgentDoneClearsStreaming(t *testing.T) {
 	m := newTestModel()
-	m.streaming = true
+	m.Input.streaming = true
 	m.Update(agentDoneMsg{err: nil})
-	if m.streaming {
+	if m.Input.streaming {
 		t.Error("agentDoneMsg should clear streaming")
 	}
 }
 
 func TestAgentDoneWithError(t *testing.T) {
 	m := newTestModel()
-	m.streaming = true
+	m.Input.streaming = true
 	m.Update(agentDoneMsg{err: context.DeadlineExceeded})
-	if m.err == nil {
+	if m.Status.err == nil {
 		t.Error("should store error from agentDoneMsg")
 	}
 	m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
@@ -59,10 +59,10 @@ func TestAgentDoneWithError(t *testing.T) {
 func TestStreamingBlocksInput(t *testing.T) {
 	m := newTestModel()
 	m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-	m.streaming = true
-	prev := m.input.Value()
+	m.Input.streaming = true
+	prev := m.Input.textarea.Value()
 	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
-	if m.input.Value() != prev {
+	if m.Input.textarea.Value() != prev {
 		t.Error("streaming should block input")
 	}
 }
@@ -70,8 +70,8 @@ func TestStreamingBlocksInput(t *testing.T) {
 func TestTokenUpdate(t *testing.T) {
 	m := newTestModel()
 	m.Update(tokenUpdateMsg{total: 42})
-	if m.tokenCount != 42 {
-		t.Errorf("expected 42 tokens, got %d", m.tokenCount)
+	if m.Status.tokenCount != 42 {
+		t.Errorf("expected 42 tokens, got %d", m.Status.tokenCount)
 	}
 }
 
@@ -83,7 +83,7 @@ func TestFullEnterCycle(t *testing.T) {
 	m := NewTUIModel(ag, reg, icmd.NewRegistry(), nil)
 	m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 
-	m.input.SetValue("echo hello")
+	m.Input.textarea.SetValue("echo hello")
 	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	if cmd == nil {
 		t.Error("Enter should return agent command")

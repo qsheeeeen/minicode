@@ -3,18 +3,29 @@ package tui
 import (
 	"fmt"
 	"strings"
+
+	"github.com/charmbracelet/bubbles/viewport"
 	"minicode/internal/agent"
 	"minicode/internal/domain"
 )
 
-func (m *TUIModel) renderMessages() string {
-	if len(m.messages) == 0 {
+// ViewportModel holds the state for the message display area.
+type ViewportModel struct {
+	viewport viewport.Model
+	messages []domain.DisplayMessage
+
+	// Multi-agent switch hint
+	sessions []agent.AgentSession
+}
+
+// Render returns the viewport content string.
+func (vp *ViewportModel) Render() string {
+	if len(vp.messages) == 0 {
 		return "\n\n" + styleDim.Render("Type a message to start...") + "\n"
 	}
 
 	var lines []string
-	for _, msg := range m.messages {
-		// Match TS filtering: tool always, status only if (not applicable in Go), others only if content
+	for _, msg := range vp.messages {
 		if msg.Role != domain.RoleTool && msg.Role != domain.RoleStatus && msg.Role != domain.RoleError && msg.Content == "" {
 			continue
 		}
@@ -30,73 +41,10 @@ func (m *TUIModel) renderMessages() string {
 			lines = append(lines, styleDim.Render(strings.TrimSpace(msg.Content)))
 			lines = append(lines, "")
 		case domain.RoleTool:
-			var call string
-			if msg.ToolName == "Read" {
-				path, _ := msg.ToolInput["path"].(string)
-				parts := []string{path}
-				if offset, ok := msg.ToolInput["offset"].(float64); ok && offset > 0 {
-					parts = append(parts, fmt.Sprintf("offset: %.0f", offset))
-				}
-				if limit, ok := msg.ToolInput["limit"].(float64); ok && limit > 0 {
-					parts = append(parts, fmt.Sprintf("limit: %.0f", limit))
-				}
-				call = fmt.Sprintf("Read(%s)", strings.Join(parts, ", "))
-			} else if msg.ToolName == "Write" {
-				path, _ := msg.ToolInput["path"].(string)
-				content, _ := msg.ToolInput["content"].(string)
-				lines := 0
-				if content != "" {
-					lines = len(strings.Split(content, "\n"))
-				}
-				call = fmt.Sprintf("Write(%s, %d lines)", path, lines)
-			} else if msg.ToolName == "Edit" {
-				path, _ := msg.ToolInput["path"].(string)
-				call = fmt.Sprintf("Edit(%s)", path)
-			} else if msg.ToolName == "Bash" {
-				cmd, _ := msg.ToolInput["command"].(string)
-				call = fmt.Sprintf("Bash(%s)", cmd)
-			} else if msg.ToolName == "SubAgent" {
-				task, _ := msg.ToolInput["task"].(string)
-				if len(task) > 30 {
-					task = task[:30] + "..."
-				}
-				call = fmt.Sprintf("SubAgent(%s)", task)
-			} else if msg.ToolName == "ActivateSkill" {
-				name, _ := msg.ToolInput["name"].(string)
-				call = fmt.Sprintf("ActivateSkill(%s)", name)
-			} else if msg.ToolName == "AskUser" {
-				question, _ := msg.ToolInput["question"].(string)
-				call = fmt.Sprintf("AskUser(%q)", question)
-			} else if msg.ToolName == "SetModel" {
-				tier, _ := msg.ToolInput["tier"].(string)
-				call = fmt.Sprintf("SetModel(Tier %s)", tier)
-			} else {
-				call = fmt.Sprintf("%s(%v)", msg.ToolName, msg.ToolInput)
-			}
-
+			call := formatToolCall(msg)
 			lines = append(lines, styleToolCall.Render(call))
 			if msg.ToolOutput != "" {
-				// Read summarises: "Read N lines, M chars" (matches TS)
-				if msg.ToolName == "Read" {
-					nl := strings.Count(msg.ToolOutput, "\n") + 1
-					lines = append(lines, styleDim.Render(fmt.Sprintf("Read %d lines, %d chars", nl, len(msg.ToolOutput))))
-				} else if msg.ToolName == "ActivateSkill" {
-					lines = append(lines, styleDim.Render("Loaded"))
-				} else if msg.ToolName == "Edit" {
-					for _, line := range strings.Split(msg.ToolOutput, "\n") {
-						if strings.Contains(line, " + ") {
-							lines = append(lines, styleGreen.Render(line))
-						} else if strings.Contains(line, " - ") {
-							lines = append(lines, styleRed.Render(line))
-						} else {
-							lines = append(lines, styleDim.Render(line))
-						}
-					}
-				} else {
-					for _, line := range strings.Split(msg.ToolOutput, "\n") {
-						lines = append(lines, styleDim.Render(line))
-					}
-				}
+				lines = append(lines, formatToolOutput(msg)...)
 			}
 			lines = append(lines, "")
 		case domain.RoleStatus:
@@ -109,12 +57,85 @@ func (m *TUIModel) renderMessages() string {
 	}
 	result := strings.Join(lines, "\n") + "\n"
 
-	// Multi-agent switch hint (matches TS)
-	if len(m.sessions) > 1 {
+	if len(vp.sessions) > 1 {
 		result += styleYellow.Render("Ctrl+O: switch agent") + "\n"
 	}
 
 	return result
+}
+
+func formatToolCall(msg domain.DisplayMessage) string {
+	switch msg.ToolName {
+	case "Read":
+		path, _ := msg.ToolInput["path"].(string)
+		parts := []string{path}
+		if offset, ok := msg.ToolInput["offset"].(float64); ok && offset > 0 {
+			parts = append(parts, fmt.Sprintf("offset: %.0f", offset))
+		}
+		if limit, ok := msg.ToolInput["limit"].(float64); ok && limit > 0 {
+			parts = append(parts, fmt.Sprintf("limit: %.0f", limit))
+		}
+		return fmt.Sprintf("Read(%s)", strings.Join(parts, ", "))
+	case "Write":
+		path, _ := msg.ToolInput["path"].(string)
+		content, _ := msg.ToolInput["content"].(string)
+		n := 0
+		if content != "" {
+			n = len(strings.Split(content, "\n"))
+		}
+		return fmt.Sprintf("Write(%s, %d lines)", path, n)
+	case "Edit":
+		path, _ := msg.ToolInput["path"].(string)
+		return fmt.Sprintf("Edit(%s)", path)
+	case "Bash":
+		cmd, _ := msg.ToolInput["command"].(string)
+		return fmt.Sprintf("Bash(%s)", cmd)
+	case "SubAgent":
+		task, _ := msg.ToolInput["task"].(string)
+		if len(task) > 30 {
+			task = task[:30] + "..."
+		}
+		return fmt.Sprintf("SubAgent(%s)", task)
+	case "ActivateSkill":
+		name, _ := msg.ToolInput["name"].(string)
+		return fmt.Sprintf("ActivateSkill(%s)", name)
+	case "AskUser":
+		question, _ := msg.ToolInput["question"].(string)
+		return fmt.Sprintf("AskUser(%q)", question)
+	case "SetModel":
+		tier, _ := msg.ToolInput["tier"].(string)
+		return fmt.Sprintf("SetModel(Tier %s)", tier)
+	default:
+		return fmt.Sprintf("%s(%v)", msg.ToolName, msg.ToolInput)
+	}
+}
+
+func formatToolOutput(msg domain.DisplayMessage) []string {
+	if msg.ToolName == "Read" {
+		nl := strings.Count(msg.ToolOutput, "\n") + 1
+		return []string{styleDim.Render(fmt.Sprintf("Read %d lines, %d chars", nl, len(msg.ToolOutput)))}
+	}
+	if msg.ToolName == "ActivateSkill" {
+		return []string{styleDim.Render("Loaded")}
+	}
+	if msg.ToolName == "Edit" {
+		var out []string
+		for _, line := range strings.Split(msg.ToolOutput, "\n") {
+			if strings.Contains(line, " + ") {
+				out = append(out, styleGreen.Render(line))
+			} else if strings.Contains(line, " - ") {
+				out = append(out, styleRed.Render(line))
+			} else {
+				out = append(out, styleDim.Render(line))
+			}
+		}
+		return out
+	}
+	var out []string
+	for _, line := range strings.Split(msg.ToolOutput, "\n") {
+		out = append(out, styleDim.Render(line))
+	}
+	return out
 }
 
 // ToDisplayMessages converts current state to render-ready DisplayMessages.
@@ -159,20 +180,18 @@ func ToDisplayMessages(turns []domain.MessageParam, statuses []agent.StatusMessa
 				case "thinking":
 					out = append(out, domain.DisplayMessage{Role: domain.RoleThinking, Content: b.Thinking, IsStreaming: isStr})
 				case "tool_use":
-					msg := domain.DisplayMessage{Role: domain.RoleTool, ToolName: b.Name, SlotID: b.ID}
+					dm := domain.DisplayMessage{Role: domain.RoleTool, ToolName: b.Name, SlotID: b.ID}
 					if input, ok := b.Input.(map[string]any); ok {
-						msg.ToolInput = input
+						dm.ToolInput = input
 					}
-					// Check if we have a result for this tool yet
 					if res, ok := results[b.ID]; ok {
-						msg.ToolOutput = res
+						dm.ToolOutput = res
 					}
-					out = append(out, msg)
+					out = append(out, dm)
 				}
 			}
 		}
 
-		// Inject statuses that happened after this turn
 		for _, s := range statuses {
 			if s.TurnIndex == ti+1 {
 				out = append(out, domain.DisplayMessage{

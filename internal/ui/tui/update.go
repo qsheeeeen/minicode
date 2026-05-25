@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
@@ -19,78 +20,81 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case sessionUpdateMsg:
-		m.sessions = msg.sessions
+		m.Header.sessions = msg.sessions
+		m.Viewport.sessions = msg.sessions
 		return m, nil
 
 	case permPromptMsg:
-		m.permPending = true
-		m.permText = msg.displayText
-		m.permResolve = msg.resolve
+		m.Input.permPending = true
+		m.Input.permText = msg.displayText
+		m.Input.permResolve = msg.resolve
 		return m, nil
 
 	case askPromptMsg:
-		m.askPending = true
-		m.askQuestion = msg.question
-		m.askOptions = msg.options
-		m.askMulti = msg.multi
-		m.askSelected = make([]bool, len(msg.options))
-		m.askCurrent = 0
-		m.askResolve = msg.resolve
+		m.Input.askPending = true
+		m.Input.askQuestion = msg.question
+		m.Input.askOptions = msg.options
+		m.Input.askMulti = msg.multi
+		m.Input.askSelected = make([]bool, len(msg.options))
+		m.Input.askCurrent = 0
+		m.Input.askResolve = msg.resolve
 		return m, nil
 
 	case tea.KeyMsg:
-		if m.permPending {
-			return m.handlePermKey(msg)
+		if m.Input.permPending {
+			m.Input.handlePermKey(msg)
+			return m, nil
 		}
-		if m.askPending {
-			return m.handleAskKey(msg)
+		if m.Input.askPending {
+			m.Input.handleAskKey(msg)
+			return m, nil
 		}
-		if m.selectMode != "" {
+		if m.Select.active() {
 			switch msg.Type {
 			case tea.KeyEsc:
-				m.clearMode()
+				m.Select.clearMode()
 				return m, nil
 			case tea.KeyEnter:
-				if i, ok := m.selectList.SelectedItem().(list.DefaultItem); ok {
+				if i, ok := m.Select.list.SelectedItem().(list.DefaultItem); ok {
 					m.handleSelectChoice(i.Title())
 				}
 				return m, nil
 			}
 			var cmd tea.Cmd
-			m.selectList, cmd = m.selectList.Update(msg)
+			m.Select.list, cmd = m.Select.list.Update(msg)
 			return m, cmd
 		}
 
-		if len(m.suggestions) > 0 {
+		if len(m.Input.suggestions) > 0 {
 			switch msg.Type {
 			case tea.KeyTab:
-				m.input.SetValue("/" + m.suggestions[m.selectedIdx].Name + " ")
-				m.suggestions = nil
-				m.selectedIdx = 0
+				m.Input.textarea.SetValue("/" + m.Input.suggestions[m.Input.selectedIdx].Name + " ")
+				m.Input.suggestions = nil
+				m.Input.selectedIdx = 0
 				return m, nil
 			case tea.KeyUp:
-				m.selectedIdx = (m.selectedIdx - 1 + len(m.suggestions)) % len(m.suggestions)
+				m.Input.selectedIdx = (m.Input.selectedIdx - 1 + len(m.Input.suggestions)) % len(m.Input.suggestions)
 				return m, nil
 			case tea.KeyDown:
-				m.selectedIdx = (m.selectedIdx + 1) % len(m.suggestions)
+				m.Input.selectedIdx = (m.Input.selectedIdx + 1) % len(m.Input.suggestions)
 				return m, nil
 			case tea.KeyEsc:
-				m.suggestions = nil
-				m.selectedIdx = 0
+				m.Input.suggestions = nil
+				m.Input.selectedIdx = 0
 				return m, nil
 			}
 		}
 
 		switch msg.Type {
 		case tea.KeyCtrlC:
-			if m.streaming {
+			if m.Input.streaming {
 				m.agent.Abort()
 				return m, nil
 			}
 			return m, tea.Quit
 
 		case tea.KeyEsc:
-			if m.streaming {
+			if m.Input.streaming {
 				m.agent.Abort()
 			}
 			return m, nil
@@ -102,13 +106,13 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		case tea.KeyEnter:
-			input := strings.TrimSpace(m.input.Value())
+			input := strings.TrimSpace(m.Input.textarea.Value())
 			if input == "" {
 				return m, nil
 			}
-			m.input.Reset()
-			m.suggestions = nil
-			m.selectedIdx = 0
+			m.Input.textarea.Reset()
+			m.Input.suggestions = nil
+			m.Input.selectedIdx = 0
 
 			cmdInput := input
 			promptText := input
@@ -138,9 +142,9 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 								m.agent.Store().AddStatus(domain.RoleStatus, r.Message)
 							}
 						case icmd.SelectResult:
-							m.setMode(r.Mode, r.Title, r.Items)
+							m.Select.setMode(r.Mode, r.Title, r.Items, m.width, m.height)
 						case icmd.SetInputResult:
-							m.input.SetValue(r.Value)
+							m.Input.textarea.SetValue(r.Value)
 						}
 					}
 				}
@@ -160,18 +164,18 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmd
 
 		case tea.KeyCtrlO:
-			// Multi-agent switching: cycle through registered agents
-			if m.agentRegistry != nil && len(m.sessions) > 1 {
+			if m.agentRegistry != nil && len(m.Header.sessions) > 1 {
 				next := m.agentRegistry.NextActive()
 				if next != nil {
 					m.agent = next
-					m.activeID = next.ID()
-					m.messages = ToDisplayMessages(next.Store().Turns(), next.Store().Statuses(), next.Store().IsStreaming())
-					m.streaming = next.Store().IsStreaming()
-					m.tokenCount = next.TokenCount()
-					m.modelName = next.Model()
-					m.session = next.SessionName()
-					
+					m.Header.activeID = next.ID()
+					m.Viewport.messages = ToDisplayMessages(next.Store().Turns(), next.Store().Statuses(), next.Store().IsStreaming())
+					m.Input.streaming = next.Store().IsStreaming()
+					m.Status.streaming = m.Input.streaming
+					m.Status.tokenCount = next.TokenCount()
+					m.Status.modelName = next.Model()
+					m.Status.session = next.SessionName()
+
 					next.OnDisplayChange(func() {
 						if m.program != nil {
 							m.program.Send(displayChangeMsg{})
@@ -182,22 +186,20 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							m.program.Send(tokenUpdateMsg{total: total})
 						}
 					})
-					
-					m.viewport.SetContent(m.renderMessages())
-					m.viewport.GotoBottom()
+
+					m.Viewport.viewport.SetContent(m.Viewport.Render())
+					m.Viewport.viewport.GotoBottom()
 				}
 			}
 			return m, nil
 
 		default:
-			// Only update input when not streaming
-			if !m.streaming {
+			if !m.Input.streaming {
 				var cmd tea.Cmd
-				m.input, cmd = m.input.Update(msg)
+				m.Input.textarea, cmd = m.Input.textarea.Update(msg)
 				cmds = append(cmds, cmd)
 
-				// Update suggestions
-				val := m.input.Value()
+				val := m.Input.textarea.Value()
 				if len(val) > 0 && val[0] == '/' && m.cmdReg != nil {
 					partial := strings.ToLower(val[1:])
 					all := m.cmdReg.List()
@@ -207,64 +209,132 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							filtered = append(filtered, c)
 						}
 					}
-					m.suggestions = filtered
-					if m.selectedIdx >= len(m.suggestions) {
-						m.selectedIdx = 0
+					m.Input.suggestions = filtered
+					if m.Input.selectedIdx >= len(m.Input.suggestions) {
+						m.Input.selectedIdx = 0
 					}
 				} else {
-					m.suggestions = nil
-					m.selectedIdx = 0
+					m.Input.suggestions = nil
+					m.Input.selectedIdx = 0
 				}
 			}
 		}
 
 	case displayChangeMsg:
-		m.messages = ToDisplayMessages(m.agent.Store().Turns(), m.agent.Store().Statuses(), m.agent.Store().IsStreaming())
-		m.streaming = m.agent.Store().IsStreaming()
-		m.modelName = m.agent.Model()
-		m.session = m.agent.SessionName()
-		m.tokenCount = m.agent.TokenCount()
-		m.viewport.SetContent(m.renderMessages())
-		m.viewport.GotoBottom()
+		m.Viewport.messages = ToDisplayMessages(m.agent.Store().Turns(), m.agent.Store().Statuses(), m.agent.Store().IsStreaming())
+		m.Input.streaming = m.agent.Store().IsStreaming()
+		m.Status.streaming = m.Input.streaming
+		m.Status.modelName = m.agent.Model()
+		m.Status.session = m.agent.SessionName()
+		m.Status.tokenCount = m.agent.TokenCount()
+		m.Viewport.viewport.SetContent(m.Viewport.Render())
+		m.Viewport.viewport.GotoBottom()
 		return m, nil
 
 	case tokenUpdateMsg:
-		m.tokenCount = msg.total
+		m.Status.tokenCount = msg.total
 		return m, nil
 
 	case agentDoneMsg:
-		m.streaming = false
+		m.Input.streaming = false
+		m.Status.streaming = false
 		if msg.err != nil {
-			m.err = msg.err
+			m.Status.err = msg.err
 			m.agent.Store().AddStatus(domain.RoleError, msg.err.Error())
 		}
-		m.messages = ToDisplayMessages(m.agent.Store().Turns(), m.agent.Store().Statuses(), m.agent.Store().IsStreaming())
-		m.modelName = m.agent.Model()
-		m.session = m.agent.SessionName()
-		m.viewport.SetContent(m.renderMessages())
-		m.viewport.GotoBottom()
+		m.Viewport.messages = ToDisplayMessages(m.agent.Store().Turns(), m.agent.Store().Statuses(), m.agent.Store().IsStreaming())
+		m.Status.modelName = m.agent.Model()
+		m.Status.session = m.agent.SessionName()
+		m.Viewport.viewport.SetContent(m.Viewport.Render())
+		m.Viewport.viewport.GotoBottom()
 		return m, nil
 
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		headerHeight := 3
-		footerHeight := 6
-		m.viewport.Width = msg.Width - 4
-		m.viewport.Height = msg.Height - headerHeight - footerHeight
-		m.input.SetWidth(msg.Width - 4)
-		m.prog.Width = msg.Width - 20
+		m.Viewport.viewport.Width = msg.Width - 4
+		m.Viewport.viewport.Height = msg.Height - 3 - 6
+		m.Input.textarea.SetWidth(msg.Width - 4)
+		m.Status.prog.Width = msg.Width - 20
 		m.ready = true
 
 	case spinner.TickMsg:
 		var cmd tea.Cmd
-		m.spinner, cmd = m.spinner.Update(msg)
+		m.Input.spinner, cmd = m.Input.spinner.Update(msg)
 		cmds = append(cmds, cmd)
 	}
 
 	var cmd tea.Cmd
-	m.viewport, cmd = m.viewport.Update(msg)
+	m.Viewport.viewport, cmd = m.Viewport.viewport.Update(msg)
 	cmds = append(cmds, cmd)
 
 	return m, tea.Batch(cmds...)
+}
+
+// handleSelectChoice dispatches a selection from the bubbles/list UI.
+func (m *TUIModel) handleSelectChoice(val string) {
+	switch m.Select.mode {
+	case "effort-select":
+		config.SetEffort(val)
+		m.agent.SetEffort(val)
+		m.agent.Store().AddStatus(domain.RoleStatus, "Effort set to: "+val)
+		m.Select.clearMode()
+	case "session-list":
+		m.Select.clearMode()
+		if err := m.agent.LoadSession(val); err != nil {
+			m.agent.Store().AddStatus(domain.RoleError, "Session not found: "+val)
+			return
+		}
+		m.Status.session = val
+		m.Viewport.messages = ToDisplayMessages(m.agent.Store().Turns(), m.agent.Store().Statuses(), m.agent.Store().IsStreaming())
+		m.Status.tokenCount = m.agent.TokenCount()
+		m.Viewport.viewport.SetContent(m.Viewport.Render())
+		m.Viewport.viewport.GotoBottom()
+		m.agent.Store().AddStatus(domain.RoleStatus, "Loaded session: "+val)
+	case "model-tier":
+		if items := m.Select.handleModelTier(val); items != nil {
+			m.Select.setMode("model-edit-tier", "Edit which tier?", items, m.width, m.height)
+			return
+		}
+		cfg, _ := config.Load()
+		spec := ""
+		if cfg.Tiers != nil {
+			spec = cfg.Tiers[val]
+		}
+		if spec == "" {
+			return
+		}
+		modelName, apiKey, baseURL, ctxLen := applyModelSpecFn(spec)
+		m.agent.SetModel(spec, apiKey, baseURL, ctxLen)
+		config.SetModel(spec)
+		m.Status.modelName = modelName
+		m.Select.clearMode()
+	case "model-edit-tier":
+		m.Select.wizardEditTier = val
+		items := m.Select.buildProviderItems()
+		if len(items) == 0 {
+			m.agent.Store().AddStatus(domain.RoleError, "No configured providers found")
+			m.Select.clearMode()
+			return
+		}
+		m.Select.setMode("model-provider", "Provider for Tier "+val+":", items, m.width, m.height)
+	case "model-provider":
+		m.Select.wizardProvider = val
+		items := m.Select.buildModelItems(val)
+		if len(items) == 0 {
+			m.agent.Store().AddStatus(domain.RoleError, "No models configured for "+val)
+			m.Select.clearMode()
+			return
+		}
+		m.Select.setMode("model-model", "Model for Tier "+m.Select.wizardEditTier+" @"+val+":", items, m.width, m.height)
+	case "model-model":
+		spec := val + "@" + m.Select.wizardProvider
+		config.SetTier(m.Select.wizardEditTier, spec)
+		modelName, apiKey, baseURL, ctxLen := applyModelSpecFn(spec)
+		m.agent.SetModel(spec, apiKey, baseURL, ctxLen)
+		config.SetModel(spec)
+		m.Status.modelName = modelName
+		m.agent.Store().AddStatus(domain.RoleStatus, "Tier "+m.Select.wizardEditTier+" -> "+spec)
+		m.Select.clearMode()
+	}
 }

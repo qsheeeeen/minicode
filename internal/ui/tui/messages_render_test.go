@@ -52,7 +52,7 @@ func TestToDisplayMessages_Status(t *testing.T) {
 
 func TestRenderAllRoles(t *testing.T) {
 	m := newTestModel()
-	m.messages = []domain.DisplayMessage{
+	m.Viewport.messages = []domain.DisplayMessage{
 		{Role: domain.RoleUser, Content: "hi"},
 		{Role: domain.RoleThinking, Content: "let me think"},
 		{Role: domain.RoleText, Content: "response", IsStreaming: true},
@@ -60,7 +60,7 @@ func TestRenderAllRoles(t *testing.T) {
 		{Role: domain.RoleStatus, Content: "done"},
 		{Role: domain.RoleError, Content: "oops"},
 	}
-	rendered := m.renderMessages()
+	rendered := m.Viewport.Render()
 	for _, expect := range []string{"hi", "think", "response", "Bash", "command output", "done", "oops"} {
 		if !strings.Contains(rendered, expect) {
 			t.Errorf("renderMessages missing %q", expect)

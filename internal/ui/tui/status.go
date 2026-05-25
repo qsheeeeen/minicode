@@ -3,7 +3,20 @@ package tui
 import (
 	"fmt"
 	"strconv"
+
+	"github.com/charmbracelet/bubbles/progress"
+	"minicode/internal/agent"
 )
+
+// StatusModel holds the state for the bottom status bar.
+type StatusModel struct {
+	prog       progress.Model
+	tokenCount int
+	modelName  string
+	session    string
+	err        error
+	streaming  bool
+}
 
 func formatNumber(n int) string {
 	in := strconv.Itoa(n)
@@ -17,29 +30,30 @@ func formatNumber(n int) string {
 	return string(out)
 }
 
-func (m *TUIModel) renderStatusBar() string {
-	provider := m.agent.Provider()
+// View renders the status bar.
+func (s *StatusModel) View(ag *agent.Agent, width int) string {
+	provider := ag.Provider()
 	if provider == "" {
 		provider = "unknown"
 	}
-	line1 := styleGreen.Render(provider) + styleDim.Render(":") + m.modelName + styleDim.Render(" | "+m.session)
-	if m.err != nil {
-		line1 += styleDim.Render(" | ") + styleErrorMsg.Render("ERR: "+m.err.Error())
-	} else if m.streaming {
+	line1 := styleGreen.Render(provider) + styleDim.Render(":") + s.modelName + styleDim.Render(" | "+s.session)
+	if s.err != nil {
+		line1 += styleDim.Render(" | ") + styleErrorMsg.Render("ERR: "+s.err.Error())
+	} else if s.streaming {
 		line1 += styleDim.Render(" | ") + styleMagenta.Render("streaming")
 	}
 
-	ctxLen := m.agent.ContextLength()
+	ctxLen := ag.ContextLength()
 	if ctxLen == 0 {
 		ctxLen = 200000
 	}
-	pct := float64(m.tokenCount) / float64(ctxLen) * 100
+	pct := float64(s.tokenCount) / float64(ctxLen) * 100
 	if pct > 100 {
 		pct = 100
 	}
 
 	permMode := "manual"
-	if p := m.agent.PermissionSvc(); p != nil {
+	if p := ag.PermissionSvc(); p != nil {
 		permMode = string(p.Mode())
 	}
 
@@ -50,8 +64,8 @@ func (m *TUIModel) renderStatusBar() string {
 		modeColor = styleHeaderCyan
 	}
 
-	line2 := styleDim.Render(fmt.Sprintf("%s/%s ", formatNumber(m.tokenCount), formatNumber(ctxLen))) +
-		m.prog.ViewAs(pct/100) +
+	line2 := styleDim.Render(fmt.Sprintf("%s/%s ", formatNumber(s.tokenCount), formatNumber(ctxLen))) +
+		s.prog.ViewAs(pct/100) +
 		styleDim.Render(fmt.Sprintf(" %d%% │ ", int(pct))) +
 		modeColor.Render(permMode) +
 		styleDim.Render(" (Shift+Tab)")
