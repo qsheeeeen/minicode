@@ -14,7 +14,7 @@ type Suggestions struct {
 	selectedIdx int
 }
 
-func (s *Suggestions) Active() bool { return len(s.items) > 0 }
+func (s *Suggestions) IsActive() bool { return len(s.items) > 0 }
 
 func (s *Suggestions) Set(items []icmd.Command) {
 	s.items = items

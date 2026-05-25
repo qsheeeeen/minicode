@@ -16,7 +16,7 @@ func TestAskUserPromptView(t *testing.T) {
 		{Label: "B", Description: "Second"},
 	}, false, ch)
 
-	if !a.Active() {
+	if !a.IsActive() {
 		t.Error("should be active after Activate")
 	}
 
@@ -48,7 +48,7 @@ func TestAskUserPromptSelectAndConfirm(t *testing.T) {
 	if !handled {
 		t.Error("Enter should confirm")
 	}
-	if a.Active() {
+	if a.IsActive() {
 		t.Error("should not be active after confirm")
 	}
 
@@ -71,7 +71,7 @@ func TestAskUserPromptCancel(t *testing.T) {
 	if !handled {
 		t.Error("Esc should cancel")
 	}
-	if a.Active() {
+	if a.IsActive() {
 		t.Error("should not be active after cancel")
 	}
 

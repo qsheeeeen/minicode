@@ -24,15 +24,15 @@ type InputModel struct {
 // by a sub-component, and any tea.Cmd from the textarea.
 func (in *InputModel) Update(msg tea.KeyMsg, cmdReg *icmd.Registry) (consumed bool, cmd tea.Cmd) {
 	// Route to active sub-components
-	if in.Perm.Active() {
+	if in.Perm.IsActive() {
 		return in.Perm.Update(msg), nil
 	}
-	if in.Ask.Active() {
+	if in.Ask.IsActive() {
 		return in.Ask.Update(msg), nil
 	}
 
 	// Suggestions navigation (only when not streaming)
-	if in.Suggest.Active() && !in.streaming {
+	if in.Suggest.IsActive() && !in.streaming {
 		switch msg.Type {
 		case tea.KeyTab:
 			in.textarea.SetValue(in.Suggest.Accept(in.textarea.Value()))
@@ -79,10 +79,10 @@ func (in *InputModel) Update(msg tea.KeyMsg, cmdReg *icmd.Registry) (consumed bo
 
 // View renders the input area. Delegates to sub-components when active.
 func (in *InputModel) View(width int) string {
-	if in.Perm.Active() {
+	if in.Perm.IsActive() {
 		return in.Perm.View(width)
 	}
-	if in.Ask.Active() {
+	if in.Ask.IsActive() {
 		return in.Ask.View(width)
 	}
 
@@ -94,7 +94,7 @@ func (in *InputModel) View(width int) string {
 	inputView := prefix + in.textarea.View()
 	mainInput := styleInputBorder.Width(width - 2).Render(inputView)
 
-	if in.Suggest.Active() && !in.streaming {
+	if in.Suggest.IsActive() && !in.streaming {
 		return in.Suggest.View(mainInput) + "\n"
 	}
 	return mainInput + "\n"

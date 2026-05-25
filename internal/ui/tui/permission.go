@@ -14,7 +14,7 @@ type PermissionPrompt struct {
 	resolve  chan string
 }
 
-func (p *PermissionPrompt) Active() bool { return p.pending }
+func (p *PermissionPrompt) IsActive() bool { return p.pending }
 
 func (p *PermissionPrompt) Activate(text string, resolve chan string) {
 	p.pending = true

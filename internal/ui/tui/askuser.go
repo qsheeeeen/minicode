@@ -20,7 +20,7 @@ type AskUserPrompt struct {
 	resolve   chan string
 }
 
-func (a *AskUserPrompt) Active() bool { return a.pending }
+func (a *AskUserPrompt) IsActive() bool { return a.pending }
 
 func (a *AskUserPrompt) Activate(question string, options []domain.AskOption, multi bool, resolve chan string) {
 	a.pending = true

@@ -9,11 +9,11 @@ import (
 
 func TestSuggestionsActive(t *testing.T) {
 	var s Suggestions
-	if s.Active() {
+	if s.IsActive() {
 		t.Error("should not be active when empty")
 	}
 	s.Set([]icmd.Command{{Name: "test", Description: "desc"}})
-	if !s.Active() {
+	if !s.IsActive() {
 		t.Error("should be active with items")
 	}
 }
@@ -22,7 +22,7 @@ func TestSuggestionsClear(t *testing.T) {
 	var s Suggestions
 	s.Set([]icmd.Command{{Name: "test"}})
 	s.Clear()
-	if s.Active() {
+	if s.IsActive() {
 		t.Error("should not be active after clear")
 	}
 }

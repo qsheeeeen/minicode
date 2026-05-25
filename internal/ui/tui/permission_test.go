@@ -10,7 +10,7 @@ import (
 func TestPermissionPromptView(t *testing.T) {
 	var p PermissionPrompt
 	p.Activate("Bash(ls)", make(chan string, 1))
-	if !p.Active() {
+	if !p.IsActive() {
 		t.Error("should be active after Activate")
 	}
 	v := p.View(100)
@@ -31,7 +31,7 @@ func TestPermissionPromptResolve(t *testing.T) {
 	if !handled {
 		t.Error("'y' should be handled")
 	}
-	if p.Active() {
+	if p.IsActive() {
 		t.Error("should not be active after resolution")
 	}
 
@@ -54,7 +54,7 @@ func TestPermissionPromptIgnoreOtherKeys(t *testing.T) {
 	if handled {
 		t.Error("'x' should not be handled")
 	}
-	if !p.Active() {
+	if !p.IsActive() {
 		t.Error("should still be active")
 	}
 }
