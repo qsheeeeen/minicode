@@ -81,7 +81,7 @@ type TUIModel struct {
 	program       *tea.Program
 	agent         *agent.Agent
 	agentRegistry *agent.AgentRegistry
-	cmdReg        *CommandRegistry
+	cmdReg        *icmd.Registry
 	viewport      viewport.Model
 	input         textarea.Model
 	spinner       spinner.Model
@@ -98,7 +98,7 @@ type TUIModel struct {
 	activeID string
 
 	// Autocomplete state
-	suggestions []Command
+	suggestions []icmd.Command
 	selectedIdx int
 
 	// Permission prompt state
@@ -134,7 +134,7 @@ type TUIModel struct {
 }
 
 // NewTUIModel creates the TUI model.
-func NewTUIModel(ag *agent.Agent, registry *agent.AgentRegistry, cmdReg *CommandRegistry, promptFiles []string) *TUIModel {
+func NewTUIModel(ag *agent.Agent, registry *agent.AgentRegistry, cmdReg *icmd.Registry, promptFiles []string) *TUIModel {
 	ta := textarea.New()
 	ta.Placeholder = "Type a message or /command..."
 	ta.ShowLineNumbers = false
@@ -414,7 +414,7 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if len(val) > 0 && val[0] == '/' && m.cmdReg != nil {
 					partial := strings.ToLower(val[1:])
 					all := m.cmdReg.List()
-					var filtered []Command
+					var filtered []icmd.Command
 					for _, c := range all {
 						if strings.HasPrefix(strings.ToLower(c.Name), partial) {
 							filtered = append(filtered, c)
@@ -1019,7 +1019,7 @@ func truncate(s string, maxLen int) string {
 // ---- TUI entry point ----
 
 // RunTUI starts the interactive Bubble Tea terminal UI.
-func RunTUI(ag *agent.Agent, registry *agent.AgentRegistry, cmdReg *CommandRegistry, promptFiles []string) error {
+func RunTUI(ag *agent.Agent, registry *agent.AgentRegistry, cmdReg *icmd.Registry, promptFiles []string) error {
 	m := NewTUIModel(ag, registry, cmdReg, promptFiles)
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	m.program = p

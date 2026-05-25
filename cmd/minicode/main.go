@@ -177,7 +177,7 @@ Reply with exactly one of:
 	}
 
 	// Commands
-	cmdReg := ui.NewCommandRegistry()
+	cmdReg := commands.NewRegistry()
 	ag.SetCommandResolver(func(input string) (handled bool, promptText string, displayContent string) {
 		cfg, _ := config.Load()
 		handled, result, expanded := cmdReg.ParseAndExecute(input, commands.Context{
