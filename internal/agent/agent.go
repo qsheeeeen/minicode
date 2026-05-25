@@ -29,7 +29,6 @@ type Agent struct {
 	skills    *skills.SkillRegistry
 	permSvc   tools.PermissionChecker
 	askUserFn func(question string, options []domain.AskOption, multiSelect bool) string
-	registry  *AgentRegistry
 	id        string
 
 	sessionName string
@@ -112,9 +111,6 @@ func (a *Agent) ID() string { return a.id }
 
 // SetID sets the agent identifier.
 func (a *Agent) SetID(id string) { a.id = id }
-
-// SetRegistry sets the agent registry.
-func (a *Agent) SetRegistry(r *AgentRegistry) { a.registry = r }
 
 // SetAskUserFn sets the callback for the AskUser tool.
 func (a *Agent) SetAskUserFn(fn func(question string, options []domain.AskOption, multiSelect bool) string) {
@@ -492,8 +488,7 @@ func (a *Agent) executeTools(ctx context.Context, calls []toolCall) (denied bool
 		AskUserFn:      a.askUserFn,
 		CurrentAgentID: a.id,
 		ParentRegistry: a.tools,
-		AgentRegistry:  a.registry,
-		AgentFactory:   &agentFactory{registry: a.registry},
+		AgentFactory:   &agentFactory{},
 		Skills:         a.skills,
 		SetModelFn:     a.SetModel,
 	}
@@ -628,14 +623,10 @@ func getCwd() string {
 }
 
 // agentFactory implements tools.AgentFactory to avoid circular imports.
-type agentFactory struct {
-	registry *AgentRegistry
-}
+type agentFactory struct{}
 
 func (f *agentFactory) Create(cfg domain.AgentConfig) any {
-	ag := NewAgent(cfg)
-	ag.SetRegistry(f.registry)
-	return ag
+	return NewAgent(cfg)
 }
 
 func (f *agentFactory) Run(ctx context.Context, ag any, task string) error {

@@ -19,10 +19,10 @@ func NewSubAgentTool(parentConfig domain.AgentConfig) *SubAgentTool {
 	return &SubAgentTool{parentConfig: parentConfig}
 }
 
-func (t *SubAgentTool) Name() string             { return "SubAgent" }
-func (t *SubAgentTool) Description() string      { return "Delegate a sub-task to an independent agent. Creates a new agent session. The sub-agent has access to all tools (except SubAgent) and returns a concise summary." }
-func (t *SubAgentTool) RequiresPermission() bool     { return false }
-func (t *SubAgentTool) Requires() []ToolRequirement  { return []ToolRequirement{ReqAgentRegistry} }
+func (t *SubAgentTool) Name() string         { return "SubAgent" }
+func (t *SubAgentTool) Description() string  { return "Delegate a sub-task to an independent agent. Creates a new agent session. The sub-agent has access to all tools (except SubAgent) and returns a concise summary." }
+func (t *SubAgentTool) RequiresPermission() bool { return false }
+func (t *SubAgentTool) Requires() []ToolRequirement { return nil }
 
 func (t *SubAgentTool) InputSchema() map[string]any {
 	return map[string]any{
@@ -64,57 +64,37 @@ func (t *SubAgentTool) Execute(ctx context.Context, args map[string]any, tc Tool
 		}
 	}
 
-	subID := "2"
-	if tc.AgentRegistry != nil {
-		subID = tc.AgentRegistry.AllocateSubID()
-	}
-
 	subAgent := tc.AgentFactory.Create(subCfg)
-	
-	if tc.AgentRegistry != nil {
-		tc.AgentRegistry.Register(subID, subAgent, task, tc.CurrentAgentID)
-	}
-
 	err := tc.AgentFactory.Run(ctx, subAgent, task)
 	if err != nil {
-		if tc.AgentRegistry != nil {
-			tc.AgentRegistry.UpdateStatus(subID, "error", err.Error())
-		}
-		return domain.ToolResult{Output: fmt.Sprintf("Agent #%s failed: %s", subID, err.Error())}, nil
+		return domain.ToolResult{Output: fmt.Sprintf("Sub-agent failed: %s", err.Error())}, nil
 	}
 
 	// Extract final response from sub-agent turns
 	subTurns := tc.AgentFactory.GetTurns(subAgent)
 	finalText := extractFinalResponse(subTurns)
-	
-	summary := ""
+
 	if finalText != "" {
-		summary = finalText
-	} else {
-		// Fallback: summary with tool call count
-		toolCalls := 0
-		for _, turn := range subTurns {
-			if turn.Role == "assistant" {
-				if blocks, ok := turn.Content.([]domain.ContentBlock); ok {
-					for _, b := range blocks {
-						if b.Type == "tool_use" {
-							toolCalls++
-						}
+		return domain.ToolResult{Output: finalText}, nil
+	}
+
+	// Fallback: count tool calls
+	toolCalls := 0
+	for _, turn := range subTurns {
+		if turn.Role == "assistant" {
+			if blocks, ok := turn.Content.([]domain.ContentBlock); ok {
+				for _, b := range blocks {
+					if b.Type == "tool_use" {
+						toolCalls++
 					}
 				}
 			}
 		}
-		summary = fmt.Sprintf("%d operations", toolCalls)
-		if toolCalls == 0 {
-			summary = "Task completed"
-		}
 	}
-
-	if tc.AgentRegistry != nil {
-		tc.AgentRegistry.UpdateStatus(subID, "completed", summary)
+	if toolCalls == 0 {
+		return domain.ToolResult{Output: "Task completed"}, nil
 	}
-
-	return domain.ToolResult{Output: summary}, nil
+	return domain.ToolResult{Output: fmt.Sprintf("%d operations", toolCalls)}, nil
 }
 
 func extractFinalResponse(turns []domain.MessageParam) string {

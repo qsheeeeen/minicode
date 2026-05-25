@@ -19,11 +19,6 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
-	case sessionUpdateMsg:
-		m.Header.sessions = msg.sessions
-		m.Viewport.sessions = msg.sessions
-		return m, nil
-
 	case permPromptMsg:
 		m.Input.permPending = true
 		m.Input.permText = msg.displayText
@@ -163,34 +158,6 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, cmd
 
-		case tea.KeyCtrlO:
-			if m.agentRegistry != nil && len(m.Header.sessions) > 1 {
-				next := m.agentRegistry.NextActive()
-				if next != nil {
-					m.agent = next
-					m.Header.activeID = next.ID()
-					m.Viewport.messages = ToDisplayMessages(next.Store().Turns(), next.Store().Statuses(), next.Store().IsStreaming())
-					m.Input.streaming = next.Store().IsStreaming()
-					m.Status.streaming = m.Input.streaming
-					m.Status.tokenCount = next.TokenCount()
-					m.Status.modelName = next.Model()
-					m.Status.session = next.SessionName()
-
-					next.OnDisplayChange(func() {
-						if m.program != nil {
-							m.program.Send(displayChangeMsg{})
-						}
-					})
-					next.OnTokenUpdate(func(total int) {
-						if m.program != nil {
-							m.program.Send(tokenUpdateMsg{total: total})
-						}
-					})
-
-					m.Viewport.viewport.SetContent(m.Viewport.Render())
-					m.Viewport.viewport.GotoBottom()
-				}
-			}
 			return m, nil
 
 		default:

@@ -229,10 +229,8 @@ Reply with exactly one of:
 	}
 
 	// Interactive TUI
-	agentReg := agent.NewAgentRegistry(ag)
-	ag.SetRegistry(agentReg)
 
-	if err := tui.RunTUI(ag, agentReg, cmdReg, promptFiles); err != nil {
+	if err := tui.RunTUI(ag, cmdReg, promptFiles); err != nil {
 		fmt.Fprintf(os.Stderr, "TUI error: %s\n", err)
 		os.Exit(1)
 	}

@@ -27,19 +27,12 @@ type ToolContext struct {
 	PermissionSvc   PermissionChecker
 	CurrentAgentID  string
 	ParentRegistry  *ToolRegistry         // for sub-agent delegation
-	AgentRegistry   AgentSessionManager   // interface to avoid circular dep
 	AgentFactory    AgentFactory          // interface to create new agents
 	Skills          *skills.SkillRegistry // for skill activation
 	SetModelFn      func(model, apiKey, baseURL string, contextLength int)
 	AskUserFn       func(question string, options []domain.AskOption, multiSelect bool) string
 }
 
-// AgentSessionManager defines what the tools need from the AgentRegistry.
-type AgentSessionManager interface {
-	AllocateSubID() string
-	Register(id string, agent any, task string, parentID string)
-	UpdateStatus(id string, status string, summary string)
-}
 
 // AgentFactory allows tools to create new agent instances.
 type AgentFactory interface {
@@ -59,7 +52,6 @@ type PermissionChecker interface {
 type ToolRequirement string
 
 const (
-	ReqAgentRegistry ToolRequirement = "agentRegistry"
 	ReqSkillRegistry ToolRequirement = "skillRegistry"
 )
 

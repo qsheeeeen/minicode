@@ -15,10 +15,9 @@ import (
 
 // TUIModel is the top-level Bubble Tea model composed of sub-models.
 type TUIModel struct {
-	program       *tea.Program
-	agent         *agent.Agent
-	agentRegistry *agent.AgentRegistry
-	cmdReg        *icmd.Registry
+	program *tea.Program
+	agent   *agent.Agent
+	cmdReg  *icmd.Registry
 
 	Header   HeaderModel
 	Input    InputModel
@@ -32,11 +31,10 @@ type TUIModel struct {
 }
 
 // NewTUIModel creates the TUI model.
-func NewTUIModel(ag *agent.Agent, registry *agent.AgentRegistry, cmdReg *icmd.Registry, promptFiles []string) *TUIModel {
+func NewTUIModel(ag *agent.Agent, cmdReg *icmd.Registry, promptFiles []string) *TUIModel {
 	m := &TUIModel{
-		agent:         ag,
-		agentRegistry: registry,
-		cmdReg:        cmdReg,
+		agent:  ag,
+		cmdReg: cmdReg,
 	}
 
 	// Input
@@ -61,7 +59,6 @@ func NewTUIModel(ag *agent.Agent, registry *agent.AgentRegistry, cmdReg *icmd.Re
 
 	// Header
 	m.Header.promptFiles = promptFiles
-	m.Header.activeID = ag.ID()
 
 	// Set viewport content
 	m.Viewport.viewport.SetContent(m.Viewport.Render())
@@ -94,16 +91,6 @@ func NewTUIModel(ag *agent.Agent, registry *agent.AgentRegistry, cmdReg *icmd.Re
 		return <-ch
 	})
 
-	if registry != nil {
-		m.Header.sessions = registry.List()
-		m.Viewport.sessions = m.Header.sessions
-		registry.OnUpdate(func(sessions []agent.AgentSession) {
-			if m.program != nil {
-				m.program.Send(sessionUpdateMsg{sessions: sessions})
-			}
-		})
-	}
-
 	if p := ag.PermissionSvc(); p != nil {
 		if ps, ok := p.(*tools.PermissionService); ok {
 			ps.SetPromptFn(func(displayText string) string {
@@ -129,8 +116,8 @@ func (m *TUIModel) Init() tea.Cmd {
 // ---- TUI entry point ----
 
 // RunTUI starts the interactive Bubble Tea terminal UI.
-func RunTUI(ag *agent.Agent, registry *agent.AgentRegistry, cmdReg *icmd.Registry, promptFiles []string) error {
-	mdl := NewTUIModel(ag, registry, cmdReg, promptFiles)
+func RunTUI(ag *agent.Agent, cmdReg *icmd.Registry, promptFiles []string) error {
+	mdl := NewTUIModel(ag, cmdReg, promptFiles)
 	p := tea.NewProgram(mdl, tea.WithAltScreen())
 	mdl.program = p
 	_, err := p.Run()

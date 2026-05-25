@@ -13,9 +13,6 @@ import (
 type ViewportModel struct {
 	viewport viewport.Model
 	messages []domain.DisplayMessage
-
-	// Multi-agent switch hint
-	sessions []agent.AgentSession
 }
 
 // Render returns the viewport content string.
@@ -55,13 +52,7 @@ func (vp *ViewportModel) Render() string {
 			lines = append(lines, "")
 		}
 	}
-	result := strings.Join(lines, "\n") + "\n"
-
-	if len(vp.sessions) > 1 {
-		result += styleYellow.Render("Ctrl+O: switch agent") + "\n"
-	}
-
-	return result
+	return strings.Join(lines, "\n") + "\n"
 }
 
 func formatToolCall(msg domain.DisplayMessage) string {

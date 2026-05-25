@@ -78,9 +78,8 @@ func TestTokenUpdate(t *testing.T) {
 func TestFullEnterCycle(t *testing.T) {
 	ag := agent.NewAgent(domain.AgentConfig{APIKey: "test", Model: "m1", ContextLength: 100})
 	ag.ToolRegistry().Register(tools.NewBashTool())
-	reg := agent.NewAgentRegistry(ag)
 
-	m := NewTUIModel(ag, reg, icmd.NewRegistry(), nil)
+	m := NewTUIModel(ag, icmd.NewRegistry(), nil)
 	m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	m.Input.textarea.SetValue("echo hello")
