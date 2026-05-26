@@ -5,18 +5,19 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/progress"
-	"github.com/charmbracelet/bubbles/spinner"
-	"github.com/charmbracelet/bubbles/textarea"
-	"github.com/charmbracelet/bubbles/viewport"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"minicode/internal/agent"
 	icmd "minicode/internal/commands"
 	"minicode/internal/config"
 	"minicode/internal/domain"
 	"minicode/internal/storage"
 	"minicode/internal/tools"
+
+	"github.com/charmbracelet/bubbles/progress"
+	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/bubbles/textarea"
+	"github.com/charmbracelet/bubbles/viewport"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 // TUIModel is the top-level Bubble Tea model composed of sub-models.
@@ -39,7 +40,7 @@ type TUIModel struct {
 // NewTUIModel creates the TUI model.
 func NewTUIModel(ag *agent.Agent, promptFiles []string) *TUIModel {
 	m := &TUIModel{
-		agent:  ag,
+		agent: ag,
 	}
 
 	// Input
@@ -358,7 +359,7 @@ func (m *TUIModel) handleSelectChoice(val string) {
 // RunTUI starts the interactive Bubble Tea terminal UI.
 func RunTUI(ag *agent.Agent, promptFiles []string) error {
 	mdl := NewTUIModel(ag, promptFiles)
-	p := tea.NewProgram(mdl, tea.WithAltScreen())
+	p := tea.NewProgram(mdl)
 	mdl.program = p
 	_, err := p.Run()
 	return err
