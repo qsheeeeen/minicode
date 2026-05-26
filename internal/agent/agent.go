@@ -71,7 +71,6 @@ func NewAgent(cfg domain.AgentConfig) *Agent {
 
 	// Load skills
 	skills.LoadSkills(cfg.SkillsDir)
-	skills.RegisterBuiltins(cfg.ProjectPromptFile)
 	a.refreshSystemPrompt()
 
 	// Permission service

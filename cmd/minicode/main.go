@@ -17,7 +17,6 @@ import (
 	"minicode/internal/config"
 	"minicode/internal/domain"
 	"minicode/internal/llm"
-	"minicode/internal/skills"
 	"minicode/internal/storage"
 	"minicode/internal/tools"
 	"minicode/internal/ui"
@@ -216,20 +215,4 @@ Reply with exactly one of:
 		fmt.Fprintf(os.Stderr, "TUI error: %s\n", err)
 		os.Exit(1)
 	}
-}
-
-func registerBuiltinSkills(r *skills.SkillRegistry, promptFile string) {
-	r.RegisterBuiltin(`---
-name: skill-creator
-description: "Guide for creating effective skills. This skill should be used when users want to create a new skill (or update an existing skill) that extends minicode's capabilities with specialized knowledge, workflows, or tool integrations."
----
-# Skill Creator Guide
-
-This skill provides guidance for creating effective skills in minicode using the agentskills.io format.`)
-
-	r.RegisterBuiltin(fmt.Sprintf(`---
-name: init
-description: "Set up a minimal %s for this repo with codebase exploration and optional skills."
----
-Set up a minimal %s (and optionally skills) for this repo.`, promptFile, promptFile))
 }
