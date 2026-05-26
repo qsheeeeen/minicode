@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"minicode/internal/domain"
-	"minicode/internal/skills"
 )
 
 func newTestAgent() *Agent {
@@ -23,11 +22,4 @@ func TestAgent_IsRunningGuard(t *testing.T) {
 	_ = ok
 }
 
-func TestAgent_SetSkills(t *testing.T) {
-	ag := newTestAgent()
-	sr := skills.NewSkillRegistry("/tmp")
-	ag.SetSkills(sr)
-	if ag.skills != sr {
-		t.Error("skills should be set")
-	}
-}
+

@@ -100,12 +100,6 @@ func run(cmd *cobra.Command, args []string) {
 
 	ag := agent.NewAgent(cfg)
 
-	// Load project skills
-	skRegistry := skills.NewSkillRegistry(resolved.SkillsDir)
-	registerBuiltinSkills(skRegistry, resolved.PromptFile)
-	_ = skRegistry.LoadSkills()
-	ag.SetSkills(skRegistry)
-
 	// Session management
 	sm := storage.NewSessionManager()
 	if sessionName != "" {
@@ -117,17 +111,6 @@ func run(cmd *cobra.Command, args []string) {
 			_ = ag.LoadSession(name) // best-effort: session may not exist
 		}
 	}
-
-	// Tools
-	registry := ag.ToolRegistry()
-	registry.Register(tools.NewReadTool())
-	registry.Register(tools.NewWriteTool())
-	registry.Register(tools.NewEditTool())
-	registry.Register(tools.NewBashTool())
-	registry.Register(tools.NewAskUserTool())
-	registry.Register(tools.NewActivateSkillTool())
-	registry.Register(tools.NewSubAgentTool(cfg))
-	registry.Register(tools.NewSetModelTool())
 
 	// Permission service
 	permSvc := tools.NewPermissionService(domain.PermissionMode(resolved.PermissionMode))
@@ -178,10 +161,9 @@ Reply with exactly one of:
 	}
 
 	// Commands
-	cmdReg := commands.NewRegistry()
 	ag.SetCommandResolver(func(input string) (handled bool, promptText string, displayContent string) {
 		cfg, _ := config.Load()
-		handled, result, expanded := cmdReg.ParseAndExecute(input, commands.Context{
+		handled, result, expanded := commands.ParseAndExecute(input, commands.Context{
 			Agent:  ag,
 			Config: cfg,
 		})
@@ -230,7 +212,7 @@ Reply with exactly one of:
 
 	// Interactive TUI
 
-	if err := tui.RunTUI(ag, cmdReg, promptFiles); err != nil {
+	if err := tui.RunTUI(ag, promptFiles); err != nil {
 		fmt.Fprintf(os.Stderr, "TUI error: %s\n", err)
 		os.Exit(1)
 	}

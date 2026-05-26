@@ -6,7 +6,7 @@ import (
 )
 
 func TestSkillRegistry_ParseSkillFrontmatter(t *testing.T) {
-	r := NewSkillRegistry("")
+	r := newSkillRegistry("")
 	content := `---
 name: test-skill
 description: "A test skill"
@@ -22,7 +22,7 @@ Body content`
 }
 
 func TestSkillRegistry_SplitFrontmatter(t *testing.T) {
-	r := NewSkillRegistry("")
+	r := newSkillRegistry("")
 	content := `---
 name: test
 ---

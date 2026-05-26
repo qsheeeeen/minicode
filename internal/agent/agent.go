@@ -24,9 +24,7 @@ type Agent struct {
 	client    llm.Client
 	config    domain.AgentConfig
 	store     *Store
-	tools     *tools.ToolRegistry
 	session   *storage.SessionManager
-	skills    *skills.SkillRegistry
 	permSvc   tools.PermissionChecker
 	askUserFn func(question string, options []domain.AskOption, multiSelect bool) string
 	id        string
@@ -61,13 +59,23 @@ func NewAgent(cfg domain.AgentConfig) *Agent {
 		client:      llm.NewClient(cfg.APIKey, cfg.BaseURL),
 		config:      cfg,
 		store:       NewStore(),
-		tools:       tools.NewToolRegistry(),
 		session:     storage.NewSessionManager(),
 		tokenMgr:    NewTokenManager(),
 		logger:      slog.New(slog.NewTextHandler(os.Stderr, nil)),
 		sessionName: fmt.Sprintf("session-%d", time.Now().UnixMilli()),
 		id:          "1",
 	}
+
+	// Register the only tool that needs AgentConfig
+	tools.Register(tools.NewSubAgentTool(cfg))
+
+	// Load skills
+	skills.LoadSkills(cfg.SkillsDir)
+	skills.RegisterBuiltins(cfg.ProjectPromptFile)
+	a.refreshSystemPrompt()
+
+	// Permission service
+	a.permSvc = tools.NewPermissionService(cfg.PermissionMode)
 
 	a.refreshEnvironment()
 	a.refreshSystemPrompt()
@@ -82,15 +90,6 @@ func (a *Agent) OnDisplayChange(fn func()) { a.store.OnChange(fn) }
 
 // Store returns the message store.
 func (a *Agent) Store() *Store { return a.store }
-
-// ToolRegistry returns the tool registry.
-func (a *Agent) ToolRegistry() *tools.ToolRegistry { return a.tools }
-
-// SetSkills sets the skill registry for tool context.
-func (a *Agent) SetSkills(sr *skills.SkillRegistry) { a.skills = sr; a.refreshSystemPrompt() }
-
-// Skills returns the skill registry.
-func (a *Agent) Skills() *skills.SkillRegistry { return a.skills }
 
 // Compress triggers conversation compression (public wrapper).
 func (a *Agent) Compress() { go a.compress(context.Background()) }
@@ -184,16 +183,14 @@ func (a *Agent) refreshSystemPrompt() {
 	}
 
 	// Inject available skills
-	if a.skills != nil {
-		available := a.skills.List()
-		if len(available) > 0 {
-			prompt += "\n\n<available_skills>\n"
-			for _, sk := range available {
-				prompt += fmt.Sprintf("  <skill>\n    <name>%s</name>\n    <description>%s</description>\n  </skill>\n", sk.Name, sk.Description)
-			}
-			prompt += "</available_skills>\n"
-			prompt += "\nTo activate a skill and receive its detailed instructions, use the ActivateSkill tool with the skill's name.\n"
+	available := skills.List()
+	if len(available) > 0 {
+		prompt += "\n\n<available_skills>\n"
+		for _, sk := range available {
+			prompt += fmt.Sprintf("  <skill>\n    <name>%s</name>\n    <description>%s</description>\n  </skill>\n", sk.Name, sk.Description)
 		}
+		prompt += "</available_skills>\n"
+		prompt += "\nTo activate a skill and receive its detailed instructions, use the ActivateSkill tool with the skill's name.\n"
 	}
 
 	a.systemPrompt = prompt
@@ -404,7 +401,7 @@ func (a *Agent) handleStream(ctx context.Context, toolDefs []llm.Tool) ([]toolCa
 						Name: evt.Block.Name,
 					},
 				}
-				if t, ok := a.tools.Get(evt.Block.Name); ok {
+				if t, ok := tools.Get(evt.Block.Name); ok {
 					pt.tool = t
 					toolCalls = append(toolCalls, toolCall{Block: pt.block, Tool: t})
 				}
@@ -459,7 +456,7 @@ func (a *Agent) handleStream(ctx context.Context, toolDefs []llm.Tool) ([]toolCa
 }
 
 func (a *Agent) buildLLMTools() []llm.Tool {
-	all := a.tools.All()
+	all := tools.All()
 	defs := make([]llm.Tool, 0, len(all))
 	for _, t := range all {
 		for _, ex := range a.config.ExcludeTools {
@@ -487,9 +484,7 @@ func (a *Agent) executeTools(ctx context.Context, calls []toolCall) (denied bool
 		PermissionSvc:  a.permSvc,
 		AskUserFn:      a.askUserFn,
 		CurrentAgentID: a.id,
-		ParentRegistry: a.tools,
 		AgentFactory:   &agentFactory{},
-		Skills:         a.skills,
 		SetModelFn:     a.SetModel,
 	}
 

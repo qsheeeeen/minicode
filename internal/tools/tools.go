@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"minicode/internal/domain"
-	"minicode/internal/skills"
 )
 
 // ErrToolDenied is returned when a tool execution is blocked by the permission gate.
@@ -26,9 +25,7 @@ type ToolContext struct {
 	Config          domain.AgentConfig
 	PermissionSvc   PermissionChecker
 	CurrentAgentID  string
-	ParentRegistry  *ToolRegistry         // for sub-agent delegation
 	AgentFactory    AgentFactory          // interface to create new agents
-	Skills          *skills.SkillRegistry // for skill activation
 	SetModelFn      func(model, apiKey, baseURL string, contextLength int)
 	AskUserFn       func(question string, options []domain.AskOption, multiSelect bool) string
 }
@@ -52,7 +49,7 @@ type PermissionChecker interface {
 type ToolRequirement string
 
 const (
-	ReqSkillRegistry ToolRequirement = "skillRegistry"
+	// Removed ReqSkillRegistry
 )
 
 // Tool is the interface every tool must implement.
@@ -71,8 +68,8 @@ type ToolRegistry struct {
 	tools map[string]Tool
 }
 
-// NewToolRegistry creates an empty tool registry.
-func NewToolRegistry() *ToolRegistry {
+// newToolRegistry creates an empty tool registry.
+func newToolRegistry() *ToolRegistry {
 	return &ToolRegistry{tools: make(map[string]Tool)}
 }
 
@@ -101,3 +98,15 @@ func (r *ToolRegistry) All() []Tool {
 	}
 	return result
 }
+
+// Default registry singleton.
+var defaultRegistry = newToolRegistry()
+
+// Register adds a tool to the default registry.
+func Register(t Tool) { defaultRegistry.Register(t) }
+
+// Get retrieves a tool by name from the default registry.
+func Get(name string) (Tool, bool) { return defaultRegistry.Get(name) }
+
+// All returns all registered tools from the default registry.
+func All() []Tool { return defaultRegistry.All() }

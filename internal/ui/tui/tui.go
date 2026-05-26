@@ -37,10 +37,9 @@ type TUIModel struct {
 }
 
 // NewTUIModel creates the TUI model.
-func NewTUIModel(ag *agent.Agent, cmdReg *icmd.Registry, promptFiles []string) *TUIModel {
+func NewTUIModel(ag *agent.Agent, promptFiles []string) *TUIModel {
 	m := &TUIModel{
 		agent:  ag,
-		cmdReg: cmdReg,
 	}
 
 	// Input
@@ -138,7 +137,7 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
-		consumed, inputCmd := m.Input.Update(msg, m.cmdReg)
+		consumed, inputCmd := m.Input.Update(msg)
 		if inputCmd != nil {
 			cmds = append(cmds, inputCmd)
 		}
@@ -357,8 +356,8 @@ func (m *TUIModel) handleSelectChoice(val string) {
 // ---- TUI entry point ----
 
 // RunTUI starts the interactive Bubble Tea terminal UI.
-func RunTUI(ag *agent.Agent, cmdReg *icmd.Registry, promptFiles []string) error {
-	mdl := NewTUIModel(ag, cmdReg, promptFiles)
+func RunTUI(ag *agent.Agent, promptFiles []string) error {
+	mdl := NewTUIModel(ag, promptFiles)
 	p := tea.NewProgram(mdl, tea.WithAltScreen())
 	mdl.program = p
 	_, err := p.Run()

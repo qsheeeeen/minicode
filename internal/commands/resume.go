@@ -6,8 +6,8 @@ import (
 	"minicode/internal/storage"
 )
 
-func registerResume(r *Registry) {
-	r.Register(&Command{Name: "resume", Description: "Load a session (without args: list sessions)", Kind: Handler,
+func init() {
+	Register(&Command{Name: "resume", Description: "Load a session (without args: list sessions)", Kind: Handler,
 		Handler: func(args []string, ctx Context) (Result, error) {
 			if len(args) > 0 && ctx.Agent != nil {
 				name := args[0]

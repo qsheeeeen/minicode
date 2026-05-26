@@ -51,3 +51,5 @@ func (t *WriteTool) Execute(ctx context.Context, args map[string]any, tc ToolCon
 
 	return domain.ToolResult{Output: fmt.Sprintf("Wrote %s", path)}, nil
 }
+
+func init() { Register(NewWriteTool()) }

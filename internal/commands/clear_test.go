@@ -8,10 +8,9 @@ import (
 )
 
 func TestClear(t *testing.T) {
-	r := NewRegistry()
-	r.RegisterBuiltins()
+	
 	ag := agent.NewAgent(domain.AgentConfig{APIKey: "test", Model: "m1"})
-	handled, result, _ := r.ParseAndExecute("/clear", Context{Agent: ag})
+	handled, result, _ := ParseAndExecute("/clear", Context{Agent: ag})
 	if !handled {
 		t.Error("/clear should be handled")
 	}

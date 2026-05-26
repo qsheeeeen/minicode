@@ -83,3 +83,5 @@ func stripANSI(str string) string {
 	var re = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
 	return re.ReplaceAllString(str, "")
 }
+
+func init() { Register(NewBashTool()) }

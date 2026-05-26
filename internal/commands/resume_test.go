@@ -8,9 +8,8 @@ import (
 )
 
 func TestResume_List(t *testing.T) {
-	r := NewRegistry()
-	r.RegisterBuiltins()
-	handled, result, _ := r.ParseAndExecute("/resume", Context{})
+	
+	handled, result, _ := ParseAndExecute("/resume", Context{})
 	if !handled {
 		t.Error("/resume without args should list sessions")
 	}
@@ -22,10 +21,9 @@ func TestResume_List(t *testing.T) {
 }
 
 func TestResume_WithName(t *testing.T) {
-	r := NewRegistry()
-	r.RegisterBuiltins()
+	
 	ag := agent.NewAgent(domain.AgentConfig{APIKey: "test", Model: "m1"})
-	handled, result, _ := r.ParseAndExecute("/resume nonexistent-session", Context{Agent: ag})
+	handled, result, _ := ParseAndExecute("/resume nonexistent-session", Context{Agent: ag})
 	if !handled {
 		t.Error("/resume with name should be handled")
 	}

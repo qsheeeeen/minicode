@@ -22,8 +22,8 @@ type SkillRegistry struct {
 	cache     map[string]string // name -> body
 }
 
-// NewSkillRegistry creates a skill registry for the given directory.
-func NewSkillRegistry(dir string) *SkillRegistry {
+// newSkillRegistry creates a skill registry for the given directory.
+func newSkillRegistry(dir string) *SkillRegistry {
 	return &SkillRegistry{
 		skillsDir: dir,
 		builtins:  make(map[string]string),
@@ -134,3 +134,21 @@ func (r *SkillRegistry) splitFrontmatter(content string) (frontmatter, body stri
 	}
 	return rest[:idx], rest[idx+3:]
 }
+
+// Default registry singleton.
+var defaultRegistry = newSkillRegistry("")
+
+// RegisterBuiltin registers a built-in skill to the default registry.
+func RegisterBuiltin(body string) { defaultRegistry.RegisterBuiltin(body) }
+
+// LoadSkills scans the skills directory in the default registry.
+func LoadSkills(dir string) error {
+	defaultRegistry.skillsDir = dir
+	return defaultRegistry.LoadSkills()
+}
+
+// List returns all loaded skills from the default registry.
+func List() []SkillInfo { return defaultRegistry.List() }
+
+// Body returns the full body of a skill from the default registry.
+func Body(name string) string { return defaultRegistry.Body(name) }

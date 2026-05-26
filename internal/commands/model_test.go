@@ -7,10 +7,9 @@ import (
 )
 
 func TestModel(t *testing.T) {
-	r := NewRegistry()
-	r.RegisterBuiltins()
+	
 	cfg, _ := config.Load()
-	handled, result, _ := r.ParseAndExecute("/model", Context{Config: cfg})
+	handled, result, _ := ParseAndExecute("/model", Context{Config: cfg})
 	if !handled {
 		t.Error("/model should be handled")
 	}

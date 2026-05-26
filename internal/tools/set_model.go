@@ -59,3 +59,5 @@ func (t *SetModelTool) Execute(ctx context.Context, args map[string]any, tc Tool
 		Output: fmt.Sprintf("Switched to tier %s: %s", tier, modelSpec),
 	}, nil
 }
+
+func init() { Register(NewSetModelTool()) }

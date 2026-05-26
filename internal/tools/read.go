@@ -71,3 +71,4 @@ func (t *ReadTool) Execute(ctx context.Context, args map[string]any, tc ToolCont
 	result := strings.Join(lines[start:end], "\n")
 	return domain.ToolResult{Output: result}, nil
 }
+func init() { Register(NewReadTool()) }

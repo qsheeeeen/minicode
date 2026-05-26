@@ -94,3 +94,5 @@ func (t *EditTool) Execute(ctx context.Context, args map[string]any, tc ToolCont
 		Output: fmt.Sprintf("Edited %s (-%d/+%d lines)\n%s", filePath, removed, added, out.String()),
 	}, nil
 }
+
+func init() { Register(NewEditTool()) }

@@ -2,8 +2,8 @@ package commands
 
 import "minicode/internal/storage"
 
-func registerRename(r *Registry) {
-	r.Register(&Command{Name: "rename", Description: "Rename current session", Kind: Handler,
+func init() {
+	Register(&Command{Name: "rename", Description: "Rename current session", Kind: Handler,
 		Handler: func(args []string, ctx Context) (Result, error) {
 			newName := ""
 			if len(args) > 0 {

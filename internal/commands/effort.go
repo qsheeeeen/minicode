@@ -6,8 +6,8 @@ import (
 	"minicode/internal/config"
 )
 
-func registerEffort(r *Registry) {
-	r.Register(&Command{Name: "effort", Description: "Set thinking effort (low|medium|high|xhigh|max)", Kind: Handler,
+func init() {
+	Register(&Command{Name: "effort", Description: "Set thinking effort (low|medium|high|xhigh|max)", Kind: Handler,
 		Handler: func(args []string, ctx Context) (Result, error) {
 			valid := map[string]bool{"low": true, "medium": true, "high": true, "xhigh": true, "max": true}
 			if len(args) > 0 && valid[args[0]] {

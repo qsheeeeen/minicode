@@ -87,8 +87,8 @@ type Registry struct {
 	commands map[string]*Command
 }
 
-// NewRegistry creates an empty command registry.
-func NewRegistry() *Registry {
+// newRegistry creates an empty command registry.
+func newRegistry() *Registry {
 	return &Registry{commands: make(map[string]*Command)}
 }
 
@@ -149,17 +149,19 @@ func (r *Registry) ParseAndExecute(input string, ctx Context) (handled bool, res
 	return false, nil, ""
 }
 
-// RegisterBuiltins adds all standard slash commands.
-func (r *Registry) RegisterBuiltins() {
-	registerExit(r)
-	registerClear(r)
-	registerCompress(r)
-	registerEffort(r)
-	registerNew(r)
-	registerRename(r)
-	registerResume(r)
-	registerPlan(r)
-	registerTest(r)
-	registerSkills(r)
-	registerModel(r)
+// Default registry singleton.
+var defaultRegistry = newRegistry()
+
+// Register adds a command to the default registry.
+func Register(cmd *Command) { defaultRegistry.Register(cmd) }
+
+// Get returns a command by name from the default registry.
+func Get(name string) (*Command, bool) { return defaultRegistry.Get(name) }
+
+// List returns all registered commands from the default registry.
+func List() []Command { return defaultRegistry.List() }
+
+// ParseAndExecute parses a command string and runs the handler from the default registry.
+func ParseAndExecute(input string, ctx Context) (bool, Result, string) {
+	return defaultRegistry.ParseAndExecute(input, ctx)
 }

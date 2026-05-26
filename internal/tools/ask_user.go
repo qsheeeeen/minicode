@@ -75,3 +75,5 @@ func (t *AskUserTool) Execute(ctx context.Context, args map[string]any, tc ToolC
 	}
 	return domain.ToolResult{Output: fmt.Sprintf(`User selected: "%s"`, answer)}, nil
 }
+
+func init() { Register(NewAskUserTool()) }

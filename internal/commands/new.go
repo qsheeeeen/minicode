@@ -5,8 +5,8 @@ import (
 	"time"
 )
 
-func registerNew(r *Registry) {
-	r.Register(&Command{Name: "new", Description: "Create a new session", Kind: Handler,
+func init() {
+	Register(&Command{Name: "new", Description: "Create a new session", Kind: Handler,
 		Handler: func(args []string, ctx Context) (Result, error) {
 			name := ""
 			if len(args) > 0 {

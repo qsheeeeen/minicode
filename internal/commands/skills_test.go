@@ -8,10 +8,9 @@ import (
 )
 
 func TestSkills(t *testing.T) {
-	r := NewRegistry()
-	r.RegisterBuiltins()
+	
 	ag := agent.NewAgent(domain.AgentConfig{APIKey: "test", Model: "m1"})
-	handled, result, _ := r.ParseAndExecute("/skills", Context{Agent: ag})
+	handled, result, _ := ParseAndExecute("/skills", Context{Agent: ag})
 	if !handled {
 		t.Error("/skills should be handled")
 	}

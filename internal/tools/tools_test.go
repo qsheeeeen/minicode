@@ -19,7 +19,7 @@ func (t *testTool) Execute(ctx context.Context, args map[string]any, tc ToolCont
 }
 
 func TestToolRegistry_RegisterAndGet(t *testing.T) {
-	r := NewToolRegistry()
+	r := newToolRegistry()
 	r.Register(&testTool{})
 	tool, ok := r.Get("TestTool")
 	if !ok {
@@ -31,7 +31,7 @@ func TestToolRegistry_RegisterAndGet(t *testing.T) {
 }
 
 func TestToolRegistry_GetMissing(t *testing.T) {
-	r := NewToolRegistry()
+	r := newToolRegistry()
 	_, ok := r.Get("nonexistent")
 	if ok {
 		t.Error("expected false for missing tool")
@@ -39,7 +39,7 @@ func TestToolRegistry_GetMissing(t *testing.T) {
 }
 
 func TestToolRegistry_All(t *testing.T) {
-	r := NewToolRegistry()
+	r := newToolRegistry()
 	r.Register(&testTool{})
 	r.Register(NewReadTool())
 	all := r.All()

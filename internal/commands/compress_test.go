@@ -3,9 +3,8 @@ package commands
 import "testing"
 
 func TestCompress(t *testing.T) {
-	r := NewRegistry()
-	r.RegisterBuiltins()
-	handled, result, _ := r.ParseAndExecute("/compress", Context{})
+	
+	handled, result, _ := ParseAndExecute("/compress", Context{})
 	if !handled {
 		t.Error("/compress should be handled")
 	}

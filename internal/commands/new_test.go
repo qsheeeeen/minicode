@@ -8,11 +8,10 @@ import (
 )
 
 func TestNew_WithName(t *testing.T) {
-	r := NewRegistry()
-	r.RegisterBuiltins()
+	
 	ag := agent.NewAgent(domain.AgentConfig{APIKey: "test", Model: "m1"})
 	oldSession := ag.SessionName()
-	handled, _, _ := r.ParseAndExecute("/new my-session", Context{Agent: ag})
+	handled, _, _ := ParseAndExecute("/new my-session", Context{Agent: ag})
 	if !handled {
 		t.Error("/new my-session should be handled")
 	}
@@ -22,11 +21,10 @@ func TestNew_WithName(t *testing.T) {
 }
 
 func TestNew_WithoutName(t *testing.T) {
-	r := NewRegistry()
-	r.RegisterBuiltins()
+	
 	ag := agent.NewAgent(domain.AgentConfig{APIKey: "test", Model: "m1"})
 	oldSession := ag.SessionName()
-	handled, _, _ := r.ParseAndExecute("/new", Context{Agent: ag})
+	handled, _, _ := ParseAndExecute("/new", Context{Agent: ag})
 	if !handled {
 		t.Error("/new without name should be handled")
 	}

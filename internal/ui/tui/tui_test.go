@@ -7,15 +7,13 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"minicode/internal/agent"
-	icmd "minicode/internal/commands"
 	"minicode/internal/domain"
-	"minicode/internal/tools"
 )
 
 func newTestModel() *TUIModel {
 	cfg := domain.AgentConfig{APIKey: "test", Model: "test-model", ContextLength: 100000}
 	ag := agent.NewAgent(cfg)
-	return NewTUIModel(ag, icmd.NewRegistry(), nil)
+	return NewTUIModel(ag, nil)
 }
 
 func TestInit(t *testing.T) {
@@ -104,8 +102,7 @@ func TestTokenUpdate(t *testing.T) {
 
 func TestFullEnterCycle(t *testing.T) {
 	ag := agent.NewAgent(domain.AgentConfig{APIKey: "test", Model: "m1", ContextLength: 100})
-	ag.ToolRegistry().Register(tools.NewBashTool())
-	m := NewTUIModel(ag, icmd.NewRegistry(), nil)
+	m := NewTUIModel(ag, nil)
 	m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m.Input.textarea.SetValue("echo hello")
 	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})

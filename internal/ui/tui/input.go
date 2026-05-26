@@ -22,7 +22,7 @@ type InputModel struct {
 
 // Update processes a key message. Returns whether the key was consumed
 // by a sub-component, and any tea.Cmd from the textarea.
-func (in *InputModel) Update(msg tea.KeyMsg, cmdReg *icmd.Registry) (consumed bool, cmd tea.Cmd) {
+func (in *InputModel) Update(msg tea.KeyMsg) (consumed bool, cmd tea.Cmd) {
 	// Route to active sub-components
 	if in.Perm.IsActive() {
 		return in.Perm.Update(msg), nil
@@ -55,22 +55,21 @@ func (in *InputModel) Update(msg tea.KeyMsg, cmdReg *icmd.Registry) (consumed bo
 		var c tea.Cmd
 		in.textarea, c = in.textarea.Update(msg)
 
-		if cmdReg != nil {
-			val := in.textarea.Value()
-			if len(val) > 0 && val[0] == '/' {
-				partial := strings.ToLower(val[1:])
-				all := cmdReg.List()
-				var filtered []icmd.Command
-				for _, cmd := range all {
-					if strings.HasPrefix(strings.ToLower(cmd.Name), partial) {
-						filtered = append(filtered, cmd)
-					}
+		val := in.textarea.Value()
+		if len(val) > 0 && val[0] == '/' {
+			partial := strings.ToLower(val[1:])
+			all := icmd.List()
+			var filtered []icmd.Command
+			for _, cmd := range all {
+				if strings.HasPrefix(strings.ToLower(cmd.Name), partial) {
+					filtered = append(filtered, cmd)
 				}
-				in.Suggest.Set(filtered)
-			} else {
-				in.Suggest.Clear()
 			}
+			in.Suggest.Set(filtered)
+		} else {
+			in.Suggest.Clear()
 		}
+		
 		return false, c
 	}
 

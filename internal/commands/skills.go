@@ -1,14 +1,15 @@
 package commands
 
-import "strings"
+import (
+	"strings"
 
-func registerSkills(r *Registry) {
-	r.Register(&Command{Name: "skills", Description: "List available skills", Kind: Handler,
+	"minicode/internal/skills"
+)
+
+func init() {
+	Register(&Command{Name: "skills", Description: "List available skills", Kind: Handler,
 		Handler: func(args []string, ctx Context) (Result, error) {
-			if ctx.Agent == nil || ctx.Agent.Skills() == nil {
-				return StatusResult{Message: "No skills loaded"}, nil
-			}
-			infos := ctx.Agent.Skills().List()
+			infos := skills.List()
 			if len(infos) == 0 {
 				return StatusResult{Message: "No skills loaded"}, nil
 			}

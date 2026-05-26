@@ -63,6 +63,8 @@ type AgentConfig struct {
 	UserPrompt                string
 	ProjectPromptFile         string
 	ExcludeTools              []string
+	SkillsDir                 string
+	PermissionMode            PermissionMode
 }
 
 // PermissionMode defines how tool execution is gated.

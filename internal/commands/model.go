@@ -4,8 +4,8 @@ import (
 	"fmt"
 )
 
-func registerModel(r *Registry) {
-	r.Register(&Command{Name: "model", Description: "Switch model/provider", Kind: Handler,
+func init() {
+	Register(&Command{Name: "model", Description: "Switch model/provider", Kind: Handler,
 		Handler: func(args []string, ctx Context) (Result, error) {
 			cfg := ctx.Config
 			if cfg == nil {

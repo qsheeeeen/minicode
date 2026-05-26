@@ -6,9 +6,8 @@ import (
 )
 
 func TestPlan(t *testing.T) {
-	r := NewRegistry()
-	r.RegisterBuiltins()
-	handled, _, expanded := r.ParseAndExecute("/plan", Context{})
+	
+	handled, _, expanded := ParseAndExecute("/plan", Context{})
 	if !handled || !strings.Contains(expanded, "executable plan") {
 		t.Error("/plan should return plan prompt")
 	}
