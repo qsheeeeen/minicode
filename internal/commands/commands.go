@@ -4,11 +4,13 @@
 package commands
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 
 	"minicode/internal/agent"
 	"minicode/internal/config"
+	"minicode/internal/skills"
 	"minicode/internal/storage"
 )
 
@@ -108,6 +110,19 @@ func (r *Registry) List() []Command {
 	var list []Command
 	for _, cmd := range r.commands {
 		list = append(list, *cmd)
+	}
+	for _, sk := range skills.List() {
+		if _, ok := r.commands[sk.Name]; !ok {
+			skName := sk.Name
+			list = append(list, Command{
+				Name:        skName,
+				Description: sk.Description,
+				Kind:        Prompt,
+				Prompt: func(args []string) string {
+					return fmt.Sprintf("Activate and execute the '%s' skill.", skName)
+				},
+			})
+		}
 	}
 	sort.Slice(list, func(i, j int) bool { return list[i].Name < list[j].Name })
 	return list
