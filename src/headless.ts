@@ -1,6 +1,6 @@
-import type { Agent } from './agent.js';
-import type { MessageParam, ContentBlock } from './llm/anthropic.js';
-import { sessionManager } from './utils/session.js';
+import type { Agent } from "./agent.js";
+import type { MessageParam, ContentBlock } from "./llm/anthropic.js";
+import { sessionManager } from "./utils/session.js";
 
 export async function runHeadless(
   agent: Agent,
@@ -10,7 +10,10 @@ export async function runHeadless(
 ): Promise<void> {
   // Load session if requested
   if (sessionName || resumeRecent) {
-    const name = sessionName ?? (await sessionManager.getMostRecent()) ?? `session-${Date.now()}`;
+    const name =
+      sessionName ??
+      (await sessionManager.getMostRecent()) ??
+      `session-${Date.now()}`;
     const data = await sessionManager.get(name);
     if (data) {
       agent.setMessages(data.messages as any);
@@ -18,8 +21,11 @@ export async function runHeadless(
       if (totalTokens > 0) {
         agent.setTokenCount(totalTokens);
       }
-      const { createLogger } = await import('./utils/logger.js');
-      const newLogger = await createLogger(sessionManager.getProjectHash(), name);
+      const { createLogger } = await import("./utils/logger.js");
+      const newLogger = await createLogger(
+        sessionManager.getProjectHash(),
+        name,
+      );
       agent.setSession(name);
       agent.setLogger(newLogger);
     }
@@ -33,17 +39,19 @@ export async function runHeadless(
   });
   agent.setPrompter({
     prompt: async (req) => {
-      console.log(`[Denied: ${req.message}] -- use --permission yolo or auto in headless mode`);
-      return '';
+      console.log(
+        `[Denied: ${req.message}] -- use --permission yolo or auto in headless mode`,
+      );
+      return "";
     },
   });
 
   let printedTurns = 0;
-  const printedBlocks = new Map<number, number>();        // turnIndex → blocks printed so far
-  const streamedChars = new Map<string, number>();         // "turnIdx:blockIdx" → chars printed
-  const finalizedBlocks = new Set<string>();               // "turnIdx:blockIdx" → finalized (printed newline)
-  const printedToolUses = new Set<string>();               // tool_use block IDs already printed
-  const printedResults = new Set<string>();                // tool_use IDs whose results have been printed
+  const printedBlocks = new Map<number, number>(); // turnIndex → blocks printed so far
+  const streamedChars = new Map<string, number>(); // "turnIdx:blockIdx" → chars printed
+  const finalizedBlocks = new Set<string>(); // "turnIdx:blockIdx" → finalized (printed newline)
+  const printedToolUses = new Set<string>(); // tool_use block IDs already printed
+  const printedResults = new Set<string>(); // tool_use IDs whose results have been printed
 
   function render(isFinal = false) {
     const turns = agent.getStore().getTurns();
@@ -53,15 +61,15 @@ export async function runHeadless(
       const turn = turns[ti];
       const isLastTurn = ti === turns.length - 1;
 
-      if (turn.role === 'user') {
-        if (typeof turn.content === 'string') {
+      if (turn.role === "user") {
+        if (typeof turn.content === "string") {
           process.stdout.write(`[user]\n${turn.content.trim()}\n\n`);
         }
         printedTurns = ti + 1;
         continue;
       }
 
-      if (turn.role === 'assistant' && Array.isArray(turn.content)) {
+      if (turn.role === "assistant" && Array.isArray(turn.content)) {
         const blocks = turn.content as ContentBlock[];
         const blocksPrinted = printedBlocks.get(ti) || 0;
 
@@ -71,37 +79,45 @@ export async function runHeadless(
           const isLastBlock = isLastTurn && bi === blocks.length - 1;
 
           // --- thinking: stream incrementally ---
-          if (block.type === 'thinking') {
+          if (block.type === "thinking") {
             const prevLen = streamedChars.get(blockKey) || 0;
             if (block.thinking.length > prevLen) {
               if (prevLen === 0) process.stdout.write(`[thinking]\n`);
-              const content = prevLen === 0 ? block.thinking.trimStart() : block.thinking.slice(prevLen);
+              const content =
+                prevLen === 0
+                  ? block.thinking.trimStart()
+                  : block.thinking.slice(prevLen);
               process.stdout.write(content);
               streamedChars.set(blockKey, block.thinking.length);
             }
             if ((!isLastBlock || isFinal) && !finalizedBlocks.has(blockKey)) {
-              process.stdout.write(block.thinking.endsWith('\n') ? '\n' : '\n\n');
+              process.stdout.write(
+                block.thinking.endsWith("\n") ? "\n" : "\n\n",
+              );
               finalizedBlocks.add(blockKey);
             }
           }
 
           // --- text: stream incrementally ---
-          if (block.type === 'text') {
+          if (block.type === "text") {
             const prevLen = streamedChars.get(blockKey) || 0;
             if (block.text.length > prevLen) {
               if (prevLen === 0) process.stdout.write(`[assistant]\n`);
-              const content = prevLen === 0 ? block.text.trimStart() : block.text.slice(prevLen);
+              const content =
+                prevLen === 0
+                  ? block.text.trimStart()
+                  : block.text.slice(prevLen);
               process.stdout.write(content);
               streamedChars.set(blockKey, block.text.length);
             }
             if ((!isLastBlock || isFinal) && !finalizedBlocks.has(blockKey)) {
-              process.stdout.write(block.text.endsWith('\n') ? '\n' : '\n\n');
+              process.stdout.write(block.text.endsWith("\n") ? "\n" : "\n\n");
               finalizedBlocks.add(blockKey);
             }
           }
 
           // --- tool_use: print call line + immediate result ---
-          if (block.type === 'tool_use' && !printedToolUses.has(block.id)) {
+          if (block.type === "tool_use" && !printedToolUses.has(block.id)) {
             printedToolUses.add(block.id);
             const callText = `${block.name}(${JSON.stringify(block.input)})`;
             process.stdout.write(`[tool] ${callText}\n`);
@@ -109,15 +125,21 @@ export async function runHeadless(
             // Scan subsequent turns for matching tool_result
             for (let rti = ti + 1; rti < turns.length; rti++) {
               const rt = turns[rti];
-              if (rt.role === 'user' && Array.isArray(rt.content)) {
+              if (rt.role === "user" && Array.isArray(rt.content)) {
                 for (const rb of rt.content as any[]) {
-                  if (rb.type === 'tool_result' && rb.tool_use_id === block.id) {
-                    const raw = typeof rb.content === 'string' ? rb.content : JSON.stringify(rb.content);
-                    const lines = raw.split('\n');
+                  if (
+                    rb.type === "tool_result" &&
+                    rb.tool_use_id === block.id
+                  ) {
+                    const raw =
+                      typeof rb.content === "string"
+                        ? rb.content
+                        : JSON.stringify(rb.content);
+                    const lines = raw.split("\n");
                     for (const line of lines) {
                       if (line) process.stdout.write(`       ${line}\n`);
                     }
-                    if (!isLastBlock || isFinal) process.stdout.write('\n');
+                    if (!isLastBlock || isFinal) process.stdout.write("\n");
                     printedResults.add(block.id);
                   }
                 }
@@ -142,16 +164,23 @@ export async function runHeadless(
 
     // Print tool results for any printed tool_use blocks
     for (const turn of turns) {
-      if (turn.role === 'user' && Array.isArray(turn.content)) {
+      if (turn.role === "user" && Array.isArray(turn.content)) {
         for (const block of turn.content as any[]) {
-          if (block.type === 'tool_result' && printedToolUses.has(block.tool_use_id) && !printedResults.has(block.tool_use_id)) {
+          if (
+            block.type === "tool_result" &&
+            printedToolUses.has(block.tool_use_id) &&
+            !printedResults.has(block.tool_use_id)
+          ) {
             printedResults.add(block.tool_use_id);
-            const raw = typeof block.content === 'string' ? block.content : JSON.stringify(block.content);
-            const lines = raw.split('\n');
+            const raw =
+              typeof block.content === "string"
+                ? block.content
+                : JSON.stringify(block.content);
+            const lines = raw.split("\n");
             for (const line of lines) {
               if (line) console.log(`       ${line}`);
             }
-            process.stdout.write('\n');
+            process.stdout.write("\n");
           }
         }
       }
@@ -159,7 +188,7 @@ export async function runHeadless(
 
     // Print any new status messages
     for (const s of statuses) {
-      if (s.role === 'error') console.error(`[error] ${s.content}`);
+      if (s.role === "error") console.error(`[error] ${s.content}`);
     }
   }
 
@@ -169,8 +198,8 @@ export async function runHeadless(
     await agent.run(initialPrompt);
     render(true);
   } catch (e) {
-    if (e instanceof Error && e.message === 'Aborted') {
-      console.log('(Aborted)');
+    if (e instanceof Error && e.message === "Aborted") {
+      console.log("(Aborted)");
     } else if (e instanceof Error) {
       console.error(`(Error: ${e.message})`);
     } else {

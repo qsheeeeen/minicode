@@ -17,8 +17,10 @@ type BashTool struct{}
 // NewBashTool creates a BashTool.
 func NewBashTool() *BashTool { return &BashTool{} }
 
-func (t *BashTool) Name() string             { return "Bash" }
-func (t *BashTool) Description() string      { return "Execute a bash command in the current working directory. Returns stdout and stderr. Optionally provide a timeout in seconds." }
+func (t *BashTool) Name() string { return "Bash" }
+func (t *BashTool) Description() string {
+	return "Execute a bash command in the current working directory. Returns stdout and stderr. Optionally provide a timeout in seconds."
+}
 func (t *BashTool) RequiresPermission() bool    { return true }
 func (t *BashTool) Requires() []ToolRequirement { return nil }
 

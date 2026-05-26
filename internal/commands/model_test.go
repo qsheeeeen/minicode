@@ -7,7 +7,7 @@ import (
 )
 
 func TestModel(t *testing.T) {
-	
+
 	cfg, _ := config.Load()
 	handled, result, _ := ParseAndExecute("/model", Context{Config: cfg})
 	if !handled {

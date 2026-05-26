@@ -3,7 +3,7 @@ package commands
 import "testing"
 
 func TestExit(t *testing.T) {
-	
+
 	handled, result, _ := ParseAndExecute("/exit", Context{})
 	if !handled {
 		t.Error("/exit should be handled")
@@ -14,7 +14,7 @@ func TestExit(t *testing.T) {
 }
 
 func TestQuit(t *testing.T) {
-	
+
 	handled, result, _ := ParseAndExecute("/quit", Context{})
 	if !handled {
 		t.Error("/quit should be handled")

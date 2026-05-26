@@ -28,7 +28,7 @@ func TestRegistry_List(t *testing.T) {
 	r.Register(&Command{Name: "b", Description: "b", Kind: Handler})
 	r.Register(&Command{Name: "a", Description: "a", Kind: Handler})
 	list := r.List()
-	
+
 	// verify it's sorted
 	for i := 0; i < len(list)-1; i++ {
 		if list[i].Name > list[i+1].Name {
@@ -39,8 +39,12 @@ func TestRegistry_List(t *testing.T) {
 	// verify a and b exist
 	foundA, foundB := false, false
 	for _, c := range list {
-		if c.Name == "a" { foundA = true }
-		if c.Name == "b" { foundB = true }
+		if c.Name == "a" {
+			foundA = true
+		}
+		if c.Name == "b" {
+			foundB = true
+		}
 	}
 	if !foundA || !foundB {
 		t.Error("expected a and b in list")

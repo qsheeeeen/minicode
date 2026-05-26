@@ -1,13 +1,37 @@
-import { AnthropicClient, Anthropic, type MessageParam, type Tool, type ContentBlock, type EffortLevel } from './llm/anthropic.js';
-import { registerTools, ToolRegistry, ToolDef, ToolExecutionContext, ToolDeniedError } from './tools/index.js';
-import { ConsoleEvents, ConsolePrompter, type AgentEvents, type UserPrompter } from './utils/display.js';
-import { TokenManager, CompressionService, AgentRegistry, PermissionService, type PermissionMode } from './services/index.js';
-import { MessageStore } from './messages.js';
-import { skillRegistry } from './skills/index.js';
-import { callContent } from './tui/tool-display.js';
-import { sessionManager } from './utils/session.js';
-import { execSync } from 'child_process';
-import type pino from 'pino';
+import {
+  AnthropicClient,
+  Anthropic,
+  type MessageParam,
+  type Tool,
+  type ContentBlock,
+  type EffortLevel,
+} from "./llm/anthropic.js";
+import {
+  registerTools,
+  ToolRegistry,
+  ToolDef,
+  ToolExecutionContext,
+  ToolDeniedError,
+} from "./tools/index.js";
+import {
+  ConsoleEvents,
+  ConsolePrompter,
+  type AgentEvents,
+  type UserPrompter,
+} from "./utils/display.js";
+import {
+  TokenManager,
+  CompressionService,
+  AgentRegistry,
+  PermissionService,
+  type PermissionMode,
+} from "./services/index.js";
+import { MessageStore } from "./messages.js";
+import { skillRegistry } from "./skills/index.js";
+import { callContent } from "./tui/tool-display.js";
+import { sessionManager } from "./utils/session.js";
+import { execSync } from "child_process";
+import type pino from "pino";
 
 export const SYSTEM_PROMPT = `你是一个交互式 CLI 编程智能体，帮助用户完成软件工程任务。请使用以下指令和可用工具来协助用户。
 
@@ -69,14 +93,22 @@ export class Agent {
   private baseURL?: string;
   private permissionService: PermissionService;
   private abortController: AbortController | null = null;
-  private currentStream: import('@anthropic-ai/sdk/lib/MessageStream.js').MessageStream<null> | null = null;
+  private currentStream:
+    | import("@anthropic-ai/sdk/lib/MessageStream.js").MessageStream<null>
+    | null = null;
   private logger?: pino.Logger;
   private saveSessionLock: Promise<void> = Promise.resolve();
   private isCompressing: boolean = false;
   private isRunning: boolean = false;
-  private environmentContext = '';
-  private systemPrompt = '';
-  private resolveCommand?: (input: string) => Promise<{ handled: boolean; promptText?: string; displayContent?: string }>;
+  private environmentContext = "";
+  private systemPrompt = "";
+  private resolveCommand?: (
+    input: string,
+  ) => Promise<{
+    handled: boolean;
+    promptText?: string;
+    displayContent?: string;
+  }>;
 
   public setSession(sessionName: string): void {
     this.currentSession = sessionName;
@@ -86,7 +118,15 @@ export class Agent {
     this.logger = logger;
   }
 
-  public setCommandResolver(resolver: (input: string) => Promise<{ handled: boolean; promptText?: string; displayContent?: string }>): void {
+  public setCommandResolver(
+    resolver: (
+      input: string,
+    ) => Promise<{
+      handled: boolean;
+      promptText?: string;
+      displayContent?: string;
+    }>,
+  ): void {
     this.resolveCommand = resolver;
   }
 
@@ -98,7 +138,13 @@ export class Agent {
     this.permissionService.setMode(mode);
   }
 
-  public setModel(model: string, apiKey?: string, baseURL?: string, provider?: string, contextLength?: number): void {
+  public setModel(
+    model: string,
+    apiKey?: string,
+    baseURL?: string,
+    provider?: string,
+    contextLength?: number,
+  ): void {
     this.model = model;
     if (provider !== undefined) this.modelProvider = provider;
     if (apiKey !== undefined) this.apiKey = apiKey;
@@ -107,9 +153,15 @@ export class Agent {
     this.client = new AnthropicClient(this.apiKey, this.baseURL);
   }
 
-  getModelName(): string | undefined { return this.model; }
-  getModelProvider(): string | undefined { return this.modelProvider; }
-  getContextLength(): number { return this.contextLength; }
+  getModelName(): string | undefined {
+    return this.model;
+  }
+  getModelProvider(): string | undefined {
+    return this.modelProvider;
+  }
+  getContextLength(): number {
+    return this.contextLength;
+  }
 
   constructor(config: AgentConfig = {}) {
     this.apiKey = config.apiKey;
@@ -125,19 +177,23 @@ export class Agent {
     this.compressionService = new CompressionService();
     this.toolRegistry = new ToolRegistry();
     this.agentRegistry = config.agentRegistry;
-    this.currentAgentId = config.currentAgentId || '1';
+    this.currentAgentId = config.currentAgentId || "1";
     this.permissionService = new PermissionService({
-      initialMode: 'manual',
+      initialMode: "manual",
       client: this.apiKey ? this.client : undefined,
       model: this.model,
     });
 
-    registerTools(this.toolRegistry, { agentRegistry: this.agentRegistry, skillRegistry }, config.excludeTools);
+    registerTools(
+      this.toolRegistry,
+      { agentRegistry: this.agentRegistry, skillRegistry },
+      config.excludeTools,
+    );
 
     this.events = new ConsoleEvents();
     this.prompter = new ConsolePrompter();
-    this.userPrompt = config.userPrompt || '';
-    this.projectPromptFile = config.projectPromptFile || '';
+    this.userPrompt = config.userPrompt || "";
+    this.projectPromptFile = config.projectPromptFile || "";
 
     this.refreshEnvironment();
     this.refreshSystemPrompt();
@@ -154,17 +210,19 @@ export class Agent {
 
   /** Save current session state to disk */
   private saveSession(): Promise<void> {
-    this.saveSessionLock = this.saveSessionLock.then(async () => {
-      await sessionManager.save(this.currentSession, {
-        model: this.model || 'unknown',
-        messages: this.store.toLLMMessages() as any,
-        totalTokens: this.tokenManager.getTotal(),
-        createdAt: '',
-        updatedAt: '',
+    this.saveSessionLock = this.saveSessionLock
+      .then(async () => {
+        await sessionManager.save(this.currentSession, {
+          model: this.model || "unknown",
+          messages: this.store.toLLMMessages() as any,
+          totalTokens: this.tokenManager.getTotal(),
+          createdAt: "",
+          updatedAt: "",
+        });
+      })
+      .catch((e) => {
+        this.logger?.error({ error: String(e) }, "Failed to save session");
       });
-    }).catch(e => {
-      this.logger?.error({ error: String(e) }, 'Failed to save session');
-    });
 
     return this.saveSessionLock;
   }
@@ -176,33 +234,49 @@ export class Agent {
 
   private throwIfAborted(): void {
     if (this.abortController?.signal.aborted) {
-      throw new Error('Aborted');
+      throw new Error("Aborted");
     }
   }
 
-  private raceWithAbort<T>(promise: Promise<T>, timeoutMs = 300_000): Promise<T> {
+  private raceWithAbort<T>(
+    promise: Promise<T>,
+    timeoutMs = 300_000,
+  ): Promise<T> {
     const ac = this.abortController;
-    if (ac?.signal.aborted) return Promise.reject(new Error('Aborted'));
+    if (ac?.signal.aborted) return Promise.reject(new Error("Aborted"));
 
     return new Promise<T>((resolve, reject) => {
       let settled = false;
-      const done = (fn: () => void) => { if (!settled) { settled = true; fn(); } };
+      const done = (fn: () => void) => {
+        if (!settled) {
+          settled = true;
+          fn();
+        }
+      };
 
       const onAbort = () => {
-        ac?.signal.removeEventListener('abort', onAbort);
+        ac?.signal.removeEventListener("abort", onAbort);
         clearTimeout(timer);
-        done(() => reject(new Error('Aborted')));
+        done(() => reject(new Error("Aborted")));
       };
-      ac?.signal.addEventListener('abort', onAbort);
+      ac?.signal.addEventListener("abort", onAbort);
 
       const timer = setTimeout(() => {
-        ac?.signal.removeEventListener('abort', onAbort);
-        done(() => reject(new Error('LLM request timed out')));
+        ac?.signal.removeEventListener("abort", onAbort);
+        done(() => reject(new Error("LLM request timed out")));
       }, timeoutMs);
 
       promise.then(
-        (val) => { ac?.signal.removeEventListener('abort', onAbort); clearTimeout(timer); done(() => resolve(val)); },
-        (err) => { ac?.signal.removeEventListener('abort', onAbort); clearTimeout(timer); done(() => reject(err)); },
+        (val) => {
+          ac?.signal.removeEventListener("abort", onAbort);
+          clearTimeout(timer);
+          done(() => resolve(val));
+        },
+        (err) => {
+          ac?.signal.removeEventListener("abort", onAbort);
+          clearTimeout(timer);
+          done(() => reject(err));
+        },
       );
     });
   }
@@ -213,22 +287,42 @@ export class Agent {
     const recentCount = 10;
     const turns = this.store.getTurns();
     if (turns.length <= recentCount + 2) {
-      this.store.addStatus({ role: 'status', content: '(Not enough messages to compress)', timestamp: new Date() });
+      this.store.addStatus({
+        role: "status",
+        content: "(Not enough messages to compress)",
+        timestamp: new Date(),
+      });
       return;
     }
 
     this.isCompressing = true;
     const totalTokens = this.tokenManager.getTotal();
-    this.store.addStatus({ role: 'status', content: `(Compressing ${turns.length - recentCount} messages, ${totalTokens.toLocaleString()} tokens...)`, timestamp: new Date() });
+    this.store.addStatus({
+      role: "status",
+      content: `(Compressing ${turns.length - recentCount} messages, ${totalTokens.toLocaleString()} tokens...)`,
+      timestamp: new Date(),
+    });
 
     try {
-      const compressed = await this.compressionService.compress(this.store.toLLMMessages(), this.client, this.model);
+      const compressed = await this.compressionService.compress(
+        this.store.toLLMMessages(),
+        this.client,
+        this.model,
+      );
       this.store.setTurns(compressed);
       this.tokenManager.reset();
       this.events.tokenUpdate(0);
-      this.store.addStatus({ role: 'status', content: `(Compressed to ${compressed.length} turns)`, timestamp: new Date() });
+      this.store.addStatus({
+        role: "status",
+        content: `(Compressed to ${compressed.length} turns)`,
+        timestamp: new Date(),
+      });
     } catch (e) {
-      this.store.addStatus({ role: 'error', content: `(Compression failed: ${(e as Error).message})`, timestamp: new Date() });
+      this.store.addStatus({
+        role: "error",
+        content: `(Compression failed: ${(e as Error).message})`,
+        timestamp: new Date(),
+      });
     } finally {
       this.isCompressing = false;
     }
@@ -237,7 +331,10 @@ export class Agent {
   private refreshEnvironment(): void {
     let ctx = `Working directory: ${process.cwd()}\n`;
     try {
-      const status = execSync('git status', { encoding: 'utf-8', timeout: 5000 });
+      const status = execSync("git status", {
+        encoding: "utf-8",
+        timeout: 5000,
+      });
       ctx += `\n${status.trim()}\n`;
       ctx += `\nThis is the git status at the start of the conversation. Note that this status is a snapshot in time, and will not update during the conversation.`;
     } catch {
@@ -265,7 +362,7 @@ export class Agent {
     const availableSkills = skillRegistry.getAvailableSkills();
     if (availableSkills.length > 0) {
       prompt += `\n\n<available_skills>\n`;
-      availableSkills.forEach(skill => {
+      availableSkills.forEach((skill) => {
         prompt += `  <skill>\n    <name>${skill.name}</name>\n    <description>${skill.description}</description>\n  </skill>\n`;
       });
       prompt += `</available_skills>\n`;
@@ -276,59 +373,80 @@ export class Agent {
   }
 
   /** Handle streaming response: build assistant turn incrementally */
-  private async handleStreamingResponse(toolDefs: Tool[]): Promise<StreamingResult> {
-    const stream = this.client.chatStream(this.store.toLLMMessages(), toolDefs, {
-      system: this.systemPrompt,
-      model: this.model,
-      signal: this.abortController?.signal,
-      effort: this.effort
-    });
+  private async handleStreamingResponse(
+    toolDefs: Tool[],
+  ): Promise<StreamingResult> {
+    const stream = this.client.chatStream(
+      this.store.toLLMMessages(),
+      toolDefs,
+      {
+        system: this.systemPrompt,
+        model: this.model,
+        signal: this.abortController?.signal,
+        effort: this.effort,
+      },
+    );
     this.currentStream = stream;
 
     let blockStreaming = false;
-    const toolCalls: Array<{ block: Anthropic.Messages.ToolUseBlock; tool: ToolDef }> = [];
+    const toolCalls: Array<{
+      block: Anthropic.Messages.ToolUseBlock;
+      tool: ToolDef;
+    }> = [];
     let hasToolCalls = false;
 
-    stream.on('thinking', (delta: string) => {
+    stream.on("thinking", (delta: string) => {
       if (!blockStreaming) {
         blockStreaming = true;
         this.store.setStreaming(true);
-        this.store.appendToLastAssistantTurn({ type: 'thinking', thinking: delta.trimStart() } as ContentBlock);
+        this.store.appendToLastAssistantTurn({
+          type: "thinking",
+          thinking: delta.trimStart(),
+        } as ContentBlock);
       } else {
         const last = this.store.getLastBlock();
-        if (last?.type === 'thinking') {
+        if (last?.type === "thinking") {
           const currentText = (last as any).thinking;
-          const newText = currentText === '' ? delta.trimStart() : delta;
+          const newText = currentText === "" ? delta.trimStart() : delta;
           this.store.updateLastBlock({ thinking: currentText + newText });
         } else {
-          this.store.appendToLastAssistantTurn({ type: 'thinking', thinking: delta.trimStart() } as ContentBlock);
+          this.store.appendToLastAssistantTurn({
+            type: "thinking",
+            thinking: delta.trimStart(),
+          } as ContentBlock);
         }
       }
     });
 
-    stream.on('text', (delta: string) => {
+    stream.on("text", (delta: string) => {
       if (!blockStreaming) {
         blockStreaming = true;
         this.store.setStreaming(true);
-        this.store.appendToLastAssistantTurn({ type: 'text', text: delta.trimStart() } as ContentBlock);
+        this.store.appendToLastAssistantTurn({
+          type: "text",
+          text: delta.trimStart(),
+        } as ContentBlock);
       } else {
         const last = this.store.getLastBlock();
-        if (last?.type === 'text') {
+        if (last?.type === "text") {
           const currentText = (last as any).text;
-          const newText = currentText === '' ? delta.trimStart() : delta;
+          const newText = currentText === "" ? delta.trimStart() : delta;
           this.store.updateLastBlock({ text: currentText + newText });
         } else {
-          this.store.appendToLastAssistantTurn({ type: 'text', text: delta.trimStart() } as ContentBlock);
+          this.store.appendToLastAssistantTurn({
+            type: "text",
+            text: delta.trimStart(),
+          } as ContentBlock);
         }
       }
     });
 
-    stream.on('contentBlock', (block: ContentBlock) => {
+    stream.on("contentBlock", (block: ContentBlock) => {
       blockStreaming = false;
-      if (block.type === 'thinking' || block.type === 'text') {
+      if (block.type === "thinking" || block.type === "text") {
         this.saveSession().catch(() => {});
       }
-      if (block.type === 'tool_use') {
+      if (block.type === "tool_use") {
         hasToolCalls = true;
         const toolBlock = block as Anthropic.Messages.ToolUseBlock;
         const tool = this.toolRegistry.get(toolBlock.name);
@@ -336,7 +454,7 @@ export class Agent {
           toolCalls.push({ block: toolBlock, tool });
         }
         this.store.appendToLastAssistantTurn({
-          type: 'tool_use',
+          type: "tool_use",
           id: toolBlock.id,
           name: toolBlock.name,
           input: toolBlock.input,
@@ -349,7 +467,7 @@ export class Agent {
     try {
       response = await this.raceWithAbort(stream.finalMessage());
     } catch (e) {
-      if (this.abortController?.signal.aborted) throw new Error('Aborted');
+      if (this.abortController?.signal.aborted) throw new Error("Aborted");
       throw e;
     } finally {
       this.currentStream = null;
@@ -360,7 +478,9 @@ export class Agent {
   }
 
   /** Track token usage and trigger auto-compression */
-  private async processTokenUsage(response: Anthropic.Messages.Message): Promise<void> {
+  private async processTokenUsage(
+    response: Anthropic.Messages.Message,
+  ): Promise<void> {
     if (!response.usage) return;
 
     this.tokenManager.addTokens(
@@ -377,25 +497,44 @@ export class Agent {
     const lastShown = this.tokenManager.getLastShownThreshold();
     for (const t of thresholds) {
       if (percentage >= t && lastShown < t) {
-        this.store.addStatus({ role: 'status', content: `[${percentage}% context]`, timestamp: new Date() });
+        this.store.addStatus({
+          role: "status",
+          content: `[${percentage}% context]`,
+          timestamp: new Date(),
+        });
         this.tokenManager.updateThreshold(t);
         break;
       }
     }
 
-    if (this.tokenManager.shouldCompress(this.contextLength, this.compressionThresholdRatio)) {
+    if (
+      this.tokenManager.shouldCompress(
+        this.contextLength,
+        this.compressionThresholdRatio,
+      )
+    ) {
       await this.compress();
     }
   }
 
   /** Run a single tool with permission check */
-  private async runTool(tool: ToolDef, args: Record<string, unknown>, context: ToolExecutionContext): Promise<import('./tools/index.js').ToolResult> {
+  private async runTool(
+    tool: ToolDef,
+    args: Record<string, unknown>,
+    context: ToolExecutionContext,
+  ): Promise<import("./tools/index.js").ToolResult> {
     if (tool.requiresPermission) {
       const displayText = callContent(tool.name, args);
-      const { allowed, reason } = await this.permissionService.check(tool.name, args, displayText);
+      const { allowed, reason } = await this.permissionService.check(
+        tool.name,
+        args,
+        displayText,
+      );
       if (!allowed) {
-        if (this.permissionService.getMode() === 'auto') {
-          return { output: `Tool execution denied by auto-gate: ${reason || 'unknown reason'}` };
+        if (this.permissionService.getMode() === "auto") {
+          return {
+            output: `Tool execution denied by auto-gate: ${reason || "unknown reason"}`,
+          };
         }
         throw new ToolDeniedError(tool.name, displayText, reason);
       }
@@ -404,7 +543,9 @@ export class Agent {
   }
 
   /** Execute tool calls sequentially and push tool_result turns */
-  private async executeToolCalls(toolCalls: Array<{ block: Anthropic.Messages.ToolUseBlock; tool: ToolDef }>): Promise<void> {
+  private async executeToolCalls(
+    toolCalls: Array<{ block: Anthropic.Messages.ToolUseBlock; tool: ToolDef }>,
+  ): Promise<void> {
     if (toolCalls.length === 0) return;
 
     const context: ToolExecutionContext = {
@@ -426,28 +567,56 @@ export class Agent {
       prompter: this.prompter,
     };
 
-    this.logger?.info({ session: this.currentSession, toolCount: toolCalls.length, tools: toolCalls.map(t => t.block.name) }, 'Executing tools sequentially');
+    this.logger?.info(
+      {
+        session: this.currentSession,
+        toolCount: toolCalls.length,
+        tools: toolCalls.map((t) => t.block.name),
+      },
+      "Executing tools sequentially",
+    );
 
     const results: Array<{ toolUseId: string; content: string }> = [];
 
     for (let i = 0; i < toolCalls.length; i++) {
       const { block, tool } = toolCalls[i];
       try {
-        const result = await this.runTool(tool, block.input as Record<string, unknown>, context);
+        const result = await this.runTool(
+          tool,
+          block.input as Record<string, unknown>,
+          context,
+        );
         results.push({ toolUseId: block.id, content: result.output });
-        this.logger?.info({ session: this.currentSession, toolName: tool.name, toolInput: block.input }, 'Tool result');
+        this.logger?.info(
+          {
+            session: this.currentSession,
+            toolName: tool.name,
+            toolInput: block.input,
+          },
+          "Tool result",
+        );
       } catch (reason) {
         if (reason instanceof ToolDeniedError) {
           results.push({ toolUseId: block.id, content: reason.reason });
           for (let j = i + 1; j < toolCalls.length; j++) {
-            results.push({ toolUseId: toolCalls[j].block.id, content: reason.reason });
+            results.push({
+              toolUseId: toolCalls[j].block.id,
+              content: reason.reason,
+            });
           }
           this.store.addToolResults(results);
           throw reason;
         }
         const error = `Error: ${reason instanceof Error ? reason.message : String(reason)}`;
         results.push({ toolUseId: block.id, content: error });
-        this.logger?.error({ session: this.currentSession, toolName: tool.name, error: String(reason) }, 'Tool error');
+        this.logger?.error(
+          {
+            session: this.currentSession,
+            toolName: tool.name,
+            error: String(reason),
+          },
+          "Tool error",
+        );
       }
     }
 
@@ -455,7 +624,10 @@ export class Agent {
     this.store.addToolResults(results);
   }
 
-  async run(userMessage: string, opts?: { displayContent?: string }): Promise<boolean> {
+  async run(
+    userMessage: string,
+    opts?: { displayContent?: string },
+  ): Promise<boolean> {
     if (this.isRunning) return false;
 
     // Resolve slash commands (e.g. /plan → expanded prompt, /clear → clear session)
@@ -477,29 +649,36 @@ export class Agent {
     this.isRunning = true;
     this.store.addUserMessage(llmText, displayOverride);
     this.abortController = new AbortController();
-    this.logger?.info({ session: this.currentSession, userMessage: llmText }, 'Session started');
+    this.logger?.info(
+      { session: this.currentSession, userMessage: llmText },
+      "Session started",
+    );
 
     try {
       while (true) {
         this.throwIfAborted();
 
-        const toolDefs = this.toolRegistry.getAll().map(t => ({
+        const toolDefs = this.toolRegistry.getAll().map((t) => ({
           name: t.name,
           description: t.description,
-          input_schema: t.input_schema
+          input_schema: t.input_schema,
         })) as Tool[];
 
-        const { response, toolCalls, hasToolCalls } = await this.handleStreamingResponse(toolDefs);
+        const { response, toolCalls, hasToolCalls } =
+          await this.handleStreamingResponse(toolDefs);
 
         await this.processTokenUsage(response);
-        this.logger?.info({
-          session: this.currentSession,
-          inputTokens: response.usage?.input_tokens,
-          outputTokens: response.usage?.output_tokens,
-          cacheCreation: response.usage?.cache_creation_input_tokens ?? 0,
-          cacheRead: response.usage?.cache_read_input_tokens ?? 0,
-          stopReason: response.stop_reason,
-        }, 'LLM response');
+        this.logger?.info(
+          {
+            session: this.currentSession,
+            inputTokens: response.usage?.input_tokens,
+            outputTokens: response.usage?.output_tokens,
+            cacheCreation: response.usage?.cache_creation_input_tokens ?? 0,
+            cacheRead: response.usage?.cache_read_input_tokens ?? 0,
+            stopReason: response.stop_reason,
+          },
+          "LLM response",
+        );
 
         this.throwIfAborted();
 
@@ -508,7 +687,7 @@ export class Agent {
         } catch (e) {
           if (e instanceof ToolDeniedError) {
             this.store.addStatus({
-              role: 'error',
+              role: "error",
               content: `Tool "${e.toolName}" was denied by user`,
               timestamp: new Date(),
             });
@@ -529,14 +708,24 @@ export class Agent {
         // Remove the last user message that triggered this aborted run
         const turns = this.store.getTurns();
         const last = turns[turns.length - 1];
-        if (last?.role === 'user' && typeof last.content === 'string' && last.content === llmText) {
+        if (
+          last?.role === "user" &&
+          typeof last.content === "string" &&
+          last.content === llmText
+        ) {
           turns.pop();
           this.store.setTurns(turns);
         }
       }
       this.abortController = null;
       this.currentStream = null;
-      this.logger?.info({ session: this.currentSession, totalTokens: this.tokenManager.getTotal() }, 'Session ended');
+      this.logger?.info(
+        {
+          session: this.currentSession,
+          totalTokens: this.tokenManager.getTotal(),
+        },
+        "Session ended",
+      );
       await this.saveSession();
     }
     return true;

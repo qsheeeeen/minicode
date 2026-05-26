@@ -19,9 +19,11 @@ func NewSubAgentTool(parentConfig domain.AgentConfig) *SubAgentTool {
 	return &SubAgentTool{parentConfig: parentConfig}
 }
 
-func (t *SubAgentTool) Name() string         { return "SubAgent" }
-func (t *SubAgentTool) Description() string  { return "Delegate a sub-task to an independent agent. Creates a new agent session. The sub-agent has access to all tools (except SubAgent) and returns a concise summary." }
-func (t *SubAgentTool) RequiresPermission() bool { return false }
+func (t *SubAgentTool) Name() string { return "SubAgent" }
+func (t *SubAgentTool) Description() string {
+	return "Delegate a sub-task to an independent agent. Creates a new agent session. The sub-agent has access to all tools (except SubAgent) and returns a concise summary."
+}
+func (t *SubAgentTool) RequiresPermission() bool    { return false }
 func (t *SubAgentTool) Requires() []ToolRequirement { return nil }
 
 func (t *SubAgentTool) InputSchema() map[string]any {

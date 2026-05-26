@@ -1,90 +1,97 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { CompressionService } from './compression-service.js';
-import type { AnthropicClient, MessageParam } from '../llm/anthropic.js';
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { CompressionService } from "./compression-service.js";
+import type { AnthropicClient, MessageParam } from "../llm/anthropic.js";
 
-vi.mock('../llm/anthropic.js', () => ({
+vi.mock("../llm/anthropic.js", () => ({
   AnthropicClient: vi.fn(),
 }));
 
-describe('CompressionService', () => {
+describe("CompressionService", () => {
   let service: CompressionService;
 
   beforeEach(() => {
     service = new CompressionService();
   });
 
-  describe('compress', () => {
-    it('returns unchanged messages when below threshold (12 or fewer)', async () => {
+  describe("compress", () => {
+    it("returns unchanged messages when below threshold (12 or fewer)", async () => {
       const messages: MessageParam[] = Array.from({ length: 12 }, (_, i) => ({
-        role: i % 2 === 0 ? 'user' : 'assistant',
+        role: i % 2 === 0 ? "user" : "assistant",
         content: `message ${i}`,
       }));
       const mockClient = {} as AnthropicClient;
-      const result = await service.compress(messages, mockClient, 'claude-3');
+      const result = await service.compress(messages, mockClient, "claude-3");
       expect(result).toEqual(messages);
     });
 
-    it('compresses when above threshold (more than 12 messages)', async () => {
+    it("compresses when above threshold (more than 12 messages)", async () => {
       const messages: MessageParam[] = Array.from({ length: 15 }, (_, i) => ({
-        role: i % 2 === 0 ? 'user' : 'assistant',
+        role: i % 2 === 0 ? "user" : "assistant",
         content: `message ${i}`,
       }));
       const mockClient = {
         chat: vi.fn().mockResolvedValue({
-          content: [{ type: 'text', text: 'Summary of conversation' }],
+          content: [{ type: "text", text: "Summary of conversation" }],
         }),
       } as unknown as AnthropicClient;
 
-      const result = await service.compress(messages, mockClient, 'claude-3');
+      const result = await service.compress(messages, mockClient, "claude-3");
 
       // Should include summary and last 10 messages
       expect(result.length).toBeLessThan(messages.length);
-      expect(result[0]).toEqual({ role: 'user', content: expect.stringContaining('Summary') });
+      expect(result[0]).toEqual({
+        role: "user",
+        content: expect.stringContaining("Summary"),
+      });
     });
 
-    it('throws error when compression fails', async () => {
+    it("throws error when compression fails", async () => {
       const messages: MessageParam[] = Array.from({ length: 15 }, (_, i) => ({
-        role: i % 2 === 0 ? 'user' : 'assistant',
+        role: i % 2 === 0 ? "user" : "assistant",
         content: `message ${i}`,
       }));
       const mockClient = {
-        chat: vi.fn().mockRejectedValue(new Error('API error')),
+        chat: vi.fn().mockRejectedValue(new Error("API error")),
       } as unknown as AnthropicClient;
 
-      await expect(service.compress(messages, mockClient, 'claude-3'))
-        .rejects.toThrow('Compression failed');
+      await expect(
+        service.compress(messages, mockClient, "claude-3"),
+      ).rejects.toThrow("Compression failed");
     });
 
-    it('calls client.chat with correct parameters', async () => {
+    it("calls client.chat with correct parameters", async () => {
       const messages: MessageParam[] = Array.from({ length: 15 }, (_, i) => ({
-        role: i % 2 === 0 ? 'user' : 'assistant',
+        role: i % 2 === 0 ? "user" : "assistant",
         content: `message ${i}`,
       }));
       const mockClient = {
         chat: vi.fn().mockResolvedValue({
-          content: [{ type: 'text', text: 'Summary' }],
+          content: [{ type: "text", text: "Summary" }],
         }),
       } as unknown as AnthropicClient;
 
-      await service.compress(messages, mockClient, 'claude-3');
+      await service.compress(messages, mockClient, "claude-3");
 
       expect(mockClient.chat).toHaveBeenCalledWith(
         expect.arrayContaining([
-          expect.objectContaining({ role: 'user', content: expect.stringContaining('Summarize') }),
+          expect.objectContaining({
+            role: "user",
+            content: expect.stringContaining("Summarize"),
+          }),
         ]),
         [],
-        expect.objectContaining({ model: 'claude-3', maxTokens: 1000 })
+        expect.objectContaining({ model: "claude-3", maxTokens: 1000 }),
       );
     });
 
-    it('uses last 10 messages in result', async () => {
+    it("uses last 10 messages in result", async () => {
       const messages: MessageParam[] = Array.from({ length: 15 }, (_, i) => ({
-        role: 'user' as const,
+        role: "user" as const,
         content: `msg${i}`,
       }));
       const mockClient = {
         chat: vi.fn().mockResolvedValue({
-          content: [{ type: 'text', text: 'Summary' }],
+          content: [{ type: "text", text: "Summary" }],
         }),
       } as unknown as AnthropicClient;
 

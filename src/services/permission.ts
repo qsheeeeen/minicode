@@ -1,9 +1,9 @@
-import type { AnthropicClient } from '../llm/anthropic.js';
-import type { UserPrompter } from '../utils/display.js';
+import type { AnthropicClient } from "../llm/anthropic.js";
+import type { UserPrompter } from "../utils/display.js";
 
-export type PermissionMode = 'manual' | 'yolo' | 'auto';
+export type PermissionMode = "manual" | "yolo" | "auto";
 
-const MODES: PermissionMode[] = ['manual', 'yolo', 'auto'];
+const MODES: PermissionMode[] = ["manual", "yolo", "auto"];
 
 export class PermissionService {
   private mode: PermissionMode;
@@ -39,34 +39,45 @@ export class PermissionService {
     return this.mode;
   }
 
-  async check(toolName: string, toolInput: Record<string, unknown>, displayText: string): Promise<{ allowed: boolean; reason?: string }> {
+  async check(
+    toolName: string,
+    toolInput: Record<string, unknown>,
+    displayText: string,
+  ): Promise<{ allowed: boolean; reason?: string }> {
     switch (this.mode) {
-      case 'yolo':
+      case "yolo":
         return { allowed: true };
-      case 'manual': {
+      case "manual": {
         const answer = await this.prompter?.prompt({
           message: `Allow tool execution?\n${displayText}`,
           options: [
-            { label: 'Yes', value: 'yes' },
-            { label: 'No', value: 'no' },
-            { label: 'Yes to all', value: 'yolo' },
+            { label: "Yes", value: "yes" },
+            { label: "No", value: "no" },
+            { label: "Yes to all", value: "yolo" },
           ],
         });
-        if (!answer) return { allowed: false, reason: 'User cancelled' };  // empty = cancelled via Esc/Ctrl+C
-        if (answer === 'yolo') {
-          this.setMode('yolo');
+        if (!answer) return { allowed: false, reason: "User cancelled" }; // empty = cancelled via Esc/Ctrl+C
+        if (answer === "yolo") {
+          this.setMode("yolo");
           return { allowed: true };
         }
-        if (answer === 'yes') return { allowed: true };
-        return { allowed: false, reason: 'User rejected' };
+        if (answer === "yes") return { allowed: true };
+        return { allowed: false, reason: "User rejected" };
       }
-      case 'auto':
+      case "auto":
         return this.autoDecide(toolName, toolInput);
     }
   }
 
-  private async autoDecide(toolName: string, toolInput: Record<string, unknown>): Promise<{ allowed: boolean; reason?: string }> {
-    if (!this.client) return { allowed: false, reason: 'No LLM client configured for auto-permission' };
+  private async autoDecide(
+    toolName: string,
+    toolInput: Record<string, unknown>,
+  ): Promise<{ allowed: boolean; reason?: string }> {
+    if (!this.client)
+      return {
+        allowed: false,
+        reason: "No LLM client configured for auto-permission",
+      };
 
     try {
       const prompt = `You are a permission gate for a coding agent. Decide if this tool execution should be allowed.
@@ -86,25 +97,28 @@ Reply with exactly one of:
 - "no: <reason explaining why it was denied>"`;
 
       const response = await this.client.chat(
-        [{ role: 'user', content: prompt }],
+        [{ role: "user", content: prompt }],
         [],
-        { model: this.model, maxTokens: 100 }
+        { model: this.model, maxTokens: 100 },
       );
 
-      const textBlock = response.content.find(b => b.type === 'text');
-      const text = (textBlock as any)?.text?.trim() ?? 'no: unknown error';
-      
-      if (text.toLowerCase().startsWith('yes')) {
+      const textBlock = response.content.find((b) => b.type === "text");
+      const text = (textBlock as any)?.text?.trim() ?? "no: unknown error";
+
+      if (text.toLowerCase().startsWith("yes")) {
         return { allowed: true };
       }
-      
-      const reason = text.toLowerCase().startsWith('no:') 
-        ? text.slice(3).trim() 
+
+      const reason = text.toLowerCase().startsWith("no:")
+        ? text.slice(3).trim()
         : text;
-        
-      return { allowed: false, reason: reason || 'Denied by auto-gate' };
+
+      return { allowed: false, reason: reason || "Denied by auto-gate" };
     } catch (e) {
-      return { allowed: false, reason: `Error during auto-permission check: ${e instanceof Error ? e.message : String(e)}` };
+      return {
+        allowed: false,
+        reason: `Error during auto-permission check: ${e instanceof Error ? e.message : String(e)}`,
+      };
     }
   }
 }

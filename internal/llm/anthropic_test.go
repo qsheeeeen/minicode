@@ -13,7 +13,7 @@ import (
 func TestClient_ChatStream(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
-		// The official SDK is quite strict about SSE format. 
+		// The official SDK is quite strict about SSE format.
 		// For a simple test, we just want to ensure our wrapper passes through data.
 		fmt.Fprintf(w, "event: message_start\ndata: %s\n\n", `{"type": "message_start", "message": {"id": "msg_1", "type": "message", "role": "assistant", "content": [], "model": "m1", "stop_reason": null, "stop_sequence": null, "usage": {"input_tokens": 5, "output_tokens": 0}}}`)
 		fmt.Fprintf(w, "event: content_block_start\ndata: %s\n\n", `{"type": "content_block_start", "index": 0, "content_block": {"type": "text", "text": ""}}`)

@@ -1,20 +1,26 @@
-import React from 'react';
-import { Box, Text } from 'ink';
-import { ProgressBar } from '@inkjs/ui';
-import { useTuiState } from './store.js';
-import type { Agent } from '../agent.js';
+import React from "react";
+import { Box, Text } from "ink";
+import { ProgressBar } from "@inkjs/ui";
+import { useTuiState } from "./store.js";
+import type { Agent } from "../agent.js";
 
 interface StatusBarProps {
   agentRef: React.MutableRefObject<Agent>;
 }
 
 export function StatusBar({ agentRef }: StatusBarProps) {
-  const { tokenCount, permissionMode, currentSession, status, isLoading } = useTuiState();
+  const { tokenCount, permissionMode, currentSession, status, isLoading } =
+    useTuiState();
 
   const contextLength = agentRef.current.getContextLength();
   const percentage = Math.min(100, (tokenCount / contextLength) * 100);
 
-  const modeColor = permissionMode === 'manual' ? 'yellow' : permissionMode === 'yolo' ? 'red' : 'cyan';
+  const modeColor =
+    permissionMode === "manual"
+      ? "yellow"
+      : permissionMode === "yolo"
+        ? "red"
+        : "cyan";
 
   return (
     <Box flexDirection="column">
@@ -30,7 +36,9 @@ export function StatusBar({ agentRef }: StatusBarProps) {
 
       {/* Status bar */}
       <Box paddingX={1} gap={1}>
-        <Text dimColor>{tokenCount.toLocaleString()}/{contextLength.toLocaleString()}</Text>
+        <Text dimColor>
+          {tokenCount.toLocaleString()}/{contextLength.toLocaleString()}
+        </Text>
         <Box flexBasis={20}>
           <ProgressBar value={percentage} />
         </Box>
@@ -42,4 +50,3 @@ export function StatusBar({ agentRef }: StatusBarProps) {
     </Box>
   );
 }
-

@@ -1,24 +1,26 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-const mockCreate = vi.fn().mockResolvedValue({ id: 'msg_1', role: 'assistant', content: [] });
+const mockCreate = vi
+  .fn()
+  .mockResolvedValue({ id: "msg_1", role: "assistant", content: [] });
 const mockStream = vi.fn().mockReturnValue({});
 
-vi.mock('@anthropic-ai/sdk', () => {
+vi.mock("@anthropic-ai/sdk", () => {
   return {
-    default: vi.fn().mockImplementation(function() {
+    default: vi.fn().mockImplementation(function () {
       return {
         messages: {
           create: mockCreate,
           stream: mockStream,
-        }
+        },
       };
     }),
   };
 });
 
-import { AnthropicClient } from './anthropic.js';
+import { AnthropicClient } from "./anthropic.js";
 
-describe('AnthropicClient', () => {
+describe("AnthropicClient", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -27,61 +29,61 @@ describe('AnthropicClient', () => {
     vi.restoreAllMocks();
   });
 
-  describe('chat', () => {
-    it('sends correct parameters to client.messages.create', async () => {
-      const client = new AnthropicClient('test-key');
-      await client.chat([{ role: 'user', content: 'hello' }], [], {
-        model: 'custom-model',
+  describe("chat", () => {
+    it("sends correct parameters to client.messages.create", async () => {
+      const client = new AnthropicClient("test-key");
+      await client.chat([{ role: "user", content: "hello" }], [], {
+        model: "custom-model",
         maxTokens: 1000,
-        system: 'test system',
+        system: "test system",
       });
 
       expect(mockCreate).toHaveBeenCalledWith(
         expect.objectContaining({
-          model: 'custom-model',
+          model: "custom-model",
           max_tokens: 1000,
-          system: 'test system',
-          messages: [{ role: 'user', content: 'hello' }],
+          system: "test system",
+          messages: [{ role: "user", content: "hello" }],
           tools: [],
-          thinking: { type: 'adaptive' }
+          thinking: { type: "adaptive" },
         }),
         expect.objectContaining({
-          signal: undefined
-        })
+          signal: undefined,
+        }),
       );
     });
 
-    it('includes effort in output_config when provided', async () => {
+    it("includes effort in output_config when provided", async () => {
       const client = new AnthropicClient();
       await client.chat([], [], {
-        effort: 'xhigh'
+        effort: "xhigh",
       });
 
       expect(mockCreate).toHaveBeenCalledWith(
         expect.objectContaining({
-          thinking: { type: 'adaptive' },
-          output_config: { effort: 'xhigh' }
+          thinking: { type: "adaptive" },
+          output_config: { effort: "xhigh" },
         }),
         expect.objectContaining({
-          signal: undefined
-        })
+          signal: undefined,
+        }),
       );
     });
   });
 
-  describe('chatStream', () => {
-    it('sends correct parameters to client.messages.stream', () => {
+  describe("chatStream", () => {
+    it("sends correct parameters to client.messages.stream", () => {
       const client = new AnthropicClient();
-      client.chatStream([{ role: 'user', content: 'hi' }], [], {});
+      client.chatStream([{ role: "user", content: "hi" }], [], {});
 
       expect(mockStream).toHaveBeenCalledWith(
         expect.objectContaining({
-          messages: [{ role: 'user', content: 'hi' }],
-          thinking: { type: 'adaptive' }
+          messages: [{ role: "user", content: "hi" }],
+          thinking: { type: "adaptive" },
         }),
         expect.objectContaining({
-          signal: undefined
-        })
+          signal: undefined,
+        }),
       );
     });
   });

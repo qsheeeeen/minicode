@@ -14,9 +14,9 @@ import (
 
 // SelectModel holds the state for interactive selection UI (bubbles/list).
 type SelectModel struct {
-	list    list.Model
-	mode    string // effort-select, session-list, model-tier, ...
-	help    list.Model
+	list list.Model
+	mode string // effort-select, session-list, model-tier, ...
+	help list.Model
 
 	// Model wizard state machine
 	wizardEditTier string

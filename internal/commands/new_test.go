@@ -8,7 +8,7 @@ import (
 )
 
 func TestNew_WithName(t *testing.T) {
-	
+
 	ag := agent.NewAgent(domain.AgentConfig{APIKey: "test", Model: "m1"})
 	oldSession := ag.SessionName()
 	handled, _, _ := ParseAndExecute("/new my-session", Context{Agent: ag})
@@ -21,7 +21,7 @@ func TestNew_WithName(t *testing.T) {
 }
 
 func TestNew_WithoutName(t *testing.T) {
-	
+
 	ag := agent.NewAgent(domain.AgentConfig{APIKey: "test", Model: "m1"})
 	oldSession := ag.SessionName()
 	handled, _, _ := ParseAndExecute("/new", Context{Agent: ag})

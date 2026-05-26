@@ -21,8 +21,8 @@ func RunHeadless(ctx context.Context, ag *agent.Agent, initialPrompt, displayPro
 
 	// Track what has already been printed for incremental rendering
 	printedTurns := 0
-	printedBlocks := make(map[int]int)      // turnIndex → blocks printed
-	streamedChars := make(map[string]int)   // "ti:bi" → chars printed
+	printedBlocks := make(map[int]int)    // turnIndex → blocks printed
+	streamedChars := make(map[string]int) // "ti:bi" → chars printed
 	finalizedBlocks := make(map[string]bool)
 	printedToolUses := make(map[string]bool)
 	printedResults := make(map[string]bool)

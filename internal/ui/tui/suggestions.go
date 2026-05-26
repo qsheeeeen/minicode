@@ -41,9 +41,9 @@ func (s *Suggestions) Set(items []icmd.Command) {
 	s.list = l
 }
 
-func (s *Suggestions) Clear()  { s.list = list.Model{} }
-func (s *Suggestions) Up()     { s.list.CursorUp() }
-func (s *Suggestions) Down()   { s.list.CursorDown() }
+func (s *Suggestions) Clear() { s.list = list.Model{} }
+func (s *Suggestions) Up()    { s.list.CursorUp() }
+func (s *Suggestions) Down()  { s.list.CursorDown() }
 
 func (s *Suggestions) Accept(textareaValue string) string {
 	if item, ok := s.list.SelectedItem().(sugItem); ok {

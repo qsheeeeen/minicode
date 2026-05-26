@@ -69,7 +69,7 @@ func (in *InputModel) Update(msg tea.KeyMsg) (consumed bool, cmd tea.Cmd) {
 		} else {
 			in.Suggest.Clear()
 		}
-		
+
 		return false, c
 	}
 

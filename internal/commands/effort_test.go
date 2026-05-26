@@ -7,7 +7,7 @@ import (
 
 func TestEffort_ValidArg(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
-	
+
 	handled, result, _ := ParseAndExecute("/effort high", Context{})
 	if !handled {
 		t.Error("/effort high should be handled")
@@ -18,7 +18,7 @@ func TestEffort_ValidArg(t *testing.T) {
 }
 
 func TestEffort_InvalidArg(t *testing.T) {
-	
+
 	handled, result, _ := ParseAndExecute("/effort invalid", Context{})
 	if !handled {
 		t.Error("/effort invalid should still be handled (shows select UI)")
@@ -29,7 +29,7 @@ func TestEffort_InvalidArg(t *testing.T) {
 }
 
 func TestEffort_NoArg(t *testing.T) {
-	
+
 	handled, result, _ := ParseAndExecute("/effort", Context{})
 	if !handled {
 		t.Error("/effort without args should be handled")

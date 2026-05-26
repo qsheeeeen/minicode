@@ -69,7 +69,7 @@ func (p *PermissionPrompt) View(width int) string {
 		BorderForeground(lipgloss.Color("3")).
 		Padding(0, 1)
 
-	return border.Width(width - 2).Render(body) + "\n"
+	return border.Width(width-2).Render(body) + "\n"
 }
 
 type permItem struct {

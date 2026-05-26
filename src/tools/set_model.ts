@@ -1,18 +1,26 @@
-import type { ToolDef, ToolResult, ToolExecutionContext } from './index.js';
+import type { ToolDef, ToolResult, ToolExecutionContext } from "./index.js";
 
 export const setModelTool: ToolDef = {
-  name: 'SetModel',
-  description: 'Switch the current conversation to the model mapped to a tier. Looks up config.tiers[tier] and switches both the running agent and persisted config to that model.',
+  name: "SetModel",
+  description:
+    "Switch the current conversation to the model mapped to a tier. Looks up config.tiers[tier] and switches both the running agent and persisted config to that model.",
   input_schema: {
-    type: 'object' as const,
+    type: "object" as const,
     properties: {
-      tier: { type: 'string', description: 'The tier number: "1", "2", or "3"' },
+      tier: {
+        type: "string",
+        description: 'The tier number: "1", "2", or "3"',
+      },
     },
-    required: ['tier'],
+    required: ["tier"],
   },
-  execute: async (args: Record<string, unknown>, context?: ToolExecutionContext): Promise<ToolResult> => {
+  execute: async (
+    args: Record<string, unknown>,
+    context?: ToolExecutionContext,
+  ): Promise<ToolResult> => {
     const tier = String(args.tier);
-    const { loadConfig, parseModelSpecifier, setModel } = await import('../config.js');
+    const { loadConfig, parseModelSpecifier, setModel } =
+      await import("../config.js");
     const config = await loadConfig();
     const modelSpec = config.tiers?.[tier];
     if (!modelSpec) {
@@ -21,12 +29,20 @@ export const setModelTool: ToolDef = {
 
     const parsed = parseModelSpecifier(modelSpec, config.providers ?? {});
     if (!parsed) {
-      return { output: `Error: Could not resolve "${modelSpec}" for tier ${tier}.` };
+      return {
+        output: `Error: Could not resolve "${modelSpec}" for tier ${tier}.`,
+      };
     }
 
-    const agent = context?.registry?.get(context.currentAgentId || '1')?.agent;
+    const agent = context?.registry?.get(context.currentAgentId || "1")?.agent;
     if (agent) {
-      agent.setModel(parsed.modelName, parsed.providerConfig.apiKey, parsed.providerConfig.baseURL, parsed.providerName, parsed.providerConfig.models?.[parsed.modelName]?.contextLength);
+      agent.setModel(
+        parsed.modelName,
+        parsed.providerConfig.apiKey,
+        parsed.providerConfig.baseURL,
+        parsed.providerName,
+        parsed.providerConfig.models?.[parsed.modelName]?.contextLength,
+      );
     }
     await setModel(modelSpec);
     return { output: `Switched to tier ${tier}: ${modelSpec}` };

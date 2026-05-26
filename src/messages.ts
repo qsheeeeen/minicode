@@ -1,8 +1,8 @@
-import type { MessageParam, ContentBlock } from './llm/anthropic.js';
+import type { MessageParam, ContentBlock } from "./llm/anthropic.js";
 
 // UI-only status / error messages — not sent to LLM
 export interface StatusMessage {
-  role: 'status' | 'error';
+  role: "status" | "error";
   content: string;
   timestamp: Date;
   turnIndex?: number;
@@ -10,15 +10,32 @@ export interface StatusMessage {
 }
 
 // Display layer — each role carries only the fields it needs
-export type MessageRole = 'user' | 'text' | 'thinking' | 'tool' | 'status' | 'error';
+export type MessageRole =
+  | "user"
+  | "text"
+  | "thinking"
+  | "tool"
+  | "status"
+  | "error";
 
 export type DisplayMessage =
-  | { role: 'user'; content: string }
-  | { role: 'text'; content: string; isStreaming?: boolean }
-  | { role: 'thinking'; content: string; isStreaming?: boolean }
-  | { role: 'tool'; name: string; input: Record<string, unknown>; output?: string; slotId: string }
-  | { role: 'status'; content: string; element?: React.ReactElement; timestamp?: Date }
-  | { role: 'error'; content: string; timestamp?: Date };
+  | { role: "user"; content: string }
+  | { role: "text"; content: string; isStreaming?: boolean }
+  | { role: "thinking"; content: string; isStreaming?: boolean }
+  | {
+      role: "tool";
+      name: string;
+      input: Record<string, unknown>;
+      output?: string;
+      slotId: string;
+    }
+  | {
+      role: "status";
+      content: string;
+      element?: React.ReactElement;
+      timestamp?: Date;
+    }
+  | { role: "error"; content: string; timestamp?: Date };
 
 // Convert MessageParam[] + statuses → DisplayMessage[]
 export function toDisplayMessages(
@@ -28,12 +45,14 @@ export function toDisplayMessages(
   // Build result map from tool_result blocks
   const results = new Map<string, string>();
   for (const turn of turns) {
-    if (turn.role === 'user' && Array.isArray(turn.content)) {
+    if (turn.role === "user" && Array.isArray(turn.content)) {
       for (const block of turn.content as any[]) {
-        if (block.type === 'tool_result') {
+        if (block.type === "tool_result") {
           results.set(
             block.tool_use_id,
-            typeof block.content === 'string' ? block.content : JSON.stringify(block.content),
+            typeof block.content === "string"
+              ? block.content
+              : JSON.stringify(block.content),
           );
         }
       }
@@ -52,27 +71,35 @@ export function toDisplayMessages(
 
   // Statuses with turnIndex 0 come before all turns
   for (const s of byTurnIndex.get(0) ?? []) {
-    result.push({ role: s.role, content: s.content, element: s.element, timestamp: s.timestamp });
+    result.push({
+      role: s.role,
+      content: s.content,
+      element: s.element,
+      timestamp: s.timestamp,
+    });
   }
 
   // Single pass: process turns, interleaving statuses after each
   for (let i = 0; i < turns.length; i++) {
     const turn = turns[i];
-    if (turn.role === 'user') {
-      if (typeof turn.content === 'string') {
-        const displayContent = (turn as any)._display !== undefined ? (turn as any)._display : turn.content;
-        result.push({ role: 'user', content: displayContent });
+    if (turn.role === "user") {
+      if (typeof turn.content === "string") {
+        const displayContent =
+          (turn as any)._display !== undefined
+            ? (turn as any)._display
+            : turn.content;
+        result.push({ role: "user", content: displayContent });
       }
-    } else if (turn.role === 'assistant') {
+    } else if (turn.role === "assistant") {
       const blocks = Array.isArray(turn.content) ? turn.content : [];
       for (const block of blocks as ContentBlock[]) {
-        if (block.type === 'thinking') {
-          result.push({ role: 'thinking', content: block.thinking });
-        } else if (block.type === 'text') {
-          result.push({ role: 'text', content: block.text });
-        } else if (block.type === 'tool_use') {
+        if (block.type === "thinking") {
+          result.push({ role: "thinking", content: block.thinking });
+        } else if (block.type === "text") {
+          result.push({ role: "text", content: block.text });
+        } else if (block.type === "tool_use") {
           result.push({
-            role: 'tool',
+            role: "tool",
             name: block.name,
             input: (block.input as Record<string, unknown>) ?? {},
             output: results.get(block.id),
@@ -83,14 +110,24 @@ export function toDisplayMessages(
     }
     // Statuses added after this turn
     for (const s of byTurnIndex.get(i + 1) ?? []) {
-      result.push({ role: s.role, content: s.content, element: s.element, timestamp: s.timestamp });
+      result.push({
+        role: s.role,
+        content: s.content,
+        element: s.element,
+        timestamp: s.timestamp,
+      });
     }
   }
 
   // Any unmatched statuses (turnIndex > turns.length) go at the end
   for (const s of statuses) {
     if (s.turnIndex !== undefined && s.turnIndex > turns.length) {
-      result.push({ role: s.role, content: s.content, element: s.element, timestamp: s.timestamp });
+      result.push({
+        role: s.role,
+        content: s.content,
+        element: s.element,
+        timestamp: s.timestamp,
+      });
     }
   }
 
@@ -117,7 +154,7 @@ export class MessageStore {
   }
 
   // Subscribe to updates. Returns an unsubscribe function.
-  onChange(callback: () => void): (() => void) {
+  onChange(callback: () => void): () => void {
     this.changeCallback = callback;
     return () => {
       // Only clear if still the same listener (prevents stale cleanup)
@@ -145,7 +182,7 @@ export class MessageStore {
 
   /** Get API-format messages for LLM. Strips display-only metadata. */
   toLLMMessages(): MessageParam[] {
-    return this.turns.map(t => {
+    return this.turns.map((t) => {
       const msg = t as any;
       if (msg._display !== undefined) {
         const { _display, ...rest } = msg;
@@ -158,7 +195,7 @@ export class MessageStore {
   // -- User messages --
 
   addUserMessage(content: string, displayContent?: string): void {
-    const msg: MessageParam = { role: 'user', content } as MessageParam;
+    const msg: MessageParam = { role: "user", content } as MessageParam;
     if (displayContent !== undefined && displayContent !== content) {
       (msg as any)._display = displayContent;
     }
@@ -170,14 +207,14 @@ export class MessageStore {
 
   /** Start a new assistant turn (empty content array). */
   startAssistantTurn(): void {
-    this.turns.push({ role: 'assistant', content: [] });
+    this.turns.push({ role: "assistant", content: [] });
     this.notify();
   }
 
   /** Append a block to the last (open) assistant turn. Creates the turn if needed. */
   appendToLastAssistantTurn(block: ContentBlock): void {
     const last = this.turns[this.turns.length - 1];
-    if (!last || last.role !== 'assistant' || !Array.isArray(last.content)) {
+    if (!last || last.role !== "assistant" || !Array.isArray(last.content)) {
       this.startAssistantTurn();
     }
     const content = this.turns[this.turns.length - 1].content as ContentBlock[];
@@ -188,7 +225,8 @@ export class MessageStore {
   /** Get the last block in the last assistant turn (if any). */
   getLastBlock(): ContentBlock | undefined {
     const last = this.turns[this.turns.length - 1];
-    if (!last || last.role !== 'assistant' || !Array.isArray(last.content)) return undefined;
+    if (!last || last.role !== "assistant" || !Array.isArray(last.content))
+      return undefined;
     const blocks = last.content as ContentBlock[];
     return blocks[blocks.length - 1];
   }
@@ -196,7 +234,8 @@ export class MessageStore {
   /** Update the text/thinking content of the last block in the last assistant turn. */
   updateLastBlock(updates: { text?: string; thinking?: string }): void {
     const last = this.turns[this.turns.length - 1];
-    if (!last || last.role !== 'assistant' || !Array.isArray(last.content)) return;
+    if (!last || last.role !== "assistant" || !Array.isArray(last.content))
+      return;
     const blocks = last.content as any[];
     if (blocks.length === 0) return;
     Object.assign(blocks[blocks.length - 1], updates);
@@ -208,12 +247,12 @@ export class MessageStore {
   /** Add a user turn containing tool_result blocks. */
   addToolResults(results: Array<{ toolUseId: string; content: string }>): void {
     if (results.length === 0) return;
-    const blocks = results.map(r => ({
-      type: 'tool_result' as const,
+    const blocks = results.map((r) => ({
+      type: "tool_result" as const,
       tool_use_id: r.toolUseId,
       content: r.content,
     }));
-    this.turns.push({ role: 'user', content: blocks });
+    this.turns.push({ role: "user", content: blocks });
     this.notify();
   }
 
@@ -236,7 +275,7 @@ export class MessageStore {
     if (this.streaming) {
       for (let i = msgs.length - 1; i >= 0; i--) {
         const m = msgs[i];
-        if ((m.role === 'text' || m.role === 'thinking') && m.content) {
+        if ((m.role === "text" || m.role === "thinking") && m.content) {
           m.isStreaming = true;
           break;
         }

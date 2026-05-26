@@ -15,8 +15,10 @@ type WriteTool struct{}
 // NewWriteTool creates a WriteTool.
 func NewWriteTool() *WriteTool { return &WriteTool{} }
 
-func (t *WriteTool) Name() string             { return "Write" }
-func (t *WriteTool) Description() string      { return "Create a new file or completely rewrite an existing file with the provided content. For modifying existing files, prefer the Edit tool." }
+func (t *WriteTool) Name() string { return "Write" }
+func (t *WriteTool) Description() string {
+	return "Create a new file or completely rewrite an existing file with the provided content. For modifying existing files, prefer the Edit tool."
+}
 func (t *WriteTool) RequiresPermission() bool    { return true }
 func (t *WriteTool) Requires() []ToolRequirement { return nil }
 

@@ -71,20 +71,20 @@ Model priority: CLI `--model` > `MODEL` env var > config `model` field.
 
 ### Slash Commands
 
-| Command | Description |
-|---------|-------------|
-| `/new [name]` | Create new session |
-| `/resume` | List sessions (arrow keys + Enter) |
-| `/resume <name>` | Load specific session |
-| `/rename <name>` | Rename current session |
-| `/compress` | Compress conversation history |
-| `/clear` | Clear history and start fresh |
+| Command           | Description                                         |
+| ----------------- | --------------------------------------------------- |
+| `/new [name]`     | Create new session                                  |
+| `/resume`         | List sessions (arrow keys + Enter)                  |
+| `/resume <name>`  | Load specific session                               |
+| `/rename <name>`  | Rename current session                              |
+| `/compress`       | Compress conversation history                       |
+| `/clear`          | Clear history and start fresh                       |
 | `/effort [level]` | Set thinking effort (low\|medium\|high\|xhigh\|max) |
-| `/plan` | Generate executable plan from discussion |
-| `/test` | Run a simple test across all tools |
-| `/skills` | List available skills |
-| `/model` | Switch model/provider via UI |
-| `/exit` | Quit (or Ctrl+C) |
+| `/plan`           | Generate executable plan from discussion            |
+| `/test`           | Run a simple test across all tools                  |
+| `/skills`         | List available skills                               |
+| `/model`          | Switch model/provider via UI                        |
+| `/exit`           | Quit (or Ctrl+C)                                    |
 
 **Permission mode:** Shift+Tab cycles between manual/yolo/auto
 

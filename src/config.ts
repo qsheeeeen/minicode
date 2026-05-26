@@ -1,11 +1,11 @@
-import fs from 'fs';
-import fsPromises from 'fs/promises';
-import path from 'path';
-import os from 'os';
-import type { EffortLevel } from './llm/anthropic.js';
+import fs from "fs";
+import fsPromises from "fs/promises";
+import path from "path";
+import os from "os";
+import type { EffortLevel } from "./llm/anthropic.js";
 
-const CONFIG_DIR = path.join(os.homedir(), '.minicode');
-const CONFIG_PATH = path.join(CONFIG_DIR, 'config.json');
+const CONFIG_DIR = path.join(os.homedir(), ".minicode");
+const CONFIG_PATH = path.join(CONFIG_DIR, "config.json");
 
 export interface ModelConfig {
   contextLength?: number;
@@ -25,14 +25,14 @@ export interface Providers {
 
 export interface Config {
   providers?: Providers;
-  model?: string;  // format: model@provider, e.g. "glm-4.7@zhipu"
-  tiers?: Record<string, string>;  // tier -> model@provider, e.g. { "1": "claude-sonnet@anthropic" }
-  compressionThreshold?: number;  // 0-1, compress at this ratio of context
-  thinking?: boolean;  // enable extended thinking
-  effort?: EffortLevel;  // reasoning effort level
-  promptFile?: string;  // project prompt filename (default: AGENTS.md)
-  permissionMode?: 'manual' | 'yolo' | 'auto';
-  skillsDir?: string;  // project skills directory (default: .minicode/skills)  // default permission mode
+  model?: string; // format: model@provider, e.g. "glm-4.7@zhipu"
+  tiers?: Record<string, string>; // tier -> model@provider, e.g. { "1": "claude-sonnet@anthropic" }
+  compressionThreshold?: number; // 0-1, compress at this ratio of context
+  thinking?: boolean; // enable extended thinking
+  effort?: EffortLevel; // reasoning effort level
+  promptFile?: string; // project prompt filename (default: AGENTS.md)
+  permissionMode?: "manual" | "yolo" | "auto";
+  skillsDir?: string; // project skills directory (default: .minicode/skills)  // default permission mode
 }
 
 let cachedConfig: Config | null = null;
@@ -42,7 +42,7 @@ export async function loadConfig(refresh = false): Promise<Config> {
 
   try {
     await fsPromises.mkdir(CONFIG_DIR, { recursive: true });
-    const content = await fsPromises.readFile(CONFIG_PATH, 'utf-8');
+    const content = await fsPromises.readFile(CONFIG_PATH, "utf-8");
     cachedConfig = JSON.parse(content) as Config;
     return cachedConfig ?? {};
   } catch {
@@ -57,9 +57,13 @@ export function invalidateConfig(): void {
 
 export function parseModelSpecifier(
   spec: string,
-  providers: Providers
-): { modelName: string; providerName: string; providerConfig: ProviderConfig } | null {
-  const parts = spec.split('@');
+  providers: Providers,
+): {
+  modelName: string;
+  providerName: string;
+  providerConfig: ProviderConfig;
+} | null {
+  const parts = spec.split("@");
   const modelName = parts[0];
   const providerName = parts[1] || Object.keys(providers || {})[0];
   const providerConfig = providers?.[providerName];
@@ -69,7 +73,7 @@ export function parseModelSpecifier(
 
 export function loadConfigSync(): Config {
   try {
-    const content = fs.readFileSync(CONFIG_PATH, 'utf-8');
+    const content = fs.readFileSync(CONFIG_PATH, "utf-8");
     return JSON.parse(content) as Config;
   } catch {
     return {};
@@ -77,19 +81,27 @@ export function loadConfigSync(): Config {
 }
 
 export interface ResolvedConfig {
-  model: { provider: string; model: string; apiKey: string; baseURL?: string; contextLength?: number } | null;
+  model: {
+    provider: string;
+    model: string;
+    apiKey: string;
+    baseURL?: string;
+    contextLength?: number;
+  } | null;
   compressionThreshold: number;
   thinking: { enabled: boolean; effort?: EffortLevel };
   promptFile: string;
-  permissionMode?: 'manual' | 'yolo' | 'auto';
+  permissionMode?: "manual" | "yolo" | "auto";
   skillsDir?: string;
 }
 
-export async function loadAllConfig(modelSpecifier?: string): Promise<ResolvedConfig> {
+export async function loadAllConfig(
+  modelSpecifier?: string,
+): Promise<ResolvedConfig> {
   const config = await loadConfig();
   const spec = modelSpecifier || process.env.MODEL || config.model;
 
-  let model: ResolvedConfig['model'] = null;
+  let model: ResolvedConfig["model"] = null;
   if (spec) {
     const parsed = parseModelSpecifier(spec, config.providers ?? {});
     if (parsed) {
@@ -99,7 +111,7 @@ export async function loadAllConfig(modelSpecifier?: string): Promise<ResolvedCo
         model: parsed.modelName,
         apiKey: parsed.providerConfig.apiKey!,
         baseURL: parsed.providerConfig.baseURL,
-        contextLength: modelConfig?.contextLength
+        contextLength: modelConfig?.contextLength,
       };
     }
   }
@@ -109,26 +121,34 @@ export async function loadAllConfig(modelSpecifier?: string): Promise<ResolvedCo
     compressionThreshold: config.compressionThreshold ?? 0.8,
     thinking: {
       enabled: config.thinking ?? false,
-      effort: config.effort
+      effort: config.effort,
     },
-    promptFile: config.promptFile || 'AGENTS.md',
+    promptFile: config.promptFile || "AGENTS.md",
     permissionMode: config.permissionMode,
-    skillsDir: config.skillsDir
+    skillsDir: config.skillsDir,
   };
 }
 
 export async function setEffort(effort: string): Promise<void> {
   const config = await loadConfig();
-  config.effort = effort as Config['effort'];
+  config.effort = effort as Config["effort"];
   cachedConfig = config;
-  await fsPromises.writeFile(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf-8');
+  await fsPromises.writeFile(
+    CONFIG_PATH,
+    JSON.stringify(config, null, 2),
+    "utf-8",
+  );
 }
 
 export async function setModel(modelSpec: string): Promise<void> {
   const config = await loadConfig();
   config.model = modelSpec;
   cachedConfig = config;
-  await fsPromises.writeFile(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf-8');
+  await fsPromises.writeFile(
+    CONFIG_PATH,
+    JSON.stringify(config, null, 2),
+    "utf-8",
+  );
 }
 
 export async function setTier(tier: string, modelSpec: string): Promise<void> {
@@ -136,5 +156,9 @@ export async function setTier(tier: string, modelSpec: string): Promise<void> {
   if (!config.tiers) config.tiers = {};
   config.tiers[tier] = modelSpec;
   cachedConfig = config;
-  await fsPromises.writeFile(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf-8');
+  await fsPromises.writeFile(
+    CONFIG_PATH,
+    JSON.stringify(config, null, 2),
+    "utf-8",
+  );
 }

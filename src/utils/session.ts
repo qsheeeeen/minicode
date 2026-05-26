@@ -1,9 +1,9 @@
-import fs from 'fs/promises';
-import path from 'path';
-import crypto from 'crypto';
-import os from 'os';
+import fs from "fs/promises";
+import path from "path";
+import crypto from "crypto";
+import os from "os";
 
-const BASE_SESSIONS_DIR = path.join(os.homedir(), '.minicode', 'sessions');
+const BASE_SESSIONS_DIR = path.join(os.homedir(), ".minicode", "sessions");
 
 // Simple error logging (could be replaced with proper logger)
 function logError(operation: string, error: unknown): void {
@@ -36,7 +36,7 @@ export class SessionManager {
 
   private computeProjectHash(): string {
     const cwd = process.cwd();
-    return crypto.createHash('md5').update(cwd).digest('hex').substring(0, 12);
+    return crypto.createHash("md5").update(cwd).digest("hex").substring(0, 12);
   }
 
   private async ensureDir(): Promise<void> {
@@ -57,8 +57,8 @@ export class SessionManager {
     const sessions: SessionInfo[] = [];
 
     for (const entry of entries) {
-      if (!entry.endsWith('.json')) continue;
-      const name = entry.replace('.json', '');
+      if (!entry.endsWith(".json")) continue;
+      const name = entry.replace(".json", "");
       const data = await this.get(name);
       if (data) {
         sessions.push({ name, updatedAt: data.updatedAt });
@@ -71,7 +71,9 @@ export class SessionManager {
   async listNames(): Promise<string[]> {
     await this.ensureDir();
     const entries = await fs.readdir(this.sessionsDir).catch(() => []);
-    return entries.filter(e => e.endsWith('.json')).map(e => e.replace('.json', ''));
+    return entries
+      .filter((e) => e.endsWith(".json"))
+      .map((e) => e.replace(".json", ""));
   }
 
   async getMostRecent(): Promise<string | null> {
@@ -83,7 +85,7 @@ export class SessionManager {
     await this.ensureDir();
     const filePath = path.join(this.sessionsDir, `${name}.json`);
     try {
-      const content = await fs.readFile(filePath, 'utf-8');
+      const content = await fs.readFile(filePath, "utf-8");
       return JSON.parse(content);
     } catch (error) {
       logError(`failed to read session ${name}`, error);

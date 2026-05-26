@@ -1,10 +1,10 @@
-import type { Agent } from '../agent.js';
+import type { Agent } from "../agent.js";
 
-export type AgentStatus = 'idle' | 'running' | 'completed' | 'error';
+export type AgentStatus = "idle" | "running" | "completed" | "error";
 
 export interface AgentSession {
   id: string;
-  type: 'main' | 'sub';
+  type: "main" | "sub";
   agent: Agent;
   status: AgentStatus;
   task?: string;
@@ -37,7 +37,9 @@ export class AgentRegistry {
   }
 
   getAll(): AgentSession[] {
-    return Array.from(this.sessions.values()).sort((a, b) => parseInt(a.id, 10) - parseInt(b.id, 10));
+    return Array.from(this.sessions.values()).sort(
+      (a, b) => parseInt(a.id, 10) - parseInt(b.id, 10),
+    );
   }
 
   updateStatus(id: string, status: AgentStatus): void {
@@ -61,8 +63,11 @@ export class AgentRegistry {
     for (let i = 2; i <= 9; i++) {
       const id = String(i);
       const session = this.sessions.get(id);
-      if (session && session.type === 'sub' &&
-          (session.status === 'completed' || session.status === 'error')) {
+      if (
+        session &&
+        session.type === "sub" &&
+        (session.status === "completed" || session.status === "error")
+      ) {
         this.sessions.delete(id);
         this.nextSubId = i + 1 > 9 ? 2 : i + 1;
         this.notifyUpdate();

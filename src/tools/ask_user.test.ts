@@ -1,17 +1,17 @@
-import { describe, it, expect, vi } from 'vitest';
-import { askUserTool } from './ask_user.js';
-import { ToolDeniedError } from './index.js';
+import { describe, it, expect, vi } from "vitest";
+import { askUserTool } from "./ask_user.js";
+import { ToolDeniedError } from "./index.js";
 
-describe('askUserTool', () => {
-  describe('execute', () => {
-    it('returns user selection on answer', async () => {
-      const mockPrompt = vi.fn().mockResolvedValue('Option A');
+describe("askUserTool", () => {
+  describe("execute", () => {
+    it("returns user selection on answer", async () => {
+      const mockPrompt = vi.fn().mockResolvedValue("Option A");
       const result = await askUserTool.execute(
         {
-          question: 'Which approach?',
+          question: "Which approach?",
           options: [
-            { label: 'Option A', description: 'First approach' },
-            { label: 'Option B', description: 'Second approach' },
+            { label: "Option A", description: "First approach" },
+            { label: "Option B", description: "Second approach" },
           ],
         },
         { prompter: { prompt: mockPrompt } } as any,
@@ -19,24 +19,32 @@ describe('askUserTool', () => {
 
       expect(result.output).toBe('User selected: "Option A"');
       expect(mockPrompt).toHaveBeenCalledWith({
-        message: 'Which approach?',
+        message: "Which approach?",
         options: [
-          { label: 'Option A', description: 'First approach', value: 'Option A' },
-          { label: 'Option B', description: 'Second approach', value: 'Option B' },
+          {
+            label: "Option A",
+            description: "First approach",
+            value: "Option A",
+          },
+          {
+            label: "Option B",
+            description: "Second approach",
+            value: "Option B",
+          },
         ],
         multiSelect: false,
       });
     });
 
-    it('throws ToolDeniedError when user cancels', async () => {
+    it("throws ToolDeniedError when user cancels", async () => {
       const mockPrompt = vi.fn().mockResolvedValue(null);
       await expect(
         askUserTool.execute(
           {
-            question: 'Pick one',
+            question: "Pick one",
             options: [
-              { label: 'X', description: 'x' },
-              { label: 'Y', description: 'y' },
+              { label: "X", description: "x" },
+              { label: "Y", description: "y" },
             ],
           },
           { prompter: { prompt: mockPrompt } } as any,
@@ -44,14 +52,14 @@ describe('askUserTool', () => {
       ).rejects.toThrow(ToolDeniedError);
     });
 
-    it('passes multiSelect when true', async () => {
-      const mockPrompt = vi.fn().mockResolvedValue('A, B');
+    it("passes multiSelect when true", async () => {
+      const mockPrompt = vi.fn().mockResolvedValue("A, B");
       await askUserTool.execute(
         {
-          question: 'Pick multiple',
+          question: "Pick multiple",
           options: [
-            { label: 'A', description: 'a' },
-            { label: 'B', description: 'b' },
+            { label: "A", description: "a" },
+            { label: "B", description: "b" },
           ],
           multiSelect: true,
         },
@@ -63,22 +71,24 @@ describe('askUserTool', () => {
       );
     });
 
-    it('returns error when options is not an array', async () => {
+    it("returns error when options is not an array", async () => {
       const result = await askUserTool.execute(
-        { question: 'What?', options: null } as any,
+        { question: "What?", options: null } as any,
         {} as any,
       );
-      expect(result.output).toContain("Error: AskUser tool requires 'options' to be an array");
+      expect(result.output).toContain(
+        "Error: AskUser tool requires 'options' to be an array",
+      );
     });
 
-    it('defaults multiSelect to false when omitted', async () => {
-      const mockPrompt = vi.fn().mockResolvedValue('A');
+    it("defaults multiSelect to false when omitted", async () => {
+      const mockPrompt = vi.fn().mockResolvedValue("A");
       await askUserTool.execute(
         {
-          question: 'Pick one',
+          question: "Pick one",
           options: [
-            { label: 'A', description: 'a' },
-            { label: 'B', description: 'b' },
+            { label: "A", description: "a" },
+            { label: "B", description: "b" },
           ],
         },
         { prompter: { prompt: mockPrompt } } as any,

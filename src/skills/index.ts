@@ -1,7 +1,7 @@
-import fs from 'fs/promises';
-import path from 'path';
-import { parse as parseYaml } from 'yaml';
-import { loadConfigSync } from '../config.js';
+import fs from "fs/promises";
+import path from "path";
+import { parse as parseYaml } from "yaml";
+import { loadConfigSync } from "../config.js";
 
 export interface SkillMeta {
   name: string;
@@ -28,11 +28,12 @@ export class SkillRegistry {
       return null;
     }
 
-    if (typeof frontmatter !== 'object' || frontmatter === null) return null;
+    if (typeof frontmatter !== "object" || frontmatter === null) return null;
 
     const fm = frontmatter as Record<string, unknown>;
-    const name = typeof fm.name === 'string' ? fm.name.trim() : undefined;
-    const description = typeof fm.description === 'string' ? fm.description.trim() : undefined;
+    const name = typeof fm.name === "string" ? fm.name.trim() : undefined;
+    const description =
+      typeof fm.description === "string" ? fm.description.trim() : undefined;
 
     if (!name || !description) return null;
 
@@ -51,10 +52,10 @@ export class SkillRegistry {
       for (const entry of entries) {
         if (entry.isDirectory()) {
           const skillDirPath = path.join(skillsDir, entry.name);
-          const skillFilePath = path.join(skillDirPath, 'SKILL.md');
+          const skillFilePath = path.join(skillDirPath, "SKILL.md");
 
           try {
-            const content = await fs.readFile(skillFilePath, 'utf-8');
+            const content = await fs.readFile(skillFilePath, "utf-8");
             const meta = this.parseSkillFile(content, skillDirPath);
             if (meta) {
               this.skills.set(meta.name, meta);
@@ -69,10 +70,10 @@ export class SkillRegistry {
     }
   }
 
-  public getAvailableSkills(): Pick<SkillMeta, 'name' | 'description'>[] {
-    return Array.from(this.skills.values()).map(s => ({
+  public getAvailableSkills(): Pick<SkillMeta, "name" | "description">[] {
+    return Array.from(this.skills.values()).map((s) => ({
       name: s.name,
-      description: s.description
+      description: s.description,
     }));
   }
 
@@ -83,11 +84,12 @@ export class SkillRegistry {
 
 export const skillRegistry = new SkillRegistry();
 
-const promptFile = loadConfigSync().promptFile || 'AGENTS.md';
+const promptFile = loadConfigSync().promptFile || "AGENTS.md";
 
 const skillCreator: SkillMeta = {
-  name: 'skill-creator',
-  description: "Guide for creating effective skills. This skill should be used when users want to create a new skill (or update an existing skill) that extends minicode's capabilities with specialized knowledge, workflows, or tool integrations.",
+  name: "skill-creator",
+  description:
+    "Guide for creating effective skills. This skill should be used when users want to create a new skill (or update an existing skill) that extends minicode's capabilities with specialized knowledge, workflows, or tool integrations.",
   body: `# Skill Creator
 
 This skill provides guidance for creating effective skills in minicode using the agentskills.io format.
@@ -104,11 +106,11 @@ Every skill consists of a required \`SKILL.md\` file:
 1. Create a directory for the skill (e.g., \`~/.minicode/skills/my-skill\`).
 2. Add a \`SKILL.md\` file in that directory.
 3. Write the frontmatter with \`name\` and \`description\`.
-4. Write the body with clear, concise instructions for the agent to follow.`
+4. Write the body with clear, concise instructions for the agent to follow.`,
 };
 
 const initSkill: SkillMeta = {
-  name: 'init',
+  name: "init",
   description: `Set up a minimal ${promptFile} for this repo with codebase exploration and optional skills.`,
   body: `Set up a minimal ${promptFile} (and optionally skills) for this repo. ${promptFile} is loaded into every agent session, so it must be concise — only include what the agent would get wrong without it.
 
@@ -177,7 +179,7 @@ description: <what the skill does and when to use it>
 
 ## Phase 6: Summary
 
-Recap what was set up and remind the user they can run /init again anytime to refine.`
+Recap what was set up and remind the user they can run /init again anytime to refine.`,
 };
 
 skillRegistry.register(skillCreator);

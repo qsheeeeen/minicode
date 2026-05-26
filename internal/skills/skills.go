@@ -114,7 +114,7 @@ func (r *SkillRegistry) parseSkillFrontmatter(content string) SkillInfo {
 	info := SkillInfo{}
 	if fm != "" {
 		if err := yaml.Unmarshal([]byte(fm), &info); err != nil {
-			// fallback to manual parsing if YAML fails? 
+			// fallback to manual parsing if YAML fails?
 			// for now just return empty if it's not valid YAML
 		}
 	}

@@ -16,9 +16,11 @@ func NewActivateSkillTool() *ActivateSkillTool {
 	return &ActivateSkillTool{}
 }
 
-func (t *ActivateSkillTool) Name() string        { return "ActivateSkill" }
-func (t *ActivateSkillTool) Description() string { return "Activate a specific skill and receive its detailed instructions. Use this when the user requests a task related to a listed skill." }
-func (t *ActivateSkillTool) RequiresPermission() bool { return false }
+func (t *ActivateSkillTool) Name() string { return "ActivateSkill" }
+func (t *ActivateSkillTool) Description() string {
+	return "Activate a specific skill and receive its detailed instructions. Use this when the user requests a task related to a listed skill."
+}
+func (t *ActivateSkillTool) RequiresPermission() bool    { return false }
 func (t *ActivateSkillTool) Requires() []ToolRequirement { return nil }
 
 func (t *ActivateSkillTool) InputSchema() map[string]any {

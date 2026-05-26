@@ -8,7 +8,7 @@ import (
 )
 
 func TestSkills(t *testing.T) {
-	
+
 	ag := agent.NewAgent(domain.AgentConfig{APIKey: "test", Model: "m1"})
 	handled, result, _ := ParseAndExecute("/skills", Context{Agent: ag})
 	if !handled {

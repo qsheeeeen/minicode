@@ -1,7 +1,7 @@
-import React from 'react';
-import { Box, Text } from 'ink';
-import { useTuiState } from './store.js';
-import { Message } from './Message.js';
+import React from "react";
+import { Box, Text } from "ink";
+import { useTuiState } from "./store.js";
+import { Message } from "./Message.js";
 
 export function MessageList() {
   const { messages, agentSessions } = useTuiState();
@@ -18,9 +18,9 @@ export function MessageList() {
     <Box flexGrow={1} flexDirection="column" paddingX={1}>
       <Box flexDirection="column">
         {messages
-          .filter(msg => {
-            if (msg.role === 'tool') return true;
-            if (msg.role === 'status' && msg.element) return true;
+          .filter((msg) => {
+            if (msg.role === "tool") return true;
+            if (msg.role === "status" && msg.element) return true;
             return !!msg.content;
           })
           .map((msg, i) => (
@@ -31,7 +31,9 @@ export function MessageList() {
       </Box>
       {agentSessions.length > 1 && (
         <Box marginTop={1}>
-          <Text dimColor color="yellow">Ctrl+O: switch agent</Text>
+          <Text dimColor color="yellow">
+            Ctrl+O: switch agent
+          </Text>
         </Box>
       )}
     </Box>

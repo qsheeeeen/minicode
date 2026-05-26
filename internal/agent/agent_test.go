@@ -21,5 +21,3 @@ func TestAgent_IsRunningGuard(t *testing.T) {
 	}
 	_ = ok
 }
-
-

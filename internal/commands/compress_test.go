@@ -3,7 +3,7 @@ package commands
 import "testing"
 
 func TestCompress(t *testing.T) {
-	
+
 	handled, result, _ := ParseAndExecute("/compress", Context{})
 	if !handled {
 		t.Error("/compress should be handled")

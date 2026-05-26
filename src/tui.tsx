@@ -1,19 +1,19 @@
-import React, { useCallback, useRef, useEffect, RefObject } from 'react';
-import { Box, useInput, useApp } from 'ink';
-import { Agent } from './agent.js';
-import type { MessageParam } from './llm/anthropic.js';
-import type { ResolvedConfig } from './config.js';
-import { CallbackEvents, CallbackPrompter } from './utils/display.js';
-import { commandRegistry } from './commands/index.js';
-import { sessionManager } from './utils/session.js';
-import { AgentRegistry, type AgentSession } from './services/index.js';
+import React, { useCallback, useRef, useEffect, RefObject } from "react";
+import { Box, useInput, useApp } from "ink";
+import { Agent } from "./agent.js";
+import type { MessageParam } from "./llm/anthropic.js";
+import type { ResolvedConfig } from "./config.js";
+import { CallbackEvents, CallbackPrompter } from "./utils/display.js";
+import { commandRegistry } from "./commands/index.js";
+import { sessionManager } from "./utils/session.js";
+import { AgentRegistry, type AgentSession } from "./services/index.js";
 
-import { TuiProvider, useTuiState, useTuiDispatch } from './tui/store.js';
-import { Header } from './tui/Header.js';
-import { MessageList } from './tui/MessageList.js';
-import { ModalPrompter } from './tui/ModalPrompter.js';
-import { InputArea } from './tui/InputArea.js';
-import { StatusBar } from './tui/StatusBar.js';
+import { TuiProvider, useTuiState, useTuiDispatch } from "./tui/store.js";
+import { Header } from "./tui/Header.js";
+import { MessageList } from "./tui/MessageList.js";
+import { ModalPrompter } from "./tui/ModalPrompter.js";
+import { InputArea } from "./tui/InputArea.js";
+import { StatusBar } from "./tui/StatusBar.js";
 
 export interface AppProps {
   agent: Agent;
@@ -28,31 +28,42 @@ export interface AppProps {
 }
 
 /** Hook: multi-agent coordination and switching using Global Store */
-function useMultiAgent(registry: AgentRegistry, agentRef: React.MutableRefObject<Agent>) {
+function useMultiAgent(
+  registry: AgentRegistry,
+  agentRef: React.MutableRefObject<Agent>,
+) {
   const { activeAgentId } = useTuiState();
   const dispatch = useTuiDispatch();
   const activeAgentIdRef = useRef(activeAgentId);
 
   useEffect(() => {
     registry.setUpdateCallback((sessions) => {
-      dispatch({ type: 'SET_AGENT_SESSIONS', payload: sessions });
-      if (activeAgentIdRef.current !== '1' && !sessions.find(s => s.id === activeAgentIdRef.current)) {
-        activeAgentIdRef.current = '1';
-        dispatch({ type: 'SET_ACTIVE_AGENT_ID', payload: '1' });
+      dispatch({ type: "SET_AGENT_SESSIONS", payload: sessions });
+      if (
+        activeAgentIdRef.current !== "1" &&
+        !sessions.find((s) => s.id === activeAgentIdRef.current)
+      ) {
+        activeAgentIdRef.current = "1";
+        dispatch({ type: "SET_ACTIVE_AGENT_ID", payload: "1" });
       }
     });
   }, [registry, dispatch]);
 
   useInput((input, key) => {
-    if (key.ctrl && input === 'o') {
+    if (key.ctrl && input === "o") {
       const sessions = registry.getAll() || [];
       if (sessions.length <= 1) return;
-      const currentIndex = sessions.findIndex(s => s.id === activeAgentIdRef.current);
+      const currentIndex = sessions.findIndex(
+        (s) => s.id === activeAgentIdRef.current,
+      );
       const nextIndex = (currentIndex + 1) % sessions.length;
       const nextSession = sessions[nextIndex];
       activeAgentIdRef.current = nextSession.id;
-      dispatch({ type: 'SET_ACTIVE_AGENT_ID', payload: nextSession.id });
-      dispatch({ type: 'SET_MESSAGES', payload: nextSession.agent.getStore().toDisplayMessages() });
+      dispatch({ type: "SET_ACTIVE_AGENT_ID", payload: nextSession.id });
+      dispatch({
+        type: "SET_MESSAGES",
+        payload: nextSession.agent.getStore().toDisplayMessages(),
+      });
       agentRef.current = nextSession.agent;
     }
   });
@@ -71,38 +82,55 @@ function useDisplay(
   const dispatch = useTuiDispatch();
 
   useEffect(() => {
-    agent.setEvents(new CallbackEvents({
-      onStatus: (msg) => dispatch({ type: 'ADD_MESSAGE', payload: msg }),
-      onTokenUpdate: (count) => dispatch({ type: 'SET_TOKEN_COUNT', payload: count }),
-    }));
+    agent.setEvents(
+      new CallbackEvents({
+        onStatus: (msg) => dispatch({ type: "ADD_MESSAGE", payload: msg }),
+        onTokenUpdate: (count) =>
+          dispatch({ type: "SET_TOKEN_COUNT", payload: count }),
+      }),
+    );
 
-    agent.setPrompter(new CallbackPrompter((req) => new Promise<string>((resolve) => {
-      dispatch({ type: 'SET_PENDING_PROMPT', payload: { ...req, resolve } });
-    })));
+    agent.setPrompter(
+      new CallbackPrompter(
+        (req) =>
+          new Promise<string>((resolve) => {
+            dispatch({
+              type: "SET_PENDING_PROMPT",
+              payload: { ...req, resolve },
+            });
+          }),
+      ),
+    );
 
     agent.getStore().onChange(() => {
-      dispatch({ type: 'SET_MESSAGES', payload: agent.getStore().toDisplayMessages() });
+      dispatch({
+        type: "SET_MESSAGES",
+        payload: agent.getStore().toDisplayMessages(),
+      });
     });
 
     registry.register({
-      id: '1',
-      type: 'main',
+      id: "1",
+      type: "main",
       agent,
-      status: 'idle',
+      status: "idle",
     });
 
     dispatch({
-      type: 'SET_AGENT_SESSIONS', payload: [{
-        id: '1',
-        type: 'main',
-        agent,
-        status: 'idle',
-      }],
+      type: "SET_AGENT_SESSIONS",
+      payload: [
+        {
+          id: "1",
+          type: "main",
+          agent,
+          status: "idle",
+        },
+      ],
     });
 
     const loadInitial = async () => {
       agent.currentSession = initialSession;
-      dispatch({ type: 'SET_CURRENT_SESSION', payload: initialSession });
+      dispatch({ type: "SET_CURRENT_SESSION", payload: initialSession });
       if (sessionName || resumeRecent) {
         const data = await sessionManager.get(initialSession);
         if (data) {
@@ -110,16 +138,22 @@ function useDisplay(
           const totalTokens = data.totalTokens || 0;
           if (totalTokens > 0) {
             agent.setTokenCount(totalTokens);
-            dispatch({ type: 'SET_TOKEN_COUNT', payload: totalTokens });
+            dispatch({ type: "SET_TOKEN_COUNT", payload: totalTokens });
           }
         } else if (sessionName) {
-          agent.getStore().addStatus({ role: 'status', content: `Created new session: ${sessionName}`, timestamp: new Date() });
+          agent
+            .getStore()
+            .addStatus({
+              role: "status",
+              content: `Created new session: ${sessionName}`,
+              timestamp: new Date(),
+            });
         }
       }
     };
     loadInitial();
 
-    return () => { };
+    return () => {};
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 }
 
@@ -132,13 +166,14 @@ function AppContent({
   sessionName,
   resumeRecent,
   agentRegistry,
-}: Omit<AppProps, 'config'>) {
+}: Omit<AppProps, "config">) {
   const { exit } = useApp();
   const dispatch = useTuiDispatch();
   const { input, pendingPrompt, isLoading } = useTuiState();
   const agentRef = useRef<Agent>(agent);
 
-  const [autoSubmitPending, setAutoSubmitPending] = React.useState(!!initialPrompt);
+  const [autoSubmitPending, setAutoSubmitPending] =
+    React.useState(!!initialPrompt);
   const loadingRef = useRef(false);
 
   useMultiAgent(agentRegistry, agentRef);
@@ -149,52 +184,73 @@ function AppContent({
       return commandRegistry.parseAndExecute(cmdInput, {
         agent: agentRef.current,
         setMessages: (msgs) => {
-          if (typeof msgs === 'function') {
+          if (typeof msgs === "function") {
             // we don't have access to prev state directly without a complex reducer action if it uses a callback
             // we skip complex implementation here as command registry doesn't use the functional update form
           } else {
-            dispatch({ type: 'SET_MESSAGES', payload: msgs });
+            dispatch({ type: "SET_MESSAGES", payload: msgs });
           }
         },
-        setCurrentSession: (session) => dispatch({ type: 'SET_CURRENT_SESSION', payload: session }),
-        setMode: () => { /* deprecated, combined with input.mode */ },
-        setInputMode: (mode, props) => dispatch({ type: 'SET_INPUT_MODE', payload: { mode, props } }),
-        setSessionList: (sessions) => dispatch({ type: 'SET_SESSION_LIST', payload: { sessions } }),
-        setSelectedIndex: (index) => dispatch({ type: 'SET_SELECTED_SESSION_INDEX', payload: index }),
+        setCurrentSession: (session) =>
+          dispatch({ type: "SET_CURRENT_SESSION", payload: session }),
+        setMode: () => {
+          /* deprecated, combined with input.mode */
+        },
+        setInputMode: (mode, props) =>
+          dispatch({ type: "SET_INPUT_MODE", payload: { mode, props } }),
+        setSessionList: (sessions) =>
+          dispatch({ type: "SET_SESSION_LIST", payload: { sessions } }),
+        setSelectedIndex: (index) =>
+          dispatch({ type: "SET_SELECTED_SESSION_INDEX", payload: index }),
         exit,
       });
     });
   }, [dispatch, exit]);
 
-  const handleSubmit = useCallback(async (value: string): Promise<boolean> => {
-    if (!value.trim() || !agentRef.current) return false;
+  const handleSubmit = useCallback(
+    async (value: string): Promise<boolean> => {
+      if (!value.trim() || !agentRef.current) return false;
 
-    if (loadingRef.current) return false;
+      if (loadingRef.current) return false;
 
-    loadingRef.current = true;
-    dispatch({ type: 'SET_IS_LOADING', payload: true });
-    try {
-      const sent = await agentRef.current.run(value);
-      if (!sent) {
-        dispatch({ type: 'SET_IS_LOADING', payload: false });
+      loadingRef.current = true;
+      dispatch({ type: "SET_IS_LOADING", payload: true });
+      try {
+        const sent = await agentRef.current.run(value);
+        if (!sent) {
+          dispatch({ type: "SET_IS_LOADING", payload: false });
+          return false;
+        }
+        return true;
+      } catch (e) {
+        if (e instanceof Error && e.message === "Aborted") {
+          agentRef.current
+            .getStore()
+            .addStatus({
+              role: "status",
+              content: "(Aborted)",
+              timestamp: new Date(),
+            });
+        } else if (e instanceof Error) {
+          agentRef.current
+            .getStore()
+            .addStatus({
+              role: "error",
+              content: `(Error: ${e.message})`,
+              timestamp: new Date(),
+            });
+        } else {
+          throw e;
+        }
         return false;
+      } finally {
+        loadingRef.current = false;
+        dispatch({ type: "SET_IS_LOADING", payload: false });
+        dispatch({ type: "SET_STATUS", payload: "" });
       }
-      return true;
-    } catch (e) {
-      if (e instanceof Error && e.message === 'Aborted') {
-        agentRef.current.getStore().addStatus({ role: 'status', content: '(Aborted)', timestamp: new Date() });
-      } else if (e instanceof Error) {
-        agentRef.current.getStore().addStatus({ role: 'error', content: `(Error: ${e.message})`, timestamp: new Date() });
-      } else {
-        throw e;
-      }
-      return false;
-    } finally {
-      loadingRef.current = false;
-      dispatch({ type: 'SET_IS_LOADING', payload: false });
-      dispatch({ type: 'SET_STATUS', payload: '' });
-    }
-  }, [dispatch]);
+    },
+    [dispatch],
+  );
 
   useEffect(() => {
     if (autoSubmitPending && agentRef.current && initialPrompt) {
@@ -205,48 +261,58 @@ function AppContent({
 
   const isModal = pendingPrompt !== null;
 
-  useInput((keyInput, key) => {
-    if (key.ctrl && keyInput === 'c') {
-      if (isLoading) {
+  useInput(
+    (keyInput, key) => {
+      if (key.ctrl && keyInput === "c") {
+        if (isLoading) {
+          agentRef.current?.abort();
+          if (pendingPrompt) {
+            pendingPrompt.resolve("");
+            dispatch({ type: "SET_PENDING_PROMPT", payload: null });
+          }
+        } else {
+          exit();
+        }
+        return;
+      }
+      if (key.shift && key.tab) {
+        const next =
+          agentRef.current.getPermissionService()?.cycleMode() ?? "manual";
+        dispatch({ type: "SET_PERMISSION_MODE", payload: next });
+        return;
+      }
+      if (key.escape && isLoading) {
         agentRef.current?.abort();
         if (pendingPrompt) {
-          pendingPrompt.resolve('');
-          dispatch({ type: 'SET_PENDING_PROMPT', payload: null });
+          pendingPrompt.resolve("");
+          dispatch({ type: "SET_PENDING_PROMPT", payload: null });
         }
-      } else {
-        exit();
+        return;
       }
-      return;
-    }
-    if (key.shift && key.tab) {
-      const next = agentRef.current.getPermissionService()?.cycleMode() ?? 'manual';
-      dispatch({ type: 'SET_PERMISSION_MODE', payload: next });
-      return;
-    }
-    if (key.escape && isLoading) {
-      agentRef.current?.abort();
-      if (pendingPrompt) {
-        pendingPrompt.resolve('');
-        dispatch({ type: 'SET_PENDING_PROMPT', payload: null });
+    },
+    { isActive: input.mode === "chat" && !isModal },
+  );
+
+  useInput(
+    (keyInput, key) => {
+      if ((key.escape || (key.ctrl && keyInput === "c")) && pendingPrompt) {
+        pendingPrompt.resolve("");
+        dispatch({ type: "SET_PENDING_PROMPT", payload: null });
       }
-      return;
-    }
-  }, { isActive: input.mode === 'chat' && !isModal });
-
-  useInput((keyInput, key) => {
-    if ((key.escape || (key.ctrl && keyInput === 'c')) && pendingPrompt) {
-      pendingPrompt.resolve('');
-      dispatch({ type: 'SET_PENDING_PROMPT', payload: null });
-    }
-  }, { isActive: isModal });
-
+    },
+    { isActive: isModal },
+  );
 
   return (
     <Box flexDirection="column" height="100%">
       <Header version={version} promptFiles={promptFiles} agentRef={agentRef} />
       <MessageList />
       <ModalPrompter />
-      <InputArea agentRef={agentRef} handleSubmit={handleSubmit} loadingRef={loadingRef} />
+      <InputArea
+        agentRef={agentRef}
+        handleSubmit={handleSubmit}
+        loadingRef={loadingRef}
+      />
       <StatusBar agentRef={agentRef} />
     </Box>
   );
@@ -254,7 +320,12 @@ function AppContent({
 
 export function App(props: AppProps) {
   return (
-    <TuiProvider initialState={{ permissionMode: props.agent.getPermissionService()?.getMode() ?? 'manual' }}>
+    <TuiProvider
+      initialState={{
+        permissionMode:
+          props.agent.getPermissionService()?.getMode() ?? "manual",
+      }}
+    >
       <AppContent {...props} />
     </TuiProvider>
   );

@@ -1,19 +1,19 @@
-import { describe, it, expect } from 'vitest';
-import { agentTool } from './sub_agent.js';
+import { describe, it, expect } from "vitest";
+import { agentTool } from "./sub_agent.js";
 
-describe('agentTool', () => {
-  describe('execute', () => {
-    it('returns error when registry not available', async () => {
-      const result = await agentTool.execute({ task: 'test' }, {});
-      expect(result.output).toContain('AgentRegistry not available');
+describe("agentTool", () => {
+  describe("execute", () => {
+    it("returns error when registry not available", async () => {
+      const result = await agentTool.execute({ task: "test" }, {});
+      expect(result.output).toContain("AgentRegistry not available");
     });
 
-    it('returns error when config not available', async () => {
+    it("returns error when config not available", async () => {
       const result = await agentTool.execute(
-        { task: 'test' },
-        { registry: { allocateSubId: () => '2' } as any }
+        { task: "test" },
+        { registry: { allocateSubId: () => "2" } as any },
       );
-      expect(result.output).toContain('Agent config not available');
+      expect(result.output).toContain("Agent config not available");
     });
   });
 });

@@ -1,36 +1,40 @@
-import { spawn } from 'child_process';
-import type { ToolDef, ToolResult, ToolExecutionContext } from './index.js';
+import { spawn } from "child_process";
+import type { ToolDef, ToolResult, ToolExecutionContext } from "./index.js";
 
 function stripAnsiCodes(text: string): string {
-  return text.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
+  return text.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");
 }
 
 export const bashTool: ToolDef = {
-  name: 'Bash',
-  description: 'Execute a bash command in the current working directory. Returns stdout and stderr. Optionally provide a timeout in seconds.',
+  name: "Bash",
+  description:
+    "Execute a bash command in the current working directory. Returns stdout and stderr. Optionally provide a timeout in seconds.",
   requiresPermission: true,
   input_schema: {
-    type: 'object' as const,
+    type: "object" as const,
     properties: {
-      command: { type: 'string' },
-      timeout: { type: 'number' }
+      command: { type: "string" },
+      timeout: { type: "number" },
     },
-    required: ['command']
+    required: ["command"],
   },
-  execute: async (args: Record<string, unknown>, context?: ToolExecutionContext): Promise<ToolResult> => {
+  execute: async (
+    args: Record<string, unknown>,
+    context?: ToolExecutionContext,
+  ): Promise<ToolResult> => {
     try {
       const command = args.command as string;
       const timeout = args.timeout as number | undefined;
       const output = await new Promise<string>((resolve, reject) => {
         const proc = spawn(command, [], { shell: true });
 
-        let stdout = '';
-        let stderr = '';
+        let stdout = "";
+        let stderr = "";
 
-        proc.stdout?.on('data', (d) => {
+        proc.stdout?.on("data", (d) => {
           stdout += stripAnsiCodes(d.toString());
         });
-        proc.stderr?.on('data', (d) => {
+        proc.stderr?.on("data", (d) => {
           stderr += stripAnsiCodes(d.toString());
         });
 
@@ -40,16 +44,16 @@ export const bashTool: ToolDef = {
 
         if (context?.signal?.aborted) {
           proc.kill();
-          resolve('Aborted');
+          resolve("Aborted");
           return;
         }
-        context?.signal?.addEventListener('abort', () => {
+        context?.signal?.addEventListener("abort", () => {
           proc.kill();
         });
 
-        proc.on('close', (code) => {
+        proc.on("close", (code) => {
           if (context?.signal?.aborted) {
-            resolve('Aborted');
+            resolve("Aborted");
           } else if (code === 0) {
             resolve(stdout || stderr);
           } else {
@@ -62,5 +66,5 @@ export const bashTool: ToolDef = {
       const msg = err instanceof Error ? err.message : String(err);
       return { output: msg };
     }
-  }
+  },
 };

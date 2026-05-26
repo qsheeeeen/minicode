@@ -22,14 +22,13 @@ func (e *ToolDeniedError) Unwrap() error { return ErrToolDenied }
 
 // ToolContext provides tools with access to shared services.
 type ToolContext struct {
-	Config          domain.AgentConfig
-	PermissionSvc   PermissionChecker
-	CurrentAgentID  string
-	AgentFactory    AgentFactory          // interface to create new agents
-	SetModelFn      func(model, apiKey, baseURL string, contextLength int)
-	AskUserFn       func(question string, options []domain.AskOption, multiSelect bool) string
+	Config         domain.AgentConfig
+	PermissionSvc  PermissionChecker
+	CurrentAgentID string
+	AgentFactory   AgentFactory // interface to create new agents
+	SetModelFn     func(model, apiKey, baseURL string, contextLength int)
+	AskUserFn      func(question string, options []domain.AskOption, multiSelect bool) string
 }
-
 
 // AgentFactory allows tools to create new agent instances.
 type AgentFactory interface {
@@ -49,7 +48,7 @@ type PermissionChecker interface {
 type ToolRequirement string
 
 const (
-	// Removed ReqSkillRegistry
+// Removed ReqSkillRegistry
 )
 
 // Tool is the interface every tool must implement.

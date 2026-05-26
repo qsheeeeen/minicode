@@ -16,8 +16,10 @@ type EditTool struct{}
 // NewEditTool creates an EditTool.
 func NewEditTool() *EditTool { return &EditTool{} }
 
-func (t *EditTool) Name() string             { return "Edit" }
-func (t *EditTool) Description() string      { return "Edit a file by replacing exact text. The oldText must match exactly (including whitespace). Use this for precise, surgical edits." }
+func (t *EditTool) Name() string { return "Edit" }
+func (t *EditTool) Description() string {
+	return "Edit a file by replacing exact text. The oldText must match exactly (including whitespace). Use this for precise, surgical edits."
+}
 func (t *EditTool) RequiresPermission() bool    { return true }
 func (t *EditTool) Requires() []ToolRequirement { return nil }
 
@@ -59,10 +61,10 @@ func (t *EditTool) Execute(ctx context.Context, args map[string]any, tc ToolCont
 
 	dmp := diffmatchpatch.New()
 	diffs := dmp.DiffMain(oldText, newText, false)
-	
+
 	var out strings.Builder
 	removed, added := 0, 0
-	
+
 	// Convert to line-based diff for better LLM/UI readability
 	for _, d := range diffs {
 		lines := strings.Split(d.Text, "\n")

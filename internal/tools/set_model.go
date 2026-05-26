@@ -16,9 +16,11 @@ func NewSetModelTool() *SetModelTool {
 	return &SetModelTool{}
 }
 
-func (t *SetModelTool) Name() string        { return "SetModel" }
-func (t *SetModelTool) Description() string { return "Update the model associated with a specific tier (\"1\", \"2\", or \"3\"). Tier 1 is for simple tasks, Tier 2 for normal development, Tier 3 for complex architecture. Format: model@provider (e.g. claude-3-5-sonnet@anthropic)." }
-func (t *SetModelTool) RequiresPermission() bool { return true }
+func (t *SetModelTool) Name() string { return "SetModel" }
+func (t *SetModelTool) Description() string {
+	return "Update the model associated with a specific tier (\"1\", \"2\", or \"3\"). Tier 1 is for simple tasks, Tier 2 for normal development, Tier 3 for complex architecture. Format: model@provider (e.g. claude-3-5-sonnet@anthropic)."
+}
+func (t *SetModelTool) RequiresPermission() bool    { return true }
 func (t *SetModelTool) Requires() []ToolRequirement { return nil }
 
 func (t *SetModelTool) InputSchema() map[string]any {

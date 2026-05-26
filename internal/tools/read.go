@@ -14,9 +14,11 @@ type ReadTool struct{}
 // NewReadTool creates a ReadTool.
 func NewReadTool() *ReadTool { return &ReadTool{} }
 
-func (t *ReadTool) Name() string        { return "Read" }
-func (t *ReadTool) Description() string { return "Read the content of a file. Returns the file content. For large files, use offset and limit to read in chunks." }
-func (t *ReadTool) RequiresPermission() bool { return false }
+func (t *ReadTool) Name() string { return "Read" }
+func (t *ReadTool) Description() string {
+	return "Read the content of a file. Returns the file content. For large files, use offset and limit to read in chunks."
+}
+func (t *ReadTool) RequiresPermission() bool    { return false }
 func (t *ReadTool) Requires() []ToolRequirement { return nil }
 
 func (t *ReadTool) InputSchema() map[string]any {
