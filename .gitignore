@@ -4,5 +4,6 @@ config.json
 .DS_Store
 coverage/
 minicode-go
+testperm
 .agent/
 !.agent/skills/
