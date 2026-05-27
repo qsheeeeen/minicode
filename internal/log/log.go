@@ -38,7 +38,7 @@ func Set(projectHash, sessionName string) {
 	if err := os.MkdirAll(logDir, 0o755); err != nil {
 		return
 	}
-	logFile := filepath.Join(logDir, sessionName+".log")
+	logFile := filepath.Join(logDir, sessionName+".log.json")
 	f, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	if err != nil {
 		return

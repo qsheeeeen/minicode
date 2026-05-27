@@ -56,7 +56,7 @@ func (s *SessionManager) Save(name string, data *SessionData) error {
 		s.log("save failed: mkdir", "session", name, "error", err)
 		return err
 	}
-	path := filepath.Join(s.dir, name+".json")
+	path := filepath.Join(s.dir, name+".context.json")
 	file, err := os.Create(path)
 	if err != nil {
 		s.log("save failed: create file", "session", name, "path", path, "error", err)
@@ -77,7 +77,7 @@ func (s *SessionManager) Get(name string) (*SessionData, error) {
 		s.log("get failed: no session directory", "session", name)
 		return nil, errors.New("session directory not found")
 	}
-	path := filepath.Join(s.dir, name+".json")
+	path := filepath.Join(s.dir, name+".context.json")
 	file, err := os.Open(path)
 	if err != nil {
 		s.log("get failed: open file", "session", name, "path", path, "error", err)
@@ -105,11 +105,11 @@ func (s *SessionManager) List() []SessionInfo {
 	}
 	var out []SessionInfo
 	for _, e := range entries {
-		if !e.IsDir() && filepath.Ext(e.Name()) == ".json" {
+		if !e.IsDir() && filepath.Ext(e.Name()) == ".context.json" {
 			info, err := e.Info()
 			if err == nil {
 				out = append(out, SessionInfo{
-					Name:      strings.TrimSuffix(e.Name(), ".json"),
+					Name:      strings.TrimSuffix(e.Name(), ".context.json"),
 					Timestamp: info.ModTime(),
 				})
 			}
@@ -136,7 +136,7 @@ func (s *SessionManager) Rename(oldName, newName string) error {
 	if s.dir == "" {
 		return nil
 	}
-	oldPath := filepath.Join(s.dir, oldName+".json")
-	newPath := filepath.Join(s.dir, newName+".json")
+	oldPath := filepath.Join(s.dir, oldName+".context.json")
+	newPath := filepath.Join(s.dir, newName+".context.json")
 	return os.Rename(oldPath, newPath)
 }
