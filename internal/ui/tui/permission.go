@@ -29,9 +29,11 @@ func (p *PermissionPrompt) Activate(text string, resolve chan string) {
 		permItem{label: "Yes to all", value: "yolo"},
 	}
 	d := list.NewDefaultDelegate()
+	d.SetSpacing(0)
+	d.SetHeight(1)
 	d.ShowDescription = false
 	d.Styles.SelectedTitle = d.Styles.SelectedTitle.Foreground(lipgloss.Color("6"))
-	l := list.New(items, d, 40, 3)
+	l := list.New(items, d, 40, len(items)*2)
 	l.SetShowHelp(true)
 	l.SetShowStatusBar(false)
 	l.SetShowPagination(false)
