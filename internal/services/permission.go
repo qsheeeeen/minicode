@@ -33,7 +33,7 @@ func NewPermissionService(mode domain.PermissionMode) *PermissionService {
 	if mode == "" {
 		mode = domain.PermManual
 	}
-	return &PermissionService{mode: mode, logger: log.Default}
+	return &PermissionService{mode: mode, logger: log.Get()}
 }
 
 // Mode returns the current mode.

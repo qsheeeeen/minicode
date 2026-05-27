@@ -2,11 +2,12 @@ package config
 
 import (
 	"fmt"
+	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 
 	"github.com/spf13/viper"
-	"minicode/internal/log"
 )
 
 // ProviderConfig holds configuration for one LLM provider.
@@ -60,7 +61,7 @@ type ModelRef struct {
 }
 
 var v *viper.Viper
-var logger = log.Default
+var logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 
 func init() {
 	resetViper()

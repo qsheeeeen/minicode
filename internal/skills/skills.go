@@ -156,7 +156,7 @@ func (r *SkillRegistry) splitFrontmatter(content string) (frontmatter, body stri
 // Default registry singleton.
 var defaultRegistry = func() *SkillRegistry {
 	r := newSkillRegistry("")
-	r.logger = log.Default
+	r.logger = log.Get()
 	return r
 }()
 

@@ -50,7 +50,7 @@ func NewClient(apiKey, baseURL string) Client {
 	if baseURL != "" {
 		opts = append(opts, option.WithBaseURL(baseURL))
 	}
-	return Client{sdk: anthropic.NewClient(opts...), logger: log.Default}
+	return Client{sdk: anthropic.NewClient(opts...), logger: log.Get()}
 }
 
 // Chat sends a non-streaming request and returns the first text content block.

@@ -40,7 +40,7 @@ func NewSessionManager() *SessionManager {
 	if err == nil {
 		dir = filepath.Join(home, ".minicode", "sessions")
 	}
-	return &SessionManager{dir: dir, logger: log.Default}
+	return &SessionManager{dir: dir, logger: log.Get()}
 }
 
 func (s *SessionManager) log(msg string, attrs ...any) {

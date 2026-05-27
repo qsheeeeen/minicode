@@ -31,7 +31,7 @@ type StatusMessage struct {
 }
 
 // NewStore creates a new message store.
-func NewStore() *Store { return &Store{logger: log.Default} }
+func NewStore() *Store { return &Store{logger: log.Get()} }
 
 // OnChange registers a callback for store mutations (single listener).
 func (s *Store) OnChange(cb ChangeCallback) {

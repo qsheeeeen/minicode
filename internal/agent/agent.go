@@ -33,7 +33,6 @@ type Agent struct {
 	id        string
 
 	sessionName string
-	logger      *slog.Logger
 	tokenMgr    *services.TokenManager
 
 	mu            sync.Mutex
@@ -60,17 +59,16 @@ func NewAgent(cfg domain.AgentConfig) *Agent {
 
 	projectHash := log.ProjectHash()
 	sessName := fmt.Sprintf("session-%d", time.Now().UnixMilli())
+	log.Set(projectHash, sessName)
 	a := &Agent{
 		client:      llm.NewClient(cfg.APIKey, cfg.BaseURL),
 		config:      cfg,
 		store:       NewStore(),
 		session:     storage.NewSessionManager(),
 		tokenMgr:    services.NewTokenManager(),
-		logger:      log.NewSessionLogger(projectHash, sessName),
 		sessionName: sessName,
 		id:          "1",
 	}
-	a.store.SetLogger(a.logger)
 
 	// Register the only tool that needs AgentConfig
 	tools.Register(tools.NewSubAgentTool(cfg))
@@ -84,12 +82,12 @@ func NewAgent(cfg domain.AgentConfig) *Agent {
 
 	a.refreshEnvironment()
 	a.refreshSystemPrompt()
-	a.logger.Info("agent created", "session", a.sessionName, "model", a.config.Model, "provider", a.config.Provider)
+	log.Get().Info("agent created", "session", a.sessionName, "model", a.config.Model, "provider", a.config.Provider)
 	return a
 }
 
-// Logger returns the agent's structured logger.
-func (a *Agent) Logger() *slog.Logger { return a.logger }
+// Logger returns the global logger.
+func (a *Agent) Logger() *slog.Logger { return log.Get() }
 
 // OnTokenUpdate registers a callback for token count changes.
 func (a *Agent) OnTokenUpdate(fn func(total int)) { a.onTokenUpdate = fn }
@@ -145,11 +143,10 @@ func (a *Agent) TokenCount() int {
 	return a.tokenMgr.Total()
 }
 
-// SetSession sets the session name and swaps the logger to a new session log file.
+// SetSession sets the session name and swaps the global logger to a new session log file.
 func (a *Agent) SetSession(name string) {
 	a.sessionName = name
-	a.logger = log.NewSessionLogger(log.ProjectHash(), name)
-	a.store.SetLogger(a.logger)
+	log.Set(log.ProjectHash(), name)
 }
 
 // SetModel updates the model and recreates the LLM client.
@@ -173,7 +170,7 @@ func (a *Agent) SetModel(modelSpec, apiKey, baseURL string, contextLength int) {
 		a.config.ContextLength = contextLength
 	}
 	a.client = llm.NewClient(a.config.APIKey, a.config.BaseURL)
-	a.logger.Info("model updated", "session", a.sessionName, "old_model", oldModel, "old_provider", oldProvider, "new_model", a.config.Model, "new_provider", a.config.Provider)
+	log.Get().Info("model updated", "session", a.sessionName, "old_model", oldModel, "old_provider", oldProvider, "new_model", a.config.Model, "new_provider", a.config.Provider)
 }
 
 func (a *Agent) refreshEnvironment() {
@@ -223,9 +220,9 @@ func (a *Agent) saveSession() {
 		TotalTokens: a.tokenMgr.Total(),
 	})
 	if err != nil {
-		a.logger.Error("save session failed", "session", a.sessionName, "error", err)
+		log.Get().Error("save session failed", "session", a.sessionName, "error", err)
 	} else {
-		a.logger.Info("session saved", "session", a.sessionName, "turns", len(turns), "tokens", a.tokenMgr.Total())
+		log.Get().Info("session saved", "session", a.sessionName, "turns", len(turns), "tokens", a.tokenMgr.Total())
 	}
 }
 
@@ -234,12 +231,12 @@ func (a *Agent) Run(ctx context.Context, userMessage, displayContent string) (bo
 	a.mu.Lock()
 	if a.isRunning {
 		a.mu.Unlock()
-		a.logger.Info("run rejected: already running", "session", a.sessionName)
+		log.Get().Info("run rejected: already running", "session", a.sessionName)
 		return false, nil
 	}
 	a.isRunning = true
 	a.mu.Unlock()
-	a.logger.Info("run started", "session", a.sessionName, "message_length", len(userMessage))
+	log.Get().Info("run started", "session", a.sessionName, "message_length", len(userMessage))
 
 	defer func() {
 		a.mu.Lock()
@@ -263,12 +260,12 @@ func (a *Agent) Run(ctx context.Context, userMessage, displayContent string) (bo
 		handled, expanded, disp := a.resolveCommand(userMessage)
 		if handled {
 			if expanded != "" {
-				a.logger.Info("command expanded", "original", userMessage, "expanded", expanded)
+				log.Get().Info("command expanded", "original", userMessage, "expanded", expanded)
 				llmText = expanded
 				display = disp
 			} else {
 				// Handler command executed (e.g. /clear) — nothing to send to LLM
-				a.logger.Info("command handled without LLM", "command", userMessage)
+				log.Get().Info("command handled without LLM", "command", userMessage)
 				return false, nil
 			}
 		}
@@ -281,46 +278,46 @@ func (a *Agent) Run(ctx context.Context, userMessage, displayContent string) (bo
 	for {
 		loopCount++
 		if err := ctx.Err(); err != nil {
-			a.logger.Info("run cancelled by context", "session", a.sessionName, "loop", loopCount, "error", err)
+			log.Get().Info("run cancelled by context", "session", a.sessionName, "loop", loopCount, "error", err)
 			runErr = err
 			break
 		}
 
 		toolDefs := a.buildLLMTools()
-		a.logger.Info("sending to LLM", "session", a.sessionName, "loop", loopCount, "turns", len(a.store.Turns()), "tools", len(toolDefs))
+		log.Get().Info("sending to LLM", "session", a.sessionName, "loop", loopCount, "turns", len(a.store.Turns()), "tools", len(toolDefs))
 		toolCalls, hasTools, err := a.handleStream(ctx, toolDefs)
 		if err != nil {
 			if errors.Is(err, context.Canceled) {
-				a.logger.Info("run cancelled during stream", "session", a.sessionName, "loop", loopCount)
+				log.Get().Info("run cancelled during stream", "session", a.sessionName, "loop", loopCount)
 				runErr = err
 				break
 			}
-			a.logger.Error("stream failed", "session", a.sessionName, "loop", loopCount, "error", err)
+			log.Get().Error("stream failed", "session", a.sessionName, "loop", loopCount, "error", err)
 			return true, err
 		}
 
 		if err := ctx.Err(); err != nil {
-			a.logger.Info("run cancelled after stream", "session", a.sessionName, "loop", loopCount, "error", err)
+			log.Get().Info("run cancelled after stream", "session", a.sessionName, "loop", loopCount, "error", err)
 			runErr = err
 			break
 		}
 
 		if len(toolCalls) > 0 {
-			a.logger.Info("executing tools", "session", a.sessionName, "loop", loopCount, "count", len(toolCalls))
+			log.Get().Info("executing tools", "session", a.sessionName, "loop", loopCount, "count", len(toolCalls))
 		}
 		denied, err := a.executeTools(ctx, toolCalls)
 		if err != nil {
-			a.logger.Error("tool execution failed", "session", a.sessionName, "loop", loopCount, "error", err)
+			log.Get().Error("tool execution failed", "session", a.sessionName, "loop", loopCount, "error", err)
 			return true, err
 		}
 		if denied {
-			a.logger.Info("tool execution denied", "session", a.sessionName, "loop", loopCount)
+			log.Get().Info("tool execution denied", "session", a.sessionName, "loop", loopCount)
 			break
 		}
 
 		// Trigger compression if over threshold
 		if a.tokenMgr.ShouldCompress(a.config.ContextLength, a.config.CompressionThresholdRatio) {
-			a.logger.Info("compression triggered", "session", a.sessionName, "tokens", a.tokenMgr.Total(), "threshold", a.config.CompressionThresholdRatio)
+			log.Get().Info("compression triggered", "session", a.sessionName, "tokens", a.tokenMgr.Total(), "threshold", a.config.CompressionThresholdRatio)
 			go a.compress(ctx)
 		}
 
@@ -328,18 +325,18 @@ func (a *Agent) Run(ctx context.Context, userMessage, displayContent string) (bo
 			a.saveSession()
 		}
 		if !hasTools {
-			a.logger.Info("no tool calls, ending loop", "session", a.sessionName, "loop", loopCount)
+			log.Get().Info("no tool calls, ending loop", "session", a.sessionName, "loop", loopCount)
 			break
 		}
 	}
 
 	if runErr != nil && errors.Is(runErr, context.Canceled) {
 		// Cleanup: remove the last user message that triggered this aborted run
-		a.logger.Info("run aborted, popping last user message", "session", a.sessionName)
+		log.Get().Info("run aborted, popping last user message", "session", a.sessionName)
 		a.store.Pop()
 	}
 
-	a.logger.Info("run completed", "session", a.sessionName, "loops", loopCount, "error", runErr)
+	log.Get().Info("run completed", "session", a.sessionName, "loops", loopCount, "error", runErr)
 	a.saveSession()
 	return true, nil
 }
@@ -349,14 +346,14 @@ func (a *Agent) Abort() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if a.cancelFunc != nil {
-		a.logger.Info("abort requested", "session", a.sessionName)
+		log.Get().Info("abort requested", "session", a.sessionName)
 		a.cancelFunc()
 	}
 }
 
 // ClearSession resets the conversation.
 func (a *Agent) ClearSession() {
-	a.logger.Info("clearing session", "session", a.sessionName)
+	log.Get().Info("clearing session", "session", a.sessionName)
 	a.store.Clear()
 	a.tokenMgr.Reset()
 	if a.onTokenUpdate != nil {
@@ -366,10 +363,10 @@ func (a *Agent) ClearSession() {
 
 // LoadSession restores saved messages into the agent.
 func (a *Agent) LoadSession(name string) error {
-	a.logger.Info("loading session", "session", name)
+	log.Get().Info("loading session", "session", name)
 	data, err := a.session.Get(name)
 	if err != nil {
-		a.logger.Error("load session failed", "session", name, "error", err)
+		log.Get().Error("load session failed", "session", name, "error", err)
 		return err
 	}
 	a.sessionName = name
@@ -379,7 +376,7 @@ func (a *Agent) LoadSession(name string) error {
 	if a.onTokenUpdate != nil {
 		a.onTokenUpdate(a.tokenMgr.Total())
 	}
-	a.logger.Info("session loaded", "session", name, "turns", len(data.Messages), "tokens", data.TotalTokens)
+	log.Get().Info("session loaded", "session", name, "turns", len(data.Messages), "tokens", data.TotalTokens)
 	return nil
 }
 
@@ -400,7 +397,7 @@ func (a *Agent) handleStream(ctx context.Context, toolDefs []llm.Tool) ([]toolCa
 		ThinkingBudget:  int64(a.config.ThinkingBudget),
 	})
 	if err != nil {
-		a.logger.Error("stream request failed", "error", err)
+		log.Get().Error("stream request failed", "error", err)
 		return nil, false, err
 	}
 
@@ -418,7 +415,7 @@ func (a *Agent) handleStream(ctx context.Context, toolDefs []llm.Tool) ([]toolCa
 
 	for evt := range ch {
 		if evt.Error != nil {
-			a.logger.Error("stream event error", "error", evt.Error)
+			log.Get().Error("stream event error", "error", evt.Error)
 			return nil, false, evt.Error
 		}
 
@@ -533,7 +530,7 @@ func (a *Agent) executeTools(ctx context.Context, calls []toolCall) (denied bool
 		CurrentAgentID: a.id,
 		AgentFactory:   &agentFactory{},
 		SetModelFn:     a.SetModel,
-		Logger:         a.logger,
+		Logger:         log.Get(),
 	}
 
 	var results []toolResultItem
@@ -543,14 +540,14 @@ func (a *Agent) executeTools(ctx context.Context, calls []toolCall) (denied bool
 			args = map[string]any{}
 		}
 
-		a.logger.Info("executing tool", "index", i, "name", call.Tool.Name(), "id", call.Block.ID)
+		log.Get().Info("executing tool", "index", i, "name", call.Tool.Name(), "id", call.Block.ID)
 
 		// Permission Check
 		if call.Tool.RequiresPermission() && tc.PermissionSvc != nil {
 			displayText := fmt.Sprintf("%s(%v)", call.Tool.Name(), args)
 			allowed, reason := tc.PermissionSvc.Check(call.Tool.Name(), displayText, args)
 			if !allowed {
-				a.logger.Info("tool denied by permission", "name", call.Tool.Name(), "reason", reason, "mode", tc.PermissionSvc.Mode())
+				log.Get().Info("tool denied by permission", "name", call.Tool.Name(), "reason", reason, "mode", tc.PermissionSvc.Mode())
 				if tc.PermissionSvc.Mode() == domain.PermAuto {
 					results = append(results, toolResultItem{
 						ToolUseID: call.Block.ID,
@@ -574,7 +571,7 @@ func (a *Agent) executeTools(ctx context.Context, calls []toolCall) (denied bool
 		if execErr != nil {
 			if de, ok := execErr.(*tools.ToolDeniedError); ok {
 				// Tool was denied by user (e.g. AskUser cancelled): stop remaining
-				a.logger.Info("tool denied by user", "name", call.Tool.Name(), "reason", de.Reason)
+				log.Get().Info("tool denied by user", "name", call.Tool.Name(), "reason", de.Reason)
 				results = append(results, toolResultItem{ToolUseID: call.Block.ID, Content: de.Reason})
 				for j := i + 1; j < len(calls); j++ {
 					results = append(results, toolResultItem{ToolUseID: calls[j].Block.ID, Content: de.Reason})
@@ -583,11 +580,11 @@ func (a *Agent) executeTools(ctx context.Context, calls []toolCall) (denied bool
 				a.store.AddStatus(domain.RoleError, fmt.Sprintf(`Tool "%s" was denied by user`, call.Tool.Name()))
 				return true, nil
 			}
-			a.logger.Error("tool execution failed", "name", call.Tool.Name(), "error", execErr)
+			log.Get().Error("tool execution failed", "name", call.Tool.Name(), "error", execErr)
 			results = append(results, toolResultItem{ToolUseID: call.Block.ID, Content: fmt.Sprintf("Error: %s", execErr.Error())})
 			continue
 		}
-		a.logger.Info("tool execution succeeded", "name", call.Tool.Name(), "output_length", len(result.Output))
+		log.Get().Info("tool execution succeeded", "name", call.Tool.Name(), "output_length", len(result.Output))
 		results = append(results, toolResultItem{ToolUseID: call.Block.ID, Content: result.Output})
 	}
 
@@ -623,7 +620,7 @@ func (a *Agent) compress(ctx context.Context) error {
 	a.mu.Lock()
 	if a.isCompressing {
 		a.mu.Unlock()
-		a.logger.Info("compression skipped: already in progress", "session", a.sessionName)
+		log.Get().Info("compression skipped: already in progress", "session", a.sessionName)
 		return nil
 	}
 	a.isCompressing = true
@@ -638,12 +635,12 @@ func (a *Agent) compress(ctx context.Context) error {
 	turns := a.store.Turns()
 	const keepRecent = 10
 	if len(turns) <= keepRecent+2 {
-		a.logger.Info("compression skipped: not enough messages", "session", a.sessionName, "turns", len(turns))
+		log.Get().Info("compression skipped: not enough messages", "session", a.sessionName, "turns", len(turns))
 		a.store.AddStatus(domain.RoleStatus, "(Not enough messages to compress)")
 		return nil
 	}
 
-	a.logger.Info("compression started", "session", a.sessionName, "messages_to_compress", len(turns)-keepRecent, "tokens", a.tokenMgr.Total())
+	log.Get().Info("compression started", "session", a.sessionName, "messages_to_compress", len(turns)-keepRecent, "tokens", a.tokenMgr.Total())
 	a.store.AddStatus(domain.RoleStatus,
 		fmt.Sprintf("(Compressing %d messages, %d tokens...)", len(turns)-keepRecent, a.tokenMgr.Total()))
 
@@ -663,7 +660,7 @@ func (a *Agent) compress(ctx context.Context) error {
 	if a.onTokenUpdate != nil {
 		a.onTokenUpdate(0)
 	}
-	a.logger.Info("compression completed", "session", a.sessionName, "compressed_turns", len(compressed))
+	log.Get().Info("compression completed", "session", a.sessionName, "compressed_turns", len(compressed))
 	a.store.AddStatus(domain.RoleStatus, fmt.Sprintf("(Compressed to %d turns)", len(compressed)))
 	return nil
 }
