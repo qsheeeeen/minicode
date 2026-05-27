@@ -1,11 +1,15 @@
 package tui
 
 import (
+	"fmt"
+	"io"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/list"
-	"github.com/charmbracelet/lipgloss"
 	icmd "minicode/internal/commands"
+
+	"github.com/charmbracelet/bubbles/list"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 // Suggestions is the command autocomplete dropdown, backed by bubbles/list.
@@ -24,14 +28,8 @@ func (s *Suggestions) Set(items []icmd.Command) {
 		}
 		listItems[i] = sugItem{name: cmd.Name, desc: desc}
 	}
-	d := list.NewDefaultDelegate()
-	d.Styles.SelectedTitle = d.Styles.SelectedTitle.Foreground(lipgloss.Color("6"))
-	d.Styles.SelectedDesc = d.Styles.SelectedDesc.Foreground(lipgloss.Color("8"))
-
-	h := len(items) + 1
-	if h > 10 {
-		h = 10
-	}
+	d := sugDelegate{}
+	h := min(len(items), 10)
 	l := list.New(listItems, d, 50, h)
 	l.SetShowHelp(true)
 	l.SetShowStatusBar(false)
@@ -72,3 +70,22 @@ type sugItem struct {
 func (i sugItem) Title() string       { return "/" + i.name }
 func (i sugItem) Description() string { return i.desc }
 func (i sugItem) FilterValue() string { return i.name }
+
+type sugDelegate struct{}
+
+func (d sugDelegate) Height() int                             { return 1 }
+func (d sugDelegate) Spacing() int                            { return 0 }
+func (d sugDelegate) Update(_ tea.Msg, _ *list.Model) tea.Cmd { return nil }
+func (d sugDelegate) Render(w io.Writer, m list.Model, index int, item list.Item) {
+	si, ok := item.(sugItem)
+	if !ok {
+		return
+	}
+	title := "/" + si.name
+	desc := si.desc
+	if index == m.Index() {
+		fmt.Fprint(w, lipgloss.NewStyle().Foreground(lipgloss.Color("6")).Render(title)+" "+lipgloss.NewStyle().Foreground(lipgloss.Color("8")).Render(desc))
+	} else {
+		fmt.Fprint(w, title+" "+styleDim.Render(desc))
+	}
+}
