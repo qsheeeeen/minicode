@@ -2,6 +2,7 @@ node_modules/
 dist/
 config.json
 .DS_Store
-.claude/plans/
 coverage/
 minicode-go
+.agent/
+!.agent/skills/
