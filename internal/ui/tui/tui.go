@@ -9,8 +9,8 @@ import (
 	icmd "minicode/internal/commands"
 	"minicode/internal/config"
 	"minicode/internal/domain"
+	"minicode/internal/services"
 	"minicode/internal/storage"
-	"minicode/internal/tools"
 
 	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/spinner"
@@ -100,7 +100,7 @@ func NewTUIModel(ag *agent.Agent, promptFiles []string) *TUIModel {
 	})
 
 	if p := ag.PermissionSvc(); p != nil {
-		if ps, ok := p.(*tools.PermissionService); ok {
+		if ps, ok := p.(*services.PermissionService); ok {
 			ps.SetPromptFn(func(displayText string) string {
 				ch := make(chan string)
 				if m.program != nil {

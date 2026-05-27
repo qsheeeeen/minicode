@@ -1,4 +1,4 @@
-package tools
+package services
 
 import "minicode/internal/domain"
 

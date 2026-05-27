@@ -1,4 +1,4 @@
-package tools
+package services
 
 import (
 	"fmt"
@@ -6,6 +6,13 @@ import (
 
 	"minicode/internal/domain"
 )
+
+// PermissionChecker is the interface tools use to gate execution.
+type PermissionChecker interface {
+	Check(toolName, displayText string, toolInput map[string]any) (allowed bool, reason string)
+	Mode() domain.PermissionMode
+	CycleMode() domain.PermissionMode
+}
 
 // PermissionService controls tool execution gating.
 type PermissionService struct {

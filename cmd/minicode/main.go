@@ -17,8 +17,8 @@ import (
 	"minicode/internal/config"
 	"minicode/internal/domain"
 	"minicode/internal/llm"
+	"minicode/internal/services"
 	"minicode/internal/storage"
-	"minicode/internal/tools"
 	"minicode/internal/ui"
 	"minicode/internal/ui/tui"
 )
@@ -112,7 +112,7 @@ func run(cmd *cobra.Command, args []string) {
 	}
 
 	// Permission service
-	permSvc := tools.NewPermissionService(domain.PermissionMode(resolved.PermissionMode))
+	permSvc := services.NewPermissionService(domain.PermissionMode(resolved.PermissionMode))
 	ag.SetPermissionSvc(permSvc)
 
 	// Wire LLM-based auto-decide for auto permission mode (matches TS)

@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"minicode/internal/domain"
+	"minicode/internal/services"
 )
 
 // ErrToolDenied is returned when a tool execution is blocked by the permission gate.
@@ -23,7 +24,7 @@ func (e *ToolDeniedError) Unwrap() error { return ErrToolDenied }
 // ToolContext provides tools with access to shared services.
 type ToolContext struct {
 	Config         domain.AgentConfig
-	PermissionSvc  PermissionChecker
+	PermissionSvc  services.PermissionChecker
 	CurrentAgentID string
 	AgentFactory   AgentFactory // interface to create new agents
 	SetModelFn     func(model, apiKey, baseURL string, contextLength int)
@@ -35,13 +36,6 @@ type AgentFactory interface {
 	Create(cfg domain.AgentConfig) any
 	Run(ctx context.Context, agent any, task string) error
 	GetTurns(agent any) []domain.MessageParam
-}
-
-// PermissionChecker is the interface tools use to gate execution.
-type PermissionChecker interface {
-	Check(toolName, displayText string, toolInput map[string]any) (allowed bool, reason string)
-	Mode() domain.PermissionMode
-	CycleMode() domain.PermissionMode
 }
 
 // ToolRequirement declares a service dependency for tool registration.

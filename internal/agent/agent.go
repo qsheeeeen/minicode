@@ -14,6 +14,7 @@ import (
 
 	"minicode/internal/domain"
 	"minicode/internal/llm"
+	"minicode/internal/services"
 	"minicode/internal/skills"
 	"minicode/internal/storage"
 	"minicode/internal/tools"
@@ -25,13 +26,13 @@ type Agent struct {
 	config    domain.AgentConfig
 	store     *Store
 	session   *storage.SessionManager
-	permSvc   tools.PermissionChecker
+	permSvc   services.PermissionChecker
 	askUserFn func(question string, options []domain.AskOption, multiSelect bool) string
 	id        string
 
 	sessionName string
 	logger      *slog.Logger
-	tokenMgr    *TokenManager
+	tokenMgr    *services.TokenManager
 
 	mu            sync.Mutex
 	cancelFunc    context.CancelFunc
@@ -60,7 +61,7 @@ func NewAgent(cfg domain.AgentConfig) *Agent {
 		config:      cfg,
 		store:       NewStore(),
 		session:     storage.NewSessionManager(),
-		tokenMgr:    NewTokenManager(),
+		tokenMgr:    services.NewTokenManager(),
 		logger:      slog.New(slog.NewTextHandler(os.Stderr, nil)),
 		sessionName: fmt.Sprintf("session-%d", time.Now().UnixMilli()),
 		id:          "1",
@@ -74,7 +75,7 @@ func NewAgent(cfg domain.AgentConfig) *Agent {
 	a.refreshSystemPrompt()
 
 	// Permission service
-	a.permSvc = tools.NewPermissionService(cfg.PermissionMode)
+	a.permSvc = services.NewPermissionService(cfg.PermissionMode)
 
 	a.refreshEnvironment()
 	a.refreshSystemPrompt()
@@ -99,10 +100,10 @@ func (a *Agent) SetCommandResolver(fn func(input string) (handled bool, promptTe
 }
 
 // PermissionSvc returns the current permission service.
-func (a *Agent) PermissionSvc() tools.PermissionChecker { return a.permSvc }
+func (a *Agent) PermissionSvc() services.PermissionChecker { return a.permSvc }
 
 // SetPermissionSvc sets the permission service.
-func (a *Agent) SetPermissionSvc(p tools.PermissionChecker) { a.permSvc = p }
+func (a *Agent) SetPermissionSvc(p services.PermissionChecker) { a.permSvc = p }
 
 // ID returns the agent identifier.
 func (a *Agent) ID() string { return a.id }
