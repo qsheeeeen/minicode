@@ -329,7 +329,7 @@ func (m *TUIModel) handleSelectChoice(val string) {
 		if spec == "" {
 			return
 		}
-		modelName, apiKey, baseURL, ctxLen := applyModelSpecFn(spec)
+		modelName, apiKey, baseURL, ctxLen := applyModelSpec(spec)
 		m.agent.SetModel(spec, apiKey, baseURL, ctxLen)
 		config.SetModel(spec)
 		m.Status.modelName = modelName
@@ -354,7 +354,7 @@ func (m *TUIModel) handleSelectChoice(val string) {
 	case "model-model":
 		spec := val + "@" + m.Select.wizardProvider
 		config.SetTier(m.Select.wizardEditTier, spec)
-		modelName, apiKey, baseURL, ctxLen := applyModelSpecFn(spec)
+		modelName, apiKey, baseURL, ctxLen := applyModelSpec(spec)
 		m.agent.SetModel(spec, apiKey, baseURL, ctxLen)
 		config.SetModel(spec)
 		m.Status.modelName = modelName

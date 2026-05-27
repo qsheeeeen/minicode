@@ -12,6 +12,28 @@ import (
 	"minicode/internal/config"
 )
 
+// applyModelSpec resolves a "model@provider" spec into its components.
+func applyModelSpec(spec string) (modelName, apiKey, baseURL string, contextLen int) {
+	cfg, _ := config.Load()
+	parts := strings.SplitN(spec, "@", 2)
+	modelName = parts[0]
+	providerName := ""
+	if len(parts) > 1 {
+		providerName = parts[1]
+	}
+	if providerName == "" {
+		for k := range cfg.Providers {
+			providerName = k
+			break
+		}
+	}
+	provider := cfg.Providers[providerName]
+	if info, ok := provider.Models[modelName]; ok {
+		contextLen = info.ContextLength
+	}
+	return modelName, provider.APIKey, provider.BaseURL, contextLen
+}
+
 // SelectModel holds the state for interactive selection UI (bubbles/list).
 type SelectModel struct {
 	list list.Model
@@ -122,25 +144,4 @@ func (sel *SelectModel) buildModelItems(providerName string) []icmd.SelectItem {
 		items = append(items, icmd.SelectItem{Value: modelName, Label: modelName})
 	}
 	return items
-}
-
-func applyModelSpecFn(spec string) (modelName, apiKey, baseURL string, contextLen int) {
-	cfg, _ := config.Load()
-	parts := strings.SplitN(spec, "@", 2)
-	modelName = parts[0]
-	providerName := ""
-	if len(parts) > 1 {
-		providerName = parts[1]
-	}
-	if providerName == "" {
-		for k := range cfg.Providers {
-			providerName = k
-			break
-		}
-	}
-	provider := cfg.Providers[providerName]
-	if info, ok := provider.Models[modelName]; ok {
-		contextLen = info.ContextLength
-	}
-	return modelName, provider.APIKey, provider.BaseURL, contextLen
 }
