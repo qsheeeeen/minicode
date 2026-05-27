@@ -75,8 +75,8 @@ func NewAgent(cfg domain.AgentConfig) *Agent {
 	// Register the only tool that needs AgentConfig
 	tools.Register(tools.NewSubAgentTool(cfg))
 
-	// Load skills
-	skills.LoadSkills(cfg.SkillsDir)
+	// Load skills from .agent/ directory
+	skills.LoadSkills(".agent")
 	a.refreshSystemPrompt()
 
 	// Permission service
@@ -193,9 +193,7 @@ func (a *Agent) refreshSystemPrompt() {
 	if a.config.UserPrompt != "" {
 		prompt += "\n\n# Additional Instructions\n" + a.config.UserPrompt
 	}
-	if a.config.ProjectPromptFile != "" {
-		prompt += fmt.Sprintf("\n\n# Workspace Information\nThis workspace's description is in `%s`. Use the Read tool to load it at the start of each conversation. It contains critical project instructions that you must follow.", a.config.ProjectPromptFile)
-	}
+	prompt += "\n\n# Workspace Information\nThis workspace's description is in `AGENTS.md`. Use the Read tool to load it at the start of each conversation. It contains critical project instructions that you must follow."
 
 	// Inject available skills
 	available := skills.List()

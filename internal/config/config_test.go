@@ -14,9 +14,6 @@ func TestResolveConfig_EmptyConfig(t *testing.T) {
 	if resolved.CompressionThreshold == 0 {
 		t.Error("expected default compression threshold")
 	}
-	if resolved.PromptFile == "" {
-		t.Error("expected default prompt file")
-	}
 	if resolved.PermissionMode != "manual" {
 		t.Errorf("expected manual mode, got %s", resolved.PermissionMode)
 	}
@@ -33,12 +30,6 @@ func TestResolveConfig_Defaults(t *testing.T) {
 	resolved, _ := Resolve("")
 	if resolved.CompressionThreshold != 0.8 {
 		t.Errorf("expected 0.8, got %f", resolved.CompressionThreshold)
-	}
-	if resolved.PromptFile != "AGENTS.md" {
-		t.Errorf("expected AGENTS.md, got %s", resolved.PromptFile)
-	}
-	if resolved.SkillsDir != ".minicode/skills" {
-		t.Errorf("expected default skills dir, got %s", resolved.SkillsDir)
 	}
 }
 

@@ -64,7 +64,7 @@ func run(cmd *cobra.Command, args []string) {
 		resolved.PermissionMode = permissionMode
 	}
 
-	userPrompt, promptFiles := config.LoadPromptFiles(resolved.PromptFile)
+	userPrompt, promptFiles := config.LoadPromptFiles()
 
 	cfg := domain.AgentConfig{
 		APIKey:                    resolved.Model.APIKey,
@@ -76,9 +76,7 @@ func run(cmd *cobra.Command, args []string) {
 		ThinkingEnabled:           resolved.Thinking.Enabled,
 		ThinkingBudget:            8192,
 		Effort:                    resolved.Thinking.Effort,
-		ProjectPromptFile:         resolved.PromptFile,
 		UserPrompt:                userPrompt,
-		SkillsDir:                 resolved.SkillsDir,
 	}
 
 	ag := agent.NewAgent(cfg)

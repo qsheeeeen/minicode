@@ -36,9 +36,7 @@ type Config struct {
 	CompressionThreshold float64                   `mapstructure:"compressionThreshold"`
 	Thinking             ThinkingConfig            `mapstructure:"thinking"`
 	Effort               string                    `mapstructure:"effort"` // legacy: top-level effort, now nested under thinking
-	PromptFile           string                    `mapstructure:"promptFile"`
 	PermissionMode       string                    `mapstructure:"permissionMode"`
-	SkillsDir            string                    `mapstructure:"skillsDir"`
 }
 
 // ResolvedConfig is the final runtime configuration after resolution.
@@ -46,9 +44,7 @@ type ResolvedConfig struct {
 	Model                ModelRef
 	CompressionThreshold float64
 	Thinking             ThinkingConfig
-	PromptFile           string
 	PermissionMode       string
-	SkillsDir            string
 }
 
 // ModelRef identifies a resolved model+provider.
@@ -79,9 +75,7 @@ func resetViper() {
 
 	// Defaults
 	v.SetDefault("compressionThreshold", 0.8)
-	v.SetDefault("promptFile", "AGENTS.md")
 	v.SetDefault("permissionMode", "manual")
-	v.SetDefault("skillsDir", ".minicode/skills")
 }
 
 // Load reads the config file.
@@ -125,9 +119,7 @@ func Resolve(specOverride string) (*ResolvedConfig, error) {
 			Enabled: cfg.Thinking.Enabled,
 			Effort:  coalesce(cfg.Thinking.Effort, cfg.Effort),
 		},
-		PromptFile:     cfg.PromptFile,
 		PermissionMode: cfg.PermissionMode,
-		SkillsDir:      cfg.SkillsDir,
 	}
 
 	if spec == "" {
@@ -193,9 +185,9 @@ func coalesce(a, b string) string {
 	return b
 }
 
-// LoadPromptFiles loads the global and project prompt files.
+// LoadPromptFiles loads the global and project AGENTS.md files.
 // Returns the combined prompt text and a list of loaded file names.
-func LoadPromptFiles(projectPromptFile string) (string, []string) {
+func LoadPromptFiles() (string, []string) {
 	var userPrompt string
 	var files []string
 
@@ -206,10 +198,8 @@ func LoadPromptFiles(projectPromptFile string) (string, []string) {
 		}
 	}
 
-	if projectPromptFile != "" {
-		if _, err := os.Stat(projectPromptFile); err == nil {
-			files = append(files, projectPromptFile)
-		}
+	if _, err := os.Stat("AGENTS.md"); err == nil {
+		files = append(files, "AGENTS.md")
 	}
 
 	return userPrompt, files

@@ -61,9 +61,7 @@ type AgentConfig struct {
 	ThinkingBudget            int
 	Effort                    string
 	UserPrompt                string
-	ProjectPromptFile         string
 	ExcludeTools              []string
-	SkillsDir                 string
 	PermissionMode            PermissionMode
 }
 
