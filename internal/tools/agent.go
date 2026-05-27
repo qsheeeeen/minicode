@@ -21,7 +21,7 @@ func NewSubAgentTool(parentConfig domain.AgentConfig) *SubAgentTool {
 
 func (t *SubAgentTool) Name() string { return "SubAgent" }
 func (t *SubAgentTool) Description() string {
-	return "Delegate a sub-task to an independent agent. Creates a new agent session. The sub-agent has access to all tools (except SubAgent) and returns a concise summary."
+	return "Delegate a sub-task to a read-only sub-agent. The sub-agent can only read and search files (Read, Grep, ActivateSkill) and returns a concise summary."
 }
 func (t *SubAgentTool) ReadOnly() bool    { return false }
 func (t *SubAgentTool) Interactive() bool { return false }
