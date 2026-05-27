@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"minicode/internal/log"
+
 	"minicode/internal/domain"
 	"minicode/internal/llm"
 	"minicode/internal/services"
@@ -56,14 +58,16 @@ func NewAgent(cfg domain.AgentConfig) *Agent {
 		cfg.ContextLength = 200000
 	}
 
+	projectHash := log.ProjectHash()
+	sessName := fmt.Sprintf("session-%d", time.Now().UnixMilli())
 	a := &Agent{
 		client:      llm.NewClient(cfg.APIKey, cfg.BaseURL),
 		config:      cfg,
 		store:       NewStore(),
 		session:     storage.NewSessionManager(),
 		tokenMgr:    services.NewTokenManager(),
-		logger:      slog.New(slog.NewTextHandler(os.Stderr, nil)),
-		sessionName: fmt.Sprintf("session-%d", time.Now().UnixMilli()),
+		logger:      log.NewSessionLogger(projectHash, sessName),
+		sessionName: sessName,
 		id:          "1",
 	}
 	a.store.SetLogger(a.logger)
@@ -141,8 +145,12 @@ func (a *Agent) TokenCount() int {
 	return a.tokenMgr.Total()
 }
 
-// SetSession sets the session name.
-func (a *Agent) SetSession(name string) { a.sessionName = name }
+// SetSession sets the session name and swaps the logger to a new session log file.
+func (a *Agent) SetSession(name string) {
+	a.sessionName = name
+	a.logger = log.NewSessionLogger(log.ProjectHash(), name)
+	a.store.SetLogger(a.logger)
+}
 
 // SetModel updates the model and recreates the LLM client.
 func (a *Agent) SetModel(modelSpec, apiKey, baseURL string, contextLength int) {

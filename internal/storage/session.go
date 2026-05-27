@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"minicode/internal/domain"
+	"minicode/internal/log"
 )
 
 // SessionData is the persisted state of an agent session.
@@ -39,7 +40,7 @@ func NewSessionManager() *SessionManager {
 	if err == nil {
 		dir = filepath.Join(home, ".minicode", "sessions")
 	}
-	return &SessionManager{dir: dir, logger: slog.New(slog.NewTextHandler(os.Stderr, nil))}
+	return &SessionManager{dir: dir, logger: log.Default}
 }
 
 func (s *SessionManager) log(msg string, attrs ...any) {

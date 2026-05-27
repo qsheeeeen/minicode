@@ -3,12 +3,12 @@ package llm
 import (
 	"context"
 	"log/slog"
-	"os"
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
 	"github.com/anthropics/anthropic-sdk-go/packages/param"
 	"minicode/internal/domain"
+	"minicode/internal/log"
 )
 
 // Tool is a tool definition sent to the API.
@@ -50,7 +50,7 @@ func NewClient(apiKey, baseURL string) Client {
 	if baseURL != "" {
 		opts = append(opts, option.WithBaseURL(baseURL))
 	}
-	return Client{sdk: anthropic.NewClient(opts...), logger: slog.New(slog.NewTextHandler(os.Stderr, nil))}
+	return Client{sdk: anthropic.NewClient(opts...), logger: log.Default}
 }
 
 // Chat sends a non-streaming request and returns the first text content block.

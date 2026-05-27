@@ -5,12 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"os"
 	"strings"
 	"time"
 
 	"minicode/internal/domain"
 	"minicode/internal/llm"
+	"minicode/internal/log"
 )
 
 // PermissionChecker is the interface tools use to gate execution.
@@ -33,7 +33,7 @@ func NewPermissionService(mode domain.PermissionMode) *PermissionService {
 	if mode == "" {
 		mode = domain.PermManual
 	}
-	return &PermissionService{mode: mode, logger: slog.New(slog.NewTextHandler(os.Stderr, nil))}
+	return &PermissionService{mode: mode, logger: log.Default}
 }
 
 // Mode returns the current mode.

@@ -2,11 +2,11 @@ package agent
 
 import (
 	"log/slog"
-	"os"
 	"sync"
 	"time"
 
 	"minicode/internal/domain"
+	"minicode/internal/log"
 )
 
 // ChangeCallback is called whenever the store mutates.
@@ -31,7 +31,7 @@ type StatusMessage struct {
 }
 
 // NewStore creates a new message store.
-func NewStore() *Store { return &Store{logger: slog.New(slog.NewTextHandler(os.Stderr, nil))} }
+func NewStore() *Store { return &Store{logger: log.Default} }
 
 // OnChange registers a callback for store mutations (single listener).
 func (s *Store) OnChange(cb ChangeCallback) {

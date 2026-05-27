@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"gopkg.in/yaml.v3"
+	"minicode/internal/log"
 )
 
 // SkillInfo is summary metadata for a skill.
@@ -155,7 +156,7 @@ func (r *SkillRegistry) splitFrontmatter(content string) (frontmatter, body stri
 // Default registry singleton.
 var defaultRegistry = func() *SkillRegistry {
 	r := newSkillRegistry("")
-	r.logger = slog.New(slog.NewTextHandler(os.Stderr, nil))
+	r.logger = log.Default
 	return r
 }()
 
