@@ -135,8 +135,6 @@ func (m *TUIModel) Init() tea.Cmd {
 	return tea.Batch(textarea.Blink, m.Input.spinner.Tick)
 }
 
-// ---- Update ----
-
 // Update is the Bubble Tea Update function.
 func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
@@ -227,6 +225,26 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	cmds = append(cmds, cmd)
 
 	return m, tea.Batch(cmds...)
+}
+
+// View is the Bubble Tea View function.
+func (m *TUIModel) View() string {
+	if !m.ready {
+		return "Initializing...\n"
+	}
+
+	header := m.Header.View(m.width)
+	viewport := m.Viewport.viewport.View()
+	input := m.Input.View(m.width)
+	status := m.Status.View(m.agent, m.width)
+	helpView := m.help.View(m.keys)
+
+	// When select mode is active, input area shows the list instead
+	if m.Select.Active() {
+		input = m.Select.list.View()
+	}
+
+	return header + viewport + "\n" + input + status + helpView + "\n"
 }
 
 // ---- Helpers ----
@@ -363,8 +381,6 @@ func (m *TUIModel) handleSelectChoice(val string) {
 	m.Select.ClearMode()
 }
 
-// ---- TUI entry point ----
-
 // RunTUI starts the interactive Bubble Tea terminal UI.
 func RunTUI(ag *agent.Agent, promptFiles []string) error {
 	mdl := NewTUIModel(ag, promptFiles)
@@ -372,26 +388,4 @@ func RunTUI(ag *agent.Agent, promptFiles []string) error {
 	mdl.program = p
 	_, err := p.Run()
 	return err
-}
-
-// ---- View ----
-
-// View is the Bubble Tea View function.
-func (m *TUIModel) View() string {
-	if !m.ready {
-		return "Initializing...\n"
-	}
-
-	header := m.Header.View(m.width)
-	viewport := m.Viewport.viewport.View()
-	input := m.Input.View(m.width)
-	status := m.Status.View(m.agent, m.width)
-	helpView := m.help.View(m.keys)
-
-	// When select mode is active, input area shows the list instead
-	if m.Select.Active() {
-		input = m.Select.list.View()
-	}
-
-	return header + viewport + "\n" + input + status + helpView + "\n"
 }
