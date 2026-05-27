@@ -15,7 +15,7 @@ func TestSetModeAndClear(t *testing.T) {
 		{Value: "a", Label: "Option A"},
 		{Value: "b", Label: "Option B", Description: "desc"},
 	}
-	m.Select.setMode("test-mode", "Pick one:", items, m.width, m.height)
+	m.Select.setMode("test-mode", "Pick one:", items)
 	if m.Select.mode != "test-mode" {
 		t.Errorf("selectMode should be 'test-mode', got %q", m.Select.mode)
 	}

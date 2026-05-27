@@ -47,7 +47,6 @@ func NewTUIModel(ag *agent.Agent, promptFiles []string) *TUIModel {
 	m.Input.textarea = textarea.New()
 	m.Input.textarea.Placeholder = "Type a message or /command..."
 	m.Input.textarea.ShowLineNumbers = false
-	m.Input.textarea.SetHeight(3)
 	m.Input.textarea.Focus()
 
 	m.Input.spinner = spinner.New()
@@ -199,10 +198,6 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.WindowSizeMsg:
-		m.Viewport.viewport.Width = msg.Width - 4
-		m.Viewport.viewport.Height = msg.Height - 3 - 6
-		m.Input.textarea.SetWidth(msg.Width - 4)
-		m.Status.prog.Width = msg.Width - 20
 		m.width = msg.Width
 		m.height = msg.Height
 		m.ready = true
@@ -267,7 +262,7 @@ func (m *TUIModel) handleEnter(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					}
 					return m, nil
 				case icmd.SelectResult:
-					m.Select.setMode(r.Mode, r.Title, r.Items, m.width, m.height)
+					m.Select.setMode(r.Mode, r.Title, r.Items)
 					return m, nil
 				case icmd.SetInputResult:
 					m.Input.textarea.SetValue(r.Value)
@@ -309,7 +304,7 @@ func (m *TUIModel) handleSelectChoice(val string) {
 		m.agent.Store().AddStatus(domain.RoleStatus, "Loaded session: "+val)
 	case "model-tier":
 		if items := m.Select.handleModelTier(val); items != nil {
-			m.Select.setMode("model-edit-tier", "Edit which tier?", items, m.width, m.height)
+			m.Select.setMode("model-edit-tier", "Edit which tier?", items)
 			return
 		}
 		cfg, _ := config.Load()
@@ -331,7 +326,7 @@ func (m *TUIModel) handleSelectChoice(val string) {
 			m.agent.Store().AddStatus(domain.RoleError, "No configured providers found")
 			return
 		}
-		m.Select.setMode("model-provider", "Provider for Tier "+val+":", items, m.width, m.height)
+		m.Select.setMode("model-provider", "Provider for Tier "+val+":", items)
 		return
 	case "model-provider":
 		m.Select.wizardProvider = val
@@ -340,7 +335,7 @@ func (m *TUIModel) handleSelectChoice(val string) {
 			m.agent.Store().AddStatus(domain.RoleError, "No models configured for "+val)
 			return
 		}
-		m.Select.setMode("model-model", "Model for Tier "+m.Select.wizardEditTier+" @"+val+":", items, m.width, m.height)
+		m.Select.setMode("model-model", "Model for Tier "+m.Select.wizardEditTier+" @"+val+":", items)
 		return
 	case "model-model":
 		spec := val + "@" + m.Select.wizardProvider

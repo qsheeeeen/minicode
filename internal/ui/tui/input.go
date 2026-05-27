@@ -91,7 +91,7 @@ func (in *InputModel) View(width int) string {
 	}
 
 	inputView := prefix + in.textarea.View()
-	mainInput := styleInputBorder.Width(width - 2).Render(inputView)
+	mainInput := styleInputBorder.Render(inputView)
 
 	if in.Suggest.IsActive() && !in.streaming {
 		return in.Suggest.View(mainInput) + "\n"

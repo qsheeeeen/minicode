@@ -33,11 +33,7 @@ func (a *AskUserPrompt) Activate(question string, options []domain.AskOption, mu
 	d.Styles.SelectedTitle = d.Styles.SelectedTitle.Foreground(lipgloss.Color("6"))
 	d.Styles.SelectedDesc = d.Styles.SelectedDesc.Foreground(lipgloss.Color("8"))
 
-	h := len(options) + 3
-	if h < 5 {
-		h = 5
-	}
-	l := list.New(items, d, 60, h)
+	l := list.New(items, d, 60, 5)
 	l.SetShowHelp(false)
 	l.SetShowStatusBar(false)
 	l.SetShowTitle(false)

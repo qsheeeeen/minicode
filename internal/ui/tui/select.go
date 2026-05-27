@@ -26,7 +26,7 @@ type SelectModel struct {
 }
 
 // setMode initializes a bubbles/list for a select mode.
-func (sel *SelectModel) setMode(mode, title string, items []icmd.SelectItem, width, height int) {
+func (sel *SelectModel) setMode(mode, title string, items []icmd.SelectItem) {
 	listItems := make([]list.Item, len(items))
 	for i, it := range items {
 		listItems[i] = listItem{title: it.Label, desc: it.Description}
@@ -36,7 +36,7 @@ func (sel *SelectModel) setMode(mode, title string, items []icmd.SelectItem, wid
 	delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.Foreground(lipgloss.Color("6"))
 	delegate.Styles.SelectedDesc = delegate.Styles.SelectedDesc.Foreground(lipgloss.Color("6"))
 
-	l := list.New(listItems, delegate, width-4, height-8)
+	l := list.New(listItems, delegate, 60, 10)
 	l.SetShowTitle(true)
 	l.Title = title
 	l.SetShowHelp(true)
