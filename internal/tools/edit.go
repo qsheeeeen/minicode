@@ -28,9 +28,10 @@ func (t *EditTool) InputSchema() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
-			"path":    map[string]any{"type": "string"},
-			"oldText": map[string]any{"type": "string"},
-			"newText": map[string]any{"type": "string"},
+			"path":       map[string]any{"type": "string"},
+			"oldText":    map[string]any{"type": "string"},
+			"newText":    map[string]any{"type": "string"},
+			"replaceAll": map[string]any{"type": "boolean", "description": "Replace all occurrences (default: false, replaces first only)"},
 		},
 		"required": []string{"path", "oldText", "newText"},
 	}
@@ -40,13 +41,14 @@ func (t *EditTool) Execute(ctx context.Context, args map[string]any, tc ToolCont
 	filePath, _ := args["path"].(string)
 	oldText, _ := args["oldText"].(string)
 	newText, _ := args["newText"].(string)
+	replaceAll, _ := args["replaceAll"].(bool)
 
 	if filePath == "" {
 		tc.Log("Edit: path is required")
 		return domain.ToolResult{Output: "Error: path is required"}, nil
 	}
 
-	tc.Log("Edit: editing file", "path", filePath, "old_length", len(oldText), "new_length", len(newText))
+	tc.Log("Edit: editing file", "path", filePath, "old_length", len(oldText), "new_length", len(newText), "replaceAll", replaceAll)
 
 	data, err := os.ReadFile(filePath)
 	if err != nil {
@@ -55,18 +57,31 @@ func (t *EditTool) Execute(ctx context.Context, args map[string]any, tc ToolCont
 	}
 
 	content := string(data)
-	if !strings.Contains(content, oldText) {
+	count := strings.Count(content, oldText)
+	if count == 0 {
 		tc.LogErr("Edit: oldText not found", "path", filePath, "old_length", len(oldText))
 		return domain.ToolResult{Output: "Error: oldText not found in file"}, nil
 	}
 
-	newContent := strings.Replace(content, oldText, newText, 1)
+	if !replaceAll && count > 1 {
+		return domain.ToolResult{Output: fmt.Sprintf("Error: oldText found %d times. Set replaceAll=true to replace all occurrences, or make oldText more specific to match exactly once.", count)}, nil
+	}
+
+	n := 1
+	if replaceAll {
+		n = -1
+	}
+	newContent := strings.Replace(content, oldText, newText, n)
 	if err := os.WriteFile(filePath, []byte(newContent), 0o644); err != nil {
 		tc.LogErr("Edit: write failed", "path", filePath, "error", err)
 		return domain.ToolResult{Output: err.Error()}, nil
 	}
 
-	tc.Log("Edit: file edited", "path", filePath, "old_size", len(content), "new_size", len(newContent))
+	replaced := count
+	if !replaceAll {
+		replaced = 1
+	}
+	tc.Log("Edit: file edited", "path", filePath, "old_size", len(content), "new_size", len(newContent), "replaced", replaced)
 
 	dmp := diffmatchpatch.New()
 	diffs := dmp.DiffMain(oldText, newText, false)
@@ -102,7 +117,7 @@ func (t *EditTool) Execute(ctx context.Context, args map[string]any, tc ToolCont
 	}
 
 	return domain.ToolResult{
-		Output: fmt.Sprintf("Edited %s (-%d/+%d lines)\n%s", filePath, removed, added, out.String()),
+		Output: fmt.Sprintf("Edited %s (%d replacement(s), -%d/+%d lines)\n%s", filePath, replaced, removed, added, out.String()),
 	}, nil
 }
 

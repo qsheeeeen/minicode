@@ -33,13 +33,39 @@ func TestEditTool_ReplaceFirstOnly(t *testing.T) {
 	os.WriteFile(path, []byte("foo bar foo"), 0o644)
 
 	et := NewEditTool()
-	et.Execute(context.Background(), map[string]any{
+	result, _ := et.Execute(context.Background(), map[string]any{
 		"path": path, "oldText": "foo", "newText": "baz",
 	}, ToolContext{})
 
+	// Without replaceAll, multiple matches should return an error
+	if !strings.Contains(result.Output, "found 2 times") {
+		t.Errorf("expected error about multiple matches, got %q", result.Output)
+	}
+
+	// File should not be modified
 	data, _ := os.ReadFile(path)
-	if string(data) != "baz bar foo" {
-		t.Errorf("expected only first occurrence replaced, got %q", string(data))
+	if string(data) != "foo bar foo" {
+		t.Errorf("expected file unchanged, got %q", string(data))
+	}
+}
+
+func TestEditTool_ReplaceAll(t *testing.T) {
+	tmp := t.TempDir()
+	path := filepath.Join(tmp, "test.txt")
+	os.WriteFile(path, []byte("foo bar foo"), 0o644)
+
+	et := NewEditTool()
+	result, _ := et.Execute(context.Background(), map[string]any{
+		"path": path, "oldText": "foo", "newText": "baz", "replaceAll": true,
+	}, ToolContext{})
+
+	if !strings.Contains(result.Output, "2 replacement(s)") {
+		t.Errorf("expected 2 replacements, got %q", result.Output)
+	}
+
+	data, _ := os.ReadFile(path)
+	if string(data) != "baz bar baz" {
+		t.Errorf("expected 'baz bar baz', got %q", string(data))
 	}
 }
 
