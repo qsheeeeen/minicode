@@ -12,7 +12,8 @@ type testTool struct{}
 func (t *testTool) Name() string                { return "TestTool" }
 func (t *testTool) Description() string         { return "A test tool" }
 func (t *testTool) InputSchema() map[string]any { return map[string]any{"type": "object"} }
-func (t *testTool) RequiresPermission() bool    { return false }
+func (t *testTool) ReadOnly() bool    { return true }
+func (t *testTool) Interactive() bool { return false }
 func (t *testTool) Requires() []ToolRequirement { return nil }
 func (t *testTool) Execute(ctx context.Context, args map[string]any, tc ToolContext) (domain.ToolResult, error) {
 	return domain.ToolResult{Output: "test output"}, nil

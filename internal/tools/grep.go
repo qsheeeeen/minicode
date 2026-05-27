@@ -18,7 +18,8 @@ func (t *GrepTool) Name() string { return "Grep" }
 func (t *GrepTool) Description() string {
 	return "Search file contents using the system grep command. Supports recursive search, line numbers, and case-insensitive matching. Searches are restricted to the current working directory and its subdirectories."
 }
-func (t *GrepTool) RequiresPermission() bool    { return false }
+func (t *GrepTool) ReadOnly() bool    { return true }
+func (t *GrepTool) Interactive() bool { return false }
 func (t *GrepTool) Requires() []ToolRequirement { return nil }
 
 func (t *GrepTool) InputSchema() map[string]any {

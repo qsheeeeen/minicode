@@ -34,6 +34,7 @@ type Agent struct {
 
 	sessionName string
 	tokenMgr    *services.TokenManager
+	toolList    []tools.Tool // allowed tools for this agent
 
 	mu            sync.Mutex
 	cancelFunc    context.CancelFunc
@@ -68,6 +69,7 @@ func NewAgent(cfg domain.AgentConfig) *Agent {
 		tokenMgr:    services.NewTokenManager(),
 		sessionName: sessName,
 		id:          "1",
+		toolList:    tools.All(),
 	}
 
 	// Register the only tool that needs AgentConfig
@@ -500,20 +502,13 @@ func (a *Agent) handleStream(ctx context.Context, toolDefs []llm.Tool) ([]toolCa
 }
 
 func (a *Agent) buildLLMTools() []llm.Tool {
-	all := tools.All()
-	defs := make([]llm.Tool, 0, len(all))
-	for _, t := range all {
-		for _, ex := range a.config.ExcludeTools {
-			if t.Name() == ex {
-				goto skip
-			}
-		}
+	defs := make([]llm.Tool, 0, len(a.toolList))
+	for _, t := range a.toolList {
 		defs = append(defs, llm.Tool{
 			Name:        t.Name(),
 			Description: t.Description(),
 			InputSchema: t.InputSchema(),
 		})
-	skip:
 	}
 	return defs
 }
@@ -543,7 +538,7 @@ func (a *Agent) executeTools(ctx context.Context, calls []toolCall) (denied bool
 		log.Get().Info("executing tool", "index", i, "name", call.Tool.Name(), "id", call.Block.ID)
 
 		// Permission Check
-		if call.Tool.RequiresPermission() && tc.PermissionSvc != nil {
+		if !call.Tool.ReadOnly() && tc.PermissionSvc != nil {
 			displayText := fmt.Sprintf("%s(%v)", call.Tool.Name(), args)
 			allowed, reason := tc.PermissionSvc.Check(call.Tool.Name(), displayText, args)
 			if !allowed {
@@ -676,7 +671,9 @@ func getCwd() string {
 type agentFactory struct{}
 
 func (f *agentFactory) Create(cfg domain.AgentConfig) any {
-	return NewAgent(cfg)
+	agent := NewAgent(cfg)
+	agent.toolList = tools.SubAgentTools()
+	return agent
 }
 
 func (f *agentFactory) Run(ctx context.Context, ag any, task string) error {

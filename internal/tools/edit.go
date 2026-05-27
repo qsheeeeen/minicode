@@ -20,7 +20,8 @@ func (t *EditTool) Name() string { return "Edit" }
 func (t *EditTool) Description() string {
 	return "Edit a file by replacing exact text. The oldText must match exactly (including whitespace). Use this for precise, surgical edits."
 }
-func (t *EditTool) RequiresPermission() bool    { return true }
+func (t *EditTool) ReadOnly() bool    { return false }
+func (t *EditTool) Interactive() bool { return false }
 func (t *EditTool) Requires() []ToolRequirement { return nil }
 
 func (t *EditTool) InputSchema() map[string]any {

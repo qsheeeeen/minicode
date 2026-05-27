@@ -67,7 +67,8 @@ type Tool interface {
 	Description() string
 	InputSchema() map[string]any
 	Execute(ctx context.Context, args map[string]any, tc ToolContext) (domain.ToolResult, error)
-	RequiresPermission() bool
+	ReadOnly() bool    // true if the tool has no side effects
+	Interactive() bool // true if the tool requires user interaction
 	Requires() []ToolRequirement
 }
 
@@ -108,6 +109,20 @@ func (r *ToolRegistry) All() []Tool {
 	return result
 }
 
+// SubAgentTools returns tools safe for sub-agents: read-only and non-interactive.
+func (r *ToolRegistry) SubAgentTools() []Tool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	result := make([]Tool, 0)
+	for _, t := range r.tools {
+		if t.ReadOnly() && !t.Interactive() {
+			result = append(result, t)
+		}
+	}
+	return result
+}
+
+
 // Default registry singleton.
 var defaultRegistry = newToolRegistry()
 
@@ -119,3 +134,6 @@ func Get(name string) (Tool, bool) { return defaultRegistry.Get(name) }
 
 // All returns all registered tools from the default registry.
 func All() []Tool { return defaultRegistry.All() }
+
+// SubAgentTools returns tools safe for sub-agents from the default registry.
+func SubAgentTools() []Tool { return defaultRegistry.SubAgentTools() }
