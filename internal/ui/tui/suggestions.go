@@ -12,6 +12,36 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+// sugItem is a single autocomplete entry.
+type sugItem struct {
+	name string
+	desc string
+}
+
+func (i sugItem) Title() string       { return "/" + i.name }
+func (i sugItem) Description() string { return i.desc }
+func (i sugItem) FilterValue() string { return i.name }
+
+// sugDelegate renders each suggestion on a single line: /name description.
+type sugDelegate struct{}
+
+func (d sugDelegate) Height() int                             { return 1 }
+func (d sugDelegate) Spacing() int                            { return 0 }
+func (d sugDelegate) Update(_ tea.Msg, _ *list.Model) tea.Cmd { return nil }
+func (d sugDelegate) Render(w io.Writer, m list.Model, index int, item list.Item) {
+	si, ok := item.(sugItem)
+	if !ok {
+		return
+	}
+	title := "/" + si.name
+	desc := si.desc
+	if index == m.Index() {
+		fmt.Fprint(w, lipgloss.NewStyle().Foreground(lipgloss.Color("6")).Render(title)+" "+lipgloss.NewStyle().Foreground(lipgloss.Color("8")).Render(desc))
+	} else {
+		fmt.Fprint(w, title+" "+styleDim.Render(desc))
+	}
+}
+
 // Suggestions is the command autocomplete dropdown, backed by bubbles/list.
 type Suggestions struct {
 	list list.Model
@@ -60,32 +90,4 @@ func (s *Suggestions) View(mainInput string) string {
 		Padding(0, 1).
 		Render(s.list.View())
 	return mainInput + "\n" + box
-}
-
-type sugItem struct {
-	name string
-	desc string
-}
-
-func (i sugItem) Title() string       { return "/" + i.name }
-func (i sugItem) Description() string { return i.desc }
-func (i sugItem) FilterValue() string { return i.name }
-
-type sugDelegate struct{}
-
-func (d sugDelegate) Height() int                             { return 1 }
-func (d sugDelegate) Spacing() int                            { return 0 }
-func (d sugDelegate) Update(_ tea.Msg, _ *list.Model) tea.Cmd { return nil }
-func (d sugDelegate) Render(w io.Writer, m list.Model, index int, item list.Item) {
-	si, ok := item.(sugItem)
-	if !ok {
-		return
-	}
-	title := "/" + si.name
-	desc := si.desc
-	if index == m.Index() {
-		fmt.Fprint(w, lipgloss.NewStyle().Foreground(lipgloss.Color("6")).Render(title)+" "+lipgloss.NewStyle().Foreground(lipgloss.Color("8")).Render(desc))
-	} else {
-		fmt.Fprint(w, title+" "+styleDim.Render(desc))
-	}
 }

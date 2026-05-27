@@ -8,6 +8,16 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+// permItem is a single permission option.
+type permItem struct {
+	label string
+	value string
+}
+
+func (i permItem) Title() string       { return i.label }
+func (i permItem) Description() string { return "" }
+func (i permItem) FilterValue() string { return i.label }
+
 // PermissionPrompt shown when a tool requires user approval.
 type PermissionPrompt struct {
 	pending bool
@@ -75,12 +85,3 @@ func (p *PermissionPrompt) View(width int) string {
 
 	return border.Render(body) + "\n"
 }
-
-type permItem struct {
-	label string
-	value string
-}
-
-func (i permItem) Title() string       { return i.label }
-func (i permItem) Description() string { return "" }
-func (i permItem) FilterValue() string { return i.label }

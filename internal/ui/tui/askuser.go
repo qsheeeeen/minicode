@@ -7,6 +7,16 @@ import (
 	"minicode/internal/domain"
 )
 
+// askItem is a single answer option.
+type askItem struct {
+	label string
+	desc  string
+}
+
+func (i askItem) Title() string       { return i.label }
+func (i askItem) Description() string { return i.desc }
+func (i askItem) FilterValue() string { return i.label }
+
 // AskUserPrompt shown when the agent asks the user a question.
 type AskUserPrompt struct {
 	pending  bool
@@ -85,12 +95,3 @@ func (a *AskUserPrompt) View(width int) string {
 
 	return questionBox + "\n" + oBorder.Render(a.list.View())
 }
-
-type askItem struct {
-	label string
-	desc  string
-}
-
-func (i askItem) Title() string       { return i.label }
-func (i askItem) Description() string { return i.desc }
-func (i askItem) FilterValue() string { return i.label }
