@@ -24,8 +24,8 @@ type SelectModel struct {
 	agent *agent.Agent // set by TUIModel after construction
 }
 
-// setMode initializes a bubbles/list for a select mode.
-func (sel *SelectModel) setMode(mode, title string, items []icmd.SelectItem) {
+// SetMode initializes a bubbles/list for a select mode.
+func (sel *SelectModel) SetMode(mode, title string, items []icmd.SelectItem) {
 	listItems := make([]list.Item, len(items))
 	for i, it := range items {
 		listItems[i] = listItem{title: it.Label, desc: it.Description}
@@ -47,26 +47,31 @@ func (sel *SelectModel) setMode(mode, title string, items []icmd.SelectItem) {
 	sel.mode = mode
 }
 
-func (sel *SelectModel) clearMode() {
+func (sel *SelectModel) ClearMode() {
 	sel.mode = ""
 	sel.list = list.Model{}
 }
 
-func (sel *SelectModel) active() bool { return sel.mode != "" }
+func (sel *SelectModel) Active() bool { return sel.mode != "" }
+
+// View renders the select list.
+func (sel *SelectModel) View() string {
+	return sel.list.View()
+}
 
 // Update handles list navigation. Returns the selected value on Enter,
 // or an empty string if Esc was pressed (selection cancelled).
 func (sel *SelectModel) Update(msg tea.KeyMsg) (consumed bool, selected string, cmd tea.Cmd) {
-	if !sel.active() {
+	if !sel.Active() {
 		return false, "", nil
 	}
 	switch msg.Type {
 	case tea.KeyEsc:
-		sel.clearMode()
+		sel.ClearMode()
 		return true, "", nil
 	case tea.KeyEnter:
 		if i, ok := sel.list.SelectedItem().(list.DefaultItem); ok {
-			sel.clearMode()
+			sel.ClearMode()
 			return true, i.Title(), nil
 		}
 		return true, "", nil

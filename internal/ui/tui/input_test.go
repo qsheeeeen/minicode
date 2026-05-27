@@ -43,7 +43,7 @@ func TestRenderInputSelectMode(t *testing.T) {
 	m := newTestModel()
 	m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m.Select.mode = "effort-select"
-	if !m.Select.active() {
+	if !m.Select.Active() {
 		t.Error("selectMode should be active")
 	}
 }

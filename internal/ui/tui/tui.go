@@ -276,7 +276,7 @@ func (m *TUIModel) handleEnter(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					}
 					return m, nil
 				case icmd.SelectResult:
-					m.Select.setMode(r.Mode, r.Title, r.Items)
+					m.Select.SetMode(r.Mode, r.Title, r.Items)
 					return m, nil
 				case icmd.SetInputResult:
 					m.Input.textarea.SetValue(r.Value)
@@ -318,7 +318,7 @@ func (m *TUIModel) handleSelectChoice(val string) {
 		m.agent.Store().AddStatus(domain.RoleStatus, "Loaded session: "+val)
 	case "model-tier":
 		if items := m.Select.handleModelTier(val); items != nil {
-			m.Select.setMode("model-edit-tier", "Edit which tier?", items)
+			m.Select.SetMode("model-edit-tier", "Edit which tier?", items)
 			return
 		}
 		cfg, _ := config.Load()
@@ -340,7 +340,7 @@ func (m *TUIModel) handleSelectChoice(val string) {
 			m.agent.Store().AddStatus(domain.RoleError, "No configured providers found")
 			return
 		}
-		m.Select.setMode("model-provider", "Provider for Tier "+val+":", items)
+		m.Select.SetMode("model-provider", "Provider for Tier "+val+":", items)
 		return
 	case "model-provider":
 		m.Select.wizardProvider = val
@@ -349,7 +349,7 @@ func (m *TUIModel) handleSelectChoice(val string) {
 			m.agent.Store().AddStatus(domain.RoleError, "No models configured for "+val)
 			return
 		}
-		m.Select.setMode("model-model", "Model for Tier "+m.Select.wizardEditTier+" @"+val+":", items)
+		m.Select.SetMode("model-model", "Model for Tier "+m.Select.wizardEditTier+" @"+val+":", items)
 		return
 	case "model-model":
 		spec := val + "@" + m.Select.wizardProvider
@@ -360,7 +360,7 @@ func (m *TUIModel) handleSelectChoice(val string) {
 		m.Status.modelName = modelName
 		m.agent.Store().AddStatus(domain.RoleStatus, "Tier "+m.Select.wizardEditTier+" -> "+spec)
 	}
-	m.Select.clearMode()
+	m.Select.ClearMode()
 }
 
 // ---- TUI entry point ----
@@ -389,7 +389,7 @@ func (m *TUIModel) View() string {
 	helpView := m.help.View(m.keys)
 
 	// When select mode is active, input area shows the list instead
-	if m.Select.active() {
+	if m.Select.Active() {
 		input = m.Select.list.View()
 	}
 
