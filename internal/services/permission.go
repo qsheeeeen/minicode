@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
+	"os"
 	"strings"
 	"time"
 
@@ -23,6 +25,7 @@ type PermissionService struct {
 	mode         domain.PermissionMode
 	promptFn     func(displayText string) string
 	autoDecideFn func(toolName string, toolInput map[string]any) (allowed bool, reason string)
+	logger       *slog.Logger
 }
 
 // NewPermissionService creates a permission service.
@@ -30,17 +33,25 @@ func NewPermissionService(mode domain.PermissionMode) *PermissionService {
 	if mode == "" {
 		mode = domain.PermManual
 	}
-	return &PermissionService{mode: mode}
+	return &PermissionService{mode: mode, logger: slog.New(slog.NewTextHandler(os.Stderr, nil))}
 }
 
 // Mode returns the current mode.
 func (p *PermissionService) Mode() domain.PermissionMode { return p.mode }
 
+func (p *PermissionService) log(msg string, attrs ...any) {
+	p.logger.Info(msg, attrs...)
+}
+
 // SetMode updates the mode.
-func (p *PermissionService) SetMode(mode domain.PermissionMode) { p.mode = mode }
+func (p *PermissionService) SetMode(mode domain.PermissionMode) {
+	p.log("permission mode changed", "old", p.mode, "new", mode)
+	p.mode = mode
+}
 
 // CycleMode rotates through manual -> yolo -> auto.
 func (p *PermissionService) CycleMode() domain.PermissionMode {
+	old := p.mode
 	switch p.mode {
 	case domain.PermManual:
 		p.mode = domain.PermYolo
@@ -51,6 +62,7 @@ func (p *PermissionService) CycleMode() domain.PermissionMode {
 	default:
 		p.mode = domain.PermManual
 	}
+	p.log("permission mode cycled", "old", old, "new", p.mode)
 	return p.mode
 }
 
@@ -111,32 +123,42 @@ Reply with exactly one of:
 func (p *PermissionService) Check(toolName, displayText string, toolInput map[string]any) (allowed bool, reason string) {
 	switch p.mode {
 	case domain.PermYolo:
+		p.log("permission auto-granted (yolo)", "tool", toolName)
 		return true, ""
 	case domain.PermManual:
 		if p.promptFn != nil {
+			p.log("permission prompt shown", "tool", toolName)
 			answer := p.promptFn(displayText)
 			switch answer {
 			case "yolo":
+				p.log("permission: user selected yolo", "tool", toolName)
 				p.SetMode(domain.PermYolo)
 				return true, ""
 			case "yes":
+				p.log("permission granted", "tool", toolName)
 				return true, ""
 			case "":
+				p.log("permission cancelled", "tool", toolName)
 				return false, "User cancelled"
 			default:
+				p.log("permission rejected", "tool", toolName, "answer", answer)
 				return false, "User rejected"
 			}
 		}
 		// In headless mode, deny by default
+		p.log("permission denied (headless)", "tool", toolName)
 		return false, fmt.Sprintf("Tool %s denied in headless mode. Use --permission yolo", toolName)
 	case domain.PermAuto:
 		if p.autoDecideFn != nil {
+			p.log("permission auto-gate", "tool", toolName)
 			return p.autoDecideFn(toolName, toolInput)
 		}
 		// Fallback when no LLM client: allow read operations, deny destructive ones
 		if isReadTool(toolName) {
+			p.log("permission auto-granted (read tool)", "tool", toolName)
 			return true, ""
 		}
+		p.log("permission auto-denied (non-read)", "tool", toolName)
 		return false, fmt.Sprintf("Auto-gate denied: %s (non-read tool)", toolName)
 	}
 	return false, "unknown mode"

@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -59,6 +60,7 @@ type ModelRef struct {
 }
 
 var v *viper.Viper
+var logger = slog.New(slog.NewTextHandler(os.Stderr, nil))
 
 func init() {
 	resetViper()
@@ -85,19 +87,24 @@ func resetViper() {
 func Load() (*Config, error) {
 	if err := v.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+			logger.Error("config load failed", "error", err)
 			return nil, fmt.Errorf("read config: %w", err)
 		}
+		logger.Info("config file not found, using defaults")
 	}
 
 	var cfg Config
 	if err := v.Unmarshal(&cfg); err != nil {
+		logger.Error("config unmarshal failed", "error", err)
 		return nil, fmt.Errorf("unmarshal config: %w", err)
 	}
+	logger.Info("config loaded", "model", cfg.Model, "providers", len(cfg.Providers), "permissionMode", cfg.PermissionMode)
 	return &cfg, nil
 }
 
 // Resolve resolves a model specifier against the config.
 func Resolve(specOverride string) (*ResolvedConfig, error) {
+	logger.Info("resolving model", "spec_override", specOverride)
 	cfg, err := Load()
 	if err != nil {
 		return nil, err
@@ -144,6 +151,7 @@ func Resolve(specOverride string) (*ResolvedConfig, error) {
 
 	provider, ok := cfg.Providers[providerName]
 	if !ok || provider.APIKey == "" {
+		logger.Warn("model resolution: no provider or API key", "spec", specOverride, "provider", providerName)
 		return resolved, nil
 	}
 
@@ -160,6 +168,7 @@ func Resolve(specOverride string) (*ResolvedConfig, error) {
 		ref.ContextLength = 200000
 	}
 	resolved.Model = ref
+	logger.Info("model resolved", "model", modelName, "provider", providerName, "baseURL", ref.BaseURL, "contextLength", ref.ContextLength)
 	return resolved, nil
 }
 
@@ -207,12 +216,14 @@ func LoadPromptFiles(projectPromptFile string) (string, []string) {
 
 // SetModel persists a model specifier.
 func SetModel(modelSpec string) error {
+	logger.Info("persisting model", "model", modelSpec)
 	v.Set("model", modelSpec)
 	return write()
 }
 
 // SetTier persists a tier mapping.
 func SetTier(tier, modelSpec string) error {
+	logger.Info("persisting tier", "tier", tier, "model", modelSpec)
 	tiers := v.GetStringMapString("tiers")
 	if tiers == nil {
 		tiers = make(map[string]string)
@@ -224,6 +235,7 @@ func SetTier(tier, modelSpec string) error {
 
 // SetEffort persists the effort level.
 func SetEffort(effort string) error {
+	logger.Info("persisting effort", "effort", effort)
 	v.Set("thinking.effort", effort)
 	return write()
 }

@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"log/slog"
 	"os"
 	"testing"
 
@@ -11,7 +12,7 @@ func TestSessionManager_SaveAndGet(t *testing.T) {
 	tmpDir, _ := os.MkdirTemp("", "session-test")
 	defer os.RemoveAll(tmpDir)
 
-	sm := &SessionManager{dir: tmpDir}
+	sm := &SessionManager{dir: tmpDir, logger: slog.New(slog.NewTextHandler(os.Stderr, nil))}
 	data := &SessionData{
 		Model:       "test-model",
 		Messages:    []domain.MessageParam{{Role: "user", Content: "hello"}},

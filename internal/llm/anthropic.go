@@ -2,6 +2,8 @@ package llm
 
 import (
 	"context"
+	"log/slog"
+	"os"
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
@@ -38,7 +40,8 @@ type ChatOptions struct {
 
 // Client wraps the official Anthropic SDK.
 type Client struct {
-	sdk anthropic.Client
+	sdk    anthropic.Client
+	logger *slog.Logger
 }
 
 // NewClient creates a new Anthropic API client.
@@ -47,7 +50,7 @@ func NewClient(apiKey, baseURL string) Client {
 	if baseURL != "" {
 		opts = append(opts, option.WithBaseURL(baseURL))
 	}
-	return Client{sdk: anthropic.NewClient(opts...)}
+	return Client{sdk: anthropic.NewClient(opts...), logger: slog.New(slog.NewTextHandler(os.Stderr, nil))}
 }
 
 // Chat sends a non-streaming request and returns the first text content block.
@@ -58,6 +61,8 @@ func (c Client) Chat(ctx context.Context, messages []domain.MessageParam, opts C
 	if opts.MaxTokens == 0 {
 		opts.MaxTokens = 100
 	}
+
+	c.logger.Info("chat request", "model", opts.Model, "max_tokens", opts.MaxTokens, "messages", len(messages))
 
 	params := anthropic.MessageNewParams{
 		Model:     anthropic.Model(opts.Model),
@@ -80,9 +85,11 @@ func (c Client) Chat(ctx context.Context, messages []domain.MessageParam, opts C
 
 	msg, err := c.sdk.Messages.New(ctx, params)
 	if err != nil {
+		c.logger.Error("chat request failed", "model", opts.Model, "error", err)
 		return "", err
 	}
 
+	c.logger.Info("chat response received", "model", opts.Model, "content_blocks", len(msg.Content), "input_tokens", msg.Usage.InputTokens, "output_tokens", msg.Usage.OutputTokens)
 	for _, block := range msg.Content {
 		if block.Type == "text" {
 			return block.Text, nil
@@ -146,6 +153,8 @@ func (c Client) ChatStream(ctx context.Context, messages []domain.MessageParam, 
 			OfAdaptive: &anthropic.ThinkingConfigAdaptiveParam{},
 		}
 	}
+
+	c.logger.Info("chat stream request", "model", opts.Model, "max_tokens", opts.MaxTokens, "messages", len(messages), "tools", len(tools), "thinking", opts.ThinkingEnabled)
 
 	ch := make(chan StreamEvent, 64)
 	stream := c.sdk.Messages.NewStreaming(ctx, params)
@@ -235,7 +244,10 @@ func (c Client) ChatStream(ctx context.Context, messages []domain.MessageParam, 
 			}
 		}
 		if err := stream.Err(); err != nil {
+			c.logger.Error("chat stream error", "model", opts.Model, "error", err)
 			send(StreamEvent{Error: err})
+		} else {
+			c.logger.Info("chat stream completed", "model", opts.Model)
 		}
 	}()
 

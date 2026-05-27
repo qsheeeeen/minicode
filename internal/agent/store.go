@@ -1,6 +1,8 @@
 package agent
 
 import (
+	"log/slog"
+	"os"
 	"sync"
 	"time"
 
@@ -17,6 +19,7 @@ type Store struct {
 	statuses  []StatusMessage
 	streaming bool
 	onChange  ChangeCallback
+	logger    *slog.Logger
 }
 
 // StatusMessage represents a UI-only update.
@@ -28,13 +31,24 @@ type StatusMessage struct {
 }
 
 // NewStore creates a new message store.
-func NewStore() *Store { return &Store{} }
+func NewStore() *Store { return &Store{logger: slog.New(slog.NewTextHandler(os.Stderr, nil))} }
 
 // OnChange registers a callback for store mutations (single listener).
 func (s *Store) OnChange(cb ChangeCallback) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.onChange = cb
+}
+
+// SetLogger sets the structured logger for store operations.
+func (s *Store) SetLogger(l *slog.Logger) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.logger = l
+}
+
+func (s *Store) log(msg string, attrs ...any) {
+	s.logger.Info(msg, attrs...)
 }
 
 func (s *Store) notify() {
@@ -55,6 +69,7 @@ func (s *Store) SetStreaming(v bool) {
 	}
 	s.mu.Unlock()
 	if changed {
+		s.log("streaming state changed", "streaming", v)
 		s.notify()
 	}
 }
@@ -81,6 +96,7 @@ func (s *Store) SetTurns(turns []domain.MessageParam) {
 	s.mu.Lock()
 	s.turns = turns
 	s.mu.Unlock()
+	s.log("turns replaced", "count", len(turns))
 	s.notify()
 }
 
@@ -110,6 +126,7 @@ func (s *Store) AddUserMessage(content, displayContent string) {
 	}
 	s.turns = append(s.turns, msg)
 	s.mu.Unlock()
+	s.log("user message added", "content_length", len(content), "has_display", displayContent != "" && displayContent != content)
 	s.notify()
 }
 
@@ -118,6 +135,7 @@ func (s *Store) StartAssistantTurn() {
 	s.mu.Lock()
 	s.turns = append(s.turns, domain.MessageParam{Role: "assistant", Content: []domain.ContentBlock{}})
 	s.mu.Unlock()
+	s.log("assistant turn started")
 	s.notify()
 }
 
@@ -132,6 +150,7 @@ func (s *Store) AppendToLastAssistantTurn(block domain.ContentBlock) {
 	blocks := s.turns[last].Content.([]domain.ContentBlock)
 	s.turns[last].Content = append(blocks, block)
 	s.mu.Unlock()
+	s.log("block appended", "type", block.Type, "turn", last)
 	s.notify()
 }
 
@@ -209,6 +228,7 @@ func (s *Store) AddToolResults(results []toolResultItem) {
 	}
 	s.turns = append(s.turns, domain.MessageParam{Role: "user", Content: blocks})
 	s.mu.Unlock()
+	s.log("tool results added", "count", len(results))
 	s.notify()
 }
 
@@ -222,6 +242,7 @@ func (s *Store) AddStatus(role domain.DisplayRole, content string) {
 		Timestamp: time.Now(),
 	})
 	s.mu.Unlock()
+	s.log("status added", "role", role, "content", content)
 	s.notify()
 }
 
@@ -240,6 +261,7 @@ func (s *Store) Clear() {
 	s.turns = nil
 	s.statuses = nil
 	s.mu.Unlock()
+	s.log("store cleared")
 	s.notify()
 }
 
@@ -249,6 +271,7 @@ func (s *Store) Replace(turns []domain.MessageParam) {
 	s.turns = turns
 	s.statuses = nil
 	s.mu.Unlock()
+	s.log("turns replaced (compression)", "count", len(turns))
 	s.notify()
 }
 
@@ -259,5 +282,6 @@ func (s *Store) Pop() {
 		s.turns = s.turns[:len(s.turns)-1]
 	}
 	s.mu.Unlock()
+	s.log("last turn popped")
 	s.notify()
 }

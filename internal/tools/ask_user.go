@@ -48,6 +48,7 @@ func (t *AskUserTool) Execute(ctx context.Context, args map[string]any, tc ToolC
 	rawOptions, _ := args["options"].([]any)
 
 	if tc.AskUserFn == nil {
+		tc.LogErr("AskUser: no prompter available")
 		return domain.ToolResult{Output: "Error: No user prompter available"}, nil
 	}
 
@@ -63,16 +64,22 @@ func (t *AskUserTool) Execute(ctx context.Context, args map[string]any, tc ToolC
 	}
 
 	if len(options) == 0 {
+		tc.LogErr("AskUser: no valid options", "raw_options", len(rawOptions))
 		return domain.ToolResult{Output: "Error: No valid options provided"}, nil
 	}
 
+	tc.Log("AskUser: presenting question", "question", question, "options", len(options), "multi", multiSelect)
+
 	answer := tc.AskUserFn(question, options, multiSelect)
 	if answer == "" {
+		tc.Log("AskUser: user cancelled", "question", question)
 		return domain.ToolResult{}, &ToolDeniedError{
 			ToolName: "AskUser",
 			Reason:   "User cancelled the question",
 		}
 	}
+
+	tc.Log("AskUser: user answered", "question", question, "answer", answer)
 	return domain.ToolResult{Output: fmt.Sprintf(`User selected: "%s"`, answer)}, nil
 }
 

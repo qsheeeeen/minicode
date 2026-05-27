@@ -41,23 +41,31 @@ func (t *EditTool) Execute(ctx context.Context, args map[string]any, tc ToolCont
 	newText, _ := args["newText"].(string)
 
 	if filePath == "" {
+		tc.Log("Edit: path is required")
 		return domain.ToolResult{Output: "Error: path is required"}, nil
 	}
 
+	tc.Log("Edit: editing file", "path", filePath, "old_length", len(oldText), "new_length", len(newText))
+
 	data, err := os.ReadFile(filePath)
 	if err != nil {
+		tc.LogErr("Edit: read failed", "path", filePath, "error", err)
 		return domain.ToolResult{Output: err.Error()}, nil
 	}
 
 	content := string(data)
 	if !strings.Contains(content, oldText) {
+		tc.LogErr("Edit: oldText not found", "path", filePath, "old_length", len(oldText))
 		return domain.ToolResult{Output: "Error: oldText not found in file"}, nil
 	}
 
 	newContent := strings.Replace(content, oldText, newText, 1)
 	if err := os.WriteFile(filePath, []byte(newContent), 0o644); err != nil {
+		tc.LogErr("Edit: write failed", "path", filePath, "error", err)
 		return domain.ToolResult{Output: err.Error()}, nil
 	}
+
+	tc.Log("Edit: file edited", "path", filePath, "old_size", len(content), "new_size", len(newContent))
 
 	dmp := diffmatchpatch.New()
 	diffs := dmp.DiffMain(oldText, newText, false)

@@ -1,6 +1,7 @@
 package skills
 
 import (
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -20,6 +21,7 @@ type SkillRegistry struct {
 	skills    []SkillInfo
 	builtins  map[string]string // name -> body
 	cache     map[string]string // name -> body
+	logger    *slog.Logger
 }
 
 // newSkillRegistry creates a skill registry for the given directory.
@@ -29,6 +31,14 @@ func newSkillRegistry(dir string) *SkillRegistry {
 		builtins:  make(map[string]string),
 		cache:     make(map[string]string),
 	}
+}
+
+func (r *SkillRegistry) log(msg string, attrs ...any) {
+	r.logger.Info(msg, attrs...)
+}
+
+func (r *SkillRegistry) logErr(msg string, attrs ...any) {
+	r.logger.Error(msg, attrs...)
 }
 
 // RegisterBuiltin registers a skill from memory.
@@ -48,33 +58,40 @@ func (r *SkillRegistry) RegisterBuiltin(body string) {
 		if !found {
 			r.skills = append(r.skills, info)
 		}
+		r.log("builtin skill registered", "name", info.Name)
 	}
 }
 
 // LoadSkills scans the skills directory for agentSkills.io-format skills.
 func (r *SkillRegistry) LoadSkills() error {
 	if r.skillsDir != "" {
+		r.log("loading skills from directory", "dir", r.skillsDir)
 		entries, err := os.ReadDir(r.skillsDir)
-		if err == nil {
-			for _, entry := range entries {
-				if !entry.IsDir() {
-					continue
-				}
-				skillDir := filepath.Join(r.skillsDir, entry.Name())
-				skillFile := filepath.Join(skillDir, "SKILL.md")
-				data, err := os.ReadFile(skillFile)
-				if err != nil {
-					continue
-				}
-				info := r.parseSkillFrontmatter(string(data))
-				if info.Name == "" {
-					info.Name = entry.Name()
-				}
-				r.skills = append(r.skills, info)
-				r.cache[info.Name] = string(data)
+		if err != nil {
+			r.logErr("failed to read skills directory", "dir", r.skillsDir, "error", err)
+			return nil
+		}
+		for _, entry := range entries {
+			if !entry.IsDir() {
+				continue
 			}
+			skillDir := filepath.Join(r.skillsDir, entry.Name())
+			skillFile := filepath.Join(skillDir, "SKILL.md")
+			data, err := os.ReadFile(skillFile)
+			if err != nil {
+				r.logErr("failed to read skill file", "file", skillFile, "error", err)
+				continue
+			}
+			info := r.parseSkillFrontmatter(string(data))
+			if info.Name == "" {
+				info.Name = entry.Name()
+			}
+			r.skills = append(r.skills, info)
+			r.cache[info.Name] = string(data)
+			r.log("skill loaded", "name", info.Name, "description", info.Description)
 		}
 	}
+	r.log("skills loading complete", "total", len(r.skills), "builtins", len(r.builtins))
 	return nil
 }
 
@@ -136,7 +153,11 @@ func (r *SkillRegistry) splitFrontmatter(content string) (frontmatter, body stri
 }
 
 // Default registry singleton.
-var defaultRegistry = newSkillRegistry("")
+var defaultRegistry = func() *SkillRegistry {
+	r := newSkillRegistry("")
+	r.logger = slog.New(slog.NewTextHandler(os.Stderr, nil))
+	return r
+}()
 
 // RegisterBuiltin registers a built-in skill to the default registry.
 func RegisterBuiltin(body string) { defaultRegistry.RegisterBuiltin(body) }

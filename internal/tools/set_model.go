@@ -39,17 +39,22 @@ func (t *SetModelTool) Execute(ctx context.Context, args map[string]any, tc Tool
 	modelSpec, _ := args["model"].(string)
 
 	if tier == "" || modelSpec == "" {
+		tc.Log("SetModel: tier and model are required")
 		return domain.ToolResult{Output: "Error: tier and model are required"}, nil
 	}
 
+	tc.Log("SetModel: updating tier", "tier", tier, "model", modelSpec)
+
 	// Persist to config
 	if err := config.SetTier(tier, modelSpec); err != nil {
+		tc.LogErr("SetModel: failed to persist tier", "tier", tier, "model", modelSpec, "error", err)
 		return domain.ToolResult{Output: fmt.Sprintf("Error persisting tier: %s", err)}, nil
 	}
 
 	// Resolve the new spec to see if it's valid
 	resolved, err := config.Resolve(modelSpec)
 	if err != nil || resolved.Model.APIKey == "" {
+		tc.LogErr("SetModel: resolution failed", "tier", tier, "model", modelSpec, "error", err)
 		return domain.ToolResult{Output: fmt.Sprintf("Tier %s updated to %s, but resolution failed (check your API keys).", tier, modelSpec)}, nil
 	}
 
@@ -57,6 +62,8 @@ func (t *SetModelTool) Execute(ctx context.Context, args map[string]any, tc Tool
 	if tc.SetModelFn != nil {
 		tc.SetModelFn(modelSpec, resolved.Model.APIKey, resolved.Model.BaseURL, resolved.Model.ContextLength)
 	}
+
+	tc.Log("SetModel: tier updated", "tier", tier, "model", modelSpec, "provider", resolved.Model.Provider)
 	return domain.ToolResult{
 		Output: fmt.Sprintf("Switched to tier %s: %s", tier, modelSpec),
 	}, nil

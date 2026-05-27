@@ -41,12 +41,16 @@ func (t *SubAgentTool) Execute(ctx context.Context, args map[string]any, tc Tool
 	task, _ := args["task"].(string)
 	tier, _ := args["tier"].(string)
 	if task == "" {
+		tc.Log("SubAgent: task is required")
 		return domain.ToolResult{Output: "Error: task is required"}, nil
 	}
 
 	if tc.AgentFactory == nil {
+		tc.LogErr("SubAgent: no agent factory available")
 		return domain.ToolResult{Output: "Error: No agent factory available"}, nil
 	}
+
+	tc.Log("SubAgent: launching sub-agent", "task_length", len(task), "tier", tier)
 
 	subCfg := t.parentConfig
 
@@ -61,6 +65,7 @@ func (t *SubAgentTool) Execute(ctx context.Context, args map[string]any, tc Tool
 					subCfg.APIKey = resolved.Model.APIKey
 					subCfg.BaseURL = resolved.Model.BaseURL
 					subCfg.ContextLength = resolved.Model.ContextLength
+					tc.Log("SubAgent: using tier model", "tier", tier, "model", subCfg.Model)
 				}
 			}
 		}
@@ -69,6 +74,7 @@ func (t *SubAgentTool) Execute(ctx context.Context, args map[string]any, tc Tool
 	subAgent := tc.AgentFactory.Create(subCfg)
 	err := tc.AgentFactory.Run(ctx, subAgent, task)
 	if err != nil {
+		tc.LogErr("SubAgent: sub-agent failed", "error", err)
 		return domain.ToolResult{Output: fmt.Sprintf("Sub-agent failed: %s", err.Error())}, nil
 	}
 
@@ -77,6 +83,7 @@ func (t *SubAgentTool) Execute(ctx context.Context, args map[string]any, tc Tool
 	finalText := extractFinalResponse(subTurns)
 
 	if finalText != "" {
+		tc.Log("SubAgent: completed with response", "response_length", len(finalText), "turns", len(subTurns))
 		return domain.ToolResult{Output: finalText}, nil
 	}
 
@@ -94,8 +101,10 @@ func (t *SubAgentTool) Execute(ctx context.Context, args map[string]any, tc Tool
 		}
 	}
 	if toolCalls == 0 {
+		tc.Log("SubAgent: completed (no tool calls)", "turns", len(subTurns))
 		return domain.ToolResult{Output: "Task completed"}, nil
 	}
+	tc.Log("SubAgent: completed with tool calls", "tool_calls", toolCalls, "turns", len(subTurns))
 	return domain.ToolResult{Output: fmt.Sprintf("%d operations", toolCalls)}, nil
 }
 

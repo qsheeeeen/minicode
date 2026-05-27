@@ -36,11 +36,15 @@ func (t *ReadTool) InputSchema() map[string]any {
 func (t *ReadTool) Execute(ctx context.Context, args map[string]any, tc ToolContext) (domain.ToolResult, error) {
 	path, _ := args["path"].(string)
 	if path == "" {
+		tc.Log("Read: path is required")
 		return domain.ToolResult{Output: "Error: path is required"}, nil
 	}
 
+	tc.Log("Read: reading file", "path", path)
+
 	data, err := os.ReadFile(path)
 	if err != nil {
+		tc.LogErr("Read: failed to read file", "path", path, "error", err)
 		return domain.ToolResult{Output: err.Error()}, nil
 	}
 
@@ -71,6 +75,7 @@ func (t *ReadTool) Execute(ctx context.Context, args map[string]any, tc ToolCont
 	}
 
 	result := strings.Join(lines[start:end], "\n")
+	tc.Log("Read: file read", "path", path, "lines", end-start, "total_lines", len(lines))
 	return domain.ToolResult{Output: result}, nil
 }
 func init() { Register(NewReadTool()) }

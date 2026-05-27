@@ -38,6 +38,7 @@ func (t *BashTool) InputSchema() map[string]any {
 func (t *BashTool) Execute(ctx context.Context, args map[string]any, tc ToolContext) (domain.ToolResult, error) {
 	command, _ := args["command"].(string)
 	if command == "" {
+		tc.Log("Bash: command is required")
 		return domain.ToolResult{Output: "Error: command is required"}, nil
 	}
 
@@ -45,6 +46,8 @@ func (t *BashTool) Execute(ctx context.Context, args map[string]any, tc ToolCont
 	if t, ok := args["timeout"].(float64); ok && t > 0 {
 		timeoutSec = t
 	}
+
+	tc.Log("Bash: executing command", "command", command, "timeout", timeoutSec)
 
 	execCtx := ctx
 	if timeoutSec > 0 {
@@ -57,9 +60,11 @@ func (t *BashTool) Execute(ctx context.Context, args map[string]any, tc ToolCont
 	stdout, err := cmd.Output()
 	if err != nil {
 		if execCtx.Err() == context.DeadlineExceeded {
+			tc.LogErr("Bash: command timed out", "command", command, "timeout", timeoutSec)
 			return domain.ToolResult{Output: "Error: command timed out"}, nil
 		}
 		if execCtx.Err() == context.Canceled {
+			tc.Log("Bash: command aborted", "command", command)
 			return domain.ToolResult{Output: "Aborted"}, nil
 		}
 		if exitErr, ok := err.(*exec.ExitError); ok {
@@ -74,11 +79,16 @@ func (t *BashTool) Execute(ctx context.Context, args map[string]any, tc ToolCont
 				}
 			}
 			code := exitErr.ExitCode()
+			tc.LogErr("Bash: command exited with error", "command", command, "exit_code", code, "output_length", len(combined))
 			return domain.ToolResult{Output: fmt.Sprintf("Exit code %d: %s", code, combined)}, nil
 		}
+		tc.LogErr("Bash: command failed", "command", command, "error", err)
 		return domain.ToolResult{Output: err.Error()}, nil
 	}
-	return domain.ToolResult{Output: strings.TrimSpace(stripANSI(string(stdout)))}, nil
+
+	output := strings.TrimSpace(stripANSI(string(stdout)))
+	tc.Log("Bash: command completed", "command", command, "output_length", len(output))
+	return domain.ToolResult{Output: output}, nil
 }
 
 func stripANSI(str string) string {

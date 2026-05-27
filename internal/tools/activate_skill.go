@@ -36,14 +36,19 @@ func (t *ActivateSkillTool) InputSchema() map[string]any {
 func (t *ActivateSkillTool) Execute(ctx context.Context, args map[string]any, tc ToolContext) (domain.ToolResult, error) {
 	name, _ := args["name"].(string)
 	if name == "" {
+		tc.Log("ActivateSkill: name is required")
 		return domain.ToolResult{Output: "Error: name is required"}, nil
 	}
 
+	tc.Log("ActivateSkill: activating skill", "name", name)
+
 	body := skills.Body(name)
 	if body == "" {
+		tc.LogErr("ActivateSkill: skill not found", "name", name)
 		return domain.ToolResult{Output: fmt.Sprintf("Error: Skill '%s' not found.", name)}, nil
 	}
 
+	tc.Log("ActivateSkill: skill activated", "name", name, "body_length", len(body))
 	return domain.ToolResult{
 		Output: fmt.Sprintf("<activated_skill name=\"%s\">\n<instructions>\n%s\n</instructions>\n</activated_skill>", name, body),
 	}, nil

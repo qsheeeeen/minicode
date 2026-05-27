@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"sync"
 
 	"minicode/internal/domain"
@@ -29,6 +30,21 @@ type ToolContext struct {
 	AgentFactory   AgentFactory // interface to create new agents
 	SetModelFn     func(model, apiKey, baseURL string, contextLength int)
 	AskUserFn      func(question string, options []domain.AskOption, multiSelect bool) string
+	Logger         *slog.Logger
+}
+
+// Log logs a message using the tool context's logger.
+func (tc ToolContext) Log(msg string, attrs ...any) {
+	if tc.Logger != nil {
+		tc.Logger.Info(msg, attrs...)
+	}
+}
+
+// LogErr logs an error using the tool context's logger.
+func (tc ToolContext) LogErr(msg string, attrs ...any) {
+	if tc.Logger != nil {
+		tc.Logger.Error(msg, attrs...)
+	}
 }
 
 // AgentFactory allows tools to create new agent instances.
