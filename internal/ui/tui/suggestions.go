@@ -33,7 +33,7 @@ func (s *Suggestions) Set(items []icmd.Command) {
 		h = 10
 	}
 	l := list.New(listItems, d, 50, h)
-	l.SetShowHelp(false)
+	l.SetShowHelp(true)
 	l.SetShowStatusBar(false)
 	l.SetShowTitle(false)
 	l.SetFilteringEnabled(false)
@@ -60,7 +60,7 @@ func (s *Suggestions) View(mainInput string) string {
 		Border(lipgloss.NormalBorder()).
 		BorderForeground(lipgloss.Color("8")).
 		Padding(0, 1).
-		Render(s.list.View() + "\n" + styleDim.Render("↑↓ navigate  Tab accept"))
+		Render(s.list.View())
 	return mainInput + "\n" + box
 }
 

@@ -34,7 +34,7 @@ func (a *AskUserPrompt) Activate(question string, options []domain.AskOption, mu
 	d.Styles.SelectedDesc = d.Styles.SelectedDesc.Foreground(lipgloss.Color("8"))
 
 	l := list.New(items, d, 60, 5)
-	l.SetShowHelp(false)
+	l.SetShowHelp(true)
 	l.SetShowStatusBar(false)
 	l.SetShowTitle(false)
 	l.SetFilteringEnabled(false)
@@ -83,8 +83,7 @@ func (a *AskUserPrompt) View(width int) string {
 		BorderForeground(lipgloss.Color("8")).
 		Padding(0, 1)
 
-	hint := "↑↓ navigate  Enter accept  Esc cancel"
-	return questionBox + "\n" + oBorder.Render(a.list.View()+"\n"+styleDim.Render(hint))
+	return questionBox + "\n" + oBorder.Render(a.list.View())
 }
 
 type askItem struct {

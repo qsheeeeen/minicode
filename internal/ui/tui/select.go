@@ -16,7 +16,6 @@ import (
 type SelectModel struct {
 	list list.Model
 	mode string // effort-select, session-list, model-tier, ...
-	help list.Model
 
 	// Model wizard state machine
 	wizardEditTier string

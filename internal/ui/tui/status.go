@@ -67,8 +67,7 @@ func (s *StatusModel) View(ag *agent.Agent, width int) string {
 	line2 := styleDim.Render(fmt.Sprintf("%s/%s ", formatNumber(s.tokenCount), formatNumber(ctxLen))) +
 		s.prog.ViewAs(pct/100) +
 		styleDim.Render(fmt.Sprintf(" %d%% │ ", int(pct))) +
-		modeColor.Render(permMode) +
-		styleDim.Render(" (Shift+Tab)")
+		modeColor.Render(permMode)
 
 	return line1 + "\n" + line2
 }

@@ -24,15 +24,15 @@ func (p *PermissionPrompt) Activate(text string, resolve chan string) {
 	p.resolve = resolve
 
 	items := []list.Item{
-		permItem{label: "[y] Yes", value: "yes"},
-		permItem{label: "[n] No", value: "no"},
-		permItem{label: "[a] Yes to all", value: "yolo"},
+		permItem{label: "Yes", value: "yes"},
+		permItem{label: "No", value: "no"},
+		permItem{label: "Yes to all", value: "yolo"},
 	}
 	d := list.NewDefaultDelegate()
 	d.ShowDescription = false
 	d.Styles.SelectedTitle = d.Styles.SelectedTitle.Foreground(lipgloss.Color("6"))
 	l := list.New(items, d, 40, 3)
-	l.SetShowHelp(false)
+	l.SetShowHelp(true)
 	l.SetShowStatusBar(false)
 	l.SetShowPagination(false)
 	l.SetShowTitle(false)

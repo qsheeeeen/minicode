@@ -12,6 +12,8 @@ import (
 	"minicode/internal/services"
 	"minicode/internal/storage"
 
+	"github.com/charmbracelet/bubbles/help"
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textarea"
@@ -32,6 +34,9 @@ type TUIModel struct {
 	Status   StatusModel
 	Select   SelectModel
 
+	keys TUIKeyMap
+	help help.Model
+
 	width  int
 	height int
 	ready  bool
@@ -41,6 +46,8 @@ type TUIModel struct {
 func NewTUIModel(ag *agent.Agent, promptFiles []string) *TUIModel {
 	m := &TUIModel{
 		agent: ag,
+		keys:  DefaultKeyMap(),
+		help:  help.New(),
 	}
 
 	// Input
@@ -67,6 +74,13 @@ func NewTUIModel(ag *agent.Agent, promptFiles []string) *TUIModel {
 
 	// Select
 	m.Select.agent = ag
+
+	// Help
+	m.help.ShowAll = false
+	m.help.Styles.ShortKey = styleDim
+	m.help.Styles.ShortDesc = styleDim
+	m.help.Styles.FullKey = styleDim
+	m.help.Styles.FullDesc = styleDim
 
 	// Set viewport content
 	m.Viewport.viewport.SetContent(m.Viewport.Render())
@@ -155,27 +169,27 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
-		switch msg.Type {
-		case tea.KeyCtrlC:
+		switch {
+		case key.Matches(msg, m.keys.Quit):
 			if m.Input.streaming {
 				m.agent.Abort()
 				return m, nil
 			}
 			return m, tea.Quit
 
-		case tea.KeyEsc:
+		case key.Matches(msg, m.keys.Abort):
 			if m.Input.streaming {
 				m.agent.Abort()
 			}
 			return m, nil
 
-		case tea.KeyShiftTab:
+		case key.Matches(msg, m.keys.CycleMode):
 			if p := m.agent.PermissionSvc(); p != nil {
 				p.CycleMode()
 			}
 			return m, nil
 
-		case tea.KeyEnter:
+		case key.Matches(msg, m.keys.Submit):
 			return m.handleEnter(msg)
 		}
 
@@ -372,11 +386,12 @@ func (m *TUIModel) View() string {
 	viewport := m.Viewport.viewport.View()
 	input := m.Input.View(m.width)
 	status := m.Status.View(m.agent, m.width)
+	helpView := m.help.View(m.keys)
 
 	// When select mode is active, input area shows the list instead
 	if m.Select.active() {
 		input = m.Select.list.View()
 	}
 
-	return header + viewport + "\n" + input + status
+	return header + viewport + "\n" + input + status + helpView + "\n"
 }

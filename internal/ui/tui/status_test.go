@@ -36,8 +36,8 @@ func TestRenderStatusBar(t *testing.T) {
 	if !strings.Contains(s, "manual") {
 		t.Error("status bar should contain permission mode")
 	}
-	if !strings.Contains(s, "Shift+Tab") {
-		t.Error("status bar should contain Shift+Tab hint")
+	if !strings.Contains(s, "unknown") {
+		t.Error("status bar should contain provider name")
 	}
 }
 
