@@ -183,6 +183,28 @@ func coalesce(a, b string) string {
 	return b
 }
 
+// LoadPromptFiles loads the global and project prompt files.
+// Returns the combined prompt text and a list of loaded file names.
+func LoadPromptFiles(projectPromptFile string) (string, []string) {
+	var userPrompt string
+	var files []string
+
+	if home, err := os.UserHomeDir(); err == nil {
+		if data, err := os.ReadFile(filepath.Join(home, ".minicode", "AGENTS.md")); err == nil {
+			userPrompt = string(data)
+			files = append(files, "AGENTS.md")
+		}
+	}
+
+	if projectPromptFile != "" {
+		if _, err := os.Stat(projectPromptFile); err == nil {
+			files = append(files, projectPromptFile)
+		}
+	}
+
+	return userPrompt, files
+}
+
 // SetModel persists a model specifier.
 func SetModel(modelSpec string) error {
 	v.Set("model", modelSpec)

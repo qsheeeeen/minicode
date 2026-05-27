@@ -5,11 +5,13 @@ package commands
 
 import (
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 
 	"minicode/internal/agent"
 	"minicode/internal/config"
+	"minicode/internal/domain"
 	"minicode/internal/skills"
 	"minicode/internal/storage"
 )
@@ -179,4 +181,27 @@ func List() []Command { return defaultRegistry.List() }
 // ParseAndExecute parses a command string and runs the handler from the default registry.
 func ParseAndExecute(input string, ctx Context) (bool, Result, string) {
 	return defaultRegistry.ParseAndExecute(input, ctx)
+}
+
+// NewResolver returns a command resolver function wired to the given agent and config.
+func NewResolver(ag *agent.Agent, cfg *config.Config) func(input string) (bool, string, string) {
+	return func(input string) (handled bool, promptText string, displayContent string) {
+		handled, result, expanded := ParseAndExecute(input, Context{
+			Agent:  ag,
+			Config: cfg,
+		})
+		if !handled {
+			return false, "", input
+		}
+		if expanded != "" {
+			return true, expanded, input
+		}
+		switch r := result.(type) {
+		case ExitResult:
+			os.Exit(0)
+		case StatusResult:
+			ag.Store().AddStatus(domain.RoleStatus, r.Message)
+		}
+		return true, "", input
+	}
 }

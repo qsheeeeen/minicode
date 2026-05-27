@@ -2,14 +2,12 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
-	"time"
 
 	"github.com/spf13/cobra"
 	"minicode/internal/agent"
@@ -62,19 +60,11 @@ func run(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	// Load global prompt
-	userPrompt := ""
-	promptFiles := []string{}
-	if home, err := os.UserHomeDir(); err == nil {
-		if data, err := os.ReadFile(home + "/.minicode/AGENTS.md"); err == nil {
-			userPrompt = string(data)
-			promptFiles = append(promptFiles, "AGENTS.md")
-		}
-	}
-
 	if permissionMode != "" {
 		resolved.PermissionMode = permissionMode
 	}
+
+	userPrompt, promptFiles := config.LoadPromptFiles(resolved.PromptFile)
 
 	cfg := domain.AgentConfig{
 		APIKey:                    resolved.Model.APIKey,
@@ -88,113 +78,37 @@ func run(cmd *cobra.Command, args []string) {
 		Effort:                    resolved.Thinking.Effort,
 		ProjectPromptFile:         resolved.PromptFile,
 		UserPrompt:                userPrompt,
-	}
-
-	// Check for project prompt file
-	if resolved.PromptFile != "" {
-		if _, err := os.Stat(resolved.PromptFile); err == nil {
-			promptFiles = append(promptFiles, resolved.PromptFile)
-		}
+		SkillsDir:                 resolved.SkillsDir,
 	}
 
 	ag := agent.NewAgent(cfg)
 
 	// Session management
-	sm := storage.NewSessionManager()
 	if sessionName != "" {
 		if err := ag.LoadSession(sessionName); err != nil {
 			ag.SetSession(sessionName)
 		}
 	} else if resumeRecent {
+		sm := storage.NewSessionManager()
 		if name, err := sm.MostRecent(); err == nil && name != "" {
-			_ = ag.LoadSession(name) // best-effort: session may not exist
+			_ = ag.LoadSession(name)
 		}
 	}
 
 	// Permission service
 	permSvc := services.NewPermissionService(domain.PermissionMode(resolved.PermissionMode))
+	if resolved.Model.APIKey != "" {
+		client := llm.NewClient(resolved.Model.APIKey, resolved.Model.BaseURL)
+		permSvc.SetupAutoDecide(client, cfg.Model)
+	}
 	ag.SetPermissionSvc(permSvc)
 
-	// Wire LLM-based auto-decide for auto permission mode (matches TS)
-	if resolved.Model.APIKey != "" {
-		autoClient := llm.NewClient(resolved.Model.APIKey, resolved.Model.BaseURL)
-		permSvc.SetAutoDecideFn(func(toolName string, toolInput map[string]any) (bool, string) {
-			inputJSON, _ := json.Marshal(toolInput)
-			prompt := fmt.Sprintf(`You are a permission gate for a coding agent. Decide if this tool execution should be allowed.
+	// Command resolver
+	cfgObj, _ := config.Load()
+	ag.SetCommandResolver(commands.NewResolver(ag, cfgObj))
 
-Tool: %s
-Arguments: %s
-
-Guidelines:
-- Read operations are always safe.
-- Writing to files in /tmp or project directories is usually safe.
-- Running commands that modify the system (apt-get, chmod, etc.) may be risky.
-- Destructive commands (rm -rf /, mkfs, dd) should be denied.
-- Network commands that download and execute code should be denied.
-
-Reply with exactly one of:
-- "yes"
-- "no: <reason explaining why it was denied>"`, toolName, string(inputJSON))
-
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
-			resp, err := autoClient.Chat(ctx, []domain.MessageParam{
-				{Role: "user", Content: prompt},
-			}, llm.ChatOptions{Model: cfg.Model})
-			if err != nil {
-				return false, fmt.Sprintf("Auto-permission error: %s", err.Error())
-			}
-			resp = strings.TrimSpace(resp)
-			if strings.HasPrefix(strings.ToLower(resp), "yes") {
-				return true, ""
-			}
-			reason := strings.TrimSpace(resp)
-			if strings.HasPrefix(strings.ToLower(reason), "no:") {
-				reason = strings.TrimSpace(reason[3:])
-			}
-			if reason == "" {
-				reason = "Denied by auto-gate"
-			}
-			return false, reason
-		})
-	}
-
-	// Commands
-	ag.SetCommandResolver(func(input string) (handled bool, promptText string, displayContent string) {
-		cfg, _ := config.Load()
-		handled, result, expanded := commands.ParseAndExecute(input, commands.Context{
-			Agent:  ag,
-			Config: cfg,
-		})
-		if !handled {
-			return false, "", input
-		}
-		if expanded != "" {
-			return true, expanded, input
-		}
-		// Handler command: process result
-		switch r := result.(type) {
-		case commands.ExitResult:
-			os.Exit(0)
-		case commands.StatusResult:
-			ag.Store().AddStatus(domain.RoleStatus, r.Message)
-		}
-		return true, "", input
-	})
-
-	prompt := ""
-	if len(args) > 0 {
-		prompt = args[0]
-	} else {
-		// check for piped input
-		stat, _ := os.Stdin.Stat()
-		if (stat.Mode() & os.ModeCharDevice) == 0 {
-			data, _ := io.ReadAll(os.Stdin)
-			if len(data) > 0 {
-				prompt = strings.TrimSpace(string(data))
-			}
-		}
-	}
+	// Determine prompt
+	prompt := readPrompt(args)
 
 	if headless && prompt == "" {
 		fmt.Fprintln(os.Stderr, "Error: --headless requires a prompt argument")
@@ -209,10 +123,22 @@ Reply with exactly one of:
 		return
 	}
 
-	// Interactive TUI
-
 	if err := tui.RunTUI(ag, promptFiles); err != nil {
 		fmt.Fprintf(os.Stderr, "TUI error: %s\n", err)
 		os.Exit(1)
 	}
+}
+
+func readPrompt(args []string) string {
+	if len(args) > 0 {
+		return args[0]
+	}
+	stat, _ := os.Stdin.Stat()
+	if (stat.Mode() & os.ModeCharDevice) == 0 {
+		data, _ := io.ReadAll(os.Stdin)
+		if len(data) > 0 {
+			return strings.TrimSpace(string(data))
+		}
+	}
+	return ""
 }

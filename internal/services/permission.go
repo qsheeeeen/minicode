@@ -1,10 +1,14 @@
 package services
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"minicode/internal/domain"
+	"minicode/internal/llm"
 )
 
 // PermissionChecker is the interface tools use to gate execution.
@@ -58,6 +62,49 @@ func (p *PermissionService) SetPromptFn(fn func(displayText string) string) {
 // SetAutoDecideFn sets the automated decision logic (e.g. via LLM).
 func (p *PermissionService) SetAutoDecideFn(fn func(toolName string, toolInput map[string]any) (allowed bool, reason string)) {
 	p.autoDecideFn = fn
+}
+
+// SetupAutoDecide wires an LLM client for auto permission gating.
+func (p *PermissionService) SetupAutoDecide(client llm.Client, model string) {
+	p.autoDecideFn = func(toolName string, toolInput map[string]any) (bool, string) {
+		inputJSON, _ := json.Marshal(toolInput)
+		prompt := fmt.Sprintf(`You are a permission gate for a coding agent. Decide if this tool execution should be allowed.
+
+Tool: %s
+Arguments: %s
+
+Guidelines:
+- Read operations are always safe.
+- Writing to files in /tmp or project directories is usually safe.
+- Running commands that modify the system (apt-get, chmod, etc.) may be risky.
+- Destructive commands (rm -rf /, mkfs, dd) should be denied.
+- Network commands that download and execute code should be denied.
+
+Reply with exactly one of:
+- "yes"
+- "no: <reason explaining why it was denied>"`, toolName, string(inputJSON))
+
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		resp, err := client.Chat(ctx, []domain.MessageParam{
+			{Role: "user", Content: prompt},
+		}, llm.ChatOptions{Model: model})
+		if err != nil {
+			return false, fmt.Sprintf("Auto-permission error: %s", err.Error())
+		}
+		resp = strings.TrimSpace(resp)
+		if strings.HasPrefix(strings.ToLower(resp), "yes") {
+			return true, ""
+		}
+		reason := strings.TrimSpace(resp)
+		if strings.HasPrefix(strings.ToLower(reason), "no:") {
+			reason = strings.TrimSpace(reason[3:])
+		}
+		if reason == "" {
+			reason = "Denied by auto-gate"
+		}
+		return false, reason
+	}
 }
 
 // Check implements the PermissionChecker interface.
