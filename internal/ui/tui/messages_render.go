@@ -15,46 +15,6 @@ type ViewportModel struct {
 	messages []domain.DisplayMessage
 }
 
-// Render returns the viewport content string.
-func (vp *ViewportModel) Render() string {
-	if len(vp.messages) == 0 {
-		return "\n\n" + styleDim.Render("Type a message to start...") + "\n"
-	}
-
-	var lines []string
-	for _, msg := range vp.messages {
-		if msg.Role != domain.RoleTool && msg.Role != domain.RoleStatus && msg.Role != domain.RoleError && msg.Content == "" {
-			continue
-		}
-		switch msg.Role {
-		case domain.RoleUser:
-			lines = append(lines, styleUserBg.Render(strings.TrimSpace(msg.Content)))
-			lines = append(lines, "")
-		case domain.RoleText:
-			lines = append(lines, strings.TrimSpace(msg.Content))
-			lines = append(lines, "")
-		case domain.RoleThinking:
-			lines = append(lines, styleThinking.Render("Thinking"))
-			lines = append(lines, styleDim.Render(strings.TrimSpace(msg.Content)))
-			lines = append(lines, "")
-		case domain.RoleTool:
-			call := formatToolCall(msg)
-			lines = append(lines, styleToolCall.Render(call))
-			if msg.ToolOutput != "" {
-				lines = append(lines, formatToolOutput(msg)...)
-			}
-			lines = append(lines, "")
-		case domain.RoleStatus:
-			lines = append(lines, styleDim.Render("— "+msg.Content))
-			lines = append(lines, "")
-		case domain.RoleError:
-			lines = append(lines, styleErrorMsg.Render("✕ "+msg.Content))
-			lines = append(lines, "")
-		}
-	}
-	return strings.Join(lines, "\n") + "\n"
-}
-
 func formatToolCall(msg domain.DisplayMessage) string {
 	switch msg.ToolName {
 	case "Read":
@@ -127,6 +87,46 @@ func formatToolOutput(msg domain.DisplayMessage) []string {
 		out = append(out, styleDim.Render(line))
 	}
 	return out
+}
+
+// Render returns the viewport content string.
+func (vp *ViewportModel) Render() string {
+	if len(vp.messages) == 0 {
+		return "\n\n" + styleDim.Render("Type a message to start...") + "\n"
+	}
+
+	var lines []string
+	for _, msg := range vp.messages {
+		if msg.Role != domain.RoleTool && msg.Role != domain.RoleStatus && msg.Role != domain.RoleError && msg.Content == "" {
+			continue
+		}
+		switch msg.Role {
+		case domain.RoleUser:
+			lines = append(lines, styleUserBg.Render(strings.TrimSpace(msg.Content)))
+			lines = append(lines, "")
+		case domain.RoleText:
+			lines = append(lines, strings.TrimSpace(msg.Content))
+			lines = append(lines, "")
+		case domain.RoleThinking:
+			lines = append(lines, styleThinking.Render("Thinking"))
+			lines = append(lines, styleDim.Render(strings.TrimSpace(msg.Content)))
+			lines = append(lines, "")
+		case domain.RoleTool:
+			call := formatToolCall(msg)
+			lines = append(lines, styleToolCall.Render(call))
+			if msg.ToolOutput != "" {
+				lines = append(lines, formatToolOutput(msg)...)
+			}
+			lines = append(lines, "")
+		case domain.RoleStatus:
+			lines = append(lines, styleDim.Render("— "+msg.Content))
+			lines = append(lines, "")
+		case domain.RoleError:
+			lines = append(lines, styleErrorMsg.Render("✕ "+msg.Content))
+			lines = append(lines, "")
+		}
+	}
+	return strings.Join(lines, "\n") + "\n"
 }
 
 // ToDisplayMessages converts current state to render-ready DisplayMessages.
