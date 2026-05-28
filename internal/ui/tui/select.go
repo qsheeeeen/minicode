@@ -4,12 +4,13 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/list"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"minicode/internal/agent"
 	icmd "minicode/internal/commands"
 	"minicode/internal/config"
+
+	"github.com/charmbracelet/bubbles/list"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 // applyModelSpec resolves a "model@provider" spec into its components.
@@ -43,7 +44,7 @@ type SelectModel struct {
 	wizardEditTier string
 	wizardProvider string
 
-	agent *agent.Agent // set by TUIModel after construction
+	agent *agent.Agent // set by TuiModel after construction
 }
 
 // SetMode initializes a bubbles/list for a select mode.

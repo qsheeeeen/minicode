@@ -22,10 +22,10 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// TUIModel is the top-level Bubble Tea model composed of sub-models.
-type TUIModel struct {
-	program *tea.Program
-	agent   *agent.Agent
+// TuiModel is the top-level Bubble Tea model composed of sub-models.
+type TuiModel struct {
+	program  *tea.Program
+	agent    *agent.Agent
 	Header   HeaderModel
 	Input    InputModel
 	Viewport ViewportModel
@@ -41,9 +41,9 @@ type TUIModel struct {
 	ready  bool
 }
 
-// NewTUIModel creates the TUI model.
-func NewTUIModel(ag *agent.Agent, promptFiles []string) *TUIModel {
-	m := &TUIModel{
+// NewTuiModel creates the TUI model.
+func NewTuiModel(ag *agent.Agent, promptFiles []string) *TuiModel {
+	m := &TuiModel{
 		agent: ag,
 		keys:  DefaultKeyMap(),
 		help:  help.New(),
@@ -130,12 +130,12 @@ func NewTUIModel(ag *agent.Agent, promptFiles []string) *TUIModel {
 }
 
 // Init is the Bubble Tea Init function.
-func (m *TUIModel) Init() tea.Cmd {
+func (m *TuiModel) Init() tea.Cmd {
 	return tea.Batch(textarea.Blink, m.Input.spinner.Tick)
 }
 
 // Update is the Bubble Tea Update function.
-func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
@@ -228,7 +228,7 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // View is the Bubble Tea View function.
-func (m *TUIModel) View() string {
+func (m *TuiModel) View() string {
 	if !m.ready {
 		return "Initializing...\n"
 	}
@@ -250,7 +250,7 @@ func (m *TUIModel) View() string {
 
 // ---- Helpers ----
 
-func (m *TUIModel) syncState() {
+func (m *TuiModel) syncState() {
 	m.Viewport.messages = ToDisplayMessages(m.agent.Store().Turns(), m.agent.Store().Statuses(), m.agent.Store().IsStreaming())
 	m.Input.streaming = m.agent.Store().IsStreaming()
 	m.Panel.streaming = m.Input.streaming
@@ -262,7 +262,7 @@ func (m *TUIModel) syncState() {
 	m.Viewport.viewport.GotoBottom()
 }
 
-func (m *TUIModel) handleEnter(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m *TuiModel) handleEnter(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	input := strings.TrimSpace(m.Input.textarea.Value())
 	if input == "" {
 		return m, nil
@@ -319,7 +319,7 @@ func (m *TUIModel) handleEnter(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m *TUIModel) handleSelectChoice(val string) {
+func (m *TuiModel) handleSelectChoice(val string) {
 	switch m.Select.mode {
 	case "effort-select":
 		config.SetEffort(val)
@@ -385,7 +385,7 @@ func (m *TUIModel) handleSelectChoice(val string) {
 
 // RunTUI starts the interactive Bubble Tea terminal UI.
 func RunTUI(ag *agent.Agent, promptFiles []string) error {
-	mdl := NewTUIModel(ag, promptFiles)
+	mdl := NewTuiModel(ag, promptFiles)
 	p := tea.NewProgram(mdl)
 	mdl.program = p
 	_, err := p.Run()
