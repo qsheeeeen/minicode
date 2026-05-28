@@ -26,8 +26,6 @@ import (
 type TUIModel struct {
 	program *tea.Program
 	agent   *agent.Agent
-	cmdReg  *icmd.Registry
-
 	Header   HeaderModel
 	Input    InputModel
 	Viewport ViewportModel
@@ -274,14 +272,14 @@ func (m *TUIModel) handleEnter(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	promptText := input
 	isPrompt := false
-	if len(input) > 0 && input[0] == '/' && m.cmdReg != nil {
+	if len(input) > 0 && input[0] == '/' {
 		cfg, _ := config.Load()
 		cmdCtx := icmd.Context{
 			Agent:    m.agent,
 			Config:   cfg,
 			Sessions: storage.NewSessionManager().List(),
 		}
-		handled, result, expanded := m.cmdReg.ParseAndExecute(input, cmdCtx)
+		handled, result, expanded := icmd.ParseAndExecute(input, cmdCtx)
 		if handled {
 			if expanded != "" {
 				isPrompt = true
