@@ -23,23 +23,31 @@ func (i sugItem) Description() string { return i.desc }
 func (i sugItem) FilterValue() string { return i.name }
 
 // sugDelegate renders each suggestion on a single line: /name description.
-type sugDelegate struct{}
+type sugDelegate struct {
+	title       *lipgloss.Style
+	description *lipgloss.Style
+	selected    *lipgloss.Style
+}
 
 func (d sugDelegate) Height() int                             { return 1 }
 func (d sugDelegate) Spacing() int                            { return 0 }
 func (d sugDelegate) Update(_ tea.Msg, _ *list.Model) tea.Cmd { return nil }
 func (d sugDelegate) Render(w io.Writer, m list.Model, index int, item list.Item) {
-	si, ok := item.(sugItem)
+	i, ok := item.(sugItem)
 	if !ok {
 		return
 	}
-	title := "/" + si.name
-	desc := si.desc
+
+	str := fmt.Sprintf("%d. %s", index+1, i.Title())
+
+	fn := lipgloss.NewStyle().PaddingLeft(4).Render
 	if index == m.Index() {
-		fmt.Fprint(w, lipgloss.NewStyle().Foreground(lipgloss.Color("6")).Render(title)+" "+lipgloss.NewStyle().Foreground(lipgloss.Color("8")).Render(desc))
-	} else {
-		fmt.Fprint(w, title+" "+styleDim.Render(desc))
+		fn = func(s ...string) string {
+			return lipgloss.NewStyle().PaddingLeft(2).Foreground(lipgloss.Color("170")).Render("> " + strings.Join(s, " "))
+		}
 	}
+
+	fmt.Fprint(w, fn(str))
 }
 
 // Suggestions is the command autocomplete dropdown, backed by bubbles/list.
@@ -65,6 +73,10 @@ func (s *Suggestions) Set(items []icmd.Command) {
 	l.SetShowStatusBar(false)
 	l.SetShowTitle(false)
 	l.SetFilteringEnabled(false)
+	l.Styles.Title = lipgloss.NewStyle()
+	l.Styles.PaginationStyle = lipgloss.NewStyle()
+	l.Styles.HelpStyle = lipgloss.NewStyle()
+
 	l.KeyMap.Quit.Unbind()
 	s.list = l
 }

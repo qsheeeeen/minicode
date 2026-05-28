@@ -14,9 +14,8 @@ import (
 )
 
 type model struct {
-	textarea tui.Suggestions
-	ta       textarea.Model
-	suggest  tui.Suggestions
+	ta      textarea.Model
+	suggest tui.Suggestions
 }
 
 func newModel() *model {
