@@ -24,7 +24,6 @@ import (
 
 // TuiModel is the top-level Bubble Tea model composed of sub-models.
 type TuiModel struct {
-	program  *tea.Program
 	agent    *agent.Agent
 	Header   HeaderModel
 	Input    InputModel
@@ -36,6 +35,12 @@ type TuiModel struct {
 	keys TUIKeyMap
 	help help.Model
 
+	// Channels for external goroutine → TUI communication.
+	displayCh chan struct{}
+	tokenCh   chan int
+	askCh     chan askPromptMsg
+	permCh    chan permPromptMsg
+
 	width  int
 	height int
 	ready  bool
@@ -44,9 +49,13 @@ type TuiModel struct {
 // NewTuiModel creates the TUI model.
 func NewTuiModel(ag *agent.Agent, promptFiles []string) *TuiModel {
 	m := &TuiModel{
-		agent: ag,
-		keys:  DefaultKeyMap(),
-		help:  help.New(),
+		agent:     ag,
+		keys:      DefaultKeyMap(),
+		help:      help.New(),
+		displayCh: make(chan struct{}, 1),
+		tokenCh:   make(chan int, 1),
+		askCh:     make(chan askPromptMsg, 1),
+		permCh:    make(chan permPromptMsg, 1),
 	}
 
 	// Input
@@ -84,30 +93,28 @@ func NewTuiModel(ag *agent.Agent, promptFiles []string) *TuiModel {
 	// Set viewport content
 	m.Viewport.viewport.SetContent(m.Viewport.Render())
 
-	// Callbacks
+	// Callbacks — write to channels, never block the caller.
 	ag.OnDisplayChange(func() {
-		if m.program != nil {
-			m.program.Send(displayChangeMsg{})
+		select {
+		case m.displayCh <- struct{}{}:
+		default: // drop if already pending
 		}
 	})
 
 	ag.OnTokenUpdate(func(total int) {
-		if m.program != nil {
-			m.program.Send(tokenUpdateMsg{total: total})
+		select {
+		case m.tokenCh <- total:
+		default:
 		}
 	})
 
 	ag.SetAskUserFn(func(question string, options []domain.AskOption, multi bool) string {
-		ch := make(chan string)
-		if m.program != nil {
-			m.program.Send(askPromptMsg{
-				question: question,
-				options:  options,
-				multi:    multi,
-				resolve:  ch,
-			})
-		} else {
-			return ""
+		ch := make(chan string, 1)
+		m.askCh <- askPromptMsg{
+			question: question,
+			options:  options,
+			multi:    multi,
+			resolve:  ch,
 		}
 		return <-ch
 	})
@@ -115,12 +122,8 @@ func NewTuiModel(ag *agent.Agent, promptFiles []string) *TuiModel {
 	if p := ag.PermissionSvc(); p != nil {
 		if ps, ok := p.(*services.PermissionService); ok {
 			ps.SetPromptFn(func(displayText string) string {
-				ch := make(chan string)
-				if m.program != nil {
-					m.program.Send(permPromptMsg{displayText: displayText, resolve: ch})
-				} else {
-					return "no"
-				}
+				ch := make(chan string, 1)
+				m.permCh <- permPromptMsg{displayText: displayText, resolve: ch}
 				return <-ch
 			})
 		}
@@ -131,7 +134,43 @@ func NewTuiModel(ag *agent.Agent, promptFiles []string) *TuiModel {
 
 // Init is the Bubble Tea Init function.
 func (m *TuiModel) Init() tea.Cmd {
-	return tea.Batch(textarea.Blink, m.Input.spinner.Tick)
+	return tea.Batch(
+		textarea.Blink,
+		m.Input.spinner.Tick,
+		listenDisplay(m.displayCh),
+		listenToken(m.tokenCh),
+		listenAsk(m.askCh),
+		listenPerm(m.permCh),
+	)
+}
+
+// listenDisplay returns a Cmd that waits for display change notifications.
+func listenDisplay(ch <-chan struct{}) tea.Cmd {
+	return func() tea.Msg {
+		<-ch
+		return displayChangeMsg{}
+	}
+}
+
+// listenToken returns a Cmd that waits for token count updates.
+func listenToken(ch <-chan int) tea.Cmd {
+	return func() tea.Msg {
+		return tokenUpdateMsg{total: <-ch}
+	}
+}
+
+// listenAsk returns a Cmd that waits for ask-user prompts.
+func listenAsk(ch <-chan askPromptMsg) tea.Cmd {
+	return func() tea.Msg {
+		return <-ch
+	}
+}
+
+// listenPerm returns a Cmd that waits for permission prompts.
+func listenPerm(ch <-chan permPromptMsg) tea.Cmd {
+	return func() tea.Msg {
+		return <-ch
+	}
 }
 
 // Update is the Bubble Tea Update function.
@@ -141,11 +180,11 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case permPromptMsg:
 		m.Input.Perm.Activate(msg.displayText, msg.resolve)
-		return m, nil
+		return m, listenPerm(m.permCh)
 
 	case askPromptMsg:
 		m.Input.Ask.Activate(msg.question, msg.options, msg.multi, msg.resolve)
-		return m, nil
+		return m, listenAsk(m.askCh)
 
 	case tea.KeyMsg:
 		consumed, inputCmd := m.Input.Update(msg)
@@ -192,11 +231,11 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case displayChangeMsg:
 		m.syncState()
-		return m, nil
+		return m, listenDisplay(m.displayCh)
 
 	case tokenUpdateMsg:
 		m.Panel.tokenCount = msg.total
-		return m, nil
+		return m, listenToken(m.tokenCh)
 
 	case agentDoneMsg:
 		m.Input.streaming = false
@@ -387,7 +426,6 @@ func (m *TuiModel) handleSelectChoice(val string) {
 func RunTUI(ag *agent.Agent, promptFiles []string) error {
 	mdl := NewTuiModel(ag, promptFiles)
 	p := tea.NewProgram(mdl)
-	mdl.program = p
 	_, err := p.Run()
 	return err
 }
