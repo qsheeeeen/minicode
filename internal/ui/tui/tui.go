@@ -272,11 +272,11 @@ func (m *TuiModel) View() string {
 		return "Initializing...\n"
 	}
 
-	header := m.Header.View(m.width)
+	header := m.Header.View()
 	viewport := m.Viewport.viewport.View()
-	input := m.Input.View(m.width)
-	status := m.Status.View(m.width)
-	panel := m.Panel.View(m.agent, m.width)
+	input := m.Input.View()
+	status := m.Status.View()
+	panel := m.Panel.View(m.agent)
 	helpView := m.help.View(m.keys)
 
 	// When select mode is active, input area shows the list instead

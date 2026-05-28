@@ -38,7 +38,7 @@ func (m *model) View() string {
 	if m.done {
 		return ""
 	}
-	return m.perm.View(80)
+	return m.perm.View()
 }
 
 func main() {

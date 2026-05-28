@@ -7,7 +7,7 @@ import (
 
 func TestStatusViewThinking(t *testing.T) {
 	s := StatusModel{streaming: true}
-	v := s.View(80)
+	v := s.View()
 	if !strings.Contains(v, "Thinking") {
 		t.Errorf("expected 'Thinking' in status view, got %q", v)
 	}
@@ -15,7 +15,7 @@ func TestStatusViewThinking(t *testing.T) {
 
 func TestStatusViewIdle(t *testing.T) {
 	s := StatusModel{streaming: false}
-	v := s.View(80)
+	v := s.View()
 	if v != "" {
 		t.Errorf("expected empty string when idle, got %q", v)
 	}

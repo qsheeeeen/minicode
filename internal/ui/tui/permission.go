@@ -69,7 +69,7 @@ func (p *PermissionPrompt) Update(msg tea.KeyMsg) (handled bool) {
 	return true
 }
 
-func (p *PermissionPrompt) View(width int) string {
+func (p *PermissionPrompt) View() string {
 	title := styleToolCall.Render("Permission Required")
 	detail := styleDim.Render(p.text)
 	body := fmt.Sprintf("%s\n\n%s\n\n%s", title, detail, p.list.View())

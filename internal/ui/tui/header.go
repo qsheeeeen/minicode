@@ -7,7 +7,7 @@ type HeaderModel struct {
 	promptFiles []string
 }
 
-func (h *HeaderModel) View(width int) string {
+func (h *HeaderModel) View() string {
 	line1 := styleHeaderCyan.Render("Mini Code") + styleDim.Render(" v"+Version)
 	if len(h.promptFiles) > 0 {
 		line1 += styleDim.Render(" | " + strings.Join(h.promptFiles, ", "))

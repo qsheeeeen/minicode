@@ -75,7 +75,7 @@ func (a *AskUserPrompt) Update(msg tea.KeyMsg) (handled bool) {
 	return true
 }
 
-func (a *AskUserPrompt) View(width int) string {
+func (a *AskUserPrompt) View() string {
 	if !a.pending {
 		return ""
 	}

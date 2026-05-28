@@ -39,7 +39,7 @@ func (m *model) View() string {
 	if m.done {
 		return ""
 	}
-	return m.ask.View(80)
+	return m.ask.View()
 }
 
 func main() {

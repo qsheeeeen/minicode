@@ -77,12 +77,12 @@ func (in *InputModel) Update(msg tea.KeyMsg) (consumed bool, cmd tea.Cmd) {
 }
 
 // View renders the input area. Delegates to sub-components when active.
-func (in *InputModel) View(width int) string {
+func (in *InputModel) View() string {
 	if in.Perm.IsActive() {
-		return in.Perm.View(width)
+		return in.Perm.View()
 	}
 	if in.Ask.IsActive() {
-		return in.Ask.View(width)
+		return in.Ask.View()
 	}
 
 	prefix := styleInputArrow.Render("> ")

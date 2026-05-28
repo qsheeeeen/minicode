@@ -20,7 +20,7 @@ func TestAskUserPromptView(t *testing.T) {
 		t.Error("should be active after Activate")
 	}
 
-	v := a.View(100)
+	v := a.View()
 	if !strings.Contains(v, "Choose one") {
 		t.Error("should show the question")
 	}

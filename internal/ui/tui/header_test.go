@@ -10,7 +10,7 @@ import (
 func TestRenderHeader(t *testing.T) {
 	m := newTestModel()
 	m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-	h := m.Header.View(m.width)
+	h := m.Header.View()
 	if !strings.Contains(h, "Mini Code") {
 		t.Error("renderHeader should contain 'Mini Code'")
 	}
@@ -23,7 +23,7 @@ func TestRenderHeaderWithPromptFiles(t *testing.T) {
 	m := newTestModel()
 	m.Header.promptFiles = []string{"AGENTS.md", "CLAUDE.md"}
 	m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-	h := m.Header.View(m.width)
+	h := m.Header.View()
 	if !strings.Contains(h, "AGENTS.md") {
 		t.Error("renderHeader should show prompt files")
 	}

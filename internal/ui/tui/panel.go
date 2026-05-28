@@ -31,7 +31,7 @@ func formatNumber(n int) string {
 }
 
 // View renders the panel.
-func (p *PanelModel) View(ag *agent.Agent, width int) string {
+func (p *PanelModel) View(ag *agent.Agent) string {
 	provider := ag.Provider()
 	if provider == "" {
 		provider = "unknown"

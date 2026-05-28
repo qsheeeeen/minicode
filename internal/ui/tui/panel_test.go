@@ -29,7 +29,7 @@ func TestFormatNumber(t *testing.T) {
 func TestRenderPanel(t *testing.T) {
 	m := newTestModel()
 	m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-	s := m.Panel.View(m.agent, m.width)
+	s := m.Panel.View(m.agent)
 	if !strings.Contains(s, "test-model") {
 		t.Error("panel should contain model name")
 	}
@@ -46,7 +46,7 @@ func TestRenderPanelStreaming(t *testing.T) {
 	m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m.Input.streaming = true
 	m.Panel.streaming = true
-	s := m.Panel.View(m.agent, m.width)
+	s := m.Panel.View(m.agent)
 	if !strings.Contains(s, "streaming") {
 		t.Error("panel should show 'streaming' when active")
 	}
@@ -56,7 +56,7 @@ func TestRenderPanelError(t *testing.T) {
 	m := newTestModel()
 	m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m.Panel.err = errors.New("test error")
-	s := m.Panel.View(m.agent, m.width)
+	s := m.Panel.View(m.agent)
 	if !strings.Contains(s, "ERR") {
 		t.Error("panel should show ERR when error is set")
 	}

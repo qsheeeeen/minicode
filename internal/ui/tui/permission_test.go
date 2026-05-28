@@ -13,7 +13,7 @@ func TestPermissionPromptView(t *testing.T) {
 	if !p.IsActive() {
 		t.Error("should be active after Activate")
 	}
-	v := p.View(100)
+	v := p.View()
 	if !strings.Contains(v, "Permission Required") {
 		t.Error("should show 'Permission Required' title")
 	}
