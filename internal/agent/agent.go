@@ -34,7 +34,7 @@ type Agent struct {
 
 	sessionName string
 	tokenMgr    *services.TokenManager
-	toolList    []tools.Tool // allowed tools for this agent
+	toolList      []tools.Tool // allowed tools for this agent
 
 	mu            sync.Mutex
 	cancelFunc    context.CancelFunc
