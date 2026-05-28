@@ -72,7 +72,7 @@ func TestAgentDoneWithError(t *testing.T) {
 	m := newTestModel()
 	m.Input.streaming = true
 	m.Update(agentDoneMsg{err: context.DeadlineExceeded})
-	if m.Status.err == nil {
+	if m.Panel.err == nil {
 		t.Error("should store error from agentDoneMsg")
 	}
 	m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
@@ -95,8 +95,8 @@ func TestStreamingBlocksInput(t *testing.T) {
 func TestTokenUpdate(t *testing.T) {
 	m := newTestModel()
 	m.Update(tokenUpdateMsg{total: 42})
-	if m.Status.tokenCount != 42 {
-		t.Errorf("expected 42 tokens, got %d", m.Status.tokenCount)
+	if m.Panel.tokenCount != 42 {
+		t.Errorf("expected 42 tokens, got %d", m.Panel.tokenCount)
 	}
 }
 

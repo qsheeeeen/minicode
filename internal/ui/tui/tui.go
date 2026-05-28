@@ -31,6 +31,7 @@ type TUIModel struct {
 	Header   HeaderModel
 	Input    InputModel
 	Viewport ViewportModel
+	Panel    PanelModel
 	Status   StatusModel
 	Select   SelectModel
 
@@ -64,10 +65,10 @@ func NewTUIModel(ag *agent.Agent, promptFiles []string) *TUIModel {
 	m.Viewport.viewport = viewport.New(80, 20)
 	m.Viewport.messages = ToDisplayMessages(ag.Store().Turns(), ag.Store().Statuses(), ag.Store().IsStreaming())
 
-	// Status
-	m.Status.prog = progress.New(progress.WithDefaultGradient())
-	m.Status.modelName = ag.Model()
-	m.Status.session = ag.SessionName()
+	// Panel
+	m.Panel.prog = progress.New(progress.WithDefaultGradient())
+	m.Panel.modelName = ag.Model()
+	m.Panel.session = ag.SessionName()
 
 	// Header
 	m.Header.promptFiles = promptFiles
@@ -196,14 +197,15 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tokenUpdateMsg:
-		m.Status.tokenCount = msg.total
+		m.Panel.tokenCount = msg.total
 		return m, nil
 
 	case agentDoneMsg:
 		m.Input.streaming = false
+		m.Panel.streaming = false
 		m.Status.streaming = false
 		if msg.err != nil {
-			m.Status.err = msg.err
+			m.Panel.err = msg.err
 			m.agent.Store().AddStatus(domain.RoleError, msg.err.Error())
 		}
 		m.syncState()
@@ -236,7 +238,8 @@ func (m *TUIModel) View() string {
 	header := m.Header.View(m.width)
 	viewport := m.Viewport.viewport.View()
 	input := m.Input.View(m.width)
-	status := m.Status.View(m.agent, m.width)
+	status := m.Status.View(m.width)
+	panel := m.Panel.View(m.agent, m.width)
 	helpView := m.help.View(m.keys)
 
 	// When select mode is active, input area shows the list instead
@@ -244,7 +247,7 @@ func (m *TUIModel) View() string {
 		input = m.Select.list.View()
 	}
 
-	return header + viewport + "\n" + input + status + helpView + "\n"
+	return header + viewport + "\n" + status + "\n" + input + panel + helpView + "\n"
 }
 
 // ---- Helpers ----
@@ -252,10 +255,11 @@ func (m *TUIModel) View() string {
 func (m *TUIModel) syncState() {
 	m.Viewport.messages = ToDisplayMessages(m.agent.Store().Turns(), m.agent.Store().Statuses(), m.agent.Store().IsStreaming())
 	m.Input.streaming = m.agent.Store().IsStreaming()
+	m.Panel.streaming = m.Input.streaming
 	m.Status.streaming = m.Input.streaming
-	m.Status.modelName = m.agent.Model()
-	m.Status.session = m.agent.SessionName()
-	m.Status.tokenCount = m.agent.TokenCount()
+	m.Panel.modelName = m.agent.Model()
+	m.Panel.session = m.agent.SessionName()
+	m.Panel.tokenCount = m.agent.TokenCount()
 	m.Viewport.viewport.SetContent(m.Viewport.Render())
 	m.Viewport.viewport.GotoBottom()
 }
@@ -328,9 +332,9 @@ func (m *TUIModel) handleSelectChoice(val string) {
 			m.agent.Store().AddStatus(domain.RoleError, "Session not found: "+val)
 			return
 		}
-		m.Status.session = val
+		m.Panel.session = val
 		m.Viewport.messages = ToDisplayMessages(m.agent.Store().Turns(), m.agent.Store().Statuses(), m.agent.Store().IsStreaming())
-		m.Status.tokenCount = m.agent.TokenCount()
+		m.Panel.tokenCount = m.agent.TokenCount()
 		m.Viewport.viewport.SetContent(m.Viewport.Render())
 		m.Viewport.viewport.GotoBottom()
 		m.agent.Store().AddStatus(domain.RoleStatus, "Loaded session: "+val)
@@ -350,7 +354,7 @@ func (m *TUIModel) handleSelectChoice(val string) {
 		modelName, apiKey, baseURL, ctxLen := applyModelSpec(spec)
 		m.agent.SetModel(spec, apiKey, baseURL, ctxLen)
 		config.SetModel(spec)
-		m.Status.modelName = modelName
+		m.Panel.modelName = modelName
 	case "model-edit-tier":
 		m.Select.wizardEditTier = val
 		items := m.Select.buildProviderItems()
@@ -375,7 +379,7 @@ func (m *TUIModel) handleSelectChoice(val string) {
 		modelName, apiKey, baseURL, ctxLen := applyModelSpec(spec)
 		m.agent.SetModel(spec, apiKey, baseURL, ctxLen)
 		config.SetModel(spec)
-		m.Status.modelName = modelName
+		m.Panel.modelName = modelName
 		m.agent.Store().AddStatus(domain.RoleStatus, "Tier "+m.Select.wizardEditTier+" -> "+spec)
 	}
 	m.Select.ClearMode()
