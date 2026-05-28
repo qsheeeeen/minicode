@@ -39,15 +39,12 @@ func (a *AskUserPrompt) Activate(question string, options []domain.AskOption, mu
 		items[i] = askItem{label: opt.Label, desc: opt.Description}
 	}
 
-	d := list.NewDefaultDelegate()
-	d.Styles.SelectedTitle = d.Styles.SelectedTitle.Foreground(lipgloss.Color("6"))
-	d.Styles.SelectedDesc = d.Styles.SelectedDesc.Foreground(lipgloss.Color("8"))
-
-	l := list.New(items, d, 60, 5)
+	l := list.New(items, selectDelegate{showDesc: true}, 60, 5)
 	l.SetShowHelp(true)
 	l.SetShowStatusBar(false)
 	l.SetShowTitle(false)
 	l.SetFilteringEnabled(false)
+	newListStyles(&l)
 	l.KeyMap.Quit.Unbind()
 	a.list = l
 }

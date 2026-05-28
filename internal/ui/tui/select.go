@@ -10,7 +10,6 @@ import (
 
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 )
 
 // applyModelSpec resolves a "model@provider" spec into its components.
@@ -57,17 +56,13 @@ func (sel *SelectModel) SetMode(mode, title string, items []icmd.SelectItem) {
 		vals[i] = it.Value
 	}
 
-	delegate := list.NewDefaultDelegate()
-	delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.Foreground(lipgloss.Color("6"))
-	delegate.Styles.SelectedDesc = delegate.Styles.SelectedDesc.Foreground(lipgloss.Color("6"))
-
-	l := list.New(listItems, delegate, 60, 10)
-	l.SetShowTitle(true)
+	l := list.New(listItems, selectDelegate{}, 60, 10)
 	l.Title = title
+	l.SetShowTitle(true)
 	l.SetShowHelp(true)
 	l.SetShowStatusBar(false)
 	l.SetFilteringEnabled(false)
-	l.Styles.Title = styleHeaderCyan
+	newListStyles(&l)
 
 	sel.list = l
 	sel.mode = mode

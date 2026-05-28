@@ -66,16 +66,13 @@ func (s *Suggestions) Set(items []icmd.Command) {
 		}
 		listItems[i] = sugItem{name: cmd.Name, desc: desc}
 	}
-	d := sugDelegate{}
 	h := min(len(items), 10)
-	l := list.New(listItems, d, 50, h)
+	l := list.New(listItems, sugDelegate{}, 50, h)
 	l.SetShowHelp(true)
 	l.SetShowStatusBar(false)
 	l.SetShowTitle(false)
 	l.SetFilteringEnabled(false)
-	l.Styles.Title = lipgloss.NewStyle()
-	l.Styles.PaginationStyle = lipgloss.NewStyle()
-	l.Styles.HelpStyle = lipgloss.NewStyle()
+	newListStyles(&l)
 
 	l.KeyMap.Quit.Unbind()
 	s.list = l
