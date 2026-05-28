@@ -37,8 +37,9 @@ func applyModelSpec(spec string) (modelName, apiKey, baseURL string, contextLen 
 
 // SelectModel holds the state for interactive selection UI (bubbles/list).
 type SelectModel struct {
-	list list.Model
-	mode string // effort-select, session-list, model-tier, ...
+	list   list.Model
+	mode   string   // effort-select, session-list, model-tier, ...
+	values []string // parallel to list items, returned on selection
 
 	// Model wizard state machine
 	wizardEditTier string
@@ -50,8 +51,10 @@ type SelectModel struct {
 // SetMode initializes a bubbles/list for a select mode.
 func (sel *SelectModel) SetMode(mode, title string, items []icmd.SelectItem) {
 	listItems := make([]list.Item, len(items))
+	vals := make([]string, len(items))
 	for i, it := range items {
 		listItems[i] = listItem{title: it.Label, desc: it.Description}
+		vals[i] = it.Value
 	}
 
 	delegate := list.NewDefaultDelegate()
@@ -68,10 +71,12 @@ func (sel *SelectModel) SetMode(mode, title string, items []icmd.SelectItem) {
 
 	sel.list = l
 	sel.mode = mode
+	sel.values = vals
 }
 
 func (sel *SelectModel) ClearMode() {
 	sel.mode = ""
+	sel.values = nil
 	sel.list = list.Model{}
 }
 
@@ -93,9 +98,9 @@ func (sel *SelectModel) Update(msg tea.KeyMsg) (consumed bool, selected string, 
 		sel.ClearMode()
 		return true, "", nil
 	case tea.KeyEnter:
-		if i, ok := sel.list.SelectedItem().(list.DefaultItem); ok {
-			sel.ClearMode()
-			return true, i.Title(), nil
+		idx := sel.list.Index()
+		if idx >= 0 && idx < len(sel.values) {
+			return true, sel.values[idx], nil
 		}
 		return true, "", nil
 	}
