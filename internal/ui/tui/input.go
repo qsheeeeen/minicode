@@ -3,7 +3,6 @@ package tui
 import (
 	"strings"
 
-	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textarea"
 	tea "github.com/charmbracelet/bubbletea"
 	icmd "minicode/internal/commands"
@@ -12,7 +11,6 @@ import (
 // InputModel is the composite input area.
 type InputModel struct {
 	textarea  textarea.Model
-	spinner   spinner.Model
 	streaming bool
 
 	Perm    PermissionPrompt
@@ -86,9 +84,6 @@ func (in *InputModel) View() string {
 	}
 
 	prefix := styleInputArrow.Render("> ")
-	if in.streaming {
-		prefix = in.spinner.View() + " "
-	}
 
 	inputView := prefix + in.textarea.View()
 	mainInput := styleInputBorder.Render(inputView)

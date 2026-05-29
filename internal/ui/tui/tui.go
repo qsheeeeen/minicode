@@ -19,7 +19,6 @@ import (
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 )
 
 // TuiModel is the top-level Bubble Tea model composed of sub-models.
@@ -64,9 +63,7 @@ func NewTuiModel(ag *agent.Agent, promptFiles []string) *TuiModel {
 	m.Input.textarea.ShowLineNumbers = false
 	m.Input.textarea.Focus()
 
-	m.Input.spinner = spinner.New()
-	m.Input.spinner.Spinner = spinner.Dot
-	m.Input.spinner.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("5"))
+	m.Status = NewStatusModel()
 
 	// Viewport
 	m.Viewport.viewport = viewport.New(80, 20)
@@ -136,7 +133,7 @@ func NewTuiModel(ag *agent.Agent, promptFiles []string) *TuiModel {
 func (m *TuiModel) Init() tea.Cmd {
 	return tea.Batch(
 		textarea.Blink,
-		m.Input.spinner.Tick,
+		m.Status.spinner.Tick,
 		listenDisplay(m.displayCh),
 		listenToken(m.tokenCh),
 		listenAsk(m.askCh),
@@ -254,9 +251,7 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.ready = true
 
 	case spinner.TickMsg:
-		var cmd tea.Cmd
-		m.Input.spinner, cmd = m.Input.spinner.Update(msg)
-		cmds = append(cmds, cmd)
+		cmds = append(cmds, m.Status.Update(msg))
 	}
 
 	var cmd tea.Cmd
