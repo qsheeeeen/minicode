@@ -73,8 +73,6 @@ func run(cmd *cobra.Command, args []string) {
 		Provider:                  resolved.Model.Provider,
 		ContextLength:             resolved.Model.ContextLength,
 		CompressionThresholdRatio: resolved.CompressionThreshold,
-		ThinkingEnabled:           resolved.Thinking.Enabled,
-		ThinkingBudget:            8192,
 		Effort:                    resolved.Thinking.Effort,
 		UserPrompt:                userPrompt,
 	}

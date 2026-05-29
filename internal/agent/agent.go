@@ -391,10 +391,9 @@ func (a *Agent) handleStream(ctx context.Context, toolDefs []llm.Tool) ([]toolCa
 	a.store.StartAssistantTurn()
 
 	ch, err := a.client.ChatStream(ctx, a.store.ToLLMMessages(), toolDefs, llm.ChatOptions{
-		Model:           a.config.Model,
-		System:          a.systemPrompt,
-		ThinkingEnabled: a.config.ThinkingEnabled,
-		ThinkingBudget:  int64(a.config.ThinkingBudget),
+		Model:  a.config.Model,
+		System: a.systemPrompt,
+		Effort: a.config.Effort,
 	})
 	if err != nil {
 		log.Get().Error("stream request failed", "error", err)

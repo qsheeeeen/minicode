@@ -57,8 +57,6 @@ type AgentConfig struct {
 	Provider                  string
 	ContextLength             int
 	CompressionThresholdRatio float64
-	ThinkingEnabled           bool
-	ThinkingBudget            int
 	Effort                    string
 	UserPrompt                string
 	ExcludeTools              []string

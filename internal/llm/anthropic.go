@@ -33,8 +33,7 @@ type ChatOptions struct {
 	Model           string
 	MaxTokens       int64
 	System          string
-	ThinkingEnabled bool
-	ThinkingBudget  int64
+	Effort string
 	Signal          <-chan struct{}
 }
 
@@ -106,13 +105,16 @@ func (c Client) ChatStream(ctx context.Context, messages []domain.MessageParam, 
 	if opts.MaxTokens == 0 {
 		opts.MaxTokens = 8192
 	}
-	if opts.ThinkingBudget == 0 {
-		opts.ThinkingBudget = 4096
-	}
-
 	params := anthropic.MessageNewParams{
 		Model:     anthropic.Model(opts.Model),
 		MaxTokens: opts.MaxTokens,
+	}
+
+	// Effort via official OutputConfig API
+	if opts.Effort != "" {
+		params.OutputConfig = anthropic.OutputConfigParam{
+			Effort: anthropic.OutputConfigEffort(opts.Effort),
+		}
 	}
 
 	if opts.System != "" {
@@ -143,18 +145,14 @@ func (c Client) ChatStream(ctx context.Context, messages []domain.MessageParam, 
 		params.Tools = sdkTools
 	}
 
-	// Thinking config
-	if opts.ThinkingEnabled {
+	// Thinking config — enabled when effort is set
+	if opts.Effort != "" {
 		params.Thinking = anthropic.ThinkingConfigParamUnion{
-			OfEnabled: &anthropic.ThinkingConfigEnabledParam{BudgetTokens: opts.ThinkingBudget},
-		}
-	} else {
-		params.Thinking = anthropic.ThinkingConfigParamUnion{
-			OfAdaptive: &anthropic.ThinkingConfigAdaptiveParam{},
+			OfEnabled: &anthropic.ThinkingConfigEnabledParam{BudgetTokens: 10240},
 		}
 	}
 
-	c.logger.Info("chat stream request", "model", opts.Model, "max_tokens", opts.MaxTokens, "messages", len(messages), "tools", len(tools), "thinking", opts.ThinkingEnabled)
+	c.logger.Info("chat stream request", "model", opts.Model, "max_tokens", opts.MaxTokens, "messages", len(messages), "tools", len(tools), "effort", opts.Effort)
 
 	ch := make(chan StreamEvent, 64)
 	stream := c.sdk.Messages.NewStreaming(ctx, params)
