@@ -89,6 +89,18 @@ func formatToolOutput(msg domain.DisplayMessage) []string {
 	return out
 }
 
+// RenderBottomAligned renders content bottom-aligned within the given height.
+// Pads with blank lines at the top when content is shorter than height.
+func (vp *ViewportModel) RenderBottomAligned(height int) string {
+	content := vp.Render()
+	content = strings.TrimRight(content, "\n")
+	lines := strings.Count(content, "\n") + 1
+	if padding := height - lines; padding > 0 {
+		content = strings.Repeat("\n", padding) + content
+	}
+	return content + "\n"
+}
+
 // Render returns the viewport content string.
 func (vp *ViewportModel) Render() string {
 	if len(vp.messages) == 0 {

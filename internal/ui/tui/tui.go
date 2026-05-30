@@ -306,7 +306,7 @@ func (m *TuiModel) syncState() {
 	m.Panel.modelName = m.agent.Model()
 	m.Panel.session = m.agent.SessionName()
 	m.Panel.tokenCount = m.agent.TokenCount()
-	m.Viewport.viewport.SetContent(m.Viewport.Render())
+	m.Viewport.viewport.SetContent(m.Viewport.RenderBottomAligned(m.Viewport.viewport.Height))
 	m.Viewport.viewport.GotoBottom()
 }
 
@@ -381,7 +381,7 @@ func (m *TuiModel) handleSelectChoice(val string) {
 		m.Panel.session = val
 		m.Viewport.messages = ToDisplayMessages(m.agent.Store().Turns(), m.agent.Store().Statuses(), m.agent.Store().IsStreaming())
 		m.Panel.tokenCount = m.agent.TokenCount()
-		m.Viewport.viewport.SetContent(m.Viewport.Render())
+		m.Viewport.viewport.SetContent(m.Viewport.RenderBottomAligned(m.Viewport.viewport.Height))
 		m.Viewport.viewport.GotoBottom()
 		m.agent.Store().AddStatus(domain.RoleStatus, "Loaded session: "+val)
 	case "model-tier":
