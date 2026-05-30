@@ -31,5 +31,5 @@ func (s *StatusModel) View() string {
 	if !s.streaming {
 		return ""
 	}
-	return s.spinner.View() + " Thinking..."
+	return s.spinner.View() + " Thinking...\n"
 }

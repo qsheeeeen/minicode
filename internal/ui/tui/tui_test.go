@@ -126,9 +126,6 @@ func TestViewAfterReady(t *testing.T) {
 	if !strings.Contains(view, "test-model") {
 		t.Errorf("View should contain model name, got: %s", view)
 	}
-	if !strings.Contains(view, "Mini Code") {
-		t.Error("View should contain 'Mini Code' header")
-	}
 	if !strings.Contains(view, "Type a message") {
 		t.Error("View should contain input placeholder")
 	}

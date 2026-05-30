@@ -19,12 +19,12 @@ import (
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 // TuiModel is the top-level Bubble Tea model composed of sub-models.
 type TuiModel struct {
 	agent    *agent.Agent
-	Header   HeaderModel
 	Input    InputModel
 	Viewport ViewportModel
 	Panel    PanelModel
@@ -65,8 +65,8 @@ func NewTuiModel(ag *agent.Agent, promptFiles []string) *TuiModel {
 
 	m.Status = NewStatusModel()
 
-	// Viewport
-	m.Viewport.viewport = viewport.New(80, 20)
+	// Viewport — placeholder size, real size set on WindowSizeMsg
+	m.Viewport.viewport = viewport.New(0, 0)
 	m.Viewport.messages = ToDisplayMessages(ag.Store().Turns(), ag.Store().Statuses(), ag.Store().IsStreaming())
 
 	// Panel
@@ -74,8 +74,7 @@ func NewTuiModel(ag *agent.Agent, promptFiles []string) *TuiModel {
 	m.Panel.modelName = ag.Model()
 	m.Panel.session = ag.SessionName()
 
-	// Header
-	m.Header.promptFiles = promptFiles
+	// Header — removed, info merged into panel
 
 	// Select
 	m.Select.agent = ag
@@ -250,6 +249,22 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		m.ready = true
 
+		// Measure bottom area exactly as View() renders it
+		status := m.Status.View()
+		input := m.Input.View()
+		panel := m.Panel.View(m.agent)
+		helpView := m.help.View(m.keys)
+		bottom := "\n" + status + input + panel + "\n" + helpView
+		bottomLines := strings.Count(bottom, "\n") + 1
+		vpHeight := msg.Height - bottomLines
+		if vpHeight < 3 {
+			vpHeight = 3
+		}
+		m.Viewport.viewport.Width = msg.Width
+		m.Viewport.viewport.Height = vpHeight
+		m.Viewport.viewport.Style = lipgloss.NewStyle().Width(msg.Width)
+		m.Input.textarea.SetWidth(msg.Width - 4)
+
 	case spinner.TickMsg:
 		cmds = append(cmds, m.Status.Update(msg))
 	}
@@ -267,7 +282,6 @@ func (m *TuiModel) View() string {
 		return "Initializing...\n"
 	}
 
-	header := m.Header.View()
 	viewport := m.Viewport.viewport.View()
 	input := m.Input.View()
 	status := m.Status.View()
@@ -279,7 +293,7 @@ func (m *TuiModel) View() string {
 		input = m.Select.list.View()
 	}
 
-	return header + viewport + "\n" + status + "\n" + input + panel + helpView + "\n"
+	return viewport + "\n" + status + input + panel + "\n" + helpView
 }
 
 // ---- Helpers ----
