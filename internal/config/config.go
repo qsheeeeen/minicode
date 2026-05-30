@@ -24,8 +24,7 @@ type ModelInfo struct {
 
 // ThinkingConfig holds configuration for thinking models.
 type ThinkingConfig struct {
-	Enabled bool   `mapstructure:"enabled"`
-	Effort  string `mapstructure:"effort"`
+	Effort string `mapstructure:"effort"`
 }
 
 // Config is the top-level configuration (~/.minicode/config.json).
@@ -43,7 +42,7 @@ type Config struct {
 type ResolvedConfig struct {
 	Model                ModelRef
 	CompressionThreshold float64
-	Thinking             ThinkingConfig
+	Effort               string
 	PermissionMode       string
 }
 
@@ -115,11 +114,8 @@ func Resolve(specOverride string) (*ResolvedConfig, error) {
 
 	resolved := &ResolvedConfig{
 		CompressionThreshold: cfg.CompressionThreshold,
-		Thinking: ThinkingConfig{
-			Enabled: cfg.Thinking.Enabled,
-			Effort:  coalesce(cfg.Thinking.Effort, cfg.Effort),
-		},
-		PermissionMode: cfg.PermissionMode,
+		Effort:               coalesce(cfg.Thinking.Effort, cfg.Effort),
+		PermissionMode:       cfg.PermissionMode,
 	}
 
 	if spec == "" {

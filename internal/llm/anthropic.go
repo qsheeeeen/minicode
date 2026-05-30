@@ -145,11 +145,9 @@ func (c Client) ChatStream(ctx context.Context, messages []domain.MessageParam, 
 		params.Tools = sdkTools
 	}
 
-	// Thinking config — enabled when effort is set
-	if opts.Effort != "" {
-		params.Thinking = anthropic.ThinkingConfigParamUnion{
-			OfEnabled: &anthropic.ThinkingConfigEnabledParam{BudgetTokens: 10240},
-		}
+	// Default thinking on
+	params.Thinking = anthropic.ThinkingConfigParamUnion{
+		OfAdaptive: &anthropic.ThinkingConfigAdaptiveParam{},
 	}
 
 	c.logger.Info("chat stream request", "model", opts.Model, "max_tokens", opts.MaxTokens, "messages", len(messages), "tools", len(tools), "effort", opts.Effort)
