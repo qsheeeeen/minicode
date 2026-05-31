@@ -14,9 +14,6 @@ func TestRenderInputNormal(t *testing.T) {
 	if !strings.Contains(out, "Type a message") {
 		t.Error("renderInput should contain placeholder")
 	}
-	if !strings.Contains(out, ">") {
-		t.Error("renderInput should contain arrow prompt")
-	}
 }
 
 func TestRenderInputStreaming(t *testing.T) {

@@ -83,10 +83,7 @@ func (in *InputModel) View() string {
 		return in.Ask.View()
 	}
 
-	prefix := styleInputArrow.Render("> ")
-
-	inputView := prefix + in.textarea.View()
-	mainInput := styleInputBorder.Render(inputView)
+	mainInput := styleInputBorder.Render(in.textarea.View())
 
 	if in.Suggest.IsActive() && !in.streaming {
 		return in.Suggest.View(mainInput) + "\n"
