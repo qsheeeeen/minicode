@@ -7,6 +7,32 @@ import type { EffortLevel } from "./llm/anthropic.js";
 const CONFIG_DIR = path.join(os.homedir(), ".minicode");
 const CONFIG_PATH = path.join(CONFIG_DIR, "config.json");
 
+// Viper (Go) lowercases all keys when writing config.
+// Map known lowercase keys to their camelCase equivalents.
+const CAMEL_CASE_MAP: Record<string, string> = {
+  apikey: "apiKey",
+  baseurl: "baseURL",
+  contextlength: "contextLength",
+  compressionthreshold: "compressionThreshold",
+  permissionmode: "permissionMode",
+  promptfile: "promptFile",
+  skillsdir: "skillsDir",
+};
+
+function normalizeKeys(obj: unknown): unknown {
+  if (typeof obj !== "object" || obj === null) return obj;
+  if (Array.isArray(obj)) return obj.map(normalizeKeys);
+
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(
+    obj as Record<string, unknown>,
+  )) {
+    const normalizedKey = CAMEL_CASE_MAP[key] ?? key;
+    result[normalizedKey] = normalizeKeys(value);
+  }
+  return result;
+}
+
 export interface ModelConfig {
   contextLength?: number;
 }
@@ -23,19 +49,52 @@ export interface Providers {
   [key: string]: ProviderConfig | undefined;
 }
 
+export interface ThinkingConfig {
+  effort?: EffortLevel;
+}
+
 export interface Config {
   providers?: Providers;
   model?: string; // format: model@provider, e.g. "glm-4.7@zhipu"
   tiers?: Record<string, string>; // tier -> model@provider, e.g. { "1": "claude-sonnet@anthropic" }
   compressionThreshold?: number; // 0-1, compress at this ratio of context
-  thinking?: boolean; // enable extended thinking
-  effort?: EffortLevel; // reasoning effort level
+  thinking?: ThinkingConfig; // thinking configuration (Go writes { effort: "high" })
+  effort?: EffortLevel; // legacy: top-level effort, now nested under thinking
   promptFile?: string; // project prompt filename (default: AGENTS.md)
   permissionMode?: "manual" | "yolo" | "auto";
-  skillsDir?: string; // project skills directory (default: .minicode/skills)  // default permission mode
+  skillsDir?: string; // project skills directory (default: .minicode/skills)
+  // Top-level provider keys (Go may write providers outside "providers" wrapper)
+  [key: string]: unknown;
 }
 
 let cachedConfig: Config | null = null;
+
+function mergeTopLevelProviders(raw: Record<string, unknown>): void {
+  // Go's Viper may write provider configs at the top level (e.g. "zhipu": {...})
+  // alongside the "providers" wrapper. Merge them in.
+  const providers = (raw.providers ?? {}) as Record<string, unknown>;
+  for (const key of Object.keys(raw)) {
+    if (key === "providers") continue;
+    const val = raw[key];
+    if (
+      typeof val === "object" &&
+      val !== null &&
+      !Array.isArray(val) &&
+      ("apikey" in val || "apiKey" in val)
+    ) {
+      if (!providers[key]) {
+        providers[key] = val;
+      }
+    }
+  }
+  raw.providers = providers;
+}
+
+function parseAndNormalize(content: string): Config {
+  const raw = JSON.parse(content) as Record<string, unknown>;
+  mergeTopLevelProviders(raw);
+  return normalizeKeys(raw) as Config;
+}
 
 export async function loadConfig(refresh = false): Promise<Config> {
   if (cachedConfig && !refresh) return cachedConfig;
@@ -43,7 +102,7 @@ export async function loadConfig(refresh = false): Promise<Config> {
   try {
     await fsPromises.mkdir(CONFIG_DIR, { recursive: true });
     const content = await fsPromises.readFile(CONFIG_PATH, "utf-8");
-    cachedConfig = JSON.parse(content) as Config;
+    cachedConfig = parseAndNormalize(content);
     return cachedConfig ?? {};
   } catch {
     // 配置文件不存在，返回空配置
@@ -74,7 +133,7 @@ export function parseModelSpecifier(
 export function loadConfigSync(): Config {
   try {
     const content = fs.readFileSync(CONFIG_PATH, "utf-8");
-    return JSON.parse(content) as Config;
+    return parseAndNormalize(content);
   } catch {
     return {};
   }
@@ -116,12 +175,17 @@ export async function loadAllConfig(
     }
   }
 
+  const effort =
+    typeof config.thinking === "object" && config.thinking?.effort
+      ? config.thinking.effort
+      : config.effort;
+
   return {
     model,
     compressionThreshold: config.compressionThreshold ?? 0.8,
     thinking: {
-      enabled: config.thinking ?? false,
-      effort: config.effort,
+      enabled: typeof config.thinking === "object",
+      effort,
     },
     promptFile: config.promptFile || "AGENTS.md",
     permissionMode: config.permissionMode,
@@ -131,7 +195,10 @@ export async function loadAllConfig(
 
 export async function setEffort(effort: string): Promise<void> {
   const config = await loadConfig();
-  config.effort = effort as Config["effort"];
+  if (typeof config.thinking !== "object" || config.thinking === null) {
+    config.thinking = {};
+  }
+  config.thinking.effort = effort as EffortLevel;
   cachedConfig = config;
   await fsPromises.writeFile(
     CONFIG_PATH,
