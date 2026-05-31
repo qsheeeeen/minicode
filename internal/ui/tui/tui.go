@@ -248,22 +248,7 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.ready = true
-
-		// Measure bottom area exactly as View() renders it
-		status := m.Status.View()
-		input := m.Input.View()
-		panel := m.Panel.View(m.agent)
-		helpView := m.help.View(m.keys)
-		bottom := "\n" + status + input + panel + "\n" + helpView
-		bottomLines := strings.Count(bottom, "\n") + 1
-		vpHeight := msg.Height - bottomLines
-		if vpHeight < 3 {
-			vpHeight = 3
-		}
-		m.Viewport.viewport.Width = msg.Width
-		m.Viewport.viewport.Height = vpHeight
-		m.Viewport.viewport.Style = lipgloss.NewStyle().Width(msg.Width)
-		m.Input.textarea.SetWidth(msg.Width - 4)
+		m.resizeViewport()
 
 	case spinner.TickMsg:
 		cmds = append(cmds, m.Status.Update(msg))
@@ -306,8 +291,26 @@ func (m *TuiModel) syncState() {
 	m.Panel.modelName = m.agent.Model()
 	m.Panel.session = m.agent.SessionName()
 	m.Panel.tokenCount = m.agent.TokenCount()
+	m.resizeViewport()
 	m.Viewport.viewport.SetContent(m.Viewport.RenderBottomAligned(m.Viewport.viewport.Height))
 	m.Viewport.viewport.GotoBottom()
+}
+
+func (m *TuiModel) resizeViewport() {
+	status := m.Status.View()
+	input := m.Input.View()
+	panel := m.Panel.View(m.agent)
+	helpView := m.help.View(m.keys)
+	bottom := "\n" + status + input + panel + "\n" + helpView
+	bottomLines := strings.Count(bottom, "\n") + 1
+	vpHeight := m.height - bottomLines
+	if vpHeight < 3 {
+		vpHeight = 3
+	}
+	m.Viewport.viewport.Width = m.width
+	m.Viewport.viewport.Height = vpHeight
+	m.Viewport.viewport.Style = lipgloss.NewStyle().Width(m.width)
+	m.Input.textarea.SetWidth(m.width - 4)
 }
 
 func (m *TuiModel) handleEnter(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -434,7 +437,7 @@ func (m *TuiModel) handleSelectChoice(val string) {
 // RunTUI starts the interactive Bubble Tea terminal UI.
 func RunTUI(ag *agent.Agent, promptFiles []string) error {
 	mdl := NewTuiModel(ag, promptFiles)
-	p := tea.NewProgram(mdl)
+	p := tea.NewProgram(mdl, tea.WithMouseCellMotion())
 	_, err := p.Run()
 	return err
 }

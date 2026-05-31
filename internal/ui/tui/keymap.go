@@ -4,11 +4,11 @@ import "github.com/charmbracelet/bubbles/key"
 
 // TUIKeyMap holds all keybindings for the TUI and implements help.KeyMap.
 type TUIKeyMap struct {
-	// Normal mode
 	Submit     key.Binding
 	Quit       key.Binding
 	Abort      key.Binding
 	CycleMode  key.Binding
+	ToggleMouse key.Binding
 }
 
 // DefaultKeyMap returns a TUIKeyMap with default bindings.
