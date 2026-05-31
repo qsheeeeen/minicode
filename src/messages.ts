@@ -7,6 +7,7 @@ export interface StatusMessage {
   timestamp: Date;
   turnIndex?: number;
   element?: React.ReactElement;
+  toolDisplay?: { name: string; input: Record<string, unknown>; output?: string };
 }
 
 // Display layer — each role carries only the fields it needs
@@ -33,6 +34,7 @@ export type DisplayMessage =
       role: "status";
       content: string;
       element?: React.ReactElement;
+      toolDisplay?: { name: string; input: Record<string, unknown>; output?: string };
       timestamp?: Date;
     }
   | { role: "error"; content: string; timestamp?: Date };
@@ -75,6 +77,7 @@ export function toDisplayMessages(
       role: s.role,
       content: s.content,
       element: s.element,
+      toolDisplay: s.toolDisplay,
       timestamp: s.timestamp,
     });
   }
@@ -114,6 +117,7 @@ export function toDisplayMessages(
         role: s.role,
         content: s.content,
         element: s.element,
+      toolDisplay: s.toolDisplay,
         timestamp: s.timestamp,
       });
     }
@@ -126,6 +130,7 @@ export function toDisplayMessages(
         role: s.role,
         content: s.content,
         element: s.element,
+      toolDisplay: s.toolDisplay,
         timestamp: s.timestamp,
       });
     }

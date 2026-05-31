@@ -189,6 +189,12 @@ export async function runHeadless(
     // Print any new status messages
     for (const s of statuses) {
       if (s.role === "error") console.error(`[error] ${s.content}`);
+      else if (s.toolDisplay) {
+        const td = s.toolDisplay;
+        console.log(`(${td.name}(${JSON.stringify(td.input)}) → ${td.output ?? ""})`);
+      } else if (s.content) {
+        console.log(s.content);
+      }
     }
   }
 

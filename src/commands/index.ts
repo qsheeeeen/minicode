@@ -52,74 +52,38 @@ export async function parseAndExecute(
   displayContent?: string;
 }> {
   const trimmed = input.trim();
+  if (!trimmed.startsWith("/")) return { handled: false };
 
-  // Direct bash execution: !command args
-  if (trimmed.startsWith("!")) {
-    const cmd = trimmed.slice(1).trim();
-    if (!cmd) return { handled: true };
-    const { execSync } = await import("child_process");
-    const { ToolDisplay } = await import("../tui/tool-display.js");
-    const { createElement: el } = await import("react");
-    let text: string;
-    try {
-      const output = execSync(cmd, {
-        encoding: "utf-8",
-        timeout: 30000,
-        cwd: process.cwd(),
-      });
-      text = output.trim() || "(no output)";
-    } catch (e: any) {
-      text = `Error: ${e.message}`;
+  const parts = trimmed.slice(1).split(/\s+/);
+  const name = parts[0];
+  const args = parts.slice(1);
+
+  const cmd = commands.get(name);
+  if (cmd) {
+    if (cmd.handler) {
+      await cmd.handler(args, context);
+      return { handled: true };
     }
-    context.agent.getStore().addUserMessage(
-      `Ran: ${cmd}\n\n\`\`\`\n${text}\n\`\`\``,
-      trimmed,
-    );
-    context.agent.getStore().addStatus({
-      role: "status",
-      content: "",
-      element: el(ToolDisplay, {
-        name: "Bash",
-        input: { command: cmd },
-        output: text,
-      }),
-      timestamp: new Date(),
-    });
-    return { handled: true };
-  } else if (trimmed.startsWith("/")) {
-    const parts = trimmed.slice(1).split(/\s+/);
-    const name = parts[0];
-    const args = parts.slice(1);
-
-    const cmd = commands.get(name);
-    if (cmd) {
-      if (cmd.handler) {
-        await cmd.handler(args, context);
-        return { handled: true };
-      }
-      if (cmd.prompt) {
-        return {
-          handled: true,
-          promptText: cmd.prompt(args),
-          displayContent: `/${name}`,
-        };
-      }
-    }
-
-    // Dynamic skill commands: if no builtin command matched, check skills
-    const body = getSkillBody(name);
-    if (body) {
+    if (cmd.prompt) {
       return {
         handled: true,
-        promptText: `Activate and execute the '${name}' skill.\n\n${body}`,
+        promptText: cmd.prompt(args),
         displayContent: `/${name}`,
       };
     }
-
-    return { handled: false };
-  } else {
-    return { handled: false };
   }
+
+  // Dynamic skill commands: if no builtin command matched, check skills
+  const body = getSkillBody(name);
+  if (body) {
+    return {
+      handled: true,
+      promptText: `Activate and execute the '${name}' skill.\n\n${body}`,
+      displayContent: `/${name}`,
+    };
+  }
+
+  return { handled: false };
 }
 
 export function getCommandNames(): string[] {

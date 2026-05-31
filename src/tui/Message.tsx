@@ -44,6 +44,17 @@ export function Message({ msg }: { msg: DisplayMessage }) {
       );
 
     case "status":
+      if (msg.toolDisplay) {
+        return (
+          <Box marginBottom={1}>
+            <ToolDisplay
+              name={msg.toolDisplay.name}
+              input={msg.toolDisplay.input}
+              output={msg.toolDisplay.output}
+            />
+          </Box>
+        );
+      }
       if (msg.element) return <Box marginBottom={1}>{msg.element}</Box>;
       return (
         <Box marginBottom={1}>
