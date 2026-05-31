@@ -10,6 +10,8 @@ export interface AgentSession {
   task?: string;
   parentId?: string;
   summary?: string;
+  tokenCount?: number;
+  toolCalls?: number;
 }
 
 export type AgentRegistryUpdateCallback = (sessions: AgentSession[]) => void;
@@ -50,6 +52,18 @@ export class AgentRegistry {
   updateSummary(id: string, summary: string): void {
     const session = this.sessions.get(id);
     if (session) session.summary = summary;
+  }
+
+  updateProgress(
+    id: string,
+    updates: { tokenCount?: number; toolCalls?: number },
+  ): void {
+    const session = this.sessions.get(id);
+    if (session) {
+      if (updates.tokenCount !== undefined) session.tokenCount = updates.tokenCount;
+      if (updates.toolCalls !== undefined) session.toolCalls = updates.toolCalls;
+      this.notifyUpdate();
+    }
   }
 
   allocateSubId(): string {

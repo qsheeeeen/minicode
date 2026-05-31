@@ -14,6 +14,7 @@ import { MessageList } from "./tui/MessageList.js";
 import { ModalPrompter } from "./tui/ModalPrompter.js";
 import { Status } from "./tui/Status.js";
 import { InputArea } from "./tui/InputArea.js";
+import { SubAgentBar } from "./tui/SubAgentBar.js";
 import { Panel } from "./tui/Panel.js";
 import { Help } from "./tui/Help.js";
 
@@ -51,22 +52,46 @@ function useMultiAgent(
     });
   }, [registry, dispatch]);
 
+  const switchToSession = useCallback(
+    (session: AgentSession) => {
+      activeAgentIdRef.current = session.id;
+      dispatch({ type: "SET_ACTIVE_AGENT_ID", payload: session.id });
+      dispatch({
+        type: "SET_MESSAGES",
+        payload: session.agent.getStore().toDisplayMessages(),
+      });
+      agentRef.current = session.agent;
+    },
+    [dispatch, agentRef],
+  );
+
   useInput((input, key) => {
+    const sessions = registry.getAll() || [];
+    if (sessions.length <= 1) return;
+
     if (key.ctrl && input === "o") {
-      const sessions = registry.getAll() || [];
-      if (sessions.length <= 1) return;
       const currentIndex = sessions.findIndex(
         (s) => s.id === activeAgentIdRef.current,
       );
       const nextIndex = (currentIndex + 1) % sessions.length;
-      const nextSession = sessions[nextIndex];
-      activeAgentIdRef.current = nextSession.id;
-      dispatch({ type: "SET_ACTIVE_AGENT_ID", payload: nextSession.id });
-      dispatch({
-        type: "SET_MESSAGES",
-        payload: nextSession.agent.getStore().toDisplayMessages(),
-      });
-      agentRef.current = nextSession.agent;
+      switchToSession(sessions[nextIndex]);
+    }
+
+    if (key.upArrow) {
+      const currentIndex = sessions.findIndex(
+        (s) => s.id === activeAgentIdRef.current,
+      );
+      const prevIndex =
+        (currentIndex - 1 + sessions.length) % sessions.length;
+      switchToSession(sessions[prevIndex]);
+    }
+
+    if (key.downArrow) {
+      const currentIndex = sessions.findIndex(
+        (s) => s.id === activeAgentIdRef.current,
+      );
+      const nextIndex = (currentIndex + 1) % sessions.length;
+      switchToSession(sessions[nextIndex]);
     }
   });
 
@@ -316,6 +341,7 @@ function AppContent({
         handleSubmit={handleSubmit}
         loadingRef={loadingRef}
       />
+      <SubAgentBar />
       <Panel agentRef={agentRef} />
       <Help />
     </Box>

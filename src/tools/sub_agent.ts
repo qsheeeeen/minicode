@@ -96,11 +96,40 @@ export const agentTool: ToolDef = {
       });
     }
 
+    // Track progress during execution
+    let toolCallCount = 0;
+    subAgent.setEvents({
+      status: () => {},
+      error: () => {},
+      tokenUpdate: (count: number) => {
+        registry.updateProgress(subId, { tokenCount: count });
+      },
+    });
+    subAgent.getStore().onChange(() => {
+      const turns = subAgent.getStore().getTurns();
+      let tc = 0;
+      for (const turn of turns) {
+        if (turn.role === "assistant" && Array.isArray(turn.content)) {
+          for (const block of turn.content) {
+            if (block.type === "tool_use") tc++;
+          }
+        }
+      }
+      if (tc !== toolCallCount) {
+        toolCallCount = tc;
+        registry.updateProgress(subId, { toolCalls: tc });
+      }
+    });
+
     try {
       await subAgent.run(task);
       const turns = subAgent.getStore().getTurns();
       const finalResponse = extractFinalResponse(turns);
       const summary = generateSummary(turns);
+      registry.updateProgress(subId, {
+        tokenCount: subAgent.getTokenCount(),
+        toolCalls: toolCallCount,
+      });
       registry.updateStatus(subId, "completed");
       registry.updateSummary(subId, summary);
       registry.remove(subId);
