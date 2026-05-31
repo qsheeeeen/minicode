@@ -77,9 +77,16 @@ vi.mock("./services/permission.js", () => ({
   }),
 }));
 
-vi.mock("./utils/session.js", () => ({
-  sessionManager: {
-    save: vi.fn().mockResolvedValue(undefined),
+vi.mock("./utils/session.js", () => ({}));
+vi.mock("fs/promises", () => ({
+  default: {
+    mkdir: vi.fn().mockResolvedValue(undefined),
+    readdir: vi.fn().mockResolvedValue([]),
+    readFile: vi.fn().mockRejectedValue(new Error("ENOENT")),
+    writeFile: vi.fn().mockResolvedValue(undefined),
+    unlink: vi.fn().mockResolvedValue(undefined),
+    rename: vi.fn().mockResolvedValue(undefined),
+    stat: vi.fn().mockResolvedValue({ mtime: new Date() }),
   },
 }));
 

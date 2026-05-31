@@ -17,10 +17,10 @@ import {
   type CommandContext,
 } from "./index.js";
 
-const { sessionManagerMock, configMock, skillsMock } = vi.hoisted(() => ({
-  sessionManagerMock: {
+const { messageStoreMock, configMock, skillsMock } = vi.hoisted(() => ({
+  messageStoreMock: {
     getProjectHash: vi.fn().mockReturnValue("testhash"),
-    get: vi.fn().mockResolvedValue(null),
+    load: vi.fn().mockResolvedValue(null),
     list: vi.fn().mockResolvedValue([]),
     rename: vi.fn().mockResolvedValue(undefined),
   },
@@ -34,8 +34,8 @@ const { sessionManagerMock, configMock, skillsMock } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("../utils/session.js", () => ({
-  sessionManager: sessionManagerMock,
+vi.mock("../messages.js", () => ({
+  MessageStore: messageStoreMock,
 }));
 
 vi.mock("../utils/logger.js", () => ({
@@ -198,7 +198,7 @@ describe("Builtin commands", () => {
         ctx as CommandContext,
       );
       expect(result.handled).toBe(true);
-      expect(sessionManagerMock.rename).toHaveBeenCalledWith(
+      expect(messageStoreMock.rename).toHaveBeenCalledWith(
         "old-session",
         "new-session",
       );
@@ -209,7 +209,7 @@ describe("Builtin commands", () => {
     });
 
     it("/resume with no args lists sessions", async () => {
-      sessionManagerMock.list.mockResolvedValue([
+      messageStoreMock.list.mockResolvedValue([
         { name: "session-1" },
         { name: "session-2" },
       ]);
@@ -222,14 +222,14 @@ describe("Builtin commands", () => {
         ctx as CommandContext,
       );
       expect(result.handled).toBe(true);
-      expect(sessionManagerMock.list).toHaveBeenCalled();
+      expect(messageStoreMock.list).toHaveBeenCalled();
       expect(ctx.setInputMode).toHaveBeenCalledWith("session-list", {
         sessions: [{ name: "session-1" }, { name: "session-2" }],
       });
     });
 
     it("/resume with args loads session", async () => {
-      sessionManagerMock.get.mockResolvedValue({
+      messageStoreMock.load.mockResolvedValue({
         messages: [],
         totalTokens: 100,
       });
@@ -253,7 +253,7 @@ describe("Builtin commands", () => {
         ctx as CommandContext,
       );
       expect(result.handled).toBe(true);
-      expect(sessionManagerMock.get).toHaveBeenCalledWith("session-1");
+      expect(messageStoreMock.load).toHaveBeenCalledWith("session-1");
       expect(agentMock.setMessages).toHaveBeenCalled();
       expect(agentMock.setTokenCount).toHaveBeenCalledWith(100);
       expect(ctx.setCurrentSession).toHaveBeenCalledWith("session-1");
@@ -263,7 +263,7 @@ describe("Builtin commands", () => {
     });
 
     it("/resume with unknown session shows error", async () => {
-      sessionManagerMock.get.mockResolvedValue(null);
+      messageStoreMock.load.mockResolvedValue(null);
       const storeMock = { addStatus: vi.fn() };
       const ctx: Partial<CommandContext> = {
         agent: { getStore: vi.fn().mockReturnValue(storeMock) } as any,

@@ -1,10 +1,22 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   MessageStore,
   toDisplayMessages,
   type StatusMessage,
 } from "./messages.js";
 import type { MessageParam } from "./llm/anthropic.js";
+
+vi.mock("fs/promises", () => ({
+  default: {
+    mkdir: vi.fn().mockResolvedValue(undefined),
+    readdir: vi.fn().mockResolvedValue([]),
+    readFile: vi.fn().mockRejectedValue(new Error("ENOENT")),
+    writeFile: vi.fn().mockResolvedValue(undefined),
+    unlink: vi.fn().mockResolvedValue(undefined),
+    rename: vi.fn().mockResolvedValue(undefined),
+    stat: vi.fn().mockResolvedValue({ mtime: new Date("2024-01-01T10:00:00Z") }),
+  },
+}));
 
 describe("toDisplayMessages", () => {
   it("renders user string turns", () => {
@@ -124,5 +136,132 @@ describe("MessageStore", () => {
     store.setStreaming(true);
     expect(store.isStreaming()).toBe(true);
     expect(cb).toHaveBeenCalled();
+  });
+});
+
+describe("MessageStore session persistence", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe("getProjectHash", () => {
+    it("returns consistent 12-char hex", () => {
+      const h1 = MessageStore.getProjectHash();
+      const h2 = MessageStore.getProjectHash();
+      expect(h1).toBe(h2);
+      expect(h1).toMatch(/^[a-f0-9]{12}$/);
+    });
+  });
+
+  describe("getSessionDir", () => {
+    it("returns path under .minicode/sessions", () => {
+      expect(MessageStore.getSessionDir()).toContain(".minicode/sessions/");
+    });
+  });
+
+  describe("list", () => {
+    it("returns empty array when no sessions", async () => {
+      const fsMod = await import("fs/promises");
+      (fsMod.default.readdir as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+      const sessions = await MessageStore.list();
+      expect(sessions).toEqual([]);
+    });
+
+    it("lists JSONL sessions sorted by mtime descending", async () => {
+      const fsMod = await import("fs/promises");
+      (fsMod.default.readdir as ReturnType<typeof vi.fn>).mockResolvedValue([
+        "old.context.jsonl",
+        "new.context.jsonl",
+      ]);
+      (fsMod.default.stat as ReturnType<typeof vi.fn>)
+        .mockResolvedValueOnce({ mtime: new Date("2024-01-02T10:00:00Z") })
+        .mockResolvedValueOnce({ mtime: new Date("2024-01-01T10:00:00Z") });
+      const sessions = await MessageStore.list();
+      expect(sessions[0].name).toBe("old");
+      expect(sessions[1].name).toBe("new");
+    });
+  });
+
+  describe("load", () => {
+    it("returns parsed JSONL session data", async () => {
+      const fsMod = await import("fs/promises");
+      const header = JSON.stringify({ model: "claude-3", totalTokens: 1000, msgCount: 1 });
+      const msg = JSON.stringify({ role: "user", content: "hello" });
+      (fsMod.default.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(
+        `${header}\n${msg}\n`,
+      );
+      const data = await MessageStore.load("test-session");
+      expect(data?.model).toBe("claude-3");
+      expect(data?.messages).toHaveLength(1);
+      expect(data?.totalTokens).toBe(1000);
+    });
+
+    it("skips malformed lines", async () => {
+      const fsMod = await import("fs/promises");
+      const header = JSON.stringify({ model: "test", totalTokens: 0, msgCount: 2 });
+      (fsMod.default.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(
+        `${header}\n{bad json}\n{"role":"user","content":"ok"}\n`,
+      );
+      const data = await MessageStore.load("test");
+      expect(data?.messages).toHaveLength(1);
+    });
+
+    it("falls back to legacy .json format", async () => {
+      const fsMod = await import("fs/promises");
+      (fsMod.default.readFile as ReturnType<typeof vi.fn>)
+        .mockRejectedValueOnce(new Error("ENOENT"))
+        .mockResolvedValueOnce(
+          JSON.stringify({ model: "legacy", messages: [], totalTokens: 0 }),
+        );
+      const data = await MessageStore.load("old-session");
+      expect(data?.model).toBe("legacy");
+    });
+
+    it("returns null when not found", async () => {
+      const fsMod = await import("fs/promises");
+      (fsMod.default.readFile as ReturnType<typeof vi.fn>).mockRejectedValue(
+        new Error("ENOENT"),
+      );
+      const data = await MessageStore.load("nonexistent");
+      expect(data).toBeNull();
+    });
+  });
+
+  describe("save", () => {
+    it("writes JSONL via tmp+rename", async () => {
+      const fsMod = await import("fs/promises");
+      const store = new MessageStore();
+      store.setSessionName("test");
+      store.addUserMessage("hello");
+      store.setMeta({ model: "claude-3", totalTokens: 100 });
+      await store.save();
+      expect(fsMod.default.writeFile).toHaveBeenCalledWith(
+        expect.stringContaining(".tmp"),
+        expect.any(String),
+      );
+      expect(fsMod.default.rename).toHaveBeenCalledWith(
+        expect.stringContaining(".tmp"),
+        expect.stringContaining("test.context.jsonl"),
+      );
+    });
+  });
+
+  describe("delete", () => {
+    it("attempts to delete both JSONL and legacy .json", async () => {
+      const fsMod = await import("fs/promises");
+      await MessageStore.delete("test-session");
+      expect(fsMod.default.unlink).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("rename", () => {
+    it("renames JSONL session files", async () => {
+      const fsMod = await import("fs/promises");
+      await MessageStore.rename("old-name", "new-name");
+      expect(fsMod.default.rename).toHaveBeenCalledWith(
+        expect.stringContaining("old-name.context.jsonl"),
+        expect.stringContaining("new-name.context.jsonl"),
+      );
+    });
   });
 });

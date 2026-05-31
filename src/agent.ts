@@ -29,7 +29,6 @@ import {
 import { MessageStore } from "./messages.js";
 import { getAvailableSkills } from "./skills/index.js";
 import { callContent } from "./tui/tool-display.js";
-import { sessionManager } from "./utils/session.js";
 import { execSync } from "child_process";
 import type pino from "pino";
 
@@ -97,7 +96,7 @@ export class Agent {
     | import("@anthropic-ai/sdk/lib/MessageStream.js").MessageStream<null>
     | null = null;
   private logger?: pino.Logger;
-  private saveSessionLock: Promise<void> = Promise.resolve();
+
   private isCompressing: boolean = false;
   private isRunning: boolean = false;
   private environmentContext = "";
@@ -112,6 +111,7 @@ export class Agent {
 
   public setSession(sessionName: string): void {
     this.currentSession = sessionName;
+    this.store.setSessionName(sessionName);
   }
 
   public setLogger(logger: pino.Logger): void {
@@ -211,23 +211,14 @@ export class Agent {
     this.permissionService.setPrompter(prompter);
   }
 
-  /** Save current session state to disk */
-  private saveSession(): Promise<void> {
-    this.saveSessionLock = this.saveSessionLock
-      .then(async () => {
-        await sessionManager.save(this.currentSession, {
-          model: this.model || "unknown",
-          messages: this.store.toLLMMessages() as any,
-          totalTokens: this.tokenManager.getTotal(),
-          createdAt: "",
-          updatedAt: "",
-        });
-      })
-      .catch((e) => {
-        this.logger?.error({ error: String(e) }, "Failed to save session");
-      });
-
-    return this.saveSessionLock;
+  private async saveStore(): Promise<void> {
+    this.store.setMeta({
+      model: this.model || "unknown",
+      totalTokens: this.tokenManager.getTotal(),
+    });
+    await this.store.save().catch((e) => {
+      this.logger?.error({ error: String(e) }, "Failed to save session");
+    });
   }
 
   abort(): void {
@@ -447,7 +438,7 @@ export class Agent {
     stream.on("contentBlock", (block: ContentBlock) => {
       blockStreaming = false;
       if (block.type === "thinking" || block.type === "text") {
-        this.saveSession().catch(() => {});
+        this.saveStore();
       }
       if (block.type === "tool_use") {
         hasToolCalls = true;
@@ -462,7 +453,7 @@ export class Agent {
           name: toolBlock.name,
           input: toolBlock.input,
         } as ContentBlock);
-        this.saveSession().catch(() => {});
+        this.saveStore();
       }
     });
 
@@ -729,7 +720,7 @@ export class Agent {
         }
 
         if (hasToolCalls) {
-          await this.saveSession();
+          await this.saveStore();
         }
 
         if (!hasToolCalls) break;
@@ -758,7 +749,7 @@ export class Agent {
         },
         "Session ended",
       );
-      await this.saveSession();
+      await this.saveStore();
     }
     return true;
   }

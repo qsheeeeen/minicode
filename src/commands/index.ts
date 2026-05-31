@@ -1,7 +1,7 @@
 import type { Agent } from "../agent.js";
 import type { DisplayMessage } from "../utils/display.js";
 import type { EffortLevel } from "../llm/anthropic.js";
-import { sessionManager } from "../utils/session.js";
+import { MessageStore } from "../messages.js";
 import { getSkillBody, getAvailableSkills } from "../skills/index.js";
 import { createLogger } from "../utils/logger.js";
 
@@ -128,7 +128,7 @@ registerCommand({
     ctx.agent.setTokenCount(0);
     const newSession = `session-${Date.now()}`;
     const newLogger = await createLogger(
-      sessionManager.getProjectHash(),
+      MessageStore.getProjectHash(),
       newSession,
     );
     ctx.agent.setSession(newSession);
@@ -189,7 +189,7 @@ registerCommand({
     if (name) {
       ctx.agent.clearSession();
       const newLogger = await createLogger(
-        sessionManager.getProjectHash(),
+        MessageStore.getProjectHash(),
         name,
       );
       ctx.agent.setSession(name);
@@ -213,9 +213,9 @@ registerCommand({
     const newName = args.join(" ");
     if (newName) {
       const oldName = ctx.agent.currentSession;
-      await sessionManager.rename(oldName, newName);
+      await MessageStore.rename(oldName, newName);
       const newLogger = await createLogger(
-        sessionManager.getProjectHash(),
+        MessageStore.getProjectHash(),
         newName,
       );
       ctx.agent.setSession(newName);
@@ -237,11 +237,11 @@ registerCommand({
   description: "Load a session (without args: list sessions)",
   handler: async (args, ctx): Promise<void> => {
     if (args.length === 0) {
-      const sessions = await sessionManager.list();
+      const sessions = await MessageStore.list();
       ctx.setInputMode("session-list", { sessions });
     } else {
       const name = args[0];
-      const data = await sessionManager.get(name);
+      const data = await MessageStore.load(name);
       if (data) {
         ctx.agent.setMessages(data.messages as any);
         const totalTokens = data.totalTokens || 0;
@@ -249,7 +249,7 @@ registerCommand({
           ctx.agent.setTokenCount(totalTokens);
         }
         const newLogger = await createLogger(
-          sessionManager.getProjectHash(),
+          MessageStore.getProjectHash(),
           name,
         );
         ctx.agent.setSession(name);

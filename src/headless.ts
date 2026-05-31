@@ -1,6 +1,6 @@
 import type { Agent } from "./agent.js";
 import type { MessageParam, ContentBlock } from "./llm/anthropic.js";
-import { sessionManager } from "./utils/session.js";
+import { MessageStore } from "./messages.js";
 
 export async function runHeadless(
   agent: Agent,
@@ -12,9 +12,9 @@ export async function runHeadless(
   if (sessionName || resumeRecent) {
     const name =
       sessionName ??
-      (await sessionManager.getMostRecent()) ??
+      (await MessageStore.getMostRecent()) ??
       `session-${Date.now()}`;
-    const data = await sessionManager.get(name);
+    const data = await MessageStore.load(name);
     if (data) {
       agent.setMessages(data.messages as any);
       const totalTokens = data.totalTokens || 0;
@@ -23,7 +23,7 @@ export async function runHeadless(
       }
       const { createLogger } = await import("./utils/logger.js");
       const newLogger = await createLogger(
-        sessionManager.getProjectHash(),
+        MessageStore.getProjectHash(),
         name,
       );
       agent.setSession(name);

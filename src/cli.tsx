@@ -7,7 +7,7 @@ import { render } from "ink";
 import { loadAllConfig } from "./config.js";
 import { Agent } from "./agent.js";
 import { AgentRegistry } from "./services/index.js";
-import { sessionManager } from "./utils/session.js";
+import { MessageStore } from "./messages.js";
 import { createLogger } from "./utils/logger.js";
 import { parseArgs, type PermissionMode } from "./args.js";
 import { loadGlobalPrompt } from "./utils/prompts.js";
@@ -97,14 +97,14 @@ let initialSession: string;
 if (sessionName) {
   initialSession = sessionName;
 } else if (resumeRecent) {
-  const recent = await sessionManager.getMostRecent();
+  const recent = await MessageStore.getMostRecent();
   initialSession = recent || `session-${Date.now()}`;
 } else {
   initialSession = `session-${Date.now()}`;
 }
 
 const logger = await createLogger(
-  sessionManager.getProjectHash(),
+  MessageStore.getProjectHash(),
   initialSession,
 );
 

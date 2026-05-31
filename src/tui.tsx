@@ -5,7 +5,7 @@ import type { MessageParam } from "./llm/anthropic.js";
 import type { ResolvedConfig } from "./config.js";
 import { CallbackEvents, CallbackPrompter } from "./utils/display.js";
 import { parseAndExecute } from "./commands/index.js";
-import { sessionManager } from "./utils/session.js";
+import { MessageStore } from "./messages.js";
 import { AgentRegistry, type AgentSession } from "./services/index.js";
 
 import { TuiProvider, useTuiState, useTuiDispatch } from "./tui/store.js";
@@ -159,7 +159,7 @@ function useDisplay(
       agent.currentSession = initialSession;
       dispatch({ type: "SET_CURRENT_SESSION", payload: initialSession });
       if (sessionName || resumeRecent) {
-        const data = await sessionManager.get(initialSession);
+        const data = await MessageStore.load(initialSession);
         if (data) {
           agent.setMessages(data.messages as MessageParam[]);
           const totalTokens = data.totalTokens || 0;

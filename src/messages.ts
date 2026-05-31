@@ -1,4 +1,29 @@
 import type { MessageParam, ContentBlock } from "./llm/anthropic.js";
+import fs from "fs/promises";
+import path from "path";
+import crypto from "crypto";
+import os from "os";
+
+// -- Session types --
+
+interface SessionHeader {
+  model: string;
+  totalTokens: number;
+  msgCount: number;
+}
+
+export interface SessionData {
+  model: string;
+  messages: Array<{ role: string; content: any }>;
+  totalTokens: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface SessionInfo {
+  name: string;
+  updatedAt: string;
+}
 
 // UI-only status / error messages — not sent to LLM
 export interface StatusMessage {
@@ -301,5 +326,147 @@ export class MessageStore {
     this.turns = turns;
     this.statuses = [];
     this.notify();
+  }
+
+  // -- Session persistence --
+
+  private sessionName = "";
+  private meta = { model: "unknown", totalTokens: 0 };
+
+  private static readonly BASE_DIR = path.join(
+    os.homedir(),
+    ".minicode",
+    "sessions",
+  );
+  private static readonly EXT = ".context.jsonl";
+
+  setSessionName(name: string): void {
+    this.sessionName = name;
+  }
+
+  getSessionName(): string {
+    return this.sessionName;
+  }
+
+  setMeta(meta: { model?: string; totalTokens?: number }): void {
+    if (meta.model !== undefined) this.meta.model = meta.model;
+    if (meta.totalTokens !== undefined) this.meta.totalTokens = meta.totalTokens;
+  }
+
+  getMeta(): { model: string; totalTokens: number } {
+    return { ...this.meta };
+  }
+
+  async save(): Promise<void> {
+    if (!this.sessionName) return;
+    const dir = MessageStore.getSessionDir();
+    await fs.mkdir(dir, { recursive: true });
+    const filePath = path.join(dir, `${this.sessionName}${MessageStore.EXT}`);
+    const tmpPath = filePath + ".tmp";
+    const header: SessionHeader = {
+      model: this.meta.model,
+      totalTokens: this.meta.totalTokens,
+      msgCount: this.turns.length,
+    };
+    const lines = [JSON.stringify(header)];
+    for (const msg of this.toLLMMessages()) {
+      lines.push(JSON.stringify(msg));
+    }
+    await fs.writeFile(tmpPath, lines.join("\n") + "\n");
+    await fs.rename(tmpPath, filePath);
+  }
+
+  static async load(
+    name: string,
+  ): Promise<SessionData | null> {
+    const dir = MessageStore.getSessionDir();
+    await fs.mkdir(dir, { recursive: true });
+    const filePath = path.join(dir, `${name}${MessageStore.EXT}`);
+    try {
+      const content = await fs.readFile(filePath, "utf-8");
+      const lines = content.split("\n").filter((l) => l.trim());
+      if (lines.length === 0) return null;
+      const header: SessionHeader = JSON.parse(lines[0]);
+      const messages: SessionData["messages"] = [];
+      for (let i = 1; i < lines.length; i++) {
+        try {
+          messages.push(JSON.parse(lines[i]));
+        } catch {
+          // skip malformed lines
+        }
+      }
+      return {
+        model: header.model,
+        messages,
+        totalTokens: header.totalTokens,
+      };
+    } catch {
+      // JSONL not found, try legacy .json format
+    }
+    const legacyPath = path.join(dir, `${name}.json`);
+    try {
+      const content = await fs.readFile(legacyPath, "utf-8");
+      return JSON.parse(content);
+    } catch {
+      return null;
+    }
+  }
+
+  static getProjectHash(): string {
+    return crypto
+      .createHash("md5")
+      .update(process.cwd())
+      .digest("hex")
+      .substring(0, 12);
+  }
+
+  static getSessionDir(): string {
+    return path.join(MessageStore.BASE_DIR, MessageStore.getProjectHash());
+  }
+
+  static async list(): Promise<SessionInfo[]> {
+    const dir = MessageStore.getSessionDir();
+    await fs.mkdir(dir, { recursive: true });
+    const entries = await fs.readdir(dir).catch(() => []);
+    const sessions: SessionInfo[] = [];
+    for (const entry of entries) {
+      if (!entry.endsWith(MessageStore.EXT)) continue;
+      const name = entry.replace(MessageStore.EXT, "");
+      try {
+        const stat = await fs.stat(path.join(dir, entry));
+        sessions.push({ name, updatedAt: stat.mtime.toISOString() });
+      } catch {
+        // skip unreadable files
+      }
+    }
+    return sessions.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  }
+
+  static async delete(name: string): Promise<void> {
+    const dir = MessageStore.getSessionDir();
+    const paths = [
+      path.join(dir, `${name}${MessageStore.EXT}`),
+      path.join(dir, `${name}.json`),
+    ];
+    for (const filePath of paths) {
+      try {
+        await fs.unlink(filePath);
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  static async rename(oldName: string, newName: string): Promise<void> {
+    const dir = MessageStore.getSessionDir();
+    await fs.mkdir(dir, { recursive: true });
+    const oldPath = path.join(dir, `${oldName}${MessageStore.EXT}`);
+    const newPath = path.join(dir, `${newName}${MessageStore.EXT}`);
+    await fs.rename(oldPath, newPath).catch(() => {});
+  }
+
+  static async getMostRecent(): Promise<string | null> {
+    const sessions = await MessageStore.list();
+    return sessions.length > 0 ? sessions[0].name : null;
   }
 }
