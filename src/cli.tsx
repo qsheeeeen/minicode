@@ -11,9 +11,9 @@ import { sessionManager } from "./utils/session.js";
 import { createLogger } from "./utils/logger.js";
 import { parseArgs, type PermissionMode } from "./args.js";
 import { loadGlobalPrompt } from "./utils/prompts.js";
-import { skillRegistry } from "./skills/index.js";
+import { loadSkills, getAvailableSkills as getSkills, getSkillBody } from "./skills/index.js";
 import { App } from "./tui.js";
-import { commandRegistry } from "./commands/index.js";
+import { getCommandNames, registerCommand, parseAndExecute } from "./commands/index.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -109,23 +109,23 @@ const logger = await createLogger(
 );
 
 // Load global skills from ~/.minicode/skills/
-await skillRegistry.loadSkills(path.join(os.homedir(), ".minicode", "skills"));
+await loadSkills(path.join(os.homedir(), ".minicode", "skills"));
 
 // Load project skills from .agent/ directory
-await skillRegistry.loadSkills(path.resolve(process.cwd(), ".agent"));
+await loadSkills(path.resolve(process.cwd(), ".agent"));
 
 // Register skills as slash commands (e.g. /skill-creator)
-for (const skill of skillRegistry.getAvailableSkills()) {
-  if (commandRegistry.getCommandNames().includes(skill.name)) {
+for (const skill of getSkills()) {
+  if (getCommandNames().includes(skill.name)) {
     console.warn(
       `Skill "${skill.name}" skipped: a builtin command with the same name already exists.`,
     );
     continue;
   }
-  const body = skillRegistry.getSkillBody(skill.name);
+  const body = getSkillBody(skill.name);
   if (!body) continue;
 
-  commandRegistry.register({
+  registerCommand({
     name: skill.name,
     description: skill.description,
     prompt: (args: string[]) => {
@@ -158,7 +158,7 @@ agent.setPermissionMode(permissionMode);
 
 // Set shared command resolver so both headless and TUI use the same resolve path
 agent.setCommandResolver((input: string) =>
-  commandRegistry.parseAndExecute(input, {
+  parseAndExecute(input, {
     agent,
     setMessages: () => {},
     setCurrentSession: (name) => {

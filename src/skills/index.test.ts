@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import fs from "fs/promises";
 import path from "path";
 import os from "os";
@@ -11,7 +11,13 @@ const { configMock } = vi.hoisted(() => ({
 
 vi.mock("../config.js", () => configMock);
 
-import { skillRegistry, SkillRegistry } from "./index.js";
+import {
+  getAvailableSkills,
+  getSkillBody,
+  loadSkills,
+  registerSkill,
+  resetSkills,
+} from "./index.js";
 
 async function createTempSkillDir(
   skillDirName: string,
@@ -26,12 +32,12 @@ async function createTempSkillDir(
 
 describe("builtin skills", () => {
   it("registers exactly 2 builtin skills", () => {
-    const skills = skillRegistry.getAvailableSkills();
+    const skills = getAvailableSkills();
     expect(skills).toHaveLength(2);
   });
 
   it("registers skill-creator into registry", () => {
-    const skills = skillRegistry.getAvailableSkills();
+    const skills = getAvailableSkills();
     const creator = skills.find((s) => s.name === "skill-creator");
     expect(creator).toBeDefined();
     expect(creator!.description).toContain(
@@ -40,13 +46,13 @@ describe("builtin skills", () => {
   });
 
   it("skill-creator has a body", () => {
-    const body = skillRegistry.getSkillBody("skill-creator");
+    const body = getSkillBody("skill-creator");
     expect(body).toBeDefined();
     expect(body!.length).toBeGreaterThan(0);
   });
 
   it("registers init skill with promptFile in description", () => {
-    const skills = skillRegistry.getAvailableSkills();
+    const skills = getAvailableSkills();
     const init = skills.find((s) => s.name === "init");
     expect(init).toBeDefined();
     expect(init!.description).toContain("AGENTS.md");
@@ -54,235 +60,250 @@ describe("builtin skills", () => {
   });
 
   it("init skill has a body", () => {
-    const body = skillRegistry.getSkillBody("init");
+    const body = getSkillBody("init");
     expect(body).toBeDefined();
     expect(body!.length).toBeGreaterThan(0);
   });
 
   it("getSkillBody returns undefined for unknown skill", () => {
-    const body = skillRegistry.getSkillBody("nonexistent");
+    const body = getSkillBody("nonexistent");
     expect(body).toBeUndefined();
   });
 });
 
-describe("SkillRegistry", () => {
-  describe("loadSkills", () => {
-    it("loads valid SKILL.md with frontmatter", async () => {
-      const content = [
-        "---",
-        "name: my-skill",
-        "description: This is a test skill.",
-        "---",
-        "# Skill Body",
-        "Some text here.",
-      ].join("\n");
+describe("loadSkills", () => {
+  afterEach(() => {
+    resetSkills();
+  });
 
-      const baseDir = await createTempSkillDir("my-skill", content);
-      try {
-        const registry = new SkillRegistry();
-        await registry.loadSkills(baseDir);
+  it("loads valid SKILL.md with frontmatter", async () => {
+    const content = [
+      "---",
+      "name: my-skill",
+      "description: This is a test skill.",
+      "---",
+      "# Skill Body",
+      "Some text here.",
+    ].join("\n");
 
-        const skills = registry.getAvailableSkills();
-        expect(skills).toHaveLength(1);
-        expect(skills[0].name).toBe("my-skill");
-        expect(skills[0].description).toBe("This is a test skill.");
-        expect(registry.getSkillBody("my-skill")).toBe(
-          "# Skill Body\nSome text here.",
-        );
-      } finally {
-        await fs.rm(baseDir, { recursive: true, force: true });
-      }
-    });
+    const baseDir = await createTempSkillDir("my-skill", content);
+    try {
+      await loadSkills(baseDir);
 
-    it("loads multiple skills from the same directory", async () => {
-      const baseDir = await fs.mkdtemp(path.join(os.tmpdir(), "skill-test-"));
-      try {
-        const dirA = path.join(baseDir, "skill-a");
-        const dirB = path.join(baseDir, "skill-b");
-        await fs.mkdir(dirA);
-        await fs.mkdir(dirB);
-        await fs.writeFile(
-          path.join(dirA, "SKILL.md"),
-          "---\nname: skill-a\ndescription: First skill\n---\n\nBody A",
-        );
-        await fs.writeFile(
-          path.join(dirB, "SKILL.md"),
-          "---\nname: skill-b\ndescription: Second skill\n---\n\nBody B",
-        );
+      const skills = getAvailableSkills().filter(
+        (s) => s.name === "my-skill",
+      );
+      expect(skills).toHaveLength(1);
+      expect(skills[0].name).toBe("my-skill");
+      expect(skills[0].description).toBe("This is a test skill.");
+      expect(getSkillBody("my-skill")).toBe("# Skill Body\nSome text here.");
+    } finally {
+      await fs.rm(baseDir, { recursive: true, force: true });
+    }
+  });
 
-        const registry = new SkillRegistry();
-        await registry.loadSkills(baseDir);
+  it("loads multiple skills from the same directory", async () => {
+    const baseDir = await fs.mkdtemp(path.join(os.tmpdir(), "skill-test-"));
+    try {
+      const dirA = path.join(baseDir, "skill-a");
+      const dirB = path.join(baseDir, "skill-b");
+      await fs.mkdir(dirA);
+      await fs.mkdir(dirB);
+      await fs.writeFile(
+        path.join(dirA, "SKILL.md"),
+        "---\nname: skill-a\ndescription: First skill\n---\n\nBody A",
+      );
+      await fs.writeFile(
+        path.join(dirB, "SKILL.md"),
+        "---\nname: skill-b\ndescription: Second skill\n---\n\nBody B",
+      );
 
-        const skills = registry.getAvailableSkills();
-        expect(skills).toHaveLength(2);
-        expect(skills.map((s) => s.name).sort()).toEqual([
-          "skill-a",
-          "skill-b",
-        ]);
-      } finally {
-        await fs.rm(baseDir, { recursive: true, force: true });
-      }
-    });
+      await loadSkills(baseDir);
 
-    it("ignores non-directory entries", async () => {
-      const baseDir = await fs.mkdtemp(path.join(os.tmpdir(), "skill-test-"));
-      try {
-        await fs.writeFile(path.join(baseDir, "readme.md"), "not a skill dir");
+      const loaded = getAvailableSkills().filter(
+        (s) => s.name === "skill-a" || s.name === "skill-b",
+      );
+      expect(loaded).toHaveLength(2);
+      expect(loaded.map((s) => s.name).sort()).toEqual([
+        "skill-a",
+        "skill-b",
+      ]);
+    } finally {
+      await fs.rm(baseDir, { recursive: true, force: true });
+    }
+  });
 
-        const registry = new SkillRegistry();
-        await registry.loadSkills(baseDir);
-        expect(registry.getAvailableSkills()).toHaveLength(0);
-      } finally {
-        await fs.rm(baseDir, { recursive: true, force: true });
-      }
-    });
+  it("ignores non-directory entries", async () => {
+    const baseDir = await fs.mkdtemp(path.join(os.tmpdir(), "skill-test-"));
+    try {
+      await fs.writeFile(path.join(baseDir, "readme.md"), "not a skill dir");
 
-    it("handles missing skills directory gracefully", async () => {
-      const registry = new SkillRegistry();
-      await registry.loadSkills("/nonexistent/skills/dir");
-      expect(registry.getAvailableSkills()).toHaveLength(0);
-    });
+      await loadSkills(baseDir);
+      const loaded = getAvailableSkills().filter(
+        (s) => !["skill-creator", "init"].includes(s.name),
+      );
+      expect(loaded).toHaveLength(0);
+    } finally {
+      await fs.rm(baseDir, { recursive: true, force: true });
+    }
+  });
 
-    it("ignores empty directories", async () => {
-      const baseDir = await fs.mkdtemp(path.join(os.tmpdir(), "skill-test-"));
-      try {
-        const emptyDir = path.join(baseDir, "empty-dir");
-        await fs.mkdir(emptyDir);
+  it("handles missing skills directory gracefully", async () => {
+    await loadSkills("/nonexistent/skills/dir");
+  });
 
-        const registry = new SkillRegistry();
-        await registry.loadSkills(baseDir);
+  it("ignores empty directories", async () => {
+    const baseDir = await fs.mkdtemp(path.join(os.tmpdir(), "skill-test-"));
+    try {
+      const emptyDir = path.join(baseDir, "empty-dir");
+      await fs.mkdir(emptyDir);
 
-        expect(registry.getAvailableSkills()).toHaveLength(0);
-      } finally {
-        await fs.rm(baseDir, { recursive: true, force: true });
-      }
-    });
+      await loadSkills(baseDir);
+      const loaded = getAvailableSkills().filter(
+        (s) => !["skill-creator", "init"].includes(s.name),
+      );
+      expect(loaded).toHaveLength(0);
+    } finally {
+      await fs.rm(baseDir, { recursive: true, force: true });
+    }
+  });
 
-    it("ignores SKILL.md without frontmatter", async () => {
-      const content = ["# Skill Body", "Some text here."].join("\n");
+  it("ignores SKILL.md without frontmatter", async () => {
+    const content = ["# Skill Body", "Some text here."].join("\n");
 
-      const baseDir = await createTempSkillDir("no-frontmatter", content);
-      try {
-        const registry = new SkillRegistry();
-        await registry.loadSkills(baseDir);
+    const baseDir = await createTempSkillDir("no-frontmatter", content);
+    try {
+      await loadSkills(baseDir);
 
-        expect(registry.getAvailableSkills()).toHaveLength(0);
-      } finally {
-        await fs.rm(baseDir, { recursive: true, force: true });
-      }
-    });
+      const loaded = getAvailableSkills().filter(
+        (s) => s.name === "no-frontmatter",
+      );
+      expect(loaded).toHaveLength(0);
+    } finally {
+      await fs.rm(baseDir, { recursive: true, force: true });
+    }
+  });
 
-    it("skips SKILL.md with invalid YAML frontmatter", async () => {
-      const content = [
-        "---",
-        'name: "unclosed',
-        "description: Broken YAML",
-        "---",
-        "Body text",
-      ].join("\n");
+  it("skips SKILL.md with invalid YAML frontmatter", async () => {
+    const content = [
+      "---",
+      'name: "unclosed',
+      "description: Broken YAML",
+      "---",
+      "Body text",
+    ].join("\n");
 
-      const baseDir = await createTempSkillDir("bad-yaml", content);
-      try {
-        const registry = new SkillRegistry();
-        await registry.loadSkills(baseDir);
-        expect(registry.getAvailableSkills()).toHaveLength(0);
-      } finally {
-        await fs.rm(baseDir, { recursive: true, force: true });
-      }
-    });
+    const baseDir = await createTempSkillDir("bad-yaml", content);
+    try {
+      await loadSkills(baseDir);
+      const loaded = getAvailableSkills().filter(
+        (s) => s.name === "bad-yaml",
+      );
+      expect(loaded).toHaveLength(0);
+    } finally {
+      await fs.rm(baseDir, { recursive: true, force: true });
+    }
+  });
 
-    it("parses YAML frontmatter with quotes correctly", async () => {
-      const content = [
-        "---",
-        'name: "quoted-skill"',
-        "description: 'Quoted description'",
-        "---",
-        "# Body",
-      ].join("\n");
+  it("parses YAML frontmatter with quotes correctly", async () => {
+    const content = [
+      "---",
+      'name: "quoted-skill"',
+      "description: 'Quoted description'",
+      "---",
+      "# Body",
+    ].join("\n");
 
-      const baseDir = await createTempSkillDir("quoted", content);
-      try {
-        const registry = new SkillRegistry();
-        await registry.loadSkills(baseDir);
+    const baseDir = await createTempSkillDir("quoted", content);
+    try {
+      await loadSkills(baseDir);
 
-        const skills = registry.getAvailableSkills();
-        expect(skills).toHaveLength(1);
-        expect(skills[0].name).toBe("quoted-skill");
-        expect(skills[0].description).toBe("Quoted description");
-      } finally {
-        await fs.rm(baseDir, { recursive: true, force: true });
-      }
-    });
+      const skills = getAvailableSkills().filter(
+        (s) => s.name === "quoted-skill",
+      );
+      expect(skills).toHaveLength(1);
+      expect(skills[0].name).toBe("quoted-skill");
+      expect(skills[0].description).toBe("Quoted description");
+    } finally {
+      await fs.rm(baseDir, { recursive: true, force: true });
+    }
+  });
 
-    it("handles YAML folded block scalar for description", async () => {
-      const content = [
-        "---",
-        "name: block-skill",
-        "description: >",
-        "  A multi-line description",
-        "  wrapped with YAML folded block scalar.",
-        "---",
-        "# Body",
-      ].join("\n");
+  it("handles YAML folded block scalar for description", async () => {
+    const content = [
+      "---",
+      "name: block-skill",
+      "description: >",
+      "  A multi-line description",
+      "  wrapped with YAML folded block scalar.",
+      "---",
+      "# Body",
+    ].join("\n");
 
-      const baseDir = await createTempSkillDir("block", content);
-      try {
-        const registry = new SkillRegistry();
-        await registry.loadSkills(baseDir);
+    const baseDir = await createTempSkillDir("block", content);
+    try {
+      await loadSkills(baseDir);
 
-        const skills = registry.getAvailableSkills();
-        expect(skills).toHaveLength(1);
-        expect(skills[0].description).toContain("A multi-line description");
-      } finally {
-        await fs.rm(baseDir, { recursive: true, force: true });
-      }
-    });
+      const skills = getAvailableSkills().filter(
+        (s) => s.name === "block-skill",
+      );
+      expect(skills).toHaveLength(1);
+      expect(skills[0].description).toContain("A multi-line description");
+    } finally {
+      await fs.rm(baseDir, { recursive: true, force: true });
+    }
+  });
 
-    it("ignores skills missing required name field", async () => {
-      const content = [
-        "---",
-        "description: Only description here.",
-        "---",
-        "# Body",
-      ].join("\n");
+  it("ignores skills missing required name field", async () => {
+    const content = [
+      "---",
+      "description: Only description here.",
+      "---",
+      "# Body",
+    ].join("\n");
 
-      const baseDir = await createTempSkillDir("no-name", content);
-      try {
-        const registry = new SkillRegistry();
-        await registry.loadSkills(baseDir);
+    const baseDir = await createTempSkillDir("no-name", content);
+    try {
+      await loadSkills(baseDir);
 
-        expect(registry.getAvailableSkills()).toHaveLength(0);
-      } finally {
-        await fs.rm(baseDir, { recursive: true, force: true });
-      }
-    });
+      const loaded = getAvailableSkills().filter(
+        (s) => s.name === "no-name",
+      );
+      expect(loaded).toHaveLength(0);
+    } finally {
+      await fs.rm(baseDir, { recursive: true, force: true });
+    }
+  });
 
-    it("ignores skills missing required description field", async () => {
-      const content = ["---", "name: no-desc", "---", "# Body"].join("\n");
+  it("ignores skills missing required description field", async () => {
+    const content = ["---", "name: no-desc", "---", "# Body"].join("\n");
 
-      const baseDir = await createTempSkillDir("no-desc", content);
-      try {
-        const registry = new SkillRegistry();
-        await registry.loadSkills(baseDir);
+    const baseDir = await createTempSkillDir("no-desc", content);
+    try {
+      await loadSkills(baseDir);
 
-        expect(registry.getAvailableSkills()).toHaveLength(0);
-      } finally {
-        await fs.rm(baseDir, { recursive: true, force: true });
-      }
-    });
+      const loaded = getAvailableSkills().filter(
+        (s) => s.name === "no-desc",
+      );
+      expect(loaded).toHaveLength(0);
+    } finally {
+      await fs.rm(baseDir, { recursive: true, force: true });
+    }
+  });
 
-    it("ignores non-object YAML frontmatter (array)", async () => {
-      const content = ["---", "- item1", "- item2", "---", "# Body"].join("\n");
+  it("ignores non-object YAML frontmatter (array)", async () => {
+    const content = ["---", "- item1", "- item2", "---", "# Body"].join("\n");
 
-      const baseDir = await createTempSkillDir("array", content);
-      try {
-        const registry = new SkillRegistry();
-        await registry.loadSkills(baseDir);
+    const baseDir = await createTempSkillDir("array", content);
+    try {
+      await loadSkills(baseDir);
 
-        expect(registry.getAvailableSkills()).toHaveLength(0);
-      } finally {
-        await fs.rm(baseDir, { recursive: true, force: true });
-      }
-    });
+      const loaded = getAvailableSkills().filter(
+        (s) => s.name === "array",
+      );
+      expect(loaded).toHaveLength(0);
+    } finally {
+      await fs.rm(baseDir, { recursive: true, force: true });
+    }
   });
 });

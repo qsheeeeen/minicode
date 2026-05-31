@@ -27,7 +27,7 @@ import {
   type PermissionMode,
 } from "./services/index.js";
 import { MessageStore } from "./messages.js";
-import { skillRegistry } from "./skills/index.js";
+import { getAvailableSkills } from "./skills/index.js";
 import { callContent } from "./tui/tool-display.js";
 import { sessionManager } from "./utils/session.js";
 import { execSync } from "child_process";
@@ -186,7 +186,7 @@ export class Agent {
       model: this.model,
     });
 
-    const availability = { agentRegistry: this.agentRegistry, skillRegistry };
+    const availability = { agentRegistry: this.agentRegistry };
     for (const [name, tool] of this.tools) {
       if (tool.requires?.some((r) => !availability[r])) {
         this.tools.delete(name);
@@ -362,7 +362,7 @@ export class Agent {
       prompt += `\n\n# Workspace Information\nThis workspace's description is in \`${this.projectPromptFile}\`. Use the Read tool to load it at the start of each conversation. It contains critical project instructions that you must follow.`;
     }
 
-    const availableSkills = skillRegistry.getAvailableSkills();
+    const availableSkills = getAvailableSkills();
     if (availableSkills.length > 0) {
       prompt += `\n\n<available_skills>\n`;
       availableSkills.forEach((skill) => {
@@ -553,7 +553,6 @@ export class Agent {
 
     const context: ToolExecutionContext = {
       registry: this.agentRegistry,
-      skillRegistry: skillRegistry,
       signal: this.abortController?.signal,
       config: {
         apiKey: this.apiKey,

@@ -1,41 +1,28 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+
+vi.mock("../skills/index.js", () => ({
+  getSkillBody: vi.fn(),
+}));
+
 import { activateSkillTool } from "./activate_skill.js";
-import type { SkillRegistry } from "../skills/index.js";
+import { getSkillBody } from "../skills/index.js";
+
+const mockGetSkillBody = vi.mocked(getSkillBody);
 
 describe("activateSkillTool", () => {
   it("returns activated skill body wrapped in tags", async () => {
-    const context = {
-      skillRegistry: {
-        getSkillBody: (name: string) =>
-          name === "my-skill" ? "do the thing" : undefined,
-      } as SkillRegistry,
-    };
+    mockGetSkillBody.mockReturnValue("do the thing");
 
-    const result = await activateSkillTool.execute(
-      { name: "my-skill" },
-      context,
-    );
+    const result = await activateSkillTool.execute({ name: "my-skill" });
     expect(result.output).toBe(
       '<activated_skill name="my-skill">\n<instructions>\ndo the thing\n</instructions>\n</activated_skill>',
     );
   });
 
   it("returns error when skill not found", async () => {
-    const context = {
-      skillRegistry: {
-        getSkillBody: () => undefined,
-      } as SkillRegistry,
-    };
+    mockGetSkillBody.mockReturnValue(undefined);
 
-    const result = await activateSkillTool.execute(
-      { name: "nonexistent" },
-      context,
-    );
+    const result = await activateSkillTool.execute({ name: "nonexistent" });
     expect(result.output).toBe("Error: Skill 'nonexistent' not found.");
-  });
-
-  it("returns error when no skillRegistry in context", async () => {
-    const result = await activateSkillTool.execute({ name: "any" }, undefined);
-    expect(result.output).toBe("Error: Skill 'any' not found.");
   });
 });

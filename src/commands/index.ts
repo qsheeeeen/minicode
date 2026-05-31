@@ -1,5 +1,9 @@
 import type { Agent } from "../agent.js";
 import type { DisplayMessage } from "../utils/display.js";
+import type { EffortLevel } from "../llm/anthropic.js";
+import { sessionManager } from "../utils/session.js";
+import { getSkillBody, getAvailableSkills } from "../skills/index.js";
+import { createLogger } from "../utils/logger.js";
 
 export interface CommandHandler {
   name: string;
@@ -23,101 +27,91 @@ export interface CommandContext {
   exit: () => void;
 }
 
-class CommandRegistry {
-  private commands = new Map<string, CommandHandler>();
+const commands = new Map<string, CommandHandler>();
 
-  register(cmd: CommandHandler): void {
-    if (!cmd.handler && !cmd.prompt) {
-      throw new Error(
-        `Command "${cmd.name}" must have either handler or prompt`,
-      );
-    }
-    if (cmd.handler && cmd.prompt) {
-      throw new Error(
-        `Command "${cmd.name}" cannot have both handler and prompt`,
-      );
-    }
-    this.commands.set(cmd.name, cmd);
+export function registerCommand(cmd: CommandHandler): void {
+  if (!cmd.handler && !cmd.prompt) {
+    throw new Error(
+      `Command "${cmd.name}" must have either handler or prompt`,
+    );
   }
+  if (cmd.handler && cmd.prompt) {
+    throw new Error(
+      `Command "${cmd.name}" cannot have both handler and prompt`,
+    );
+  }
+  commands.set(cmd.name, cmd);
+}
 
-  async parseAndExecute(
-    input: string,
-    context: CommandContext,
-  ): Promise<{
-    handled: boolean;
-    promptText?: string;
-    displayContent?: string;
-  }> {
-    const trimmed = input.trim();
-    if (!trimmed.startsWith("/")) return { handled: false };
+export async function parseAndExecute(
+  input: string,
+  context: CommandContext,
+): Promise<{
+  handled: boolean;
+  promptText?: string;
+  displayContent?: string;
+}> {
+  const trimmed = input.trim();
+  if (!trimmed.startsWith("/")) return { handled: false };
 
-    const parts = trimmed.slice(1).split(/\s+/);
-    const name = parts[0];
-    const args = parts.slice(1);
+  const parts = trimmed.slice(1).split(/\s+/);
+  const name = parts[0];
+  const args = parts.slice(1);
 
-    const cmd = this.commands.get(name);
-    if (cmd) {
-      if (cmd.handler) {
-        await cmd.handler(args, context);
-        return { handled: true };
-      }
-      if (cmd.prompt) {
-        return {
-          handled: true,
-          promptText: cmd.prompt(args),
-          displayContent: `/${name}`,
-        };
-      }
+  const cmd = commands.get(name);
+  if (cmd) {
+    if (cmd.handler) {
+      await cmd.handler(args, context);
+      return { handled: true };
     }
-
-    // Dynamic skill commands: if no builtin command matched, check skills
-    const skillBody = skillRegistry.getSkillBody(name);
-    if (skillBody) {
+    if (cmd.prompt) {
       return {
         handled: true,
-        promptText: `Activate and execute the '${name}' skill.\n\n${skillBody}`,
+        promptText: cmd.prompt(args),
         displayContent: `/${name}`,
       };
     }
-
-    return { handled: false };
   }
 
-  getCommandNames(): string[] {
-    return Array.from(this.commands.keys());
+  // Dynamic skill commands: if no builtin command matched, check skills
+  const body = getSkillBody(name);
+  if (body) {
+    return {
+      handled: true,
+      promptText: `Activate and execute the '${name}' skill.\n\n${body}`,
+      displayContent: `/${name}`,
+    };
   }
 
-  getCommandList(): Array<{ name: string; description: string }> {
-    const builtin = Array.from(this.commands.values()).map((cmd) => ({
-      name: cmd.name,
-      description: cmd.description,
-    }));
-    const skills = skillRegistry
-      .getAvailableSkills()
-      .filter((s) => !this.commands.has(s.name))
-      .map((s) => ({ name: s.name, description: s.description }));
-    return [...builtin, ...skills].sort((a, b) => a.name.localeCompare(b.name));
-  }
-
-  getHelp(): string {
-    const lines = ["Available commands:"];
-    for (const cmd of this.getCommandList()) {
-      lines.push(`  /${cmd.name} - ${cmd.description}`);
-    }
-    return lines.join("\n");
-  }
+  return { handled: false };
 }
 
-export const commandRegistry = new CommandRegistry();
+export function getCommandNames(): string[] {
+  return Array.from(commands.keys());
+}
+
+export function getCommandList(): Array<{ name: string; description: string }> {
+  const builtin = Array.from(commands.values()).map((cmd) => ({
+    name: cmd.name,
+    description: cmd.description,
+  }));
+  const skills = getAvailableSkills()
+    .filter((s) => !commands.has(s.name))
+    .map((s) => ({ name: s.name, description: s.description }));
+  return [...builtin, ...skills].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export function getHelp(): string {
+  const lines = ["Available commands:"];
+  for (const cmd of getCommandList()) {
+    lines.push(`  /${cmd.name} - ${cmd.description}`);
+  }
+  return lines.join("\n");
+}
 
 // -- builtin commands ---------------------------------------------------------
 
-import type { EffortLevel } from "../llm/anthropic.js";
-import { sessionManager } from "../utils/session.js";
-import { skillRegistry } from "../skills/index.js";
-import { createLogger } from "../utils/logger.js";
-
-commandRegistry.register({
+registerCommand({
   name: "exit",
   description: "Exit the application",
   handler: async (_args, ctx): Promise<void> => {
@@ -125,7 +119,7 @@ commandRegistry.register({
   },
 });
 
-commandRegistry.register({
+registerCommand({
   name: "clear",
   description: "Clear all history and start a new session",
   handler: async (_args, ctx): Promise<void> => {
@@ -149,7 +143,7 @@ commandRegistry.register({
   },
 });
 
-commandRegistry.register({
+registerCommand({
   name: "compress",
   description: "Compress conversation history",
   handler: async (_args, ctx): Promise<void> => {
@@ -164,7 +158,7 @@ commandRegistry.register({
   },
 });
 
-commandRegistry.register({
+registerCommand({
   name: "effort",
   description: "Set thinking effort (low|medium|high|xhigh|max)",
   handler: async (args, ctx): Promise<void> => {
@@ -186,7 +180,7 @@ commandRegistry.register({
   },
 });
 
-commandRegistry.register({
+registerCommand({
   name: "new",
   description: "Create a new session",
   handler: async (args, ctx): Promise<void> => {
@@ -211,7 +205,7 @@ commandRegistry.register({
   },
 });
 
-commandRegistry.register({
+registerCommand({
   name: "rename",
   description: "Rename current session",
   handler: async (args, ctx): Promise<void> => {
@@ -237,7 +231,7 @@ commandRegistry.register({
   },
 });
 
-commandRegistry.register({
+registerCommand({
   name: "resume",
   description: "Load a session (without args: list sessions)",
   handler: async (args, ctx): Promise<void> => {
@@ -280,7 +274,7 @@ commandRegistry.register({
   },
 });
 
-commandRegistry.register({
+registerCommand({
   name: "plan",
   description: "Turn the current discussion into an executable plan",
   prompt: () => {
@@ -288,7 +282,7 @@ commandRegistry.register({
   },
 });
 
-commandRegistry.register({
+registerCommand({
   name: "test",
   description: "Run a simple test across all available tools",
   prompt: () => {
@@ -296,11 +290,11 @@ commandRegistry.register({
   },
 });
 
-commandRegistry.register({
+registerCommand({
   name: "skills",
   description: "List available skills",
   handler: async (_args, ctx): Promise<void> => {
-    const skills = skillRegistry.getAvailableSkills();
+    const skills = getAvailableSkills();
     if (skills.length === 0) {
       ctx.agent
         .getStore()
@@ -355,7 +349,7 @@ commandRegistry.register({
   },
 });
 
-commandRegistry.register({
+registerCommand({
   name: "model",
   description: "Switch model/provider",
   handler: async (_args, ctx): Promise<void> => {

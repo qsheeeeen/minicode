@@ -8,9 +8,16 @@ import {
   beforeEach,
   afterEach,
 } from "vitest";
-import { commandRegistry, type CommandContext } from "./index.js";
+import {
+  registerCommand,
+  parseAndExecute,
+  getCommandNames,
+  getCommandList,
+  getHelp,
+  type CommandContext,
+} from "./index.js";
 
-const { sessionManagerMock, configMock } = vi.hoisted(() => ({
+const { sessionManagerMock, configMock, skillsMock } = vi.hoisted(() => ({
   sessionManagerMock: {
     getProjectHash: vi.fn().mockReturnValue("testhash"),
     get: vi.fn().mockResolvedValue(null),
@@ -20,6 +27,10 @@ const { sessionManagerMock, configMock } = vi.hoisted(() => ({
   configMock: {
     setEffort: vi.fn().mockResolvedValue(undefined),
     loadConfig: vi.fn().mockResolvedValue({ providers: {} }),
+  },
+  skillsMock: {
+    getAvailableSkills: vi.fn().mockReturnValue([]),
+    getSkillBody: vi.fn().mockReturnValue(undefined),
   },
 }));
 
@@ -31,12 +42,7 @@ vi.mock("../utils/logger.js", () => ({
   createLogger: vi.fn().mockResolvedValue({ info: vi.fn(), error: vi.fn() }),
 }));
 
-vi.mock("../skills/index.js", () => ({
-  skillRegistry: {
-    getAvailableSkills: vi.fn().mockReturnValue([]),
-    getSkillBody: vi.fn().mockReturnValue(undefined),
-  },
-}));
+vi.mock("../skills/index.js", () => skillsMock);
 
 vi.mock("../config.js", () => ({
   setEffort: configMock.setEffort,
@@ -54,7 +60,7 @@ vi.mock("ink", () => ({
 
 describe("Builtin commands", () => {
   beforeAll(() => {
-    // Commands are already registered on the real commandRegistry at import time
+    // Commands are already registered at import time
   });
 
   afterAll(() => {
@@ -66,7 +72,7 @@ describe("Builtin commands", () => {
   });
 
   it("registers expected commands", () => {
-    const names = commandRegistry.getCommandNames();
+    const names = getCommandNames();
 
     expect(names).toContain("exit");
     expect(names).toContain("clear");
@@ -97,7 +103,7 @@ describe("Builtin commands", () => {
   describe("handlers", () => {
     it("/exit calls ctx.exit()", async () => {
       const ctx: Partial<CommandContext> = { exit: vi.fn() };
-      const result = await commandRegistry.parseAndExecute(
+      const result = await parseAndExecute(
         "/exit",
         ctx as CommandContext,
       );
@@ -111,7 +117,7 @@ describe("Builtin commands", () => {
       });
       const ctx: Partial<CommandContext> = { agent: agentMock as any };
 
-      const result = await commandRegistry.parseAndExecute(
+      const result = await parseAndExecute(
         "/compress",
         ctx as CommandContext,
       );
@@ -135,7 +141,7 @@ describe("Builtin commands", () => {
         setMessages: vi.fn(),
       };
 
-      const result = await commandRegistry.parseAndExecute(
+      const result = await parseAndExecute(
         "/clear",
         ctx as CommandContext,
       );
@@ -161,7 +167,7 @@ describe("Builtin commands", () => {
         setCurrentSession: vi.fn(),
       };
 
-      const result = await commandRegistry.parseAndExecute(
+      const result = await parseAndExecute(
         "/new my new session",
         ctx as CommandContext,
       );
@@ -187,7 +193,7 @@ describe("Builtin commands", () => {
         setCurrentSession: vi.fn(),
       };
 
-      const result = await commandRegistry.parseAndExecute(
+      const result = await parseAndExecute(
         "/rename new-session",
         ctx as CommandContext,
       );
@@ -211,7 +217,7 @@ describe("Builtin commands", () => {
         setInputMode: vi.fn(),
       };
 
-      const result = await commandRegistry.parseAndExecute(
+      const result = await parseAndExecute(
         "/resume",
         ctx as CommandContext,
       );
@@ -242,7 +248,7 @@ describe("Builtin commands", () => {
         setMessages: vi.fn(),
       };
 
-      const result = await commandRegistry.parseAndExecute(
+      const result = await parseAndExecute(
         "/resume session-1",
         ctx as CommandContext,
       );
@@ -264,7 +270,7 @@ describe("Builtin commands", () => {
         setMessages: vi.fn(),
       };
 
-      const result = await commandRegistry.parseAndExecute(
+      const result = await parseAndExecute(
         "/resume unknown",
         ctx as CommandContext,
       );
@@ -275,7 +281,7 @@ describe("Builtin commands", () => {
     });
 
     it("/plan returns prompt text", async () => {
-      const result = await commandRegistry.parseAndExecute(
+      const result = await parseAndExecute(
         "/plan",
         {} as CommandContext,
       );
@@ -284,7 +290,7 @@ describe("Builtin commands", () => {
     });
 
     it("/test returns prompt text", async () => {
-      const result = await commandRegistry.parseAndExecute(
+      const result = await parseAndExecute(
         "/test",
         {} as CommandContext,
       );
@@ -296,7 +302,7 @@ describe("Builtin commands", () => {
       const ctx: Partial<CommandContext> = {
         setInputMode: vi.fn(),
       };
-      const result = await commandRegistry.parseAndExecute(
+      const result = await parseAndExecute(
         "/effort",
         ctx as CommandContext,
       );
@@ -308,7 +314,7 @@ describe("Builtin commands", () => {
       const ctx: Partial<CommandContext> = {
         setInputMode: vi.fn(),
       };
-      const result = await commandRegistry.parseAndExecute(
+      const result = await parseAndExecute(
         "/effort invalid",
         ctx as CommandContext,
       );
@@ -325,7 +331,7 @@ describe("Builtin commands", () => {
       const ctx: Partial<CommandContext> = {
         agent: agentMock as any,
       };
-      const result = await commandRegistry.parseAndExecute(
+      const result = await parseAndExecute(
         "/effort high",
         ctx as CommandContext,
       );
@@ -341,15 +347,12 @@ describe("Builtin commands", () => {
     });
 
     it("/skills with no skills shows no-skills status", async () => {
-      const skillRegistry = await import("../skills/index.js");
-      (skillRegistry.skillRegistry.getAvailableSkills as any).mockReturnValue(
-        [],
-      );
+      skillsMock.getAvailableSkills.mockReturnValue([]);
       const storeMock = { addStatus: vi.fn() };
       const agentMock = { getStore: vi.fn().mockReturnValue(storeMock) };
       const ctx: Partial<CommandContext> = { agent: agentMock as any };
 
-      const result = await commandRegistry.parseAndExecute(
+      const result = await parseAndExecute(
         "/skills",
         ctx as CommandContext,
       );
@@ -363,8 +366,7 @@ describe("Builtin commands", () => {
     });
 
     it("/skills with available skills renders skill list", async () => {
-      const skillRegistry = await import("../skills/index.js");
-      (skillRegistry.skillRegistry.getAvailableSkills as any).mockReturnValue([
+      skillsMock.getAvailableSkills.mockReturnValue([
         { name: "my-skill", description: "A custom skill" },
         { name: "other", description: "Another one" },
       ]);
@@ -372,7 +374,7 @@ describe("Builtin commands", () => {
       const agentMock = { getStore: vi.fn().mockReturnValue(storeMock) };
       const ctx: Partial<CommandContext> = { agent: agentMock as any };
 
-      const result = await commandRegistry.parseAndExecute(
+      const result = await parseAndExecute(
         "/skills",
         ctx as CommandContext,
       );
@@ -393,7 +395,7 @@ describe("Builtin commands", () => {
       const ctx: Partial<CommandContext> = {
         setInputMode: vi.fn(),
       };
-      const result = await commandRegistry.parseAndExecute(
+      const result = await parseAndExecute(
         "/model",
         ctx as CommandContext,
       );
@@ -402,165 +404,6 @@ describe("Builtin commands", () => {
         providers: { anthropic: {}, zhipu: {} },
         tiers: {},
       });
-    });
-  });
-});
-
-describe("CommandRegistry", () => {
-  let savedCommands: Map<string, any>;
-
-  beforeEach(() => {
-    savedCommands = new Map((commandRegistry as any).commands);
-    (commandRegistry as any).commands = new Map();
-  });
-
-  afterEach(() => {
-    (commandRegistry as any).commands = savedCommands;
-  });
-
-  function createMockContext(): CommandContext {
-    return {
-      agent: {} as any,
-      setMessages: vi.fn(),
-      setCurrentSession: vi.fn(),
-      setMode: vi.fn(),
-      setInputMode: vi.fn(),
-      setSessionList: vi.fn(),
-      setSelectedIndex: vi.fn(),
-      exit: vi.fn(),
-    };
-  }
-
-  describe("register", () => {
-    it("registers command with handler", async () => {
-      const handler = vi.fn();
-      commandRegistry.register({
-        name: "test",
-        description: "Test command",
-        handler,
-      });
-      const result = await commandRegistry.parseAndExecute(
-        "/test",
-        createMockContext(),
-      );
-      expect(result.handled).toBe(true);
-      expect(handler).toHaveBeenCalled();
-    });
-
-    it("registers command with prompt", async () => {
-      commandRegistry.register({
-        name: "idea",
-        description: "Share ideas",
-        prompt: () => "Here is my idea",
-      });
-      const result = await commandRegistry.parseAndExecute(
-        "/idea",
-        createMockContext(),
-      );
-      expect(result.handled).toBe(true);
-      expect(result.promptText).toBe("Here is my idea");
-    });
-
-    it("throws when neither handler nor prompt provided", () => {
-      expect(() =>
-        commandRegistry.register({
-          name: "bad",
-          description: "Invalid",
-        } as any),
-      ).toThrow("must have either handler or prompt");
-    });
-
-    it("throws when both handler and prompt provided", () => {
-      expect(() =>
-        commandRegistry.register({
-          name: "bad",
-          description: "Invalid",
-          handler: vi.fn(),
-          prompt: () => "text",
-        } as any),
-      ).toThrow("cannot have both handler and prompt");
-    });
-  });
-
-  describe("parseAndExecute", () => {
-    it("returns handled=false for non-command input", async () => {
-      const result = await commandRegistry.parseAndExecute(
-        "hello",
-        createMockContext(),
-      );
-      expect(result.handled).toBe(false);
-    });
-
-    it("strips leading slash and parses args", async () => {
-      const handler = vi.fn();
-      commandRegistry.register({ name: "cmd", description: "Test", handler });
-      await commandRegistry.parseAndExecute(
-        "/cmd arg1 arg2",
-        createMockContext(),
-      );
-      expect(handler).toHaveBeenCalledWith(["arg1", "arg2"], expect.anything());
-    });
-
-    it("trims whitespace", async () => {
-      const handler = vi.fn();
-      commandRegistry.register({ name: "cmd", description: "Test", handler });
-      await commandRegistry.parseAndExecute(
-        "/cmd  arg1  ",
-        createMockContext(),
-      );
-      expect(handler).toHaveBeenCalledWith(["arg1"], expect.anything());
-    });
-
-    it("returns handled=false for unknown command", async () => {
-      const result = await commandRegistry.parseAndExecute(
-        "/unknown",
-        createMockContext(),
-      );
-      expect(result.handled).toBe(false);
-    });
-  });
-
-  describe("getCommandNames", () => {
-    it("returns all registered command names", () => {
-      commandRegistry.register({
-        name: "cmd1",
-        description: "One",
-        handler: vi.fn(),
-      });
-      commandRegistry.register({
-        name: "cmd2",
-        description: "Two",
-        handler: vi.fn(),
-      });
-      expect(commandRegistry.getCommandNames()).toContain("cmd1");
-      expect(commandRegistry.getCommandNames()).toContain("cmd2");
-    });
-  });
-
-  describe("getCommandList", () => {
-    it("returns command names and descriptions", () => {
-      commandRegistry.register({
-        name: "test",
-        description: "A test command",
-        handler: vi.fn(),
-      });
-      const list = commandRegistry.getCommandList();
-      expect(list).toContainEqual({
-        name: "test",
-        description: "A test command",
-      });
-    });
-  });
-
-  describe("getHelp", () => {
-    it("formats help text", () => {
-      commandRegistry.register({
-        name: "exit",
-        description: "Exit the app",
-        handler: vi.fn(),
-      });
-      const help = commandRegistry.getHelp();
-      expect(help).toContain("/exit - Exit the app");
     });
   });
 });

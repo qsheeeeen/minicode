@@ -4,7 +4,7 @@ import { Agent } from "./agent.js";
 import type { MessageParam } from "./llm/anthropic.js";
 import type { ResolvedConfig } from "./config.js";
 import { CallbackEvents, CallbackPrompter } from "./utils/display.js";
-import { commandRegistry } from "./commands/index.js";
+import { parseAndExecute } from "./commands/index.js";
 import { sessionManager } from "./utils/session.js";
 import { AgentRegistry, type AgentSession } from "./services/index.js";
 
@@ -183,7 +183,7 @@ function AppContent({
 
   useEffect(() => {
     agent.setCommandResolver(async (cmdInput: string) => {
-      return commandRegistry.parseAndExecute(cmdInput, {
+      return parseAndExecute(cmdInput, {
         agent: agentRef.current,
         setMessages: (msgs) => {
           if (typeof msgs === "function") {

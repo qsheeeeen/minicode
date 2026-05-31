@@ -2,7 +2,7 @@ import React, { useMemo, useState, useCallback } from "react";
 import { Box, Text, useInput } from "ink";
 import { useTuiState, useTuiDispatch } from "./store.js";
 import { getInputComponent } from "./inputs.js";
-import { commandRegistry } from "../commands/index.js";
+import { getCommandList } from "../commands/index.js";
 import type { Agent } from "../agent.js";
 import type { EffortLevel } from "../llm/anthropic.js";
 
@@ -23,8 +23,7 @@ export function InputArea({
   // Command autocomplete logic
   const commandList = useMemo(
     () =>
-      commandRegistry
-        .getCommandList()
+      getCommandList()
         .sort((a, b) => a.name.localeCompare(b.name)),
     [],
   );
