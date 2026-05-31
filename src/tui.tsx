@@ -4,7 +4,7 @@ import { Agent } from "./agent.js";
 import type { MessageParam } from "./llm/anthropic.js";
 import type { ResolvedConfig } from "./config.js";
 import { CallbackEvents, CallbackPrompter } from "./utils/display.js";
-import { parseAndExecute } from "./commands/index.js";
+import { executeCommand } from "./commands/index.js";
 import { MessageStore } from "./messages.js";
 import { AgentRegistry, type AgentSession } from "./services/index.js";
 
@@ -206,44 +206,88 @@ function AppContent({
   useMultiAgent(agentRegistry, agentRef);
   useDisplay(agent, initialSession, sessionName, resumeRecent, agentRegistry);
 
-  useEffect(() => {
-    agent.setCommandResolver(async (cmdInput: string) => {
-      return parseAndExecute(cmdInput, {
-        agent: agentRef.current,
-        setMessages: (msgs) => {
-          if (typeof msgs === "function") {
-            // we don't have access to prev state directly without a complex reducer action if it uses a callback
-            // we skip complex implementation here as command registry doesn't use the functional update form
-          } else {
-            dispatch({ type: "SET_MESSAGES", payload: msgs });
-          }
-        },
-        setCurrentSession: (session) =>
-          dispatch({ type: "SET_CURRENT_SESSION", payload: session }),
-        setMode: () => {
-          /* deprecated, combined with input.mode */
-        },
-        setInputMode: (mode, props) =>
-          dispatch({ type: "SET_INPUT_MODE", payload: { mode, props } }),
-        setSessionList: (sessions) =>
-          dispatch({ type: "SET_SESSION_LIST", payload: { sessions } }),
-        setSelectedIndex: (index) =>
-          dispatch({ type: "SET_SELECTED_SESSION_INDEX", payload: index }),
-        exit,
-      });
-    });
-  }, [dispatch, exit]);
+  const cmdContext = useCallback(() => ({
+    agent: agentRef.current,
+    setMessages: (msgs: any) => {
+      if (typeof msgs !== "function") {
+        dispatch({ type: "SET_MESSAGES", payload: msgs });
+      }
+    },
+    setCurrentSession: (session: string) =>
+      dispatch({ type: "SET_CURRENT_SESSION", payload: session }),
+    setMode: () => {},
+    setInputMode: (mode: string, props?: Record<string, unknown>) =>
+      dispatch({ type: "SET_INPUT_MODE", payload: { mode, props } }),
+    setSessionList: (sessions: Array<{ name: string }>) =>
+      dispatch({ type: "SET_SESSION_LIST", payload: { sessions } }),
+    setSelectedIndex: (index: number) =>
+      dispatch({ type: "SET_SELECTED_SESSION_INDEX", payload: index }),
+    exit,
+  }), [dispatch, exit]);
 
   const handleSubmit = useCallback(
     async (value: string): Promise<boolean> => {
-      if (!value.trim() || !agentRef.current) return false;
-
+      const trimmed = value.trim();
+      if (!trimmed || !agentRef.current) return false;
       if (loadingRef.current) return false;
 
+      const agent = agentRef.current;
+
+      // ! prefix → direct bash execution
+      if (trimmed.startsWith("!")) {
+        const cmd = trimmed.slice(1).trim();
+        if (!cmd) return false;
+        const { execSync } = await import("child_process");
+        let text: string;
+        try {
+          const output = execSync(cmd, { encoding: "utf-8", timeout: 30000, cwd: process.cwd() });
+          text = output.trim() || "(no output)";
+        } catch (e: any) {
+          text = `Error: ${e.message}`;
+        }
+        agent.getStore().addUserMessage(`Ran: ${cmd}\n\n\`\`\`\n${text}\n\`\`\``, trimmed);
+        agent.getStore().addStatus({
+          role: "status",
+          content: `$ ${cmd}\n${text}`,
+          toolDisplay: { name: "Bash", input: { command: cmd }, output: text },
+          timestamp: new Date(),
+        });
+        dispatch({ type: "SET_MESSAGES", payload: agent.getStore().toDisplayMessages() });
+        return false;
+      }
+
+      // / prefix → command resolution
+      if (trimmed.startsWith("/")) {
+        const parts = trimmed.slice(1).split(/\s+/);
+        const name = parts[0];
+        const args = parts.slice(1);
+        const result = await executeCommand(name, args, cmdContext());
+        if (result.handled) {
+          if (result.promptText) {
+            dispatch({ type: "SET_IS_LOADING", payload: true });
+            loadingRef.current = true;
+            try {
+              await agent.run(result.promptText, { displayContent: result.displayContent });
+            } catch (e) {
+              if (e instanceof Error) {
+                agent.getStore().addStatus({ role: "error", content: `(Error: ${e.message})`, timestamp: new Date() });
+              } else throw e;
+            } finally {
+              loadingRef.current = false;
+              dispatch({ type: "SET_IS_LOADING", payload: false });
+              dispatch({ type: "SET_STATUS", payload: "" });
+            }
+          }
+          dispatch({ type: "SET_MESSAGES", payload: agent.getStore().toDisplayMessages() });
+        }
+        return false;
+      }
+
+      // Plain text → LLM
       loadingRef.current = true;
       dispatch({ type: "SET_IS_LOADING", payload: true });
       try {
-        const sent = await agentRef.current.run(value);
+        const sent = await agent.run(trimmed);
         if (!sent) {
           dispatch({ type: "SET_IS_LOADING", payload: false });
           return false;
@@ -251,21 +295,9 @@ function AppContent({
         return true;
       } catch (e) {
         if (e instanceof Error && e.message === "Aborted") {
-          agentRef.current
-            .getStore()
-            .addStatus({
-              role: "status",
-              content: "(Aborted)",
-              timestamp: new Date(),
-            });
+          agent.getStore().addStatus({ role: "status", content: "(Aborted)", timestamp: new Date() });
         } else if (e instanceof Error) {
-          agentRef.current
-            .getStore()
-            .addStatus({
-              role: "error",
-              content: `(Error: ${e.message})`,
-              timestamp: new Date(),
-            });
+          agent.getStore().addStatus({ role: "error", content: `(Error: ${e.message})`, timestamp: new Date() });
         } else {
           throw e;
         }
@@ -276,7 +308,7 @@ function AppContent({
         dispatch({ type: "SET_STATUS", payload: "" });
       }
     },
-    [dispatch],
+    [dispatch, cmdContext],
   );
 
   useEffect(() => {

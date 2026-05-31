@@ -13,7 +13,7 @@ import { parseArgs, type PermissionMode } from "./args.js";
 import { loadGlobalPrompt } from "./utils/prompts.js";
 import { loadSkills, getAvailableSkills as getSkills, getSkillBody } from "./skills/index.js";
 import { App } from "./tui.js";
-import { getCommandNames, registerCommand, parseAndExecute } from "./commands/index.js";
+import { getCommandNames, registerCommand, executeCommand } from "./commands/index.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -156,22 +156,20 @@ agent.setSession(initialSession);
 agent.setLogger(logger);
 agent.setPermissionMode(permissionMode);
 
-// Set shared command resolver so both headless and TUI use the same resolve path
-agent.setCommandResolver((input: string) =>
-  parseAndExecute(input, {
-    agent,
-    setMessages: () => {},
-    setCurrentSession: (name) => {
-      initialSession = name;
-      agent.currentSession = name;
-    },
-    setMode: () => {},
-    setInputMode: () => {},
-    setSessionList: () => {},
-    setSelectedIndex: () => {},
-    exit: () => process.exit(0),
-  }),
-);
+// Shared command context for headless mode
+const cmdContext = {
+  agent,
+  setMessages: () => {},
+  setCurrentSession: (name: string) => {
+    initialSession = name;
+    agent.currentSession = name;
+  },
+  setMode: () => {},
+  setInputMode: () => {},
+  setSessionList: () => {},
+  setSelectedIndex: () => {},
+  exit: () => process.exit(0),
+};
 
 // Branch: display layer only
 if (headless) {
@@ -181,7 +179,7 @@ if (headless) {
   }
 
   const { runHeadless } = await import("./headless.js");
-  await runHeadless(agent, initialPrompt, sessionName, resumeRecent);
+  await runHeadless(agent, initialPrompt, sessionName, resumeRecent, cmdContext);
   process.exit(0);
 }
 

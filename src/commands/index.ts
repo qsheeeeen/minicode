@@ -43,21 +43,15 @@ export function registerCommand(cmd: CommandHandler): void {
   commands.set(cmd.name, cmd);
 }
 
-export async function parseAndExecute(
-  input: string,
+export async function executeCommand(
+  name: string,
+  args: string[],
   context: CommandContext,
 ): Promise<{
   handled: boolean;
   promptText?: string;
   displayContent?: string;
 }> {
-  const trimmed = input.trim();
-  if (!trimmed.startsWith("/")) return { handled: false };
-
-  const parts = trimmed.slice(1).split(/\s+/);
-  const name = parts[0];
-  const args = parts.slice(1);
-
   const cmd = commands.get(name);
   if (cmd) {
     if (cmd.handler) {

@@ -101,14 +101,6 @@ export class Agent {
   private isRunning: boolean = false;
   private environmentContext = "";
   private systemPrompt = "";
-  private resolveCommand?: (
-    input: string,
-  ) => Promise<{
-    handled: boolean;
-    promptText?: string;
-    displayContent?: string;
-  }>;
-
   public setSession(sessionName: string): void {
     this.currentSession = sessionName;
     this.store.setSessionName(sessionName);
@@ -116,18 +108,6 @@ export class Agent {
 
   public setLogger(logger: pino.Logger): void {
     this.logger = logger;
-  }
-
-  public setCommandResolver(
-    resolver: (
-      input: string,
-    ) => Promise<{
-      handled: boolean;
-      promptText?: string;
-      displayContent?: string;
-    }>,
-  ): void {
-    this.resolveCommand = resolver;
   }
 
   public setEffort(effort: EffortLevel): void {
@@ -623,57 +603,11 @@ export class Agent {
   ): Promise<boolean> {
     if (this.isRunning) return false;
 
-    // Direct bash execution: !command args
-    const trimmed = userMessage.trim();
-    if (trimmed.startsWith("!")) {
-      const cmd = trimmed.slice(1).trim();
-      if (!cmd) return false;
-      const { execSync } = await import("child_process");
-      let text: string;
-      try {
-        const output = execSync(cmd, {
-          encoding: "utf-8",
-          timeout: 30000,
-          cwd: process.cwd(),
-        });
-        text = output.trim() || "(no output)";
-      } catch (e: any) {
-        text = `Error: ${e.message}`;
-      }
-      this.store.addUserMessage(
-        `Ran: ${cmd}\n\n\`\`\`\n${text}\n\`\`\``,
-        trimmed,
-      );
-      this.store.addStatus({
-        role: "status",
-        content: `$ ${cmd}\n${text}`,
-        toolDisplay: { name: "Bash", input: { command: cmd }, output: text },
-        timestamp: new Date(),
-      });
-      return false;
-    }
-
-    // Resolve slash commands (e.g. /plan → expanded prompt, /clear → clear session)
-    let llmText = userMessage;
-    let displayOverride = opts?.displayContent;
-    if (this.resolveCommand) {
-      const resolved = await this.resolveCommand(userMessage);
-      if (resolved.handled) {
-        if (resolved.promptText) {
-          llmText = resolved.promptText;
-          displayOverride = resolved.displayContent;
-        } else {
-          // Handler command executed (e.g. /clear); nothing to send to LLM
-          return false;
-        }
-      }
-    }
-
     this.isRunning = true;
-    this.store.addUserMessage(llmText, displayOverride);
+    this.store.addUserMessage(userMessage, opts?.displayContent);
     this.abortController = new AbortController();
     this.logger?.info(
-      { session: this.currentSession, userMessage: llmText },
+      { session: this.currentSession, userMessage },
       "Session started",
     );
 
@@ -734,7 +668,7 @@ export class Agent {
         if (
           last?.role === "user" &&
           typeof last.content === "string" &&
-          last.content === llmText
+          last.content === userMessage
         ) {
           turns.pop();
           this.store.setTurns(turns);
