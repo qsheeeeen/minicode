@@ -17,9 +17,7 @@ const mockAgent = {
     getStatuses: mockGetStatuses,
     toLLMMessages: vi.fn().mockReturnValue([]),
   }),
-  getToolRegistry: vi.fn().mockReturnValue({
-    get: vi.fn().mockReturnValue(undefined),
-  }),
+  getTools: vi.fn().mockReturnValue(new Map()),
   setTokenCount: vi.fn(),
   setSession: vi.fn(),
   setMessages: vi.fn(),

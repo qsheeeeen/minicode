@@ -233,7 +233,7 @@ describe("Builtin commands", () => {
         setTokenCount: vi.fn(),
         setSession: vi.fn(),
         setLogger: vi.fn(),
-        getToolRegistry: vi.fn(),
+        getTools: vi.fn(),
         getStore: vi.fn().mockReturnValue(storeMock),
       };
       const ctx: Partial<CommandContext> = {

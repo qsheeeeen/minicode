@@ -1,22 +1,21 @@
 import { describe, it, expect } from "vitest";
-import { ToolRegistry, all, subAgentTools } from "./index.js";
+import { getAll, getSubAgentTools } from "./index.js";
 
 describe("tool registry", () => {
-  it("all() returns self-registered tools", () => {
-    const tools = all();
-    expect(tools.length).toBeGreaterThan(0);
-    const names = tools.map((t) => t.name);
-    expect(names).toContain("Read");
-    expect(names).toContain("Write");
-    expect(names).toContain("Edit");
-    expect(names).toContain("Bash");
-    expect(names).toContain("Grep");
-    expect(names).toContain("SubAgent");
+  it("getAll() returns self-registered tools", () => {
+    const tools = getAll();
+    expect(tools.size).toBeGreaterThan(0);
+    expect(tools.has("Read")).toBe(true);
+    expect(tools.has("Write")).toBe(true);
+    expect(tools.has("Edit")).toBe(true);
+    expect(tools.has("Bash")).toBe(true);
+    expect(tools.has("Grep")).toBe(true);
+    expect(tools.has("SubAgent")).toBe(true);
   });
 
-  it("subAgentTools() returns only read-only non-interactive tools", () => {
-    const safe = subAgentTools();
-    const names = safe.map((t) => t.name);
+  it("getSubAgentTools() returns only read-only non-interactive tools", () => {
+    const safe = getSubAgentTools();
+    const names = [...safe.keys()];
     expect(names).toContain("Read");
     expect(names).toContain("Grep");
     expect(names).toContain("ActivateSkill");
@@ -27,25 +26,17 @@ describe("tool registry", () => {
     expect(names).not.toContain("SubAgent");
   });
 
-  it("ToolRegistry can register and retrieve tools", () => {
-    const registry = new ToolRegistry();
-    const tools = all();
-    for (const tool of tools) {
-      registry.register(tool);
-    }
-    expect(registry.get("Read")).toBeDefined();
-    expect(registry.get("Bash")).toBeDefined();
-    expect(registry.get("NonExistent")).toBeUndefined();
+  it("getAll() returns a Map copy", () => {
+    const tools = getAll();
+    expect(tools).toBeInstanceOf(Map);
   });
 
-  it("ToolRegistry filters by requirement", () => {
-    const registry = new ToolRegistry();
-    const noAgent = {};
-    for (const tool of all()) {
-      if (tool.requires?.some((r) => !noAgent[r])) continue;
-      registry.register(tool);
+  it("tools have required properties", () => {
+    for (const [name, tool] of getAll()) {
+      expect(tool.name).toBe(name);
+      expect(typeof tool.description).toBe("string");
+      expect(tool.input_schema).toBeDefined();
+      expect(typeof tool.execute).toBe("function");
     }
-    expect(registry.get("Read")).toBeDefined();
-    expect(registry.get("SubAgent")).toBeUndefined();
   });
 });

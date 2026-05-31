@@ -34,30 +34,14 @@ export interface ToolDef {
   interactive?: boolean;
 }
 
-export class ToolRegistry {
-  private tools = new Map<string, ToolDef>();
-
-  register(tool: ToolDef): void {
-    this.tools.set(tool.name, tool);
-  }
-
-  get(name: string): ToolDef | undefined {
-    return this.tools.get(name);
-  }
-
-  getAll(): ToolDef[] {
-    return Array.from(this.tools.values());
-  }
-}
-
-const defaultTools: ToolDef[] = [];
+const defaultTools = new Map<string, ToolDef>();
 
 export function register(tool: ToolDef): void {
-  defaultTools.push(tool);
+  defaultTools.set(tool.name, tool);
 }
 
-export function all(): ToolDef[] {
-  return [...defaultTools];
+export function getAll(): Map<string, ToolDef> {
+  return new Map(defaultTools);
 }
 
 export class ToolDeniedError extends Error {
@@ -71,8 +55,12 @@ export class ToolDeniedError extends Error {
   }
 }
 
-export function subAgentTools(): ToolDef[] {
-  return defaultTools.filter(
-    (t) => (t.readOnly ?? !t.requiresPermission) && !t.interactive,
-  );
+export function getSubAgentTools(): Map<string, ToolDef> {
+  const result = new Map<string, ToolDef>();
+  for (const [name, t] of defaultTools) {
+    if ((t.readOnly ?? !t.requiresPermission) && !t.interactive) {
+      result.set(name, t);
+    }
+  }
+  return result;
 }

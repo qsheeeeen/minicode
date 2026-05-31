@@ -1,86 +1,60 @@
 import { describe, it, expect } from "vitest";
-import { ToolRegistry } from "./registry.js";
+import { register, getAll, getSubAgentTools } from "./registry.js";
 import type { ToolDef } from "./index.js";
 
-describe("ToolRegistry", () => {
-  describe("register", () => {
-    it("adds tool to registry", () => {
-      const registry = new ToolRegistry();
-      const tool: ToolDef = {
-        name: "test",
-        description: "A test tool",
-        input_schema: { type: "object", properties: {} },
-        execute: async () => ({ output: "ok" }),
-      };
-      registry.register(tool);
-      expect(registry.get("test")).toBe(tool);
-    });
-
-    it("overwrites existing tool with same name", () => {
-      const registry = new ToolRegistry();
-      const tool1: ToolDef = {
-        name: "test",
-        description: "Tool 1",
-        input_schema: { type: "object", properties: {} },
-        execute: async () => ({ output: "ok" }),
-      };
-      const tool2: ToolDef = {
-        name: "test",
-        description: "Tool 2",
-        input_schema: { type: "object", properties: {} },
-        execute: async () => ({ output: "changed" }),
-      };
-      registry.register(tool1);
-      registry.register(tool2);
-      expect(registry.get("test")?.description).toBe("Tool 2");
-    });
+describe("register", () => {
+  it("adds tool to registry", () => {
+    const tool: ToolDef = {
+      name: "reg-test",
+      description: "A test tool",
+      input_schema: { type: "object", properties: {} },
+      execute: async () => ({ output: "ok" }),
+    };
+    register(tool);
+    expect(getAll().get("reg-test")).toBe(tool);
   });
 
-  describe("get", () => {
-    it("returns registered tool", () => {
-      const registry = new ToolRegistry();
-      const tool: ToolDef = {
-        name: "my-tool",
-        description: "Test",
-        input_schema: { type: "object", properties: {} },
-        execute: async () => ({ output: "ok" }),
-      };
-      registry.register(tool);
-      expect(registry.get("my-tool")).toBe(tool);
-    });
+  it("overwrites existing tool with same name", () => {
+    const tool1: ToolDef = {
+      name: "overwrite-test",
+      description: "Tool 1",
+      input_schema: { type: "object", properties: {} },
+      execute: async () => ({ output: "ok" }),
+    };
+    const tool2: ToolDef = {
+      name: "overwrite-test",
+      description: "Tool 2",
+      input_schema: { type: "object", properties: {} },
+      execute: async () => ({ output: "changed" }),
+    };
+    register(tool1);
+    register(tool2);
+    expect(getAll().get("overwrite-test")?.description).toBe("Tool 2");
+  });
+});
 
-    it("returns undefined for unknown tool", () => {
-      const registry = new ToolRegistry();
-      expect(registry.get("nonexistent")).toBeUndefined();
-    });
+describe("all", () => {
+  it("returns all registered tools as Map", () => {
+    const tools = getAll();
+    expect(tools).toBeInstanceOf(Map);
+    expect(tools.size).toBeGreaterThan(0);
   });
 
-  describe("getAll", () => {
-    it("returns all registered tools as array", () => {
-      const registry = new ToolRegistry();
-      const tool1: ToolDef = {
-        name: "tool1",
-        description: "Tool 1",
-        input_schema: { type: "object", properties: {} },
-        execute: async () => ({ output: "ok" }),
-      };
-      const tool2: ToolDef = {
-        name: "tool2",
-        description: "Tool 2",
-        input_schema: { type: "object", properties: {} },
-        execute: async () => ({ output: "ok" }),
-      };
-      registry.register(tool1);
-      registry.register(tool2);
-      const all = registry.getAll();
-      expect(all).toHaveLength(2);
-      expect(all.map((t) => t.name)).toContain("tool1");
-      expect(all.map((t) => t.name)).toContain("tool2");
-    });
+  it("returns a copy (mutations don't affect source)", () => {
+    const tools = getAll();
+    const sizeBefore = getAll().size;
+    tools.delete("Read");
+    expect(getAll().size).toBe(sizeBefore);
+  });
+});
 
-    it("returns empty array when no tools registered", () => {
-      const registry = new ToolRegistry();
-      expect(registry.getAll()).toEqual([]);
-    });
+describe("subAgentTools", () => {
+  it("returns only read-only non-interactive tools", () => {
+    const safe = getSubAgentTools();
+    expect(safe).toBeInstanceOf(Map);
+    for (const tool of safe.values()) {
+      expect(tool.readOnly ?? !tool.requiresPermission).toBe(true);
+      expect(tool.interactive).toBeFalsy();
+    }
   });
 });

@@ -33,8 +33,8 @@ vi.mock("./tools/index.js", async (importOriginal) => {
   };
   return {
     ...actual,
-    all: () => [testTool],
-    subAgentTools: () => [testTool],
+    getAll: () => new Map([[testTool.name, testTool]]),
+    getSubAgentTools: () => new Map([[testTool.name, testTool]]),
   };
 });
 

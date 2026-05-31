@@ -1,9 +1,8 @@
 export {
-  ToolRegistry,
   ToolDeniedError,
   register,
-  all,
-  subAgentTools,
+  getAll,
+  getSubAgentTools,
 } from "./registry.js";
 export type {
   ToolDef,

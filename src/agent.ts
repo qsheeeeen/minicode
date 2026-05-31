@@ -7,9 +7,8 @@ import {
   type EffortLevel,
 } from "./llm/anthropic.js";
 import {
-  all,
-  subAgentTools,
-  ToolRegistry,
+  getAll,
+  getSubAgentTools,
   ToolDef,
   ToolExecutionContext,
   ToolDeniedError,
@@ -60,7 +59,6 @@ export interface AgentConfig {
   effort?: EffortLevel;
   userPrompt?: string;
   projectPromptFile?: string;
-  excludeTools?: string[];
   subAgentMode?: boolean;
   agentRegistry?: AgentRegistry;
   currentAgentId?: string;
@@ -74,7 +72,7 @@ interface StreamingResult {
 
 export class Agent {
   private client: AnthropicClient;
-  private toolRegistry: ToolRegistry;
+  private tools: Map<string, ToolDef>;
   private store = new MessageStore();
   private model?: string;
   private modelProvider?: string;
@@ -177,7 +175,9 @@ export class Agent {
     this.effort = config.effort;
     this.tokenManager = new TokenManager();
     this.compressionService = new CompressionService();
-    this.toolRegistry = new ToolRegistry();
+    this.tools = config.subAgentMode
+      ? getSubAgentTools()
+      : getAll();
     this.agentRegistry = config.agentRegistry;
     this.currentAgentId = config.currentAgentId || "1";
     this.permissionService = new PermissionService({
@@ -187,12 +187,10 @@ export class Agent {
     });
 
     const availability = { agentRegistry: this.agentRegistry, skillRegistry };
-    const toolSet = config.subAgentMode
-      ? subAgentTools()
-      : all().filter((t) => !(config.excludeTools ?? []).includes(t.name));
-    for (const tool of toolSet) {
-      if (tool.requires?.some((r) => !availability[r])) continue;
-      this.toolRegistry.register(tool);
+    for (const [name, tool] of this.tools) {
+      if (tool.requires?.some((r) => !availability[r])) {
+        this.tools.delete(name);
+      }
     }
 
     this.events = new ConsoleEvents();
@@ -454,7 +452,7 @@ export class Agent {
       if (block.type === "tool_use") {
         hasToolCalls = true;
         const toolBlock = block as Anthropic.Messages.ToolUseBlock;
-        const tool = this.toolRegistry.get(toolBlock.name);
+        const tool = this.tools.get(toolBlock.name);
         if (tool) {
           toolCalls.push({ block: toolBlock, tool });
         }
@@ -663,7 +661,7 @@ export class Agent {
       while (true) {
         this.throwIfAborted();
 
-        const toolDefs = this.toolRegistry.getAll().map((t) => ({
+        const toolDefs = [...this.tools.values()].map((t) => ({
           name: t.name,
           description: t.description,
           input_schema: t.input_schema,
@@ -768,8 +766,8 @@ export class Agent {
     this.tokenManager.reset();
   }
 
-  getToolRegistry(): ToolRegistry {
-    return this.toolRegistry;
+  getTools(): Map<string, ToolDef> {
+    return this.tools;
   }
 
   getPermissionService(): PermissionService {
