@@ -1,9 +1,11 @@
-import type { ToolDef, ToolResult, ToolExecutionContext } from "./index.js";
+import type { ToolDef, ToolResult, ToolExecutionContext } from "./registry.js";
+import { register } from "./registry.js";
 
 export const activateSkillTool: ToolDef = {
   name: "ActivateSkill",
   description:
     "Loads the full instructions of a skill by name. Returns the skill's instructions wrapped in <activated_skill> tags. Use this when you identify a task that matches a skill's description.",
+  readOnly: true,
   input_schema: {
     type: "object",
     properties: {
@@ -29,3 +31,4 @@ export const activateSkillTool: ToolDef = {
     return { output };
   },
 };
+register(activateSkillTool);

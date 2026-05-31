@@ -1,10 +1,12 @@
 import fs from "fs/promises";
-import type { ToolDef, ToolResult } from "./index.js";
+import type { ToolDef, ToolResult } from "./registry.js";
+import { register } from "./registry.js";
 
 export const readTool: ToolDef = {
   name: "Read",
   description:
     "Read the contents of a file. Supports text files. Defaults to first 2000 lines. Use offset/limit for large files.",
+  readOnly: true,
   input_schema: {
     type: "object" as const,
     properties: {
@@ -34,3 +36,5 @@ export const readTool: ToolDef = {
     }
   },
 };
+
+register(readTool);

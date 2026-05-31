@@ -1,11 +1,14 @@
-import type { ToolDef, ToolResult, ToolExecutionContext } from "./index.js";
-import { ToolDeniedError } from "./index.js";
+import type { ToolDef, ToolResult, ToolExecutionContext } from "./registry.js";
+import { ToolDeniedError } from "./registry.js";
+import { register } from "./registry.js";
 
 export const askUserTool: ToolDef = {
   name: "AskUser",
   description:
     "Ask the user a question with predefined options. Use this when you need the user to choose from a set of alternatives — for example, selecting a library, choosing an approach, or clarifying requirements. Set multiSelect to true when the user may select multiple options. The user can select options or reject all options and type their own response.",
   requiresPermission: false,
+  readOnly: true,
+  interactive: true,
   input_schema: {
     type: "object" as const,
     properties: {
@@ -75,3 +78,4 @@ export const askUserTool: ToolDef = {
     return { output: `User selected: "${answer}"` };
   },
 };
+register(askUserTool);

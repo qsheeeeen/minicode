@@ -1,12 +1,14 @@
 import fs from "fs/promises";
 import path from "path";
-import type { ToolDef, ToolResult } from "./index.js";
+import type { ToolDef, ToolResult } from "./registry.js";
+import { register } from "./registry.js";
 
 export const writeTool: ToolDef = {
   name: "Write",
   description:
     "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
   requiresPermission: true,
+  readOnly: false,
   input_schema: {
     type: "object" as const,
     properties: {
@@ -29,3 +31,4 @@ export const writeTool: ToolDef = {
     }
   },
 };
+register(writeTool);

@@ -12,8 +12,10 @@ import { TuiProvider, useTuiState, useTuiDispatch } from "./tui/store.js";
 import { Header } from "./tui/Header.js";
 import { MessageList } from "./tui/MessageList.js";
 import { ModalPrompter } from "./tui/ModalPrompter.js";
+import { Status } from "./tui/Status.js";
 import { InputArea } from "./tui/InputArea.js";
-import { StatusBar } from "./tui/StatusBar.js";
+import { Panel } from "./tui/Panel.js";
+import { Help } from "./tui/Help.js";
 
 export interface AppProps {
   agent: Agent;
@@ -308,12 +310,14 @@ function AppContent({
       <Header version={version} promptFiles={promptFiles} agentRef={agentRef} />
       <MessageList />
       <ModalPrompter />
+      <Status />
       <InputArea
         agentRef={agentRef}
         handleSubmit={handleSubmit}
         loadingRef={loadingRef}
       />
-      <StatusBar agentRef={agentRef} />
+      <Panel agentRef={agentRef} />
+      <Help />
     </Box>
   );
 }

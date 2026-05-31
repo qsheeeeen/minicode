@@ -7,7 +7,8 @@ import {
   type EffortLevel,
 } from "./llm/anthropic.js";
 import {
-  registerTools,
+  all,
+  subAgentTools,
   ToolRegistry,
   ToolDef,
   ToolExecutionContext,
@@ -33,20 +34,20 @@ import { sessionManager } from "./utils/session.js";
 import { execSync } from "child_process";
 import type pino from "pino";
 
-export const SYSTEM_PROMPT = `你是一个交互式 CLI 编程智能体，帮助用户完成软件工程任务。请使用以下指令和可用工具来协助用户。
+export const SYSTEM_PROMPT = `You are an interactive CLI coding agent that helps users with software engineering tasks. Use the following instructions and available tools to assist the user.
 
-# 指南：
-- 使用用户的语言
-- 使用 Bash 进行文件操作，如 ls、grep、find
-- 编辑文件前先用 Read 查看
-- 使用 Edit 进行精确修改（旧文本必须完全匹配）
-- 仅在创建新文件或完全重写时使用 Write
-- 总结操作时直接输出纯文本——不要用 cat 或 Bash 来展示你做了什么
-- 回复保持简洁严谨——不要使用比喻
-- 操作文件时清晰展示文件路径
-- 在操作前评估影响范围，和用户确认不可逆的操作，用户的确认单次生效
-- 你可以在单次响应中调用多个工具
-- 适当地并行来提高效率`;
+# Guidelines:
+- Always think and respond in the language the user first spoke at the start of the conversation
+- Use Bash for file operations like ls, grep, find
+- Read files with Read before editing
+- Use Write only when creating new files or fully rewriting
+- When summarizing actions, output plain text directly - do not use cat or Bash to show what you did
+- Keep responses concise and precise - do not use metaphors
+- Show file paths clearly when operating on files
+- Assess impact before operations and confirm irreversible actions with the user; confirmations are single-use
+- You may call multiple tools in a single response
+- Parallelize appropriately to improve efficiency
+- Use read-only subagents for parallel investigation tasks: code exploration, code review, debugging research, documentation generation, and dependency analysis. Do not use subagents for simple lookups or when a direct grep/find suffices.`;
 
 export interface AgentConfig {
   apiKey?: string;
@@ -60,6 +61,7 @@ export interface AgentConfig {
   userPrompt?: string;
   projectPromptFile?: string;
   excludeTools?: string[];
+  subAgentMode?: boolean;
   agentRegistry?: AgentRegistry;
   currentAgentId?: string;
 }
@@ -184,11 +186,14 @@ export class Agent {
       model: this.model,
     });
 
-    registerTools(
-      this.toolRegistry,
-      { agentRegistry: this.agentRegistry, skillRegistry },
-      config.excludeTools,
-    );
+    const availability = { agentRegistry: this.agentRegistry, skillRegistry };
+    const toolSet = config.subAgentMode
+      ? subAgentTools()
+      : all().filter((t) => !(config.excludeTools ?? []).includes(t.name));
+    for (const tool of toolSet) {
+      if (tool.requires?.some((r) => !availability[r])) continue;
+      this.toolRegistry.register(tool);
+    }
 
     this.events = new ConsoleEvents();
     this.prompter = new ConsolePrompter();
@@ -523,7 +528,7 @@ export class Agent {
     args: Record<string, unknown>,
     context: ToolExecutionContext,
   ): Promise<import("./tools/index.js").ToolResult> {
-    if (tool.requiresPermission) {
+    if (!(tool.readOnly ?? !tool.requiresPermission)) {
       const displayText = callContent(tool.name, args);
       const { allowed, reason } = await this.permissionService.check(
         tool.name,

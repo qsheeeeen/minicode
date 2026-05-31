@@ -70,6 +70,16 @@ class CommandRegistry {
       }
     }
 
+    // Dynamic skill commands: if no builtin command matched, check skills
+    const skillBody = skillRegistry.getSkillBody(name);
+    if (skillBody) {
+      return {
+        handled: true,
+        promptText: `Activate and execute the '${name}' skill.\n\n${skillBody}`,
+        displayContent: `/${name}`,
+      };
+    }
+
     return { handled: false };
   }
 
@@ -78,15 +88,20 @@ class CommandRegistry {
   }
 
   getCommandList(): Array<{ name: string; description: string }> {
-    return Array.from(this.commands.values()).map((cmd) => ({
+    const builtin = Array.from(this.commands.values()).map((cmd) => ({
       name: cmd.name,
       description: cmd.description,
     }));
+    const skills = skillRegistry
+      .getAvailableSkills()
+      .filter((s) => !this.commands.has(s.name))
+      .map((s) => ({ name: s.name, description: s.description }));
+    return [...builtin, ...skills].sort((a, b) => a.name.localeCompare(b.name));
   }
 
   getHelp(): string {
     const lines = ["Available commands:"];
-    for (const cmd of this.commands.values()) {
+    for (const cmd of this.getCommandList()) {
       lines.push(`  /${cmd.name} - ${cmd.description}`);
     }
     return lines.join("\n");

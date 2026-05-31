@@ -10,7 +10,7 @@ import { AgentRegistry } from "./services/index.js";
 import { sessionManager } from "./utils/session.js";
 import { createLogger } from "./utils/logger.js";
 import { parseArgs, type PermissionMode } from "./args.js";
-import { loadGlobalPrompt, DEFAULT_PROMPT_FILE } from "./utils/prompts.js";
+import { loadGlobalPrompt } from "./utils/prompts.js";
 import { skillRegistry } from "./skills/index.js";
 import { App } from "./tui.js";
 import { commandRegistry } from "./commands/index.js";
@@ -78,14 +78,14 @@ const permissionMode: PermissionMode =
 // Load global prompt only (project prompt is loaded on-demand by the LLM)
 const globalPrompt = await loadGlobalPrompt();
 const promptFiles: string[] = [];
-if (globalPrompt) promptFiles.push(`~/.minicode/${DEFAULT_PROMPT_FILE}`);
+if (globalPrompt) promptFiles.push("~/.minicode/AGENTS.md");
 
-const projectPromptPath = path.resolve(process.cwd(), config.promptFile);
+const projectPromptPath = path.resolve(process.cwd(), "AGENTS.md");
 let projectPromptFile = "";
 try {
   const fs = await import("fs/promises");
   await fs.access(projectPromptPath);
-  projectPromptFile = `./${config.promptFile}`;
+  projectPromptFile = "./AGENTS.md";
   promptFiles.push(projectPromptFile);
 } catch {
   // Project prompt file doesn't exist — skip
@@ -111,9 +111,8 @@ const logger = await createLogger(
 // Load global skills from ~/.minicode/skills/
 await skillRegistry.loadSkills(path.join(os.homedir(), ".minicode", "skills"));
 
-// Load project skills from configured directory (default: .minicode/skills)
-const projectSkillsDir = config.skillsDir ?? ".minicode/skills";
-await skillRegistry.loadSkills(path.resolve(process.cwd(), projectSkillsDir));
+// Load project skills from .agent/ directory
+await skillRegistry.loadSkills(path.resolve(process.cwd(), ".agent"));
 
 // Register skills as slash commands (e.g. /skill-creator)
 for (const skill of skillRegistry.getAvailableSkills()) {

@@ -32,7 +32,20 @@ describe("editTool", () => {
       );
     });
 
-    it("replaces first occurrence only", async () => {
+    it("errors when oldText appears multiple times without replaceAll", async () => {
+      const fs = await import("fs/promises");
+      (fs.default.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(
+        "foo bar foo",
+      );
+      const result = await editTool.execute({
+        path: "test.txt",
+        oldText: "foo",
+        newText: "baz",
+      });
+      expect(result.output).toContain("found 2 times");
+    });
+
+    it("replaces all occurrences with replaceAll=true", async () => {
       const fs = await import("fs/promises");
       (fs.default.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(
         "foo bar foo",
@@ -41,10 +54,26 @@ describe("editTool", () => {
         path: "test.txt",
         oldText: "foo",
         newText: "baz",
+        replaceAll: true,
       });
       const written = (fs.default.writeFile as ReturnType<typeof vi.fn>).mock
         .calls[0][1];
-      expect(written).toBe("baz bar foo");
+      expect(written).toBe("baz bar baz");
+    });
+
+    it("replaces single occurrence without replaceAll", async () => {
+      const fs = await import("fs/promises");
+      (fs.default.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(
+        "foo bar baz",
+      );
+      await editTool.execute({
+        path: "test.txt",
+        oldText: "foo",
+        newText: "qux",
+      });
+      const written = (fs.default.writeFile as ReturnType<typeof vi.fn>).mock
+        .calls[0][1];
+      expect(written).toBe("qux bar baz");
     });
 
     it("throws when oldText not found", async () => {

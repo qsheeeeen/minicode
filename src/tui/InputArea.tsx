@@ -180,13 +180,9 @@ export function InputArea({
     <Box flexDirection="column">
       <Box borderStyle="single" borderColor="gray" paddingX={1}>
         <Box flexBasis={3} flexShrink={0}>
-          {isLoading ? (
-            <Text dimColor>{"…"}</Text>
-          ) : (
-            <Text color="cyan" bold>
-              {">"}
-            </Text>
-          )}
+          <Text color="cyan" bold>
+            {">"}
+          </Text>
         </Box>
         <InputComponent {...inputProps} />
       </Box>

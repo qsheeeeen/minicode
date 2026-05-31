@@ -149,9 +149,7 @@ export interface ResolvedConfig {
   } | null;
   compressionThreshold: number;
   thinking: { enabled: boolean; effort?: EffortLevel };
-  promptFile: string;
   permissionMode?: "manual" | "yolo" | "auto";
-  skillsDir?: string;
 }
 
 export async function loadAllConfig(
@@ -187,9 +185,7 @@ export async function loadAllConfig(
       enabled: typeof config.thinking === "object",
       effort,
     },
-    promptFile: config.promptFile || "AGENTS.md",
     permissionMode: config.permissionMode,
-    skillsDir: config.skillsDir,
   };
 }
 

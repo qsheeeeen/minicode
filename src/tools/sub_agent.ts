@@ -1,12 +1,14 @@
-import type { ToolDef, ToolResult, ToolExecutionContext } from "./index.js";
+import type { ToolDef, ToolResult, ToolExecutionContext } from "./registry.js";
 import type { AgentConfig } from "../agent.js";
 import type { MessageParam, ContentBlock } from "../llm/anthropic.js";
 import { Agent } from "../agent.js";
+import { register } from "./registry.js";
 
 export const agentTool: ToolDef = {
   name: "SubAgent",
   description:
-    "Delegate a sub-task to an independent agent. Creates a new agent session that runs in parallel. The sub-agent has access to all tools (except agent) and returns a concise summary.",
+    "Delegate a sub-task to an independent read-only agent. The sub-agent has access to read-only, non-interactive tools only and returns a concise summary.",
+  readOnly: false,
   requires: ["agentRegistry"],
   input_schema: {
     type: "object" as const,
@@ -45,7 +47,7 @@ export const agentTool: ToolDef = {
 
     const subConfig: AgentConfig = {
       ...config,
-      excludeTools: ["SubAgent"],
+      subAgentMode: true,
       agentRegistry: registry,
       currentAgentId: subId,
     };
@@ -143,3 +145,4 @@ function generateSummary(turns: MessageParam[]): string {
 
   return toolCallCount > 0 ? `${toolCallCount} operations` : "Task completed";
 }
+register(agentTool);

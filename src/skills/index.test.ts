@@ -49,7 +49,7 @@ describe("builtin skills", () => {
     const skills = skillRegistry.getAvailableSkills();
     const init = skills.find((s) => s.name === "init");
     expect(init).toBeDefined();
-    expect(init!.description).toContain("MINICODE.md");
+    expect(init!.description).toContain("AGENTS.md");
     expect(init!.description).toContain("Set up a minimal");
   });
 

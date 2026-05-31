@@ -1,7 +1,6 @@
 import fs from "fs/promises";
 import path from "path";
 import { parse as parseYaml } from "yaml";
-import { loadConfigSync } from "../config.js";
 
 export interface SkillMeta {
   name: string;
@@ -84,7 +83,7 @@ export class SkillRegistry {
 
 export const skillRegistry = new SkillRegistry();
 
-const promptFile = loadConfigSync().promptFile || "AGENTS.md";
+const promptFile = "AGENTS.md";
 
 const skillCreator: SkillMeta = {
   name: "skill-creator",
@@ -103,7 +102,7 @@ Every skill consists of a required \`SKILL.md\` file:
 - **Body** (Markdown): Instructions and guidance for using the skill.
 
 ## Steps
-1. Create a directory for the skill (e.g., \`~/.minicode/skills/my-skill\`).
+1. Create a directory for the skill (e.g., \`.agent/my-skill\`).
 2. Add a \`SKILL.md\` file in that directory.
 3. Write the frontmatter with \`name\` and \`description\`.
 4. Write the body with clear, concise instructions for the agent to follow.`,
@@ -166,7 +165,7 @@ Skills add capabilities the agent can use on demand without bloating every sessi
 - Repeatable workflows (verify changes, deploy, release process)
 - Reference knowledge for specific subsystems
 
-Create each skill in the configured skills directory (default: \`.minicode/skills/<skill-name>/SKILL.md\`):
+Create each skill in the \`.agent/<skill-name>/SKILL.md\` directory:
 
 \`\`\`yaml
 ---

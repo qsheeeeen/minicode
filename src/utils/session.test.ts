@@ -5,15 +5,12 @@ vi.mock("fs/promises", () => ({
   default: {
     mkdir: vi.fn().mockResolvedValue(undefined),
     readdir: vi.fn().mockResolvedValue([]),
-    readFile: vi.fn().mockResolvedValue("{}"),
+    readFile: vi.fn().mockRejectedValue(new Error("ENOENT")),
     writeFile: vi.fn().mockResolvedValue(undefined),
     unlink: vi.fn().mockResolvedValue(undefined),
     rename: vi.fn().mockResolvedValue(undefined),
+    stat: vi.fn().mockResolvedValue({ mtime: new Date("2024-01-01T10:00:00Z") }),
   },
-}));
-
-vi.mock("process/cwd", () => ({
-  cwd: vi.fn().mockReturnValue("/test/project"),
 }));
 
 describe("SessionManager", () => {
@@ -52,33 +49,28 @@ describe("SessionManager", () => {
       expect(sessions).toEqual([]);
     });
 
-    it("returns sessions sorted by updatedAt descending", async () => {
+    it("lists JSONL sessions sorted by mtime descending", async () => {
       const fs = await import("fs/promises");
       (fs.default.readdir as ReturnType<typeof vi.fn>).mockResolvedValue([
-        "session1.json",
-        "session2.json",
+        "old.context.jsonl",
+        "new.context.jsonl",
       ]);
-      (fs.default.readFile as ReturnType<typeof vi.fn>)
-        .mockResolvedValueOnce(
-          JSON.stringify({ updatedAt: "2024-01-01T10:00:00Z" }),
-        )
-        .mockResolvedValueOnce(
-          JSON.stringify({ updatedAt: "2024-01-02T10:00:00Z" }),
-        );
+      (fs.default.stat as ReturnType<typeof vi.fn>)
+        .mockResolvedValueOnce({ mtime: new Date("2024-01-02T10:00:00Z") })
+        .mockResolvedValueOnce({ mtime: new Date("2024-01-01T10:00:00Z") });
       const manager = new SessionManager();
       const sessions = await manager.list();
-      // Sorted descending by updatedAt (later dates first)
-      expect(sessions[0].name).toBe("session2");
-      expect(sessions[1].name).toBe("session1");
+      expect(sessions[0].name).toBe("old");
+      expect(sessions[1].name).toBe("new");
     });
   });
 
   describe("listNames", () => {
-    it("returns session names without .json extension", async () => {
+    it("returns session names without extension", async () => {
       const fs = await import("fs/promises");
       (fs.default.readdir as ReturnType<typeof vi.fn>).mockResolvedValue([
-        "a.json",
-        "b.json",
+        "a.context.jsonl",
+        "b.context.jsonl",
         "c.txt",
       ]);
       const manager = new SessionManager();
@@ -98,25 +90,53 @@ describe("SessionManager", () => {
   });
 
   describe("get", () => {
-    it("returns parsed session data", async () => {
+    it("returns parsed JSONL session data", async () => {
       const fs = await import("fs/promises");
-      const sessionData: SessionData = {
+      const header = JSON.stringify({
         model: "claude-3",
-        messages: [{ role: "user", content: "hello" }],
         totalTokens: 1000,
-        createdAt: "2024-01-01T00:00:00Z",
-        updatedAt: "2024-01-01T00:00:00Z",
-      };
+        msgCount: 1,
+      });
+      const msg = JSON.stringify({ role: "user", content: "hello" });
       (fs.default.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(
-        JSON.stringify(sessionData),
+        `${header}\n${msg}\n`,
       );
       const manager = new SessionManager();
       const data = await manager.get("test-session");
       expect(data?.model).toBe("claude-3");
       expect(data?.messages).toHaveLength(1);
+      expect(data?.totalTokens).toBe(1000);
     });
 
-    it("returns null when file not found", async () => {
+    it("skips malformed lines", async () => {
+      const fs = await import("fs/promises");
+      const header = JSON.stringify({ model: "test", totalTokens: 0, msgCount: 2 });
+      (fs.default.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(
+        `${header}\n{bad json}\n{"role":"user","content":"ok"}\n`,
+      );
+      const manager = new SessionManager();
+      const data = await manager.get("test");
+      expect(data?.messages).toHaveLength(1);
+    });
+
+    it("falls back to legacy .json format", async () => {
+      const fs = await import("fs/promises");
+      // First call (JSONL) fails, second call (legacy .json) succeeds
+      (fs.default.readFile as ReturnType<typeof vi.fn>)
+        .mockRejectedValueOnce(new Error("ENOENT"))
+        .mockResolvedValueOnce(
+          JSON.stringify({
+            model: "legacy",
+            messages: [],
+            totalTokens: 0,
+          }),
+        );
+      const manager = new SessionManager();
+      const data = await manager.get("old-session");
+      expect(data?.model).toBe("legacy");
+    });
+
+    it("returns null when not found in either format", async () => {
       const fs = await import("fs/promises");
       (fs.default.readFile as ReturnType<typeof vi.fn>).mockRejectedValue(
         new Error("ENOENT"),
@@ -128,51 +148,45 @@ describe("SessionManager", () => {
   });
 
   describe("save", () => {
-    it("writes session data with timestamps", async () => {
+    it("writes JSONL with header and messages", async () => {
       const fs = await import("fs/promises");
       const data: SessionData = {
         model: "claude-3",
-        messages: [],
-        totalTokens: 0,
-        createdAt: "",
-        updatedAt: "",
+        messages: [{ role: "user", content: "hello" }],
+        totalTokens: 100,
       };
       const manager = new SessionManager();
       await manager.save("test", data);
+      // Should write to .tmp path first
       expect(fs.default.writeFile).toHaveBeenCalledWith(
-        expect.stringContaining("test.json"),
+        expect.stringContaining(".tmp"),
         expect.any(String),
       );
-      // Check that updatedAt was set
-      const writtenData = JSON.parse(
-        (fs.default.writeFile as ReturnType<typeof vi.fn>).mock.calls[0][1],
+      // Should rename .tmp to final path
+      expect(fs.default.rename).toHaveBeenCalledWith(
+        expect.stringContaining(".tmp"),
+        expect.stringContaining("test.context.jsonl"),
       );
-      expect(writtenData.updatedAt).toBeTruthy();
-    });
-
-    it("sets createdAt on first save", async () => {
-      const fs = await import("fs/promises");
-      const data: SessionData = {
-        model: "claude-3",
-        messages: [],
-        totalTokens: 0,
-        createdAt: "",
-        updatedAt: "",
-      };
-      const manager = new SessionManager();
-      await manager.save("test", data);
-      const writtenData = JSON.parse(
-        (fs.default.writeFile as ReturnType<typeof vi.fn>).mock.calls[0][1],
-      );
-      expect(writtenData.createdAt).toBeTruthy();
+      // Verify JSONL content
+      const content = (fs.default.writeFile as ReturnType<typeof vi.fn>).mock
+        .calls[0][1] as string;
+      const lines = content.split("\n").filter((l: string) => l.trim());
+      const header = JSON.parse(lines[0]);
+      expect(header.model).toBe("claude-3");
+      expect(header.msgCount).toBe(1);
+      expect(JSON.parse(lines[1])).toEqual({ role: "user", content: "hello" });
     });
   });
 
   describe("delete", () => {
-    it("calls unlink with correct path", async () => {
+    it("attempts to delete both JSONL and legacy .json", async () => {
       const fs = await import("fs/promises");
       const manager = new SessionManager();
       await manager.delete("test-session");
+      expect(fs.default.unlink).toHaveBeenCalledTimes(2);
+      expect(fs.default.unlink).toHaveBeenCalledWith(
+        expect.stringContaining("test-session.context.jsonl"),
+      );
       expect(fs.default.unlink).toHaveBeenCalledWith(
         expect.stringContaining("test-session.json"),
       );
@@ -180,13 +194,13 @@ describe("SessionManager", () => {
   });
 
   describe("rename", () => {
-    it("calls rename with correct paths", async () => {
+    it("renames JSONL session files", async () => {
       const fs = await import("fs/promises");
       const manager = new SessionManager();
       await manager.rename("old-name", "new-name");
       expect(fs.default.rename).toHaveBeenCalledWith(
-        expect.stringContaining("old-name.json"),
-        expect.stringContaining("new-name.json"),
+        expect.stringContaining("old-name.context.jsonl"),
+        expect.stringContaining("new-name.context.jsonl"),
       );
     });
   });

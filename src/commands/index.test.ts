@@ -34,6 +34,7 @@ vi.mock("../utils/logger.js", () => ({
 vi.mock("../skills/index.js", () => ({
   skillRegistry: {
     getAvailableSkills: vi.fn().mockReturnValue([]),
+    getSkillBody: vi.fn().mockReturnValue(undefined),
   },
 }));
 

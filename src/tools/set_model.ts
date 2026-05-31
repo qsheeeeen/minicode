@@ -1,9 +1,11 @@
-import type { ToolDef, ToolResult, ToolExecutionContext } from "./index.js";
+import type { ToolDef, ToolResult, ToolExecutionContext } from "./registry.js";
+import { register } from "./registry.js";
 
 export const setModelTool: ToolDef = {
   name: "SetModel",
   description:
     "Switch the current conversation to the model mapped to a tier. Looks up config.tiers[tier] and switches both the running agent and persisted config to that model.",
+  readOnly: false,
   input_schema: {
     type: "object" as const,
     properties: {
@@ -48,3 +50,4 @@ export const setModelTool: ToolDef = {
     return { output: `Switched to tier ${tier}: ${modelSpec}` };
   },
 };
+register(setModelTool);

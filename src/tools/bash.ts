@@ -1,5 +1,6 @@
 import { spawn } from "child_process";
-import type { ToolDef, ToolResult, ToolExecutionContext } from "./index.js";
+import type { ToolDef, ToolResult, ToolExecutionContext } from "./registry.js";
+import { register } from "./registry.js";
 
 function stripAnsiCodes(text: string): string {
   return text.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");
@@ -10,6 +11,7 @@ export const bashTool: ToolDef = {
   description:
     "Execute a bash command in the current working directory. Returns stdout and stderr. Optionally provide a timeout in seconds.",
   requiresPermission: true,
+  readOnly: false,
   input_schema: {
     type: "object" as const,
     properties: {
@@ -68,3 +70,4 @@ export const bashTool: ToolDef = {
     }
   },
 };
+register(bashTool);

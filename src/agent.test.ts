@@ -24,17 +24,17 @@ vi.mock("./llm/anthropic.js", () => ({
 
 vi.mock("./tools/index.js", async (importOriginal) => {
   const actual: any = await importOriginal();
+  const testTool = {
+    name: "testTool",
+    description: "Test Tool",
+    input_schema: { type: "object", properties: {} },
+    requiresPermission: true,
+    execute: vi.fn().mockResolvedValue({ output: "success" }),
+  };
   return {
     ...actual,
-    registerTools: (registry: any) => {
-      registry.register({
-        name: "testTool",
-        description: "Test Tool",
-        input_schema: { type: "object", properties: {} },
-        requiresPermission: true,
-        execute: vi.fn().mockResolvedValue({ output: "success" }),
-      });
-    },
+    all: () => [testTool],
+    subAgentTools: () => [testTool],
   };
 });
 
