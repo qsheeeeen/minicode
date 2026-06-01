@@ -49,10 +49,10 @@ A minimal coding agent powered by LLMs with TUI. Simple, opinionated, hackable.
 2. Install and run:
 
    ```bash
-   npm install
-   npm run dev       # Development mode (tsx, hot reload)
-   npm run build    # Compile to dist/
-   npm start        # Run built version
+   bun install
+   bun run dev       # Development mode (Bun native TS/TSX)
+   bun run build    # Compile to dist/
+   bun run start    # Run built version
    ```
 
 ## CLI Usage
