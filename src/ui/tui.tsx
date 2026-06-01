@@ -4,7 +4,7 @@ import { Agent } from "../agent.js";
 import type { MessageParam } from "../llm/anthropic.js";
 import type { ResolvedConfig } from "../config.js";
 import { CallbackEvents, CallbackPrompter } from "../utils/display.js";
-import { executeCommand } from "./commands/index.js";
+import { routeInput, runBash } from "./routing.js";
 import { MessageStore } from "../messages.js";
 import { AgentRegistry, type AgentSession } from "../services/index.js";
 
@@ -227,59 +227,44 @@ function AppContent({
 
   const handleSubmit = useCallback(
     async (value: string): Promise<boolean> => {
-      const trimmed = value.trim();
-      if (!trimmed || !agentRef.current) return false;
+      if (!value.trim() || !agentRef.current) return false;
       if (loadingRef.current) return false;
 
       const agent = agentRef.current;
+      const route = await routeInput(value, cmdContext());
 
-      // ! prefix → direct bash execution
-      if (trimmed.startsWith("!")) {
-        const cmd = trimmed.slice(1).trim();
-        if (!cmd) return false;
-        const { execSync } = await import("child_process");
-        let text: string;
-        try {
-          const output = execSync(cmd, { encoding: "utf-8", timeout: 30000, cwd: process.cwd() });
-          text = output.trim() || "(no output)";
-        } catch (e: any) {
-          text = `Error: ${e.message}`;
-        }
-        agent.getStore().addUserMessage(`Ran: ${cmd}\n\n\`\`\`\n${text}\n\`\`\``, trimmed);
+      if (route.action === "none") return false;
+
+      if (route.action === "bash") {
+        const output = runBash(route.promptText!);
+        agent.getStore().addUserMessage(`Ran: ${route.promptText}\n\n\`\`\`\n${output}\n\`\`\``, value.trim());
         agent.getStore().addStatus({
           role: "status",
-          content: `$ ${cmd}\n${text}`,
-          toolDisplay: { name: "Bash", input: { command: cmd }, output: text },
+          content: `$ ${route.promptText}\n${output}`,
+          toolDisplay: { name: "Bash", input: { command: route.promptText! }, output },
           timestamp: new Date(),
         });
         dispatch({ type: "SET_MESSAGES", payload: agent.getStore().toDisplayMessages() });
         return false;
       }
 
-      // / prefix → command resolution
-      if (trimmed.startsWith("/")) {
-        const parts = trimmed.slice(1).split(/\s+/);
-        const name = parts[0];
-        const args = parts.slice(1);
-        const result = await executeCommand(name, args, cmdContext());
-        if (result.handled) {
-          if (result.promptText) {
-            dispatch({ type: "SET_IS_LOADING", payload: true });
-            loadingRef.current = true;
-            try {
-              await agent.run(result.promptText, { displayContent: result.displayContent });
-            } catch (e) {
-              if (e instanceof Error) {
-                agent.getStore().addStatus({ role: "error", content: `(Error: ${e.message})`, timestamp: new Date() });
-              } else throw e;
-            } finally {
-              loadingRef.current = false;
-              dispatch({ type: "SET_IS_LOADING", payload: false });
-              dispatch({ type: "SET_STATUS", payload: "" });
-            }
+      if (route.action === "command") {
+        if (route.promptText) {
+          loadingRef.current = true;
+          dispatch({ type: "SET_IS_LOADING", payload: true });
+          try {
+            await agent.run(route.promptText, { displayContent: route.displayContent });
+          } catch (e) {
+            if (e instanceof Error) {
+              agent.getStore().addStatus({ role: "error", content: `(Error: ${e.message})`, timestamp: new Date() });
+            } else throw e;
+          } finally {
+            loadingRef.current = false;
+            dispatch({ type: "SET_IS_LOADING", payload: false });
+            dispatch({ type: "SET_STATUS", payload: "" });
           }
-          dispatch({ type: "SET_MESSAGES", payload: agent.getStore().toDisplayMessages() });
         }
+        dispatch({ type: "SET_MESSAGES", payload: agent.getStore().toDisplayMessages() });
         return false;
       }
 
@@ -287,7 +272,7 @@ function AppContent({
       loadingRef.current = true;
       dispatch({ type: "SET_IS_LOADING", payload: true });
       try {
-        const sent = await agent.run(trimmed);
+        const sent = await agent.run(route.promptText!);
         if (!sent) {
           dispatch({ type: "SET_IS_LOADING", payload: false });
           return false;

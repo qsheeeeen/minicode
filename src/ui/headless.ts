@@ -1,7 +1,7 @@
 import type { Agent } from "../agent.js";
 import type { MessageParam, ContentBlock } from "../llm/anthropic.js";
 import type { CommandContext } from "./commands/index.js";
-import { executeCommand } from "./commands/index.js";
+import { routeInput, runBash } from "./routing.js";
 import { MessageStore } from "../messages.js";
 
 export async function runHeadless(
@@ -204,40 +204,46 @@ export async function runHeadless(
   const unsubscribe = agent.getStore().onChange(() => render(false));
 
   // Input routing
-  const trimmed = initialPrompt.trim();
-  let promptToRun = initialPrompt;
-
-  if (trimmed.startsWith("!") && cmdContext) {
-    const cmd = trimmed.slice(1).trim();
-    if (cmd) {
-      const { execSync } = await import("child_process");
-      let text: string;
-      try {
-        const output = execSync(cmd, { encoding: "utf-8", timeout: 30000, cwd: process.cwd() });
-        text = output.trim() || "(no output)";
-      } catch (e: any) {
-        text = `Error: ${e.message}`;
+  if (!cmdContext) {
+    try {
+      await agent.run(initialPrompt);
+      render(true);
+    } catch (e) {
+      if (e instanceof Error && e.message === "Aborted") {
+        console.log("(Aborted)");
+      } else if (e instanceof Error) {
+        console.error(`(Error: ${e.message})`);
+      } else {
+        throw e;
       }
-      console.log(`$ ${cmd}\n${text}`);
-      return;
+    } finally {
+      unsubscribe();
     }
+    return;
   }
 
-  if (trimmed.startsWith("/") && cmdContext) {
-    const parts = trimmed.slice(1).split(/\s+/);
-    const name = parts[0];
-    const args = parts.slice(1);
-    const result = await executeCommand(name, args, cmdContext);
-    if (result.handled && result.promptText) {
-      promptToRun = result.promptText;
-    } else {
-      render(true);
-      return;
-    }
+  const route = await routeInput(initialPrompt, cmdContext);
+
+  if (route.action === "none") {
+    unsubscribe();
+    return;
+  }
+
+  if (route.action === "bash") {
+    const output = runBash(route.promptText!);
+    console.log(`$ ${route.promptText}\n${output}`);
+    unsubscribe();
+    return;
+  }
+
+  if (route.action === "command" && !route.promptText) {
+    render(true);
+    unsubscribe();
+    return;
   }
 
   try {
-    await agent.run(promptToRun);
+    await agent.run(route.promptText!);
     render(true);
   } catch (e) {
     if (e instanceof Error && e.message === "Aborted") {
