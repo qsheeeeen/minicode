@@ -59,6 +59,7 @@ export function Receipt({ data, onDismiss }: ReceiptProps) {
       borderColor="gray"
       paddingX={1}
       marginX={2}
+      width={W + 4}
     >
       <Box justifyContent="center">
         <Text bold>MINICODE SESSION RECEIPT</Text>
