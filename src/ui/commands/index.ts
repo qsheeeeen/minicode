@@ -359,3 +359,48 @@ registerCommand({
     ctx.setInputMode("model-select", { providers, tiers });
   },
 });
+
+registerCommand({
+  name: "undo",
+  description: "Rollback to a previous conversation turn",
+  handler: async (_args, ctx): Promise<void> => {
+    if (ctx.agent.getIsRunning()) {
+      ctx.agent.getStore().addStatus({
+        role: "status",
+        content: "(Agent is running, please wait)",
+        timestamp: new Date(),
+      });
+      return;
+    }
+
+    const turns = ctx.agent.getStore().getTurns();
+    const userMessages: string[] = [];
+    for (const t of turns) {
+      if (t.role === "user" && typeof t.content === "string") {
+        userMessages.push(t.content);
+      }
+    }
+
+    if (userMessages.length === 0) {
+      ctx.agent.getStore().addStatus({
+        role: "status",
+        content: "(Nothing to rollback)",
+        timestamp: new Date(),
+      });
+      return;
+    }
+
+    const journal = ctx.agent.getChangeJournal();
+    const entriesByTurnMap = await journal.getEntriesByTurn();
+    const entriesByTurn = Array.from(entriesByTurnMap.entries()).map(
+      ([turnIdx, entries]) => ({ turnIdx, entries }),
+    );
+
+    ctx.setInputMode("undo", {
+      totalTurns: userMessages.length,
+      entriesByTurn,
+      userMessages,
+      agent: ctx.agent,
+    });
+  },
+});

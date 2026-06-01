@@ -9,6 +9,8 @@ export const editTool: ToolDef = {
     "Edit a file by replacing exact text. The oldText must match exactly (including whitespace). Use this for precise, surgical edits.",
   requiresPermission: true,
   readOnly: false,
+  trackChanges: true,
+  changeOp: "edit",
   input_schema: {
     type: "object" as const,
     properties: {

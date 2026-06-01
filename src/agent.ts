@@ -27,6 +27,7 @@ import {
   PermissionService,
   type PermissionMode,
 } from "./services/index.js";
+import { ChangeJournal } from "./services/change-journal.js";
 import { MessageStore } from "./messages.js";
 import { getAvailableSkills } from "./skills/index.js";
 import { callContent } from "./ui/tui/tool-display.js";
@@ -80,6 +81,8 @@ export class Agent {
   private compressionThresholdRatio: number;
   private tokenManager: TokenManager;
   private compressionService: CompressionService;
+  private changeJournal = new ChangeJournal();
+  private activeTurnIdx = 0;
   public currentSession = `session-${Date.now()}`;
   private thinkingEnabled: boolean;
   private effort?: EffortLevel;
@@ -105,6 +108,10 @@ export class Agent {
   public setSession(sessionName: string): void {
     this.currentSession = sessionName;
     this.store.setSessionName(sessionName);
+    this.changeJournal.startSession(
+      MessageStore.getSessionDir(),
+      sessionName,
+    );
   }
 
   public setLogger(logger: pino.Logger): void {
@@ -279,14 +286,43 @@ export class Agent {
     });
 
     try {
+      // Count original user prompts before compression
+      let originalUserPrompts = 0;
+      for (const t of turns) {
+        if (t.role === "user" && typeof t.content === "string") originalUserPrompts++;
+      }
+
       const compressed = await this.compressionService.compress(
         this.store.toLLMMessages(),
         this.client,
         this.model,
       );
+
+      // Count kept user prompts (excluding the summary added by compression)
+      let keptUserPrompts = 0;
+      for (let i = 0; i < compressed.length; i++) {
+        const t = compressed[i];
+        if (t.role === "user" && typeof t.content === "string") keptUserPrompts++;
+      }
+      // Summary adds 1 user prompt, so original kept = keptUserPrompts - 1
+      const originalKept = keptUserPrompts - 1;
+      const prunedCount = originalUserPrompts - originalKept;
+
+      if (prunedCount > 0) {
+        // Remove entries for compressed-away turns, renumber kept entries
+        await this.changeJournal.pruneAndRenumber(prunedCount, 1);
+      }
+
       this.store.setTurns(compressed);
       this.tokenManager.reset();
       this.events.tokenUpdate(0);
+
+      // Recalculate activeTurnIdx for the compressed conversation
+      let newActiveIdx = 0;
+      for (const t of compressed) {
+        if (t.role === "user" && typeof t.content === "string") newActiveIdx++;
+      }
+      this.activeTurnIdx = newActiveIdx;
       this.store.addStatus({
         role: "status",
         content: `(Compressed to ${compressed.length} turns)`,
@@ -521,6 +557,24 @@ export class Agent {
         throw new ToolDeniedError(tool.name, displayText, reason);
       }
     }
+
+    if (tool.trackChanges && args.path && this.activeTurnIdx > 0) {
+      const filePath = args.path as string;
+      let before = "";
+      try {
+        const fs = await import("fs/promises");
+        before = await fs.readFile(filePath, "utf-8");
+      } catch {
+        // File doesn't exist yet — before stays ""
+      }
+      this.changeJournal.recordBefore(
+        this.activeTurnIdx,
+        filePath,
+        tool.changeOp ?? "write",
+        before,
+      );
+    }
+
     return tool.execute(args, context);
   }
 
@@ -613,6 +667,15 @@ export class Agent {
 
     this.isRunning = true;
     this.store.addUserMessage(userMessage, opts?.displayContent);
+
+    // Count user prompts to determine current turn index
+    const turns = this.store.getTurns();
+    let promptCount = 0;
+    for (const t of turns) {
+      if (t.role === "user" && typeof t.content === "string") promptCount++;
+    }
+    this.activeTurnIdx = promptCount;
+
     this.abortController = new AbortController();
     this.logger?.info(
       { session: this.currentSession, userMessage },
@@ -698,6 +761,10 @@ export class Agent {
 
   // -- Public accessors --
 
+  getIsRunning(): boolean {
+    return this.isRunning;
+  }
+
   getMessages(): MessageParam[] {
     return this.store.toLLMMessages();
   }
@@ -709,6 +776,10 @@ export class Agent {
 
   getStore(): MessageStore {
     return this.store;
+  }
+
+  getChangeJournal(): ChangeJournal {
+    return this.changeJournal;
   }
 
   getTokenCount(): number {
@@ -726,6 +797,8 @@ export class Agent {
   clearSession(): void {
     this.store.clear();
     this.tokenManager.reset();
+    this.changeJournal.close();
+    this.changeJournal = new ChangeJournal();
   }
 
   getTools(): Map<string, ToolDef> {

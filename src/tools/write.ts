@@ -9,6 +9,8 @@ export const writeTool: ToolDef = {
     "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
   requiresPermission: true,
   readOnly: false,
+  trackChanges: true,
+  changeOp: "write",
   input_schema: {
     type: "object" as const,
     properties: {

@@ -30,6 +30,8 @@ export interface ToolDef {
   requiresPermission?: boolean;
   readOnly?: boolean;
   interactive?: boolean;
+  trackChanges?: boolean;
+  changeOp?: "edit" | "write";
 }
 
 const defaultTools = new Map<string, ToolDef>();
