@@ -1,12 +1,12 @@
 import React, { useCallback, useRef, useEffect } from "react";
 import { Box, useInput, useApp } from "ink";
-import { Agent } from "#src/agent.js";
-import type { MessageParam } from "#src/llm/anthropic.js";
-import type { ResolvedConfig } from "#src/config.js";
-import { CallbackEvents, CallbackPrompter } from "#src/utils/display.js";
+import { Agent } from "../agent.js";
+import type { MessageParam } from "../llm/anthropic.js";
+import type { ResolvedConfig } from "../config.js";
+import { CallbackEvents, CallbackPrompter } from "../utils/display.js";
 import { executeCommand } from "./commands/index.js";
-import { MessageStore } from "#src/messages.js";
-import { AgentRegistry, type AgentSession } from "#src/services/index.js";
+import { MessageStore } from "../messages.js";
+import { AgentRegistry, type AgentSession } from "../services/index.js";
 
 import { TuiProvider, useTuiState, useTuiDispatch } from "./tui/store.js";
 import { Header } from "./tui/Header.js";

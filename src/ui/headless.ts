@@ -1,8 +1,8 @@
-import type { Agent } from "#src/agent.js";
-import type { MessageParam, ContentBlock } from "#src/llm/anthropic.js";
+import type { Agent } from "../agent.js";
+import type { MessageParam, ContentBlock } from "../llm/anthropic.js";
 import type { CommandContext } from "./commands/index.js";
 import { executeCommand } from "./commands/index.js";
-import { MessageStore } from "#src/messages.js";
+import { MessageStore } from "../messages.js";
 
 export async function runHeadless(
   agent: Agent,
@@ -24,7 +24,7 @@ export async function runHeadless(
       if (totalTokens > 0) {
         agent.setTokenCount(totalTokens);
       }
-      const { createLogger } = await import("#src/utils/logger.js");
+      const { createLogger } = await import("../utils/logger.js");
       const newLogger = await createLogger(
         MessageStore.getProjectHash(),
         name,

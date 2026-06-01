@@ -1,4 +1,4 @@
-import type { Agent } from "#src/agent.js";
+import type { Agent } from "../agent.js";
 
 export type AgentStatus = "idle" | "running" | "completed" | "error";
 

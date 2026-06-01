@@ -1,7 +1,7 @@
 import type { ToolDef, ToolResult, ToolExecutionContext } from "./registry.js";
-import type { AgentConfig } from "#src/agent.js";
-import type { MessageParam, ContentBlock } from "#src/llm/anthropic.js";
-import { Agent } from "#src/agent.js";
+import type { AgentConfig } from "../agent.js";
+import type { MessageParam, ContentBlock } from "../llm/anthropic.js";
+import { Agent } from "../agent.js";
 import { register } from "./registry.js";
 
 export const agentTool: ToolDef = {
@@ -54,7 +54,7 @@ export const agentTool: ToolDef = {
 
     // Override model from tier mapping
     if (tier) {
-      const { loadConfig, parseModelSpecifier } = await import("#src/config.js");
+      const { loadConfig, parseModelSpecifier } = await import("../config.js");
       const appConfig = await loadConfig();
       const modelSpec = appConfig.tiers?.[tier];
       if (modelSpec) {

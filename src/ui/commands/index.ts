@@ -1,9 +1,9 @@
-import type { Agent } from "#src/agent.js";
-import type { DisplayMessage } from "#src/utils/display.js";
-import type { EffortLevel } from "#src/llm/anthropic.js";
-import { MessageStore } from "#src/messages.js";
-import { getSkillBody, getAvailableSkills } from "#src/skills/index.js";
-import { createLogger } from "#src/utils/logger.js";
+import type { Agent } from "../../agent.js";
+import type { DisplayMessage } from "../../utils/display.js";
+import type { EffortLevel } from "../../llm/anthropic.js";
+import { MessageStore } from "../../messages.js";
+import { getSkillBody, getAvailableSkills } from "../../skills/index.js";
+import { createLogger } from "../../utils/logger.js";
 
 export interface CommandHandler {
   name: string;
@@ -165,7 +165,7 @@ registerCommand({
       return;
     }
     ctx.agent.setEffort(value as EffortLevel);
-    const { setEffort } = await import("#src/config.js");
+    const { setEffort } = await import("../../config.js");
     await setEffort(value);
     ctx.agent.getStore().addStatus({
       role: "status",
@@ -348,7 +348,7 @@ registerCommand({
   name: "model",
   description: "Switch model/provider",
   handler: async (_args, ctx): Promise<void> => {
-    const { loadConfig } = await import("#src/config.js");
+    const { loadConfig } = await import("../../config.js");
     const config = await loadConfig();
     const providers = config.providers ?? {};
     const tiers = config.tiers ?? {};

@@ -22,7 +22,7 @@ export const setModelTool: ToolDef = {
   ): Promise<ToolResult> => {
     const tier = String(args.tier);
     const { loadConfig, parseModelSpecifier, setModel } =
-      await import("#src/config.js");
+      await import("../config.js");
     const config = await loadConfig();
     const modelSpec = config.tiers?.[tier];
     if (!modelSpec) {

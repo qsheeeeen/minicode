@@ -2,9 +2,9 @@ import React, { useMemo, useState, useCallback } from "react";
 import { Box, Text, useInput } from "ink";
 import { useTuiState, useTuiDispatch } from "./store.js";
 import { getInputComponent } from "./inputs.js";
-import { getCommandList } from "#src/ui/commands/index.js";
-import type { Agent } from "#src/agent.js";
-import type { EffortLevel } from "#src/llm/anthropic.js";
+import { getCommandList } from "../commands/index.js";
+import type { Agent } from "../../agent.js";
+import type { EffortLevel } from "../../llm/anthropic.js";
 
 interface InputAreaProps {
   agentRef: React.MutableRefObject<Agent>;
@@ -71,7 +71,7 @@ export function InputArea({
     async (value: string) => {
       if (input.mode === "effort-select") {
         agentRef.current.setEffort(value as EffortLevel);
-        import("#src/config.js").then((m) => m.setEffort(value));
+        import("../../config.js").then((m) => m.setEffort(value));
         dispatch({
           type: "ADD_MESSAGE",
           payload: {
@@ -92,7 +92,7 @@ export function InputArea({
         setSelectedSuggestion(0);
       } else if (input.mode === "model-select") {
         const { loadConfig, parseModelSpecifier, setTier } =
-          await import("#src/config.js");
+          await import("../../config.js");
         const config = await loadConfig();
 
         const tierMatch = value.match(/^(\d):(.*)$/);
@@ -117,7 +117,7 @@ export function InputArea({
                 parsed.providerName,
                 parsed.providerConfig.models?.[parsed.modelName]?.contextLength,
               );
-              import("#src/config.js").then((m) => m.setModel(modelSpec));
+              import("../../config.js").then((m) => m.setModel(modelSpec));
               if (tierMatch[2]) {
                 setTier(tier, modelSpec);
               }

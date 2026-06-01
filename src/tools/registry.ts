@@ -1,7 +1,7 @@
-import type { AgentRegistry } from "#src/services/agent-registry.js";
-import type { AgentConfig } from "#src/agent.js";
-import type { PermissionService } from "#src/services/permission.js";
-import type { UserPrompter } from "#src/utils/display.js";
+import type { AgentRegistry } from "../services/agent-registry.js";
+import type { AgentConfig } from "../agent.js";
+import type { PermissionService } from "../services/permission.js";
+import type { UserPrompter } from "../utils/display.js";
 
 export type ToolRequirement = "agentRegistry";
 

@@ -1,5 +1,5 @@
 import fs from "fs/promises";
-import { generateDiffSummary } from "#src/utils/diff.js";
+import { generateDiffSummary } from "../utils/diff.js";
 import type { ToolDef, ToolResult } from "./registry.js";
 import { register } from "./registry.js";
 

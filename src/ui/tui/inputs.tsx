@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Box, Text, useInput } from "ink";
 import { Select, TextInput } from "@inkjs/ui";
-import type { ProviderConfig } from "#src/config.js";
+import type { ProviderConfig } from "../../config.js";
 
 export interface InputComponentProps {
   onSubmit?: (value: string) => void;
