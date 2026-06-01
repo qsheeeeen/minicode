@@ -90,7 +90,7 @@ export function Receipt({ data, onDismiss }: ReceiptProps) {
               )}
               <Box width={W}>
                 <Box width={LABEL_W}><Text dimColor>{"  ────────"}</Text></Box>
-                <Box width={VALUE_W}><Text dimColor>{"──────────"}</Text></Box>
+                <Box width={VALUE_W} justifyContent="flex-end"><Text dimColor>{"─────────"}</Text></Box>
               </Box>
               <Field label="  Subtotal:" value={fmtNum(m.total)} bold />
             </Box>
@@ -105,6 +105,7 @@ export function Receipt({ data, onDismiss }: ReceiptProps) {
           <Field label="Models:" value={String(data.models.length)} />
         </Box>
       </Box>
+      <Text>{"  "}</Text>
     </Box>
   );
 }
