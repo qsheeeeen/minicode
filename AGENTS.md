@@ -4,145 +4,90 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-minicode is an LLM-powered CLI coding agent with TUI. This repo contains both the original **TypeScript** implementation (`src/`) and a **Go** rewrite (`cmd/`, `internal/`) with 100% feature parity. The Go version is the active development target.
+minicode is an LLM-powered CLI coding agent with React/Ink TUI. TypeScript implementation in `src/` is the sole codebase.
 
-## Build & Run (Go)
-
-```bash
-go build ./...                          # Build all packages
-go build -o minicode-go .               # Build binary (root main.go)
-go run ./cmd/minicode                   # Run TUI
-go run ./cmd/minicode "prompt"          # Headless mode with prompt
-go run ./cmd/minicode -m model@provider # Override model
-go run ./cmd/minicode -s my-session     # Named session
-go run ./cmd/minicode -r                # Resume recent session
-```
-
-## Test & Lint (Go)
+## Build & Run
 
 ```bash
-go test ./...                           # All tests
-go test ./internal/tools -run TestRead  # Single package, filtered
-go test ./... -cover                    # With coverage
-go test ./... -v -count=1               # Verbose, no cache
-go vet ./...                            # Static analysis
-go mod tidy                            # Prune dependencies
-```
-
-## Build & Run (TypeScript, reference only)
-
-```bash
-npm run dev           # Development mode via tsx
-npm run build         # Compile to dist/
+npm run dev           # Development mode via tsx (no compile needed)
+npm run build         # tsc → dist/
+npm start             # node dist/cli.js
 npm test              # Vitest in watch mode
 npm run test:run      # Run tests once
+npx vitest run src/agent.test.ts  # Single test file
 ```
 
-## Architecture (Go)
+## Architecture
 
 ```
-cmd/minicode/main.go          # Cobra CLI entry, config loading, mode branching
-internal/
-├── domain/domain.go          # Shared types: MessageParam, ContentBlock, DisplayMessage, AgentConfig
-├── config/config.go          # Viper-based config loader (~/.minicode/config.json), model resolution
-├── llm/anthropic.go          # Anthropic Go SDK wrapper, SSE streaming, event dispatch
-├── agent/
-│   ├── agent.go              # Core loop: user input → LLM stream → tools → repeat
-│   ├── store.go              # MessageStore with RWMutex (two-layer: LLM + Display)
-│   ├── token_manager.go      # Token tracking and compression threshold
-│   └── agent_registry.go     # Multi-agent coordination (Ctrl+O switching)
+src/
+├── cli.tsx               # Entry point: arg parsing, config loading, TUI/headless branching
+├── agent.ts              # Core Agent class with LLM loop (stream → tools → repeat)
+├── messages.ts           # MessageStore: two-layer messages (LLM + Display), session persistence
+├── config.ts             # Multi-provider config loader (~/.minicode/config.json)
+├── args.ts               # CLI argument parser
+├── llm/anthropic.ts      # Anthropic SDK wrapper (chat + chatStream)
+├── services/
+│   ├── agent-registry.ts # Multi-agent session tracking (main + sub-agents 2-9)
+│   ├── token-manager.ts  # Token counting, compression threshold tracking
+│   ├── compression-service.ts  # LLM-based context compression (keeps last 10 turns)
+│   ├── permission.ts     # manual/yolo/auto permission modes
+│   └── bash.ts           # Synchronous execSync wrapper for slash commands
 ├── tools/
-│   ├── tools.go              # Tool interface, ToolRegistry (RWMutex), ToolContext
-│   ├── permission.go         # manual/yolo/auto permission modes
-│   ├── read.go / write.go / edit.go / bash.go
-│   ├── agent.go              # SubAgent delegation
-│   ├── activate_skill.go / ask_user.go / set_model.go
-│   └── *_test.go             # One test file per tool
-├── storage/session.go        # Session persistence (~/.minicode/sessions/<md5-hash>/)
-├── skills/skills.go          # agentSkills.io loader (directory with SKILL.md)
+│   ├── registry.ts       # ToolDef interface, self-registering pattern via register()
+│   ├── index.ts          # Barrel: imports all tool modules to trigger registration
+│   ├── bash.ts           # child_process.spawn with streaming
+│   ├── read.ts / write.ts / edit.ts / grep.ts
+│   ├── sub_agent.ts      # Spawns child Agent with restricted tool set
+│   ├── activate_skill.ts / ask_user.ts / set_model.ts
+├── skills/index.ts       # Loads SKILL.md from skills directories (built-in + external)
 ├── ui/
-│   ├── tui.go                # Bubble Tea TUI (textarea, viewport, list, spinner, progress, help)
-│   ├── headless.go           # Incremental stdout renderer
-│   ├── commands.go           # Re-exports Command/Context/Kind/Registry types from ui/commands/
-│   ├── tui_test.go           # TUI integration tests
-│   ├── display_test.go       # Display adapter tests
-│   └── commands/             # One file per slash command + Registry + tests
+│   ├── tui.tsx           # Root <App> component, Ink render
+│   ├── headless.ts       # Non-interactive stdout renderer
+│   ├── routing.ts        # Input router: slash commands / bash escapes / agent
+│   ├── commands/index.ts # Slash command registry (handler vs prompt types)
+│   └── tui/              # React components: store.tsx (useReducer+Context), inputs, Header, etc.
+└── utils/
+    ├── logger.ts         # Pino session-scoped logging
+    ├── prompts.ts        # Global + project AGENTS.md loading
+    ├── display.ts        # AgentEvents + UserPrompter interfaces
+    └── diff.ts           # Unified diff generation for Edit tool
 ```
 
 ### Core Flow
 
-1. User input → Agent resolves slash commands via `resolveCommand`, adds to `Store`
-2. `Store.ToLLMMessages()` → Anthropic SDK streaming via `llm.Client.ChatStream()`
-3. `handleStream()` accumulates `input_json_delta` events into tool_use blocks
-4. Tools execute sequentially via `Tool.Execute()`; results pushed as `tool_result` user turn
-5. Loop repeats if tools were called; otherwise returns
-6. `Store.OnChange()` → TUI via `program.Send(displayChangeMsg{})` or headless via callback
-7. Token tracking; auto-compression trigger at threshold
+1. `cli.tsx` loads config, skills, creates Agent → branches to TUI (`render(<App>)`) or headless (`runHeadless()`)
+2. Input routed through `routeInput()`: slash command → `executeCommand()`, `!` prefix → `runBash()`, else → `agent.run()`
+3. `Agent.run()` enters loop: `AnthropicClient.chatStream()` → accumulate blocks in MessageStore → execute tool calls → repeat
+4. `MessageStore.onChange()` → TUI dispatches to Redux-like store; headless renders to stdout
+5. `TokenManager` tracks usage; auto-triggers `CompressionService` when exceeding threshold ratio
 
 ### Key Concepts
 
-**Two-layer messages:** `MessageParam` (LLM API format, in `domain`) and `DisplayMessage` (UI format, in `domain`). `Store.ToLLMMessages()` strips `Display` metadata before API call; `Store.ToDisplayMessages()` produces render-ready messages.
+**Two-layer messages:** `MessageParam[]` (raw Anthropic API format, with `_display` metadata stripped by `toLLMMessages()`) and `DisplayMessage[]` (flat discriminated union for UI, including UI-only `StatusMessage[]`). Session persisted as JSONL at `~/.minicode/sessions/<md5-hash>/<name>.context.jsonl`.
 
-**Permission system:** `tools.PermissionChecker` interface with `Check()`, `Mode()`, `CycleMode()`. Shift+Tab cycles in TUI. Headless defaults to deny.
+**Self-registering tools:** Each tool file calls `register(toolDef)` at module scope. `tools/index.ts` imports all to trigger registration. `ToolDef` has `execute()`, `requiresPermission`, `readOnly`, `interactive` flags. Sub-agents get filtered set: only read-only + non-interactive tools.
 
-**Tool interface:** `Tool` requires `Name()`, `Description()`, `InputSchema()`, `Execute(ctx, args, tc)`, `RequiresPermission()`, `Requires()`. Tools use `Requires()` to declare `ReqAgentRegistry`/`ReqSkillRegistry` dependencies.
+**Permission modes:** `manual` (prompt per call), `yolo` (allow all), `auto` (LLM decides safety). Shift+Tab cycles in TUI.
 
-**Thread safety:** `Store` and `ToolRegistry` use `sync.RWMutex`; read-heavy ops use RLock.
+**Skills:** Progressive disclosure — `getAvailableSkills()` returns name+description only; `getSkillBody()` loads full content on demand when `ActivateSkill` tool runs. Built-in: `skill-creator`, `init`. External: directories with `SKILL.md` (YAML frontmatter + body).
 
 ## Config
 
-`~/.minicode/config.json` (shared by TS and Go):
-
-```json
-{
-  "providers": {
-    "deepseek": {
-      "apiKey": "sk-...",
-      "baseURL": "https://api.deepseek.com/anthropic",
-      "models": { "deepseek-v4-pro": { "contextLength": 1000000 } }
-    }
-  },
-  "model": "deepseek-v4-pro@deepseek",
-  "tiers": { "1": "claude-sonnet@anthropic" },
-  "thinking": { "enabled": true, "budgetTokens": 4096, "effort": "medium" },
-  "compressionThreshold": 0.8,
-  "promptFile": "AGENTS.md",
-  "permissionMode": "manual",
-  "skillsDir": ".minicode/skills"
-}
-```
-
-Model resolution: CLI `-m` > `MODEL` env > config `model` field.
-
-## Logging
-
-Go standard library `log/slog` with `TextHandler` writing to `os.Stderr`. Each `Agent` carries a `*slog.Logger` field (initialized in `NewAgent`, `internal/agent/agent.go:68`). The logger is wired but not yet used in the current code — use `a.logger.Info("msg", "key", val)` for structured log output.
-
-TypeScript reference: `src/utils/logger.ts` uses pino for session-scoped logging.
-
-## TUI Dependencies
-
-Uses 6 Charmbracelet Bubbles components: `textarea`, `viewport`, `spinner`, `progress`, `list`, `help`. Styles via `lipgloss`. The TUI aligns with the TS Ink/React reference for visual layout, keyboard shortcuts, and message rendering.
+`~/.minicode/config.json` — model specifier format: `model@provider` (e.g., `claude-sonnet-4-5@anthropic`). Resolution order: CLI `-m` > `MODEL` env > config `model` field. Supports tiers (1/2/3 → haiku/sonnet/opus).
 
 ## Verification Protocol
 
-After implementing any feature or fix, self-test in headless mode before marking complete:
+After implementing any feature or fix, self-test in headless mode:
 
 ```bash
-go run ./cmd/minicode -H "<prompt that exercises the change>"
+tsx src/cli.tsx -H "<prompt that exercises the change>"
 ```
 
-Headless mode exposes bugs that TUI doesn't (e.g., `Store.toLLMMessages()` skipping `tool_call` blocks without assistant text). Always verify output is correct.
+Headless mode exposes bugs that TUI doesn't. Always verify output is correct.
 
-## Plan Generation
+## Module Convention
 
-The `/plan` slash command generates executable plans written to `.claude/plans/` in the project root.
-
-## Naming Conventions
-
-- Package: single word, lowercase (`agent`, `tools`, `domain`)
-- File: `snake_case.go` for multi-word (`activate_skill.go`, `agent_registry.go`)
-- No `Get` prefix on getters (`Turns()` not `GetTurns()`)
-- No `tool_` prefix on files in `tools/` package (package name already provides context)
-- Error variables: `Err` prefix (`ErrToolDenied`); error types: `Error` suffix (`ToolDeniedError`)
-- Constructor: `New` for single primary type (`NewStore()`), `NewTypeName` for multi-type (`NewReadTool()`)
+- All imports use `.js` extensions with relative paths (Node16 ESM resolution)
+- Pure ESM (`"type": "module"`), no CommonJS
+- JSX via `react-jsx` automatic runtime (Ink v7 + React 19)
