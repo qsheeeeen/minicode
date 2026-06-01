@@ -4,6 +4,7 @@ config.json
 .DS_Store
 coverage/
 minicode-go
+package-lock.json
 /testperm
 /testask
 /testsuggest

@@ -9,11 +9,12 @@ minicode is an LLM-powered CLI coding agent with React/Ink TUI. TypeScript imple
 ## Build & Run
 
 ```bash
-npm run dev           # Development mode via tsx (no compile needed)
-npm run build         # tsc → dist/
-npm start             # node dist/cli.js
-npm test              # Vitest in watch mode
-npm run test:run      # Run tests once
+bun run dev           # Development mode (Bun native TS/TSX)
+bun run build         # tsc → dist/
+bun run start         # Run compiled output
+bun run typecheck     # tsc --noEmit (type check only)
+bun test              # Vitest in watch mode
+bun run test:run      # Run tests once
 npx vitest run src/agent.test.ts  # Single test file
 ```
 
@@ -81,7 +82,7 @@ src/
 After implementing any feature or fix, self-test in headless mode:
 
 ```bash
-tsx src/cli.tsx -H "<prompt that exercises the change>"
+bun run src/cli.tsx -H "<prompt that exercises the change>"
 ```
 
 Headless mode exposes bugs that TUI doesn't. Always verify output is correct.
