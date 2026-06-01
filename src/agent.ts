@@ -19,6 +19,7 @@ import {
   type AgentEvents,
   type UserPrompter,
 } from "./utils/display.js";
+import { sessionStats } from "./services/session-stats.js";
 import {
   TokenManager,
   CompressionService,
@@ -458,6 +459,13 @@ export class Agent {
     if (!response.usage) return;
 
     this.tokenManager.addTokens(
+      response.usage.input_tokens,
+      response.usage.output_tokens,
+      response.usage.cache_creation_input_tokens ?? 0,
+      response.usage.cache_read_input_tokens ?? 0,
+    );
+    sessionStats.recordUsage(
+      this.model || "unknown",
       response.usage.input_tokens,
       response.usage.output_tokens,
       response.usage.cache_creation_input_tokens ?? 0,

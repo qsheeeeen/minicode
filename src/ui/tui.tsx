@@ -7,6 +7,8 @@ import { CallbackEvents, CallbackPrompter } from "../utils/display.js";
 import { routeInput, runBash } from "./routing.js";
 import { MessageStore } from "../messages.js";
 import { AgentRegistry, type AgentSession } from "../services/index.js";
+import { sessionStats } from "../services/session-stats.js";
+import { Receipt } from "./tui/Receipt.js";
 
 import { TuiProvider, useTuiState, useTuiDispatch } from "./tui/store.js";
 import { Header } from "./tui/Header.js";
@@ -28,6 +30,7 @@ export interface AppProps {
   sessionName?: string;
   resumeRecent: boolean;
   agentRegistry: AgentRegistry;
+  programStartTime: number;
 }
 
 /** Hook: multi-agent coordination and switching using Global Store */
@@ -193,10 +196,11 @@ function AppContent({
   sessionName,
   resumeRecent,
   agentRegistry,
+  programStartTime,
 }: Omit<AppProps, "config">) {
   const { exit } = useApp();
   const dispatch = useTuiDispatch();
-  const { input, pendingPrompt, isLoading } = useTuiState();
+  const { input, pendingPrompt, isLoading, showReceipt } = useTuiState();
   const agentRef = useRef<Agent>(agent);
 
   const [autoSubmitPending, setAutoSubmitPending] =
@@ -205,6 +209,14 @@ function AppContent({
 
   useMultiAgent(agentRegistry, agentRef);
   useDisplay(agent, initialSession, sessionName, resumeRecent, agentRegistry);
+
+  useEffect(() => {
+    sessionStats.init(
+      programStartTime,
+      process.cwd().split("/").pop() || "unknown",
+      initialSession,
+    );
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const cmdContext = useCallback(() => ({
     agent: agentRef.current,
@@ -222,8 +234,8 @@ function AppContent({
       dispatch({ type: "SET_SESSION_LIST", payload: { sessions } }),
     setSelectedIndex: (index: number) =>
       dispatch({ type: "SET_SELECTED_SESSION_INDEX", payload: index }),
-    exit,
-  }), [dispatch, exit]);
+    exit: () => dispatch({ type: "SET_SHOW_RECEIPT", payload: true }),
+  }), [dispatch]);
 
   const handleSubmit = useCallback(
     async (value: string): Promise<boolean> => {
@@ -315,7 +327,7 @@ function AppContent({
             dispatch({ type: "SET_PENDING_PROMPT", payload: null });
           }
         } else {
-          exit();
+          dispatch({ type: "SET_SHOW_RECEIPT", payload: true });
         }
         return;
       }
@@ -353,14 +365,19 @@ function AppContent({
       <MessageList />
       <Status />
       <ModalPrompter />
-      <InputArea
-        agentRef={agentRef}
-        handleSubmit={handleSubmit}
-        loadingRef={loadingRef}
-      />
+      {!showReceipt && (
+        <InputArea
+          agentRef={agentRef}
+          handleSubmit={handleSubmit}
+          loadingRef={loadingRef}
+        />
+      )}
       <SubAgentBar />
       <Panel agentRef={agentRef} />
       <Help />
+      {showReceipt && (
+        <Receipt data={sessionStats.getStats()} onDismiss={() => exit()} />
+      )}
     </Box>
   );
 }

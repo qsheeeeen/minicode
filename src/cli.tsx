@@ -17,6 +17,7 @@ import { getCommandNames, registerCommand, executeCommand } from "./ui/commands/
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const programStartTime = Date.now();
 
 // Read version from package.json
 const packagePath = path.join(__dirname, "../package.json");
@@ -195,6 +196,7 @@ render(
     sessionName={sessionName}
     resumeRecent={resumeRecent}
     agentRegistry={sharedAgentRegistry}
+    programStartTime={programStartTime}
   />,
   { exitOnCtrlC: false },
 );

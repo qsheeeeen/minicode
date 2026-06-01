@@ -26,6 +26,7 @@ export interface TuiState {
   status: string;
   permissionMode: PermissionMode;
   pendingPrompt: (Prompt & { resolve: (value: string) => void }) | null;
+  showReceipt: boolean;
 }
 
 export type TuiAction =
@@ -52,7 +53,8 @@ export type TuiAction =
   | {
       type: "SET_PENDING_PROMPT";
       payload: (Prompt & { resolve: (value: string) => void }) | null;
-    };
+    }
+  | { type: "SET_SHOW_RECEIPT"; payload: boolean };
 
 export const initialState: TuiState = {
   messages: [],
@@ -74,6 +76,7 @@ export const initialState: TuiState = {
   status: "",
   permissionMode: "manual",
   pendingPrompt: null,
+  showReceipt: false,
 };
 
 export function tuiReducer(state: TuiState, action: TuiAction): TuiState {
@@ -148,6 +151,8 @@ export function tuiReducer(state: TuiState, action: TuiAction): TuiState {
       return { ...state, permissionMode: action.payload };
     case "SET_PENDING_PROMPT":
       return { ...state, pendingPrompt: action.payload };
+    case "SET_SHOW_RECEIPT":
+      return { ...state, showReceipt: action.payload };
     default:
       return state;
   }

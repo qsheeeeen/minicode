@@ -4,6 +4,7 @@ import type { EffortLevel } from "../../llm/anthropic.js";
 import { MessageStore } from "../../messages.js";
 import { getSkillBody, getAvailableSkills } from "../../skills/index.js";
 import { createLogger } from "../../utils/logger.js";
+import { sessionStats } from "../../services/session-stats.js";
 
 export interface CommandHandler {
   name: string;
@@ -128,6 +129,7 @@ registerCommand({
     ctx.agent.setSession(newSession);
     ctx.agent.setLogger(newLogger);
     ctx.setCurrentSession(newSession);
+    sessionStats.incrementSessionCount(newSession);
     ctx.agent
       .getStore()
       .addStatus({
@@ -189,6 +191,7 @@ registerCommand({
       ctx.agent.setSession(name);
       ctx.agent.setLogger(newLogger);
       ctx.setCurrentSession(name);
+      sessionStats.incrementSessionCount(name);
       ctx.agent
         .getStore()
         .addStatus({
@@ -249,6 +252,7 @@ registerCommand({
         ctx.agent.setSession(name);
         ctx.agent.setLogger(newLogger);
         ctx.setCurrentSession(name);
+        sessionStats.incrementSessionCount(name);
         ctx.agent
           .getStore()
           .addStatus({
