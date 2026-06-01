@@ -351,8 +351,8 @@ function AppContent({
     <Box flexDirection="column" height="100%">
       <Header version={version} promptFiles={promptFiles} agentRef={agentRef} />
       <MessageList />
-      <ModalPrompter />
       <Status />
+      <ModalPrompter />
       <InputArea
         agentRef={agentRef}
         handleSubmit={handleSubmit}

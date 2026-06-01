@@ -9,7 +9,7 @@ interface PanelProps {
 }
 
 export function Panel({ agentRef }: PanelProps) {
-  const { tokenCount, permissionMode, currentSession, status, isLoading } =
+  const { tokenCount, permissionMode, currentSession, status, isLoading, pendingPrompt } =
     useTuiState();
 
   const contextLength = agentRef.current.getContextLength() || 200000;
@@ -31,8 +31,10 @@ export function Panel({ agentRef }: PanelProps) {
         <Text dimColor> | {currentSession}</Text>
         {status && !isLoading && <Text dimColor> | </Text>}
         {status && !isLoading && <Text color="magenta">{status}</Text>}
-        {isLoading && <Text dimColor> | </Text>}
-        {isLoading && <Text color="magenta">streaming</Text>}
+        {isLoading && !pendingPrompt && <Text dimColor> | </Text>}
+        {isLoading && !pendingPrompt && <Text color="magenta">streaming</Text>}
+        {isLoading && pendingPrompt && <Text dimColor> | </Text>}
+        {isLoading && pendingPrompt && <Text color="yellow">waiting for user</Text>}
       </Box>
 
       <Box paddingX={1} gap={1}>

@@ -5,7 +5,7 @@ import { useTuiState } from "./store.js";
 const FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
 export function Status() {
-  const { isLoading } = useTuiState();
+  const { isLoading, pendingPrompt } = useTuiState();
   const [frame, setFrame] = useState(0);
 
   useEffect(() => {
@@ -16,9 +16,11 @@ export function Status() {
 
   if (!isLoading) return null;
 
+  const label = pendingPrompt ? "Waiting for user..." : "Thinking...";
+
   return (
     <Box paddingX={1}>
-      <Text color="gray">{FRAMES[frame]} Thinking...</Text>
+      <Text color="gray">{FRAMES[frame]} {label}</Text>
     </Box>
   );
 }
