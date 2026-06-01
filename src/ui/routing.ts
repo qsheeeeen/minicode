@@ -1,4 +1,4 @@
-import { runBash } from "../services/bash.js";
+import { runBash } from "../services/index.js";
 import type { CommandContext } from "./commands/index.js";
 import { executeCommand } from "./commands/index.js";
 
