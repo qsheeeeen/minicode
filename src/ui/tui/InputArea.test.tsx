@@ -64,7 +64,7 @@ describe("InputArea Component", () => {
     expect(output).toContain(">");
   });
 
-  it("shows … prompt when isLoading is true", () => {
+  it("still renders input when isLoading is true", () => {
     const mockAgentRef = {
       current: { getStore: () => ({ addStatus: vi.fn() }) },
     } as any;
@@ -86,7 +86,7 @@ describe("InputArea Component", () => {
     );
 
     const output = lastFrame();
-    expect(output).toContain("…");
-    expect(output).not.toContain(">");
+    expect(output).toContain("Type a message or /command...");
+    expect(output).toContain(">");
   });
 });
