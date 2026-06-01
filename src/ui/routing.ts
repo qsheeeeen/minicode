@@ -1,20 +1,13 @@
-import { execSync } from "child_process";
+import { runBash } from "../services/bash.js";
 import type { CommandContext } from "./commands/index.js";
 import { executeCommand } from "./commands/index.js";
+
+export { runBash };
 
 export interface RouteResult {
   action: "none" | "bash" | "command" | "llm";
   promptText?: string;
   displayContent?: string;
-}
-
-export function runBash(cmd: string): string {
-  try {
-    const output = execSync(cmd, { encoding: "utf-8", timeout: 30000, cwd: process.cwd() });
-    return output.trim() || "(no output)";
-  } catch (e: any) {
-    return `Error: ${e.message}`;
-  }
 }
 
 export async function routeInput(
