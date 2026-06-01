@@ -1,5 +1,5 @@
 import { Box, Text } from "ink";
-import type { DisplayMessage } from "../messages.js";
+import type { DisplayMessage } from "#src/messages.js";
 import { ToolDisplay } from "./tool-display.js";
 
 export function Message({ msg }: { msg: DisplayMessage }) {

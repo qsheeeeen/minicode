@@ -1,5 +1,5 @@
 import React from "react";
-import type { DisplayMessage } from "../messages.js";
+import type { DisplayMessage } from "#src/messages.js";
 
 export type { DisplayMessage };
 

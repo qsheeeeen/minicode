@@ -1,7 +1,7 @@
 import React from "react";
 import { Box, Text } from "ink";
 import { useTuiState } from "./store.js";
-import type { Agent } from "../agent.js";
+import type { Agent } from "#src/agent.js";
 
 interface HeaderProps {
   version: string;

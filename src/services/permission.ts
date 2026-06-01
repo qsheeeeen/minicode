@@ -1,5 +1,5 @@
-import type { AnthropicClient } from "../llm/anthropic.js";
-import type { UserPrompter } from "../utils/display.js";
+import type { AnthropicClient } from "#src/llm/anthropic.js";
+import type { UserPrompter } from "#src/utils/display.js";
 
 export type PermissionMode = "manual" | "yolo" | "auto";
 

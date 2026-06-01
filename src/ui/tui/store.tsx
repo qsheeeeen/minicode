@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useReducer, ReactNode } from "react";
-import type { DisplayMessage, Prompt } from "../utils/display.js";
-import type { AgentSession, PermissionMode } from "../services/index.js";
+import type { DisplayMessage, Prompt } from "#src/utils/display.js";
+import type { AgentSession, PermissionMode } from "#src/services/index.js";
 
 export interface InputState {
   mode: string;

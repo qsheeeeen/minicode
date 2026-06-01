@@ -28,7 +28,7 @@ import {
 } from "./services/index.js";
 import { MessageStore } from "./messages.js";
 import { getAvailableSkills } from "./skills/index.js";
-import { callContent } from "./tui/tool-display.js";
+import { callContent } from "#src/ui/tui/tool-display.js";
 import { execSync } from "child_process";
 import type pino from "pino";
 

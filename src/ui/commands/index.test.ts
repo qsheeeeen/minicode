@@ -34,17 +34,17 @@ const { messageStoreMock, configMock, skillsMock } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("../messages.js", () => ({
+vi.mock("../../messages.js", () => ({
   MessageStore: messageStoreMock,
 }));
 
-vi.mock("../utils/logger.js", () => ({
+vi.mock("../../utils/logger.js", () => ({
   createLogger: vi.fn().mockResolvedValue({ info: vi.fn(), error: vi.fn() }),
 }));
 
-vi.mock("../skills/index.js", () => skillsMock);
+vi.mock("../../skills/index.js", () => skillsMock);
 
-vi.mock("../config.js", () => ({
+vi.mock("../../config.js", () => ({
   setEffort: configMock.setEffort,
   loadConfig: configMock.loadConfig,
 }));

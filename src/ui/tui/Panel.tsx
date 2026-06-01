@@ -2,7 +2,7 @@ import React from "react";
 import { Box, Text } from "ink";
 import { ProgressBar } from "@inkjs/ui";
 import { useTuiState } from "./store.js";
-import type { Agent } from "../agent.js";
+import type { Agent } from "#src/agent.js";
 
 interface PanelProps {
   agentRef: React.MutableRefObject<Agent>;

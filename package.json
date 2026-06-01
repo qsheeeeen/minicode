@@ -11,6 +11,9 @@
     "dist",
     "package.json"
   ],
+  "imports": {
+    "#src/*": "./src/*"
+  },
   "scripts": {
     "dev": "tsx src/cli.tsx",
     "build": "tsc",

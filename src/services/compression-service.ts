@@ -3,7 +3,7 @@ import type {
   MessageParam,
   Message,
   Anthropic,
-} from "../llm/anthropic.js";
+} from "#src/llm/anthropic.js";
 
 export class CompressionService {
   private readonly recentCount = 10;
