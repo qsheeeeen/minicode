@@ -177,7 +177,7 @@ export function InputArea({
 
   return (
     <Box flexDirection="column">
-      <Box borderStyle="single" borderColor="gray" borderLeft={false} borderRight={false} paddingX={1}>
+      <Box borderStyle="single" borderLeft={false} borderRight={false} paddingX={1}>
         <Box flexBasis={3} flexShrink={0}>
           <Text color="cyan" bold>
             {">"}
