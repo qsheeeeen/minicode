@@ -1,5 +1,6 @@
 import React from "react";
 import { Box, Text } from "ink";
+import Gradient from "ink-gradient";
 
 interface HeaderProps {
   version: string;
@@ -8,7 +9,9 @@ interface HeaderProps {
 export function Header({ version }: HeaderProps) {
   return (
     <Box paddingX={1} marginBottom={1}>
-      <Text bold color="cyan">minicode</Text>
+      <Gradient name="mind">
+        <Text bold>MiniCode</Text>
+      </Gradient>
       <Text dimColor> v{version}</Text>
     </Box>
   );

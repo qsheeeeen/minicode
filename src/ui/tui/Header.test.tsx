@@ -7,7 +7,7 @@ describe("Header Component", () => {
   it("renders app name and version", () => {
     const { lastFrame } = render(<Header version="1.2.3" />);
     const output = lastFrame();
-    expect(output).toContain("minicode");
+    expect(output).toContain("MiniCode");
     expect(output).toContain("v1.2.3");
   });
 });
