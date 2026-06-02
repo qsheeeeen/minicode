@@ -33,7 +33,10 @@ src/
 │   ├── token-manager.ts  # Token counting, compression threshold tracking
 │   ├── compression-service.ts  # LLM-based context compression (keeps last 10 turns)
 │   ├── permission.ts     # manual/yolo/auto permission modes
-│   └── bash.ts           # Synchronous execSync wrapper for slash commands
+│   ├── bash.ts           # Synchronous execSync wrapper for slash commands
+│   ├── change-journal.ts # JSONL change tracking (before-state per file edit/write)
+│   ├── rollback-executor.ts # Conversation + file rollback using change journal
+│   └── session-stats.ts  # Per-model token usage tracking, receipt data
 ├── tools/
 │   ├── registry.ts       # ToolDef interface, self-registering pattern via register()
 │   ├── index.ts          # Barrel: imports all tool modules to trigger registration
@@ -72,6 +75,8 @@ src/
 **Permission modes:** `manual` (prompt per call), `yolo` (allow all), `auto` (LLM decides safety). Shift+Tab cycles in TUI.
 
 **Skills:** Progressive disclosure — `getAvailableSkills()` returns name+description only; `getSkillBody()` loads full content on demand when `ActivateSkill` tool runs. Built-in: `skill-creator`, `init`. External: directories with `SKILL.md` (YAML frontmatter + body).
+
+**Undo/rollback:** `/undo` command with two scopes — conversation-only or conversation+files. `ChangeJournal` records before-state of each file edit/write as JSONL. `RollbackExecutor` restores files and truncates conversation to a chosen turn.
 
 ## Config
 
