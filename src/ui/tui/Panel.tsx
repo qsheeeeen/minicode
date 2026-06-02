@@ -6,9 +6,10 @@ import type { Agent } from "../../agent.js";
 
 interface PanelProps {
   agentRef: React.MutableRefObject<Agent>;
+  promptFiles?: string[];
 }
 
-export function Panel({ agentRef }: PanelProps) {
+export function Panel({ agentRef, promptFiles = [] }: PanelProps) {
   const { tokenCount, permissionMode, currentSession, status, isLoading, pendingPrompt } =
     useTuiState();
 
@@ -29,6 +30,12 @@ export function Panel({ agentRef }: PanelProps) {
         <Text dimColor>:</Text>
         <Text>{agentRef.current.getModelName()}</Text>
         <Text dimColor> | {currentSession}</Text>
+        {promptFiles.length > 0 && (
+          <>
+            <Text dimColor> | </Text>
+            <Text dimColor>{promptFiles.join(", ")}</Text>
+          </>
+        )}
         {status && !isLoading && <Text dimColor> | </Text>}
         {status && !isLoading && <Text color="magenta">{status}</Text>}
         {isLoading && !pendingPrompt && <Text dimColor> | </Text>}

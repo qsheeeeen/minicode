@@ -361,7 +361,7 @@ function AppContent({
 
   return (
     <Box flexDirection="column" height="100%">
-      <Header version={version} promptFiles={promptFiles} agentRef={agentRef} />
+      <Header version={version} />
       <MessageList />
       <Status />
       <ModalPrompter />
@@ -373,7 +373,7 @@ function AppContent({
         />
       )}
       <SubAgentBar />
-      <Panel agentRef={agentRef} />
+      <Panel agentRef={agentRef} promptFiles={promptFiles} />
       <Help />
       {showReceipt && (
         <Receipt data={sessionStats.getStats()} onDismiss={() => exit()} />

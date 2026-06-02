@@ -57,6 +57,8 @@ export function Receipt({ data, onDismiss }: ReceiptProps) {
       flexDirection="column"
       borderStyle="round"
       borderColor="gray"
+      borderLeft={false}
+      borderRight={false}
       paddingX={1}
       marginX={2}
       width={W + 4}

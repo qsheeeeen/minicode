@@ -105,6 +105,8 @@ function SinglePrompt({
       flexDirection="column"
       borderStyle="round"
       borderColor="yellow"
+      borderLeft={false}
+      borderRight={false}
       paddingX={1}
       marginBottom={1}
     >
@@ -159,6 +161,8 @@ function MultiPrompt({
       flexDirection="column"
       borderStyle="round"
       borderColor="yellow"
+      borderLeft={false}
+      borderRight={false}
       paddingX={1}
       marginBottom={1}
     >

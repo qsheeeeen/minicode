@@ -8,7 +8,7 @@ export function SubAgentBar() {
   if (agentSessions.length <= 1) return null;
 
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor="gray" paddingX={1}>
+    <Box flexDirection="column" borderStyle="round" borderColor="gray" borderLeft={false} borderRight={false} paddingX={1}>
       {agentSessions.map((session) => {
         const isActive = session.id === activeAgentId;
         const statusIcon =
