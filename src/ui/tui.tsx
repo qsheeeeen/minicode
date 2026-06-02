@@ -361,7 +361,7 @@ function AppContent({
 
   return (
     <Box flexDirection="column" height="100%">
-      <Header version={version} />
+      <Header version={version} projectPath={process.cwd()} />
       <MessageList />
       <Status />
       <ModalPrompter />
