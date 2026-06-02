@@ -25,7 +25,10 @@ export function Header({ version, projectPath }: HeaderProps) {
         </Gradient>
         <Text dimColor> (v{version})</Text>
       </Box>
-      <Text dimColor>directory: {projectPath}</Text>
+      <Box>
+        <Text dimColor>directory: </Text>
+        <Text>{projectPath}</Text>
+      </Box>
     </Box>
   );
 }
