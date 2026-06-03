@@ -33,7 +33,7 @@ const agentSessions = [
 const agentRef = { current: { getModelProvider: () => "anthropic", getModelName: () => "claude-sonnet-4-5", getContextLength: () => 200000, setEffort: () => {}, setModel: () => {}, getStore: () => ({ addStatus: () => {} }) } as any };
 
 const receiptData = {
-  projectName: "express-ts-app", startTime: Date.now() - 1000 * 60 * 15, sessionCount: 2, sessionNames: ["setup", "add-auth"],
+  projectName: "express-ts-app", startTime: Date.now() - 1000 * 60 * 15, sessionCount: 2, sessionNames: ["session-1231231123123", "session-4564564456456"],
   models: [{ name: "claude-sonnet-4-5", inputTokens: 28500, outputTokens: 6200, cacheCreation: 8000, cacheRead: 20000, total: 34700 }],
   totalTokens: 34700,
 };
@@ -42,20 +42,16 @@ const inputModes = ["chat", "effort", "session"] as const;
 
 function Demo() {
   const [inputIdx, setInputIdx] = useState(0);
-  const [showReceipt, setShowReceipt] = useState(false);
   useInput((_input, key) => {
     if (key.shift && key.tab) setInputIdx((i) => (i + 1) % inputModes.length);
-    if (key.ctrl && _input === "r") setShowReceipt((s) => !s);
   });
-
-  if (showReceipt) return <Receipt data={receiptData} onDismiss={() => setShowReceipt(false)} />;
 
   const mode = inputModes[inputIdx];
 
   return (
     <Box flexDirection="column">
       <Header version="0.1.0" projectPath="/home/user/express-ts-app" />
-      <TuiProvider initialState={{ messages, agentSessions, activeAgentId: "1", tokenCount: 34700, currentSession: "setup", isLoading: true, permissionMode: "manual" as const, status: "", pendingPrompt: null, input: { mode, value: "", props: {}, key: 0 } }}>
+      <TuiProvider initialState={{ messages, agentSessions, activeAgentId: "1", tokenCount: 34700, currentSession: "session-1231231123123", isLoading: true, permissionMode: "manual" as const, status: "", pendingPrompt: null, input: { mode, value: "", props: {}, key: 0 } }}>
         <MessageList />
         <Status />
         {mode === "chat" ? (
@@ -66,13 +62,14 @@ function Demo() {
           </Box>
         ) : (
           <Box borderStyle="single" borderLeft={false} borderRight={false} paddingX={1}>
-            <SessionListInput sessions={[{ name: "setup" }, { name: "add-auth" }]} onExecute={(v) => console.log(v)} onCancel={() => setInputIdx(0)} />
+            <SessionListInput sessions={[{ name: "session-1231231123123" }, { name: "session-4564564456456" }]} onExecute={(v) => console.log(v)} onCancel={() => setInputIdx(0)} />
           </Box>
         )}
         <SubAgentBar />
         <Panel agentRef={agentRef} />
       </TuiProvider>
       <Help />
+      <Receipt data={receiptData} onDismiss={() => {}} />
     </Box>
   );
 }
