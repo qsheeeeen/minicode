@@ -304,7 +304,7 @@ export function UndoInput({
     { label: "Conversation", value: "conversation" },
   ];
   if (hasFiles) {
-    scopeOptions.push({ label: "Conversation + files", value: "both" });
+    scopeOptions.push({ label: "Conversation + code", value: "both" });
   }
   scopeOptions.push({ label: "Cancel", value: "cancel" });
 
