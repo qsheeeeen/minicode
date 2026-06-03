@@ -4,7 +4,7 @@ import { useTuiState } from "./store.js";
 import { Message } from "./Message.js";
 
 export function MessageList() {
-  const { messages, agentSessions } = useTuiState();
+  const { messages } = useTuiState();
 
   if (messages.length === 0) {
     return (
@@ -29,13 +29,6 @@ export function MessageList() {
             </Box>
           ))}
       </Box>
-      {agentSessions.length > 1 && (
-        <Box marginTop={1}>
-          <Text dimColor color="yellow">
-            Ctrl+O: switch agent
-          </Text>
-        </Box>
-      )}
     </Box>
   );
 }
