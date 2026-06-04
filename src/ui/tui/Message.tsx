@@ -1,4 +1,5 @@
 import { Box, Text } from "ink";
+import { StatusMessage } from "@inkjs/ui";
 import Markdown from "ink-markdown-es";
 import type { DisplayMessage } from "../../messages.js";
 import { ToolDisplay } from "./tool-display.js";
@@ -66,18 +67,14 @@ export function Message({ msg }: { msg: DisplayMessage }) {
       if (msg.element) return <Box marginBottom={1}>{msg.element}</Box>;
       return (
         <Box marginBottom={1}>
-          <Text color="white">
-            {"—"} {msg.content}
-          </Text>
+          <StatusMessage variant="info">{msg.content}</StatusMessage>
         </Box>
       );
 
     case "error":
       return (
         <Box marginBottom={1}>
-          <Text color="red" bold>
-            {"✕"} {msg.content}
-          </Text>
+          <StatusMessage variant="error">{msg.content}</StatusMessage>
         </Box>
       );
 
