@@ -1,6 +1,16 @@
 import { Box, Text } from "ink";
+import Markdown from "ink-markdown-es";
 import type { DisplayMessage } from "../../messages.js";
 import { ToolDisplay } from "./tool-display.js";
+
+const markdownStyles = {
+  h1: { bold: true, color: undefined },
+  h2: { bold: true, color: undefined },
+  h3: { bold: true, color: undefined },
+  h4: { bold: true, color: undefined },
+  h5: { bold: true, color: undefined },
+  h6: { bold: true, color: undefined },
+};
 
 export function Message({ msg }: { msg: DisplayMessage }) {
   switch (msg.role) {
@@ -16,9 +26,7 @@ export function Message({ msg }: { msg: DisplayMessage }) {
     case "text":
       return (
         <Box marginBottom={1}>
-          <Text>
-            {msg.isStreaming ? msg.content : msg.content.trim() || " "}
-          </Text>
+          <Markdown showSharp styles={markdownStyles}>{msg.content.trim() || " "}</Markdown>
         </Box>
       );
 
@@ -77,3 +85,4 @@ export function Message({ msg }: { msg: DisplayMessage }) {
       return null;
   }
 }
+
