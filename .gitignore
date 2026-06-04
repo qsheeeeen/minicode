@@ -3,6 +3,7 @@ dist/
 config.json
 .DS_Store
 coverage/
+/minicode
 minicode-go
 package-lock.json
 /testperm
