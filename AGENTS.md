@@ -15,7 +15,13 @@ bun run start         # Run compiled output
 bun run typecheck     # tsc --noEmit (type check only)
 bun test              # Vitest in watch mode
 bun run test:run      # Run tests once
-npx vitest run src/agent.test.ts  # Single test file
+bunx vitest run src/agent.test.ts  # Single test file (use bunx, not npx)
+```
+
+**Headless mode** (non-TUI, for scripting and verification):
+```bash
+bun run src/cli.tsx -H "<prompt>"           # Basic headless
+bun run src/cli.tsx -H --perm yolo "<prompt>" # Headless with permission mode
 ```
 
 ## Architecture
@@ -92,8 +98,29 @@ bun run src/cli.tsx -H "<prompt that exercises the change>"
 
 Headless mode exposes bugs that TUI doesn't. Always verify output is correct.
 
+## Testing Patterns
+
+- Tests use Vitest with `ink-testing-library` for TUI components
+- Test files colocated with source: `foo.ts` → `foo.test.ts`
+- Mock patterns: `vi.spyOn()`, `vi.fn()`, module mocking with `vi.mock()`
+- TUI component tests: render with `render()`, query with `lastFrame()`, simulate input with `stdin.write()`
+- Demo components in `src/ui/tui/demos/` for visual testing during development
+
+## Skills Directory
+
+External skills live in `.agent/skills/` (gitignored except this directory). Each skill is a directory with a `SKILL.md` file containing YAML frontmatter + body. Built-in skills (`skill-creator`, `init`) are in `src/skills/`.
+
 ## Module Convention
 
 - All imports use `.js` extensions with relative paths (Node16 ESM resolution)
 - Pure ESM (`"type": "module"`), no CommonJS
 - JSX via `react-jsx` automatic runtime (Ink v7 + React 19)
+- TypeScript strict mode enabled
+
+## TUI Development
+
+Demo components in `src/ui/tui/demos/` render individual TUI components in isolation. Run them with:
+```bash
+bun run src/ui/tui/demos/index.tsx
+```
+Useful for visual testing when modifying UI components.
