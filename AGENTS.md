@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to the CLI agent when working with code in this repository.
 
 ## Overview
 
@@ -74,7 +74,7 @@ src/
 
 ### Key Concepts
 
-**Two-layer messages:** `MessageParam[]` (raw Anthropic API format, with `_display` metadata stripped by `toLLMMessages()`) and `DisplayMessage[]` (flat discriminated union for UI, including UI-only `StatusMessage[]`). Session persisted as JSONL at `~/.minicode/sessions/<md5-hash>/<name>.context.jsonl`.
+**Two-layer messages:** `MessageParam[]` (raw API format, with `_display` metadata stripped by `toLLMMessages()`) and `DisplayMessage[]` (flat discriminated union for UI, including UI-only `StatusMessage[]`). Session persisted as JSONL at `~/.minicode/sessions/<md5-hash>/<name>.context.jsonl`.
 
 **Self-registering tools:** Each tool file calls `register(toolDef)` at module scope. `tools/index.ts` imports all to trigger registration. `ToolDef` has `execute()`, `requiresPermission`, `readOnly`, `interactive` flags. Sub-agents get filtered set: only read-only + non-interactive tools.
 
