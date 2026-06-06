@@ -30,7 +30,7 @@ import {
 import { ChangeJournal } from "./services/change-journal.js";
 import { MessageStore } from "./messages.js";
 import { getAvailableSkills } from "./skills/index.js";
-import { callContent } from "./ui/tui/tool-display.js";
+import { callContent } from "./utils/tool-format.js";
 import { execSync } from "child_process";
 import type pino from "pino";
 
