@@ -7,7 +7,7 @@ import { CallbackEvents, CallbackPrompter } from "../utils/display.js";
 import { routeInput, runBash } from "./routing.js";
 import { MessageStore } from "../messages.js";
 import { AgentRegistry, type AgentSession } from "../services/index.js";
-import { sessionStats } from "../services/session-stats.js";
+import type { SessionStats } from "../services/session-stats.js";
 import { Receipt } from "./tui/Receipt.js";
 
 import { TuiProvider, useTuiState, useTuiDispatch } from "./tui/store.js";
@@ -31,6 +31,7 @@ export interface AppProps {
   resumeRecent: boolean;
   agentRegistry: AgentRegistry;
   programStartTime: number;
+  sessionStats: SessionStats;
 }
 
 /** Hook: multi-agent coordination and switching using Global Store */
@@ -197,6 +198,7 @@ function AppContent({
   resumeRecent,
   agentRegistry,
   programStartTime,
+  sessionStats,
 }: Omit<AppProps, "config">) {
   const { exit } = useApp();
   const dispatch = useTuiDispatch();
@@ -220,6 +222,7 @@ function AppContent({
 
   const cmdContext = useCallback(() => ({
     agent: agentRef.current,
+    sessionStats,
     setMessages: (msgs: any) => {
       if (typeof msgs !== "function") {
         dispatch({ type: "SET_MESSAGES", payload: msgs });

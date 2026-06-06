@@ -19,7 +19,7 @@ import {
   type AgentEvents,
   type UserPrompter,
 } from "./utils/display.js";
-import { sessionStats } from "./services/session-stats.js";
+import { type SessionStats } from "./services/session-stats.js";
 import {
   TokenManager,
   CompressionService,
@@ -64,6 +64,7 @@ export interface AgentConfig {
   subAgentMode?: boolean;
   agentRegistry?: AgentRegistry;
   currentAgentId?: string;
+  sessionStats?: SessionStats;
 }
 
 interface StreamingResult {
@@ -99,6 +100,7 @@ export class Agent {
   private currentAgentId: string;
   private apiKey?: string;
   private baseURL?: string;
+  private sessionStats?: SessionStats;
   private permissionService: PermissionService;
   private abortController: AbortController | null = null;
   private currentStream:
@@ -176,6 +178,7 @@ export class Agent {
       : getAll();
     this.agentRegistry = config.agentRegistry;
     this.currentAgentId = config.currentAgentId || "1";
+    this.sessionStats = config.sessionStats;
     this.permissionService = new PermissionService({
       initialMode: "manual",
       client: this.apiKey ? this.client : undefined,
@@ -508,7 +511,7 @@ export class Agent {
       response.usage.cache_creation_input_tokens ?? 0,
       response.usage.cache_read_input_tokens ?? 0,
     );
-    sessionStats.recordUsage(
+    this.sessionStats?.recordUsage(
       this.model || "unknown",
       response.usage.input_tokens,
       response.usage.output_tokens,

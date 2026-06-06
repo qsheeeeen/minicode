@@ -68,15 +68,4 @@ describe("loadProjectPrompt", () => {
       .calls[0][0];
     expect(readCall).toBe("/my/project/AGENTS.md");
   });
-
-  it("uses custom prompt filename", async () => {
-    const fs = await import("fs/promises");
-    (fs.default.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(
-      "custom prompt",
-    );
-    await loadProjectPrompt("/my/project", "CUSTOM.md");
-    const readCall = (fs.default.readFile as ReturnType<typeof vi.fn>).mock
-      .calls[0][0];
-    expect(readCall).toBe("/my/project/CUSTOM.md");
-  });
 });

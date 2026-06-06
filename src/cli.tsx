@@ -6,7 +6,7 @@ import { fileURLToPath } from "url";
 import { render } from "ink";
 import { loadAllConfig } from "./config.js";
 import { Agent } from "./agent.js";
-import { AgentRegistry } from "./services/index.js";
+import { AgentRegistry, SessionStats } from "./services/index.js";
 import { MessageStore } from "./messages.js";
 import { createLogger } from "./utils/logger.js";
 import { parseArgs, type PermissionMode } from "./args.js";
@@ -138,6 +138,7 @@ for (const skill of getSkills()) {
 
 // Create shared AgentRegistry (used by both Agent tools and TUI state display)
 const sharedAgentRegistry = new AgentRegistry();
+const sharedSessionStats = new SessionStats();
 
 // Create Agent (composition root — single creation point)
 const agent = new Agent({
@@ -153,6 +154,7 @@ const agent = new Agent({
   userPrompt,
   projectPromptFile,
   agentRegistry: sharedAgentRegistry,
+  sessionStats: sharedSessionStats,
 });
 agent.setSession(initialSession);
 agent.setLogger(logger);
@@ -161,6 +163,7 @@ agent.setPermissionMode(permissionMode);
 // Shared command context for headless mode
 const cmdContext = {
   agent,
+  sessionStats: sharedSessionStats,
   setMessages: () => {},
   setCurrentSession: (name: string) => {
     initialSession = name;
@@ -198,6 +201,7 @@ render(
     resumeRecent={resumeRecent}
     agentRegistry={sharedAgentRegistry}
     programStartTime={programStartTime}
+    sessionStats={sharedSessionStats}
   />,
   { exitOnCtrlC: false },
 );

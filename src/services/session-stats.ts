@@ -88,5 +88,3 @@ export class SessionStats {
     };
   }
 }
-
-export const sessionStats = new SessionStats();

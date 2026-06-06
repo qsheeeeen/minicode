@@ -1,10 +1,10 @@
 import type { Agent } from "../../agent.js";
 import type { DisplayMessage } from "../../utils/display.js";
 import type { EffortLevel } from "../../llm/anthropic.js";
+import type { SessionStats } from "../../services/session-stats.js";
 import { MessageStore } from "../../messages.js";
 import { getSkillBody, getAvailableSkills } from "../../skills/index.js";
 import { createLogger } from "../../utils/logger.js";
-import { sessionStats } from "../../services/session-stats.js";
 
 export interface CommandHandler {
   name: string;
@@ -17,6 +17,7 @@ export interface CommandHandler {
 
 export interface CommandContext {
   agent: Agent;
+  sessionStats: SessionStats;
   setMessages: (
     msg: DisplayMessage[] | ((prev: DisplayMessage[]) => DisplayMessage[]),
   ) => void;
@@ -129,7 +130,7 @@ registerCommand({
     ctx.agent.setSession(newSession);
     ctx.agent.setLogger(newLogger);
     ctx.setCurrentSession(newSession);
-    sessionStats.incrementSessionCount(newSession);
+    ctx.sessionStats.incrementSessionCount(newSession);
     ctx.agent
       .getStore()
       .addStatus({
@@ -191,7 +192,7 @@ registerCommand({
       ctx.agent.setSession(name);
       ctx.agent.setLogger(newLogger);
       ctx.setCurrentSession(name);
-      sessionStats.incrementSessionCount(name);
+      ctx.sessionStats.incrementSessionCount(name);
       ctx.agent
         .getStore()
         .addStatus({
@@ -252,7 +253,7 @@ registerCommand({
         ctx.agent.setSession(name);
         ctx.agent.setLogger(newLogger);
         ctx.setCurrentSession(name);
-        sessionStats.incrementSessionCount(name);
+        ctx.sessionStats.incrementSessionCount(name);
         ctx.agent
           .getStore()
           .addStatus({

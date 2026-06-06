@@ -131,6 +131,7 @@ describe("Builtin commands", () => {
       });
       const ctx: Partial<CommandContext> = {
         agent: agentMock as any,
+        sessionStats: { incrementSessionCount: vi.fn() } as any,
         setCurrentSession: vi.fn(),
         setMessages: vi.fn(),
       };
@@ -155,6 +156,7 @@ describe("Builtin commands", () => {
       });
       const ctx: Partial<CommandContext> = {
         agent: agentMock as any,
+        sessionStats: { incrementSessionCount: vi.fn() } as any,
         setCurrentSession: vi.fn(),
       };
 
@@ -178,6 +180,7 @@ describe("Builtin commands", () => {
       };
       const ctx: Partial<CommandContext> = {
         agent: agentMock as any,
+        sessionStats: { incrementSessionCount: vi.fn() } as any,
         setCurrentSession: vi.fn(),
       };
 
@@ -226,6 +229,7 @@ describe("Builtin commands", () => {
       };
       const ctx: Partial<CommandContext> = {
         agent: agentMock as any,
+        sessionStats: { incrementSessionCount: vi.fn() } as any,
         setCurrentSession: vi.fn(),
         setMessages: vi.fn(),
       };
