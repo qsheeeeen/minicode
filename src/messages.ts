@@ -7,10 +7,6 @@ import path from "path";
 import os from "os";
 import crypto from "crypto";
 
-export type StoredMessage = MessageParam & {
-  _display?: string;
-};
-
 // -- Session types --
 
 interface SessionHeader {
@@ -21,7 +17,7 @@ interface SessionHeader {
 
 export interface SessionData {
   model: string;
-  messages: StoredMessage[];
+  messages: MessageParam[];
   totalTokens: number;
   createdAt?: string;
   updatedAt?: string;
@@ -73,8 +69,9 @@ export type DisplayMessage =
 
 // Convert MessageParam[] + statuses → DisplayMessage[]
 export function toDisplayMessages(
-  turns: StoredMessage[],
+  turns: MessageParam[],
   statuses: StatusMessage[],
+  displayOverrides?: Map<number, string>,
 ): DisplayMessage[] {
   // Build result map from tool_result blocks
   const results = new Map<string, string>();
@@ -120,9 +117,7 @@ export function toDisplayMessages(
     if (turn.role === "user") {
       if (typeof turn.content === "string") {
         const displayContent =
-          turn._display !== undefined
-            ? turn._display
-            : turn.content;
+          displayOverrides?.get(i) ?? turn.content;
         result.push({ role: "user", content: displayContent });
       }
     } else if (turn.role === "assistant") {
@@ -173,6 +168,7 @@ export function toDisplayMessages(
 
 export class MessageStore {
   private turns: MessageParam[] = [];
+  private displayOverrides = new Map<number, string>();
   private statuses: StatusMessage[] = [];
   private listeners = new Set<() => void>();
   private streaming = false;
@@ -202,37 +198,33 @@ export class MessageStore {
     for (const cb of this.listeners) cb();
   }
 
-  getTurns(): StoredMessage[] {
+  getTurns(): MessageParam[] {
     return [...this.turns];
   }
 
   /** Remove the last turn if it matches the predicate. Returns true if removed. */
-  removeLastTurn(predicate: (turn: StoredMessage) => boolean): boolean {
+  removeLastTurn(predicate: (turn: MessageParam) => boolean): boolean {
     const last = this.turns[this.turns.length - 1];
     if (last && predicate(last)) {
+      const idx = this.turns.length - 1;
       this.turns.pop();
+      this.displayOverrides.delete(idx);
       this.notify();
       return true;
     }
     return false;
   }
 
-  /** Replace all turns (for session resume). */
-  setTurns(turns: StoredMessage[]): void {
+  /** Replace all turns (for session resume / compression). */
+  setTurns(turns: MessageParam[]): void {
     this.turns = turns;
+    this.displayOverrides.clear();
     this.notify();
   }
 
-  /** Get API-format messages for LLM. Strips display-only metadata. */
+  /** Get API-format messages for LLM. */
   toLLMMessages(): MessageParam[] {
-    return this.turns.map((t) => {
-      const msg = t as any;
-      if (msg._display !== undefined) {
-        const { _display, ...rest } = msg;
-        return rest as MessageParam;
-      }
-      return t as MessageParam;
-    });
+    return this.turns as MessageParam[];
   }
 
   // -- User messages --
@@ -240,7 +232,7 @@ export class MessageStore {
   addUserMessage(content: string, displayContent?: string): void {
     const msg: MessageParam = { role: "user", content } as MessageParam;
     if (displayContent !== undefined && displayContent !== content) {
-      (msg as any)._display = displayContent;
+      this.displayOverrides.set(this.turns.length, displayContent);
     }
     this.turns.push(msg);
     this.notify();
@@ -313,7 +305,7 @@ export class MessageStore {
 
   /** Convenience: generate display messages from current state. */
   toDisplayMessages(): DisplayMessage[] {
-    const msgs = toDisplayMessages(this.turns, this.statuses);
+    const msgs = toDisplayMessages(this.turns, this.statuses, this.displayOverrides);
     // Mark last non-empty text/thinking block as streaming
     if (this.streaming) {
       for (let i = msgs.length - 1; i >= 0; i--) {
@@ -331,6 +323,7 @@ export class MessageStore {
 
   clear(): void {
     this.turns = [];
+    this.displayOverrides.clear();
     this.statuses = [];
     this.notify();
   }
