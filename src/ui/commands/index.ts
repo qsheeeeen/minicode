@@ -5,6 +5,7 @@ import type { SessionStats } from "../../services/session-stats.js";
 import { MessageStore } from "../../messages.js";
 import { getSkillBody, getAvailableSkills } from "../../skills/index.js";
 import { createLogger } from "../../utils/logger.js";
+import { switchSession } from "../../services/session-lifecycle.js";
 
 export interface CommandHandler {
   name: string;
@@ -123,21 +124,13 @@ registerCommand({
     ctx.agent.clearSession();
     ctx.agent.setTokenCount(0);
     const newSession = `session-${Date.now()}`;
-    const newLogger = await createLogger(
-      MessageStore.getProjectHash(),
-      newSession,
-    );
-    ctx.agent.setSession(newSession);
-    ctx.agent.setLogger(newLogger);
-    ctx.setCurrentSession(newSession);
-    ctx.sessionStats.incrementSessionCount(newSession);
-    ctx.agent
-      .getStore()
-      .addStatus({
-        role: "status",
-        content: "(Cleared)",
-        timestamp: new Date(),
-      });
+    await switchSession({
+      agent: ctx.agent,
+      sessionName: newSession,
+      setCurrentSession: ctx.setCurrentSession,
+      sessionStats: ctx.sessionStats,
+      statusMessage: "(Cleared)",
+    });
   },
 });
 
@@ -185,21 +178,13 @@ registerCommand({
     const name = args.join(" ");
     if (name) {
       ctx.agent.clearSession();
-      const newLogger = await createLogger(
-        MessageStore.getProjectHash(),
-        name,
-      );
-      ctx.agent.setSession(name);
-      ctx.agent.setLogger(newLogger);
-      ctx.setCurrentSession(name);
-      ctx.sessionStats.incrementSessionCount(name);
-      ctx.agent
-        .getStore()
-        .addStatus({
-          role: "status",
-          content: `Created session: ${name}`,
-          timestamp: new Date(),
-        });
+      await switchSession({
+        agent: ctx.agent,
+        sessionName: name,
+        setCurrentSession: ctx.setCurrentSession,
+        sessionStats: ctx.sessionStats,
+        statusMessage: `Created session: ${name}`,
+      });
     }
   },
 });
@@ -246,21 +231,13 @@ registerCommand({
         if (totalTokens > 0) {
           ctx.agent.setTokenCount(totalTokens);
         }
-        const newLogger = await createLogger(
-          MessageStore.getProjectHash(),
-          name,
-        );
-        ctx.agent.setSession(name);
-        ctx.agent.setLogger(newLogger);
-        ctx.setCurrentSession(name);
-        ctx.sessionStats.incrementSessionCount(name);
-        ctx.agent
-          .getStore()
-          .addStatus({
-            role: "status",
-            content: `Loaded session: ${name}`,
-            timestamp: new Date(),
-          });
+        await switchSession({
+          agent: ctx.agent,
+          sessionName: name,
+          setCurrentSession: ctx.setCurrentSession,
+          sessionStats: ctx.sessionStats,
+          statusMessage: `Loaded session: ${name}`,
+        });
       } else {
         ctx.agent
           .getStore()
