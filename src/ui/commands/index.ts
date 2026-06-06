@@ -240,7 +240,7 @@ registerCommand({
       const name = args[0];
       const data = await MessageStore.load(name);
       if (data) {
-        ctx.agent.setMessages(data.messages as any);
+        ctx.agent.setMessages(data.messages);
         const totalTokens = data.totalTokens || 0;
         if (totalTokens > 0) {
           ctx.agent.setTokenCount(totalTokens);

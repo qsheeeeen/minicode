@@ -19,7 +19,7 @@ export async function runHeadless(
       `session-${Date.now()}`;
     const data = await MessageStore.load(name);
     if (data) {
-      agent.setMessages(data.messages as any);
+      agent.setMessages(data.messages);
       const totalTokens = data.totalTokens || 0;
       if (totalTokens > 0) {
         agent.setTokenCount(totalTokens);
@@ -129,7 +129,7 @@ export async function runHeadless(
             for (let rti = ti + 1; rti < turns.length; rti++) {
               const rt = turns[rti];
               if (rt.role === "user" && Array.isArray(rt.content)) {
-                for (const rb of rt.content as any[]) {
+                for (const rb of rt.content) {
                   if (
                     rb.type === "tool_result" &&
                     rb.tool_use_id === block.id
@@ -168,7 +168,7 @@ export async function runHeadless(
     // Print tool results for any printed tool_use blocks
     for (const turn of turns) {
       if (turn.role === "user" && Array.isArray(turn.content)) {
-        for (const block of turn.content as any[]) {
+        for (const block of turn.content) {
           if (
             block.type === "tool_result" &&
             printedToolUses.has(block.tool_use_id) &&

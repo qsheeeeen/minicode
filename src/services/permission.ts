@@ -103,7 +103,7 @@ Reply with exactly one of:
       );
 
       const textBlock = response.content.find((b) => b.type === "text");
-      const text = (textBlock as any)?.text?.trim() ?? "no: unknown error";
+      const text = textBlock && "text" in textBlock ? textBlock.text.trim() : "no: unknown error";
 
       if (text.toLowerCase().startsWith("yes")) {
         return { allowed: true };

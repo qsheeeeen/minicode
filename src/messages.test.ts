@@ -227,7 +227,48 @@ describe("MessageStore session persistence", () => {
     });
   });
 
-  describe("save", () => {
+  describe("getTurns", () => {
+    it("returns a shallow copy of turns", () => {
+      const store = new MessageStore();
+      store.addUserMessage("test");
+      const turns = store.getTurns();
+      expect(turns).toHaveLength(1);
+      
+      // Mutating the returned array should not affect the store
+      turns.pop();
+      expect(store.getTurns()).toHaveLength(1);
+    });
+  });
+
+  describe("removeLastTurn", () => {
+    it("removes the last turn if predicate matches", () => {
+      const store = new MessageStore();
+      store.addUserMessage("msg1");
+      store.addUserMessage("msg2");
+      
+      const removed = store.removeLastTurn(t => t.role === "user" && t.content === "msg2");
+      expect(removed).toBe(true);
+      expect(store.getTurns()).toHaveLength(1);
+      expect(store.getTurns()[0].content).toBe("msg1");
+    });
+
+    it("does not remove if predicate fails", () => {
+      const store = new MessageStore();
+      store.addUserMessage("msg1");
+      
+      const removed = store.removeLastTurn(t => t.role === "user" && t.content === "other");
+      expect(removed).toBe(false);
+      expect(store.getTurns()).toHaveLength(1);
+    });
+
+    it("does nothing on empty store", () => {
+      const store = new MessageStore();
+      const removed = store.removeLastTurn(() => true);
+      expect(removed).toBe(false);
+    });
+  });
+
+  describe("setTurns", () => {
     it("writes JSONL via tmp+rename", async () => {
       const fsMod = await import("fs/promises");
       const store = new MessageStore();

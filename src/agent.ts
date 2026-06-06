@@ -421,8 +421,8 @@ export class Agent {
         } as ContentBlock);
       } else {
         const last = this.store.getLastBlock();
-        if (last?.type === "thinking") {
-          const currentText = (last as any).thinking;
+        if (last?.type === "thinking" && "thinking" in last) {
+          const currentText = last.thinking;
           const newText = currentText === "" ? delta.trimStart() : delta;
           this.store.updateLastBlock({ thinking: currentText + newText });
         } else {
@@ -444,8 +444,8 @@ export class Agent {
         } as ContentBlock);
       } else {
         const last = this.store.getLastBlock();
-        if (last?.type === "text") {
-          const currentText = (last as any).text;
+        if (last?.type === "text" && "text" in last) {
+          const currentText = last.text;
           const newText = currentText === "" ? delta.trimStart() : delta;
           this.store.updateLastBlock({ text: currentText + newText });
         } else {
@@ -739,16 +739,12 @@ export class Agent {
       this.isRunning = false;
       if (this.abortController?.signal.aborted) {
         // Remove the last user message that triggered this aborted run
-        const turns = this.store.getTurns();
-        const last = turns[turns.length - 1];
-        if (
-          last?.role === "user" &&
-          typeof last.content === "string" &&
-          last.content === userMessage
-        ) {
-          turns.pop();
-          this.store.setTurns(turns);
-        }
+        this.store.removeLastTurn(
+          (last) =>
+            last.role === "user" &&
+            typeof last.content === "string" &&
+            last.content === userMessage
+        );
       }
       this.abortController = null;
       this.currentStream = null;

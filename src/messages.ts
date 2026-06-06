@@ -1,8 +1,17 @@
-import type { MessageParam, ContentBlock } from "./llm/anthropic.js";
+import type {
+  MessageParam,
+  ContentBlock,
+} from "@anthropic-ai/sdk/resources/messages.js";
+import type { Element } from "react";
 import fs from "fs/promises";
 import path from "path";
-import crypto from "crypto";
 import os from "os";
+import { getAppDir } from "../config.js";
+import crypto from "crypto";
+
+export type StoredMessage = MessageParam & {
+  _display?: string;
+};
 
 // -- Session types --
 
@@ -14,7 +23,7 @@ interface SessionHeader {
 
 export interface SessionData {
   model: string;
-  messages: Array<{ role: string; content: any }>;
+  messages: StoredMessage[];
   totalTokens: number;
   createdAt?: string;
   updatedAt?: string;
@@ -66,14 +75,14 @@ export type DisplayMessage =
 
 // Convert MessageParam[] + statuses → DisplayMessage[]
 export function toDisplayMessages(
-  turns: MessageParam[],
+  turns: StoredMessage[],
   statuses: StatusMessage[],
 ): DisplayMessage[] {
   // Build result map from tool_result blocks
   const results = new Map<string, string>();
   for (const turn of turns) {
     if (turn.role === "user" && Array.isArray(turn.content)) {
-      for (const block of turn.content as any[]) {
+      for (const block of turn.content) {
         if (block.type === "tool_result") {
           results.set(
             block.tool_use_id,
@@ -113,8 +122,8 @@ export function toDisplayMessages(
     if (turn.role === "user") {
       if (typeof turn.content === "string") {
         const displayContent =
-          (turn as any)._display !== undefined
-            ? (turn as any)._display
+          turn._display !== undefined
+            ? turn._display
             : turn.content;
         result.push({ role: "user", content: displayContent });
       }
@@ -198,14 +207,23 @@ export class MessageStore {
     this.changeCallback?.();
   }
 
-  // -- Turn access --
+  getTurns(): StoredMessage[] {
+    return [...this.turns];
+  }
 
-  getTurns(): MessageParam[] {
-    return this.turns;
+  /** Remove the last turn if it matches the predicate. Returns true if removed. */
+  removeLastTurn(predicate: (turn: StoredMessage) => boolean): boolean {
+    const last = this.turns[this.turns.length - 1];
+    if (last && predicate(last)) {
+      this.turns.pop();
+      this.notify();
+      return true;
+    }
+    return false;
   }
 
   /** Replace all turns (for session resume). */
-  setTurns(turns: MessageParam[]): void {
+  setTurns(turns: StoredMessage[]): void {
     this.turns = turns;
     this.notify();
   }
@@ -218,7 +236,7 @@ export class MessageStore {
         const { _display, ...rest } = msg;
         return rest as MessageParam;
       }
-      return t;
+      return t as MessageParam;
     });
   }
 
