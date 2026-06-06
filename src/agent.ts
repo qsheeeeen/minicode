@@ -3,7 +3,6 @@ import {
   Anthropic,
   type MessageParam,
   type Tool,
-  type ContentBlock,
   type EffortLevel,
 } from "./llm/anthropic.js";
 import {
@@ -19,7 +18,7 @@ import {
   type AgentEvents,
   type UserPrompter,
 } from "./utils/display.js";
-import { type SessionStats } from "./services/session-stats.js";
+import type { SessionStats } from "./services/session-stats.js";
 import {
   TokenManager,
   CompressionService,
@@ -27,6 +26,7 @@ import {
   PermissionService,
   type PermissionMode,
 } from "./services/index.js";
+import { StreamingHandler } from "./services/streaming-handler.js";
 import { ChangeJournal } from "./services/change-journal.js";
 import { MessageStore } from "./messages.js";
 import { getAvailableSkills } from "./skills/index.js";
@@ -67,11 +67,7 @@ export interface AgentConfig {
   sessionStats?: SessionStats;
 }
 
-interface StreamingResult {
-  response: Anthropic.Messages.Message;
-  toolCalls: Array<{ block: Anthropic.Messages.ToolUseBlock; tool: ToolDef }>;
-  hasToolCalls: boolean;
-}
+import type { StreamingResult } from "./services/streaming-handler.js";
 
 export class Agent {
   private client: AnthropicClient;
@@ -84,6 +80,7 @@ export class Agent {
   private compressionThresholdRatio: number;
   private tokenManager: TokenManager;
   private compressionService: CompressionService;
+  private streamingHandler: StreamingHandler;
   private changeJournal = new ChangeJournal();
   private activeTurnIdx = 0;
   private _currentSession = `session-${Date.now()}`;
@@ -103,9 +100,7 @@ export class Agent {
   private sessionStats?: SessionStats;
   private permissionService: PermissionService;
   private abortController: AbortController | null = null;
-  private currentStream:
-    | import("@anthropic-ai/sdk/lib/MessageStream.js").MessageStream<null>
-    | null = null;
+  private currentStreamRef: { current: any } = { current: null };
   private logger?: pino.Logger;
 
   private isCompressing: boolean = false;
@@ -176,6 +171,7 @@ export class Agent {
     this.tools = config.subAgentMode
       ? getSubAgentTools()
       : getAll();
+    this.streamingHandler = new StreamingHandler(this.store, this.tools, () => this.saveStore());
     this.agentRegistry = config.agentRegistry;
     this.currentAgentId = config.currentAgentId || "1";
     this.sessionStats = config.sessionStats;
@@ -222,56 +218,13 @@ export class Agent {
 
   abort(): void {
     this.abortController?.abort();
-    this.currentStream?.abort();
+    this.currentStreamRef.current?.abort();
   }
 
   private throwIfAborted(): void {
     if (this.abortController?.signal.aborted) {
       throw new Error("Aborted");
     }
-  }
-
-  private raceWithAbort<T>(
-    promise: Promise<T>,
-    timeoutMs = 300_000,
-  ): Promise<T> {
-    const ac = this.abortController;
-    if (ac?.signal.aborted) return Promise.reject(new Error("Aborted"));
-
-    return new Promise<T>((resolve, reject) => {
-      let settled = false;
-      const done = (fn: () => void) => {
-        if (!settled) {
-          settled = true;
-          fn();
-        }
-      };
-
-      const onAbort = () => {
-        ac?.signal.removeEventListener("abort", onAbort);
-        clearTimeout(timer);
-        done(() => reject(new Error("Aborted")));
-      };
-      ac?.signal.addEventListener("abort", onAbort);
-
-      const timer = setTimeout(() => {
-        ac?.signal.removeEventListener("abort", onAbort);
-        done(() => reject(new Error("LLM request timed out")));
-      }, timeoutMs);
-
-      promise.then(
-        (val) => {
-          ac?.signal.removeEventListener("abort", onAbort);
-          clearTimeout(timer);
-          done(() => resolve(val));
-        },
-        (err) => {
-          ac?.signal.removeEventListener("abort", onAbort);
-          clearTimeout(timer);
-          done(() => reject(err));
-        },
-      );
-    });
   }
 
   async compress(): Promise<void> {
@@ -395,110 +348,6 @@ export class Agent {
   }
 
   /** Handle streaming response: build assistant turn incrementally */
-  private async handleStreamingResponse(
-    toolDefs: Tool[],
-  ): Promise<StreamingResult> {
-    const stream = this.client.chatStream(
-      this.store.toLLMMessages(),
-      toolDefs,
-      {
-        system: this.systemPrompt,
-        model: this.model,
-        signal: this.abortController?.signal,
-        effort: this.effort,
-      },
-    );
-    this.currentStream = stream;
-
-    let blockStreaming = false;
-    const toolCalls: Array<{
-      block: Anthropic.Messages.ToolUseBlock;
-      tool: ToolDef;
-    }> = [];
-    let hasToolCalls = false;
-
-    stream.on("thinking", (delta: string) => {
-      if (!blockStreaming) {
-        blockStreaming = true;
-        this.store.setStreaming(true);
-        this.store.appendToLastAssistantTurn({
-          type: "thinking",
-          thinking: delta.trimStart(),
-        } as ContentBlock);
-      } else {
-        const last = this.store.getLastBlock();
-        if (last?.type === "thinking" && "thinking" in last) {
-          const currentText = last.thinking;
-          const newText = currentText === "" ? delta.trimStart() : delta;
-          this.store.updateLastBlock({ thinking: currentText + newText });
-        } else {
-          this.store.appendToLastAssistantTurn({
-            type: "thinking",
-            thinking: delta.trimStart(),
-          } as ContentBlock);
-        }
-      }
-    });
-
-    stream.on("text", (delta: string) => {
-      if (!blockStreaming) {
-        blockStreaming = true;
-        this.store.setStreaming(true);
-        this.store.appendToLastAssistantTurn({
-          type: "text",
-          text: delta.trimStart(),
-        } as ContentBlock);
-      } else {
-        const last = this.store.getLastBlock();
-        if (last?.type === "text" && "text" in last) {
-          const currentText = last.text;
-          const newText = currentText === "" ? delta.trimStart() : delta;
-          this.store.updateLastBlock({ text: currentText + newText });
-        } else {
-          this.store.appendToLastAssistantTurn({
-            type: "text",
-            text: delta.trimStart(),
-          } as ContentBlock);
-        }
-      }
-    });
-
-    stream.on("contentBlock", (block: ContentBlock) => {
-      blockStreaming = false;
-      if (block.type === "thinking" || block.type === "text") {
-        this.saveStore();
-      }
-      if (block.type === "tool_use") {
-        hasToolCalls = true;
-        const toolBlock = block as Anthropic.Messages.ToolUseBlock;
-        const tool = this.tools.get(toolBlock.name);
-        if (tool) {
-          toolCalls.push({ block: toolBlock, tool });
-        }
-        this.store.appendToLastAssistantTurn({
-          type: "tool_use",
-          id: toolBlock.id,
-          name: toolBlock.name,
-          input: toolBlock.input,
-        } as ContentBlock);
-        this.saveStore();
-      }
-    });
-
-    let response: Anthropic.Messages.Message;
-    try {
-      response = await this.raceWithAbort(stream.finalMessage());
-    } catch (e) {
-      if (this.abortController?.signal.aborted) throw new Error("Aborted");
-      throw e;
-    } finally {
-      this.currentStream = null;
-      this.store.setStreaming(false);
-    }
-
-    return { response, toolCalls, hasToolCalls };
-  }
-
   /** Track token usage and trigger auto-compression */
   private async processTokenUsage(
     response: Anthropic.Messages.Message,
@@ -704,7 +553,19 @@ export class Agent {
         })) as Tool[];
 
         const { response, toolCalls, hasToolCalls } =
-          await this.handleStreamingResponse(toolDefs);
+          await this.streamingHandler.handle(
+            this.client,
+            this.store.toLLMMessages(),
+            toolDefs,
+            {
+              system: this.systemPrompt,
+              model: this.model,
+              signal: this.abortController?.signal,
+              effort: this.effort,
+            },
+            this.abortController?.signal,
+            this.currentStreamRef,
+          );
 
         await this.processTokenUsage(response);
         this.logger?.info(
@@ -753,7 +614,7 @@ export class Agent {
         );
       }
       this.abortController = null;
-      this.currentStream = null;
+      this.currentStreamRef.current = null;
       this.logger?.info(
         {
           session: this.currentSession,
