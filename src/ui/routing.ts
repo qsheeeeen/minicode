@@ -1,8 +1,15 @@
-import { runBash } from "../services/index.js";
+import { execSync } from "child_process";
 import type { CommandContext } from "./commands/index.js";
 import { executeCommand } from "./commands/index.js";
 
-export { runBash };
+export function runBash(cmd: string): string {
+  try {
+    const output = execSync(cmd, { encoding: "utf-8", timeout: 30000, cwd: process.cwd() });
+    return output.trim() || "(no output)";
+  } catch (e: any) {
+    return `Error: ${e.message}`;
+  }
+}
 
 export interface RouteResult {
   action: "none" | "bash" | "command" | "llm";
