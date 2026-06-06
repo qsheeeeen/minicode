@@ -2,7 +2,7 @@ export class TokenManager {
   private totalTokens = 0;
   private lastShownThreshold = 0;
 
-  addTokens(
+  updateUsage(
     input: number,
     output: number,
     cacheCreation = 0,

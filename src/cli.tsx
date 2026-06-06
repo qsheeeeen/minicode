@@ -164,7 +164,7 @@ const cmdContext = {
   setMessages: () => {},
   setCurrentSession: (name: string) => {
     initialSession = name;
-    agent.currentSession = name;
+    agent.setSession(name);
   },
   setMode: () => {},
   setInputMode: () => {},

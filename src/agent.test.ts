@@ -42,7 +42,7 @@ vi.mock("./services/token-manager.js", () => ({
   TokenManager: vi.fn().mockImplementation(function () {
     return {
       getTotal: vi.fn().mockReturnValue(100),
-      addTokens: vi.fn(),
+      updateUsage: vi.fn(),
       getRatio: vi.fn().mockReturnValue(0.1),
       getLastShownThreshold: vi.fn().mockReturnValue(0),
       updateThreshold: vi.fn(),

@@ -159,7 +159,7 @@ function useDisplay(
     });
 
     const loadInitial = async () => {
-      agent.currentSession = initialSession;
+      agent.setSession(initialSession);
       dispatch({ type: "SET_CURRENT_SESSION", payload: initialSession });
       if (sessionName || resumeRecent) {
         const data = await MessageStore.load(initialSession);

@@ -85,7 +85,10 @@ export class Agent {
   private compressionService: CompressionService;
   private changeJournal = new ChangeJournal();
   private activeTurnIdx = 0;
-  public currentSession = `session-${Date.now()}`;
+  private _currentSession = `session-${Date.now()}`;
+  get currentSession(): string {
+    return this._currentSession;
+  }
   private thinkingEnabled: boolean;
   private effort?: EffortLevel;
   private events: AgentEvents;
@@ -108,7 +111,7 @@ export class Agent {
   private environmentContext = "";
   private systemPrompt = "";
   public setSession(sessionName: string): void {
-    this.currentSession = sessionName;
+    this._currentSession = sessionName;
     this.store.setSessionName(sessionName);
     this.changeJournal.startSession(
       MessageStore.getSessionDir(),
@@ -499,7 +502,7 @@ export class Agent {
   ): Promise<void> {
     if (!response.usage) return;
 
-    this.tokenManager.addTokens(
+    this.tokenManager.updateUsage(
       response.usage.input_tokens,
       response.usage.output_tokens,
       response.usage.cache_creation_input_tokens ?? 0,
@@ -790,7 +793,7 @@ export class Agent {
   setTokenCount(count: number): void {
     this.tokenManager.reset();
     if (count > 0) {
-      this.tokenManager.addTokens(count, 0);
+      this.tokenManager.updateUsage(count, 0);
     }
     this.events.tokenUpdate(this.tokenManager.getTotal());
   }
