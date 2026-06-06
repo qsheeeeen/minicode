@@ -2,7 +2,13 @@ import type { ToolDef, ToolResult, ToolExecutionContext } from "./registry.js";
 import { ToolDeniedError } from "./registry.js";
 import { register } from "./registry.js";
 
-export const askUserTool: ToolDef = {
+interface AskUserArgs {
+  question: string;
+  options: Array<{ label: string; description: string }>;
+  multiSelect?: boolean;
+}
+
+export const askUserTool: ToolDef<AskUserArgs> = {
   name: "AskUser",
   description:
     "Ask the user a question with predefined options. Use this when you need the user to choose from a set of alternatives — for example, selecting a library, choosing an approach, or clarifying requirements. Set multiSelect to true when the user may select multiple options. The user can select options or reject all options and type their own response.",
@@ -48,23 +54,21 @@ export const askUserTool: ToolDef = {
     required: ["question", "options"],
   },
   execute: async (
-    args: Record<string, unknown>,
+    args: AskUserArgs,
     context?: ToolExecutionContext,
   ): Promise<ToolResult> => {
-    const question = args.question as string;
+    const question = args.question;
     const options = args.options;
     if (!Array.isArray(options)) {
       return {
         output: `Error: AskUser tool requires 'options' to be an array, received: ${JSON.stringify(args.options)}`,
       };
     }
-    const multiSelect = (args.multiSelect as boolean) ?? false;
+    const multiSelect = args.multiSelect ?? false;
 
     const answer = await context?.prompter?.prompt({
       message: question,
-      options: (options as Array<{ label: string; description: string }>).map(
-        (o) => ({ ...o, value: o.label }),
-      ),
+      options: options.map((o) => ({ ...o, value: o.label })),
       multiSelect,
     });
 

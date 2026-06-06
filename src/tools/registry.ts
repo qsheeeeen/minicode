@@ -18,12 +18,12 @@ export interface ToolResult {
   output: string;
 }
 
-export interface ToolDef {
+export interface ToolDef<TArgs = Record<string, unknown>> {
   name: string;
   description: string;
   input_schema: Record<string, unknown>;
   execute: (
-    args: Record<string, unknown>,
+    args: TArgs,
     context?: ToolExecutionContext,
   ) => Promise<ToolResult>;
   requires?: ToolRequirement[];
@@ -34,13 +34,13 @@ export interface ToolDef {
   changeOp?: "edit" | "write";
 }
 
-const defaultTools = new Map<string, ToolDef>();
+const defaultTools = new Map<string, ToolDef<any>>();
 
-export function register(tool: ToolDef): void {
+export function register(tool: ToolDef<any>): void {
   defaultTools.set(tool.name, tool);
 }
 
-export function getAll(): Map<string, ToolDef> {
+export function getAll(): Map<string, ToolDef<any>> {
   return new Map(defaultTools);
 }
 
@@ -55,8 +55,8 @@ export class ToolDeniedError extends Error {
   }
 }
 
-export function getSubAgentTools(): Map<string, ToolDef> {
-  const result = new Map<string, ToolDef>();
+export function getSubAgentTools(): Map<string, ToolDef<any>> {
+  const result = new Map<string, ToolDef<any>>();
   for (const [name, t] of defaultTools) {
     if ((t.readOnly ?? !t.requiresPermission) && !t.interactive) {
       result.set(name, t);
