@@ -174,7 +174,7 @@ export function toDisplayMessages(
 export class MessageStore {
   private turns: MessageParam[] = [];
   private statuses: StatusMessage[] = [];
-  private changeCallback?: () => void;
+  private listeners = new Set<() => void>();
   private streaming = false;
 
   // -- Streaming state (for TUI cursor animation) --
@@ -192,17 +192,14 @@ export class MessageStore {
 
   // Subscribe to updates. Returns an unsubscribe function.
   onChange(callback: () => void): () => void {
-    this.changeCallback = callback;
+    this.listeners.add(callback);
     return () => {
-      // Only clear if still the same listener (prevents stale cleanup)
-      if (this.changeCallback === callback) {
-        this.changeCallback = undefined;
-      }
+      this.listeners.delete(callback);
     };
   }
 
   private notify(): void {
-    this.changeCallback?.();
+    for (const cb of this.listeners) cb();
   }
 
   getTurns(): StoredMessage[] {
