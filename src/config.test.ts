@@ -85,11 +85,11 @@ describe("loadConfigSync", () => {
 
   it("parses valid JSON config", () => {
     vi.mocked(fs.readFileSync).mockReturnValue(
-      '{"model": "glm-4.7@zhipu", "promptFile": "CUSTOM.md"}',
+      '{"model": "glm-4.7@zhipu", "compressionThreshold": 0.9}',
     );
     const config = loadConfigSync();
     expect(config.model).toBe("glm-4.7@zhipu");
-    expect(config.promptFile).toBe("CUSTOM.md");
+    expect(config.compressionThreshold).toBe(0.9);
   });
 });
 

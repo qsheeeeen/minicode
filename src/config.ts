@@ -36,9 +36,7 @@ export interface Config {
   compressionThreshold?: number; // 0-1, compress at this ratio of context
   thinking?: ThinkingConfig; // thinking configuration (Go writes { effort: "high" })
   effort?: EffortLevel; // legacy: top-level effort, now nested under thinking
-  promptFile?: string; // project prompt filename (default: AGENTS.md)
   permissionMode?: "manual" | "yolo" | "auto";
-  skillsDir?: string; // project skills directory (default: .minicode/skills)
 }
 
 let cachedConfig: Config | null = null;

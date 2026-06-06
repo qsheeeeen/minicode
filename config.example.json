@@ -25,7 +25,5 @@
   "compressionThreshold": 0.8,
   "thinking": {
     "effort": "medium"
-  },
-  "promptFile": "AGENTS.md",
-  "skillsDir": ".minicode/skills"
+  }
 }
