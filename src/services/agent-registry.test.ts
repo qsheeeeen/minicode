@@ -164,5 +164,31 @@ describe("AgentRegistry", () => {
       registry.remove("2");
       expect(cb).toHaveBeenCalledWith([]);
     });
+
+    it("calls updateCallback on updateStatus", () => {
+      const registry = new AgentRegistry();
+      const callback = vi.fn();
+      registry.setUpdateCallback(callback);
+      registry.register(createMockSession("1", "main"));
+      callback.mockClear();
+      
+      registry.updateStatus("1", "completed");
+      
+      expect(callback).toHaveBeenCalledTimes(1);
+      expect(callback.mock.calls[0][0][0].status).toBe("completed");
+    });
+
+    it("calls updateCallback on updateSummary", () => {
+      const registry = new AgentRegistry();
+      const callback = vi.fn();
+      registry.setUpdateCallback(callback);
+      registry.register(createMockSession("1", "main"));
+      callback.mockClear();
+      
+      registry.updateSummary("1", "done");
+      
+      expect(callback).toHaveBeenCalledTimes(1);
+      expect(callback.mock.calls[0][0][0].summary).toBe("done");
+    });
   });
 });

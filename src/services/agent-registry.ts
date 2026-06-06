@@ -46,12 +46,18 @@ export class AgentRegistry {
 
   updateStatus(id: string, status: AgentStatus): void {
     const session = this.sessions.get(id);
-    if (session) session.status = status;
+    if (session) {
+      session.status = status;
+      this.notifyUpdate();
+    }
   }
 
   updateSummary(id: string, summary: string): void {
     const session = this.sessions.get(id);
-    if (session) session.summary = summary;
+    if (session) {
+      session.summary = summary;
+      this.notifyUpdate();
+    }
   }
 
   updateProgress(
