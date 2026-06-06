@@ -2,11 +2,9 @@ import type {
   MessageParam,
   ContentBlock,
 } from "@anthropic-ai/sdk/resources/messages.js";
-import type { Element } from "react";
 import fs from "fs/promises";
 import path from "path";
 import os from "os";
-import { getAppDir } from "../config.js";
 import crypto from "crypto";
 
 export type StoredMessage = MessageParam & {
@@ -40,7 +38,7 @@ export interface StatusMessage {
   content: string;
   timestamp: Date;
   turnIndex?: number;
-  element?: React.ReactElement;
+  element?: unknown;
   toolDisplay?: { name: string; input: Record<string, unknown>; output?: string };
 }
 
@@ -67,7 +65,7 @@ export type DisplayMessage =
   | {
       role: "status";
       content: string;
-      element?: React.ReactElement;
+      element?: unknown;
       toolDisplay?: { name: string; input: Record<string, unknown>; output?: string };
       timestamp?: Date;
     }

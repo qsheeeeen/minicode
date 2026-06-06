@@ -64,7 +64,7 @@ export function Message({ msg }: { msg: DisplayMessage }) {
           </Box>
         );
       }
-      if (msg.element) return <Box marginBottom={1}>{msg.element}</Box>;
+      if (msg.element) return <Box marginBottom={1}>{msg.element as React.ReactElement}</Box>;
       return (
         <Box marginBottom={1}>
           <StatusMessage variant="info">{msg.content}</StatusMessage>
