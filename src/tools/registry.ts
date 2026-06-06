@@ -6,10 +6,10 @@ import type { UserPrompter } from "../utils/display.js";
 export type ToolRequirement = "agentRegistry";
 
 export interface ToolExecutionContext {
-  registry?: AgentRegistry;
-  config?: AgentConfig;
-  currentAgentId?: string;
-  signal?: AbortSignal;
+  registry: AgentRegistry | undefined;
+  config: AgentConfig;
+  currentAgentId: string;
+  signal: AbortSignal | undefined;
   permissionService?: PermissionService;
   prompter?: UserPrompter;
 }
