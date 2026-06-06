@@ -95,7 +95,7 @@ export function InputArea({
           await import("../../config.js");
         const config = await loadConfig();
 
-        const tierMatch = value.match(/^(\d):(.*)$/);
+        const tierMatch = value.match(/^(pro|flash):(.*)$/);
         if (tierMatch) {
           const tier = tierMatch[1];
           let modelSpec = tierMatch[2];
@@ -110,12 +110,14 @@ export function InputArea({
               config.providers ?? {},
             );
             if (parsed) {
+              const modelConfig = parsed.providerConfig.models?.[parsed.modelName];
               agentRef.current.setModel(
                 parsed.modelName,
                 parsed.providerConfig.apiKey,
                 parsed.providerConfig.baseURL,
                 parsed.providerName,
-                parsed.providerConfig.models?.[parsed.modelName]?.contextLength,
+                modelConfig?.contextLength,
+                modelConfig?.name,
               );
               import("../../config.js").then((m) => m.setModel(modelSpec));
               if (tierMatch[2]) {

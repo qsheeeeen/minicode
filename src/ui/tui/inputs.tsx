@@ -87,6 +87,10 @@ export function SessionListInput({
   );
 }
 
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 /** Model selection input - tier-based with optional edit flow */
 export function ModelSelectInput({
   onExecute,
@@ -119,10 +123,10 @@ export function ModelSelectInput({
 
   // ── Main: tiers + edit entry ──
   if (step === "main") {
-    const tierLabels = ["1", "2", "3"];
+    const tierLabels = ["pro", "flash"];
     const options = [
       ...tierLabels.map((t) => ({
-        label: `Tier ${t} → ${tiers[t] || "(unset)"}`,
+        label: `${capitalize(t)} → ${tiers[t] || "(unset)"}`,
         value: `${t}:`,
       })),
       { label: "Edit tier mapping...", value: "_edit_" },
@@ -131,7 +135,7 @@ export function ModelSelectInput({
     return (
       <Box flexDirection="column">
         <Text bold color="magenta">
-          Select tier:
+          Select model:
         </Text>
         <Select
           options={options}
@@ -150,9 +154,9 @@ export function ModelSelectInput({
 
   // ── Edit: pick tier to reconfigure ──
   if (step === "edit-tier") {
-    const tierLabels = ["1", "2", "3"];
+    const tierLabels = ["pro", "flash"];
     const options = tierLabels.map((t) => ({
-      label: `Tier ${t} → ${tiers[t] || "(unset)"}`,
+      label: `${capitalize(t)} → ${tiers[t] || "(unset)"}`,
       value: t,
     }));
 
@@ -182,7 +186,7 @@ export function ModelSelectInput({
     return (
       <Box flexDirection="column">
         <Text bold color="magenta">
-          Provider for Tier {editTier}:
+          Provider for {capitalize(editTier)}:
         </Text>
         {options.length > 0 ? (
           <Select
@@ -201,14 +205,15 @@ export function ModelSelectInput({
   }
 
   // ── Edit: pick model ──
-  const options = Object.keys(providers[selectedProvider]?.models ?? {}).map(
-    (k) => ({ label: k, value: `${editTier}:${k}@${selectedProvider}` }),
+  const models = providers[selectedProvider]?.models ?? {};
+  const options = Object.keys(models).map(
+    (k) => ({ label: models[k]?.name || k, value: `${editTier}:${k}@${selectedProvider}` }),
   );
 
   return (
     <Box flexDirection="column">
       <Text bold color="magenta">
-        Model for Tier {editTier} @{selectedProvider}:
+        Model for {capitalize(editTier)} @{selectedProvider}:
       </Text>
       {options.length > 0 ? (
         <Select options={options} onChange={(v) => onExecute?.(v)} />

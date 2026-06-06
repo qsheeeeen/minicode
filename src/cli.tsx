@@ -145,6 +145,7 @@ const agent = new Agent({
   baseURL: config.model!.baseURL,
   model: config.model!.model,
   provider: config.model!.provider,
+  displayName: config.model!.displayName,
   contextLength: config.model!.contextLength,
   compressionThresholdRatio: config.compressionThreshold,
   thinkingEnabled: config.thinking.enabled,

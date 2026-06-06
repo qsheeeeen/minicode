@@ -16,7 +16,7 @@ function Demo() {
       <ToolDisplay name="SubAgent" input={{ task: "Find all TypeScript files that export a default function" }} output="Found 5 files." />
       <ToolDisplay name="ActivateSkill" input={{ name: "code-review" }} output="Loaded" />
       <ToolDisplay name="AskUser" input={{ question: "Which database should we use?" }} />
-      <ToolDisplay name="SetModel" input={{ tier: "2" }} />
+      <ToolDisplay name="SetModel" input={{ tier: "flash" }} />
     </Box>
   );
 }

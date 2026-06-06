@@ -204,13 +204,13 @@ describe("tiers", () => {
     const fs = await import("fs/promises");
     (fs.default.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(
       JSON.stringify({
-        tiers: { "1": "claude-sonnet@anthropic", "2": "glm-4.7@zhipu" },
+        tiers: { "pro": "claude-sonnet@anthropic", "flash": "glm-4.7@zhipu" },
       }),
     );
     const config = await loadConfig();
     expect(config.tiers).toEqual({
-      "1": "claude-sonnet@anthropic",
-      "2": "glm-4.7@zhipu",
+      "pro": "claude-sonnet@anthropic",
+      "flash": "glm-4.7@zhipu",
     });
   });
 
@@ -224,10 +224,10 @@ describe("tiers", () => {
   it("setTier writes tier mapping", async () => {
     const fs = await import("fs/promises");
     (fs.default.readFile as ReturnType<typeof vi.fn>).mockResolvedValue("{}");
-    await setTier("1", "claude-opus@anthropic");
+    await setTier("pro", "claude-opus@anthropic");
     expect(fs.default.writeFile).toHaveBeenCalledWith(
       expect.stringContaining("config.json"),
-      expect.stringContaining('"1"'),
+      expect.stringContaining('"pro"'),
       "utf-8",
     );
   });

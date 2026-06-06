@@ -86,7 +86,7 @@ src/
 
 ## Config
 
-`~/.minicode/config.json` — model specifier format: `model@provider` (e.g., `claude-sonnet-4-5@anthropic`). Resolution order: CLI `-m` > `MODEL` env > config `model` field. Supports tiers (1/2/3 → haiku/sonnet/opus).
+`~/.minicode/config.json` — model specifier format: `model@provider` (e.g., `claude-sonnet-4-5@anthropic`). Resolution order: CLI `-m` > `MODEL` env > config `model` field. Supports tiers: `"pro"` and `"flash"`, each mapping to a `model@provider`.
 
 ## Verification Protocol
 

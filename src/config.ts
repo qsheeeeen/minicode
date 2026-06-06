@@ -35,6 +35,7 @@ function normalizeKeys(obj: unknown): unknown {
 
 export interface ModelConfig {
   contextLength?: number;
+  name?: string;
 }
 
 export interface ProviderConfig {
@@ -56,7 +57,7 @@ export interface ThinkingConfig {
 export interface Config {
   providers?: Providers;
   model?: string; // format: model@provider, e.g. "glm-4.7@zhipu"
-  tiers?: Record<string, string>; // tier -> model@provider, e.g. { "1": "claude-sonnet@anthropic" }
+  tiers?: Record<string, string>; // tier -> model@provider, e.g. { "pro": "claude-sonnet@anthropic", "flash": "glm-4.7@zhipu" }
   compressionThreshold?: number; // 0-1, compress at this ratio of context
   thinking?: ThinkingConfig; // thinking configuration (Go writes { effort: "high" })
   effort?: EffortLevel; // legacy: top-level effort, now nested under thinking
@@ -146,6 +147,7 @@ export interface ResolvedConfig {
     apiKey: string;
     baseURL?: string;
     contextLength?: number;
+    displayName?: string;
   } | null;
   compressionThreshold: number;
   thinking: { enabled: boolean; effort?: EffortLevel };
@@ -169,6 +171,7 @@ export async function loadAllConfig(
         apiKey: parsed.providerConfig.apiKey!,
         baseURL: parsed.providerConfig.baseURL,
         contextLength: modelConfig?.contextLength,
+        displayName: modelConfig?.name,
       };
     }
   }

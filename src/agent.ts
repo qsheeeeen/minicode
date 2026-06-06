@@ -54,6 +54,7 @@ export interface AgentConfig {
   baseURL?: string;
   model?: string;
   provider?: string;
+  displayName?: string;
   contextLength?: number;
   compressionThresholdRatio?: number;
   thinkingEnabled?: boolean;
@@ -76,6 +77,7 @@ export class Agent {
   private tools: Map<string, ToolDef>;
   private store = new MessageStore();
   private model?: string;
+  private displayName?: string;
   private modelProvider?: string;
   private contextLength: number;
   private compressionThresholdRatio: number;
@@ -132,8 +134,10 @@ export class Agent {
     baseURL?: string,
     provider?: string,
     contextLength?: number,
+    displayName?: string,
   ): void {
     this.model = model;
+    this.displayName = displayName;
     if (provider !== undefined) this.modelProvider = provider;
     if (apiKey !== undefined) this.apiKey = apiKey;
     if (baseURL !== undefined) this.baseURL = baseURL;
@@ -142,7 +146,7 @@ export class Agent {
   }
 
   getModelName(): string | undefined {
-    return this.model;
+    return this.displayName || this.model;
   }
   getModelProvider(): string | undefined {
     return this.modelProvider;
@@ -156,6 +160,7 @@ export class Agent {
     this.baseURL = config.baseURL;
     this.client = new AnthropicClient(this.apiKey, this.baseURL);
     this.model = config.model;
+    this.displayName = config.displayName;
     this.modelProvider = config.provider;
     this.contextLength = config.contextLength || 200000;
     this.compressionThresholdRatio = config.compressionThresholdRatio || 0.8;

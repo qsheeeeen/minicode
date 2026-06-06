@@ -11,7 +11,7 @@ export const setModelTool: ToolDef = {
     properties: {
       tier: {
         type: "string",
-        description: 'The tier number: "1", "2", or "3"',
+        description: 'The model tier: "pro" or "flash"',
       },
     },
     required: ["tier"],
@@ -37,17 +37,19 @@ export const setModelTool: ToolDef = {
     }
 
     const agent = context?.registry?.get(context.currentAgentId || "1")?.agent;
+    const modelConfig = parsed.providerConfig.models?.[parsed.modelName];
     if (agent) {
       agent.setModel(
         parsed.modelName,
         parsed.providerConfig.apiKey,
         parsed.providerConfig.baseURL,
         parsed.providerName,
-        parsed.providerConfig.models?.[parsed.modelName]?.contextLength,
+        modelConfig?.contextLength,
+        modelConfig?.name,
       );
     }
     await setModel(modelSpec);
-    return { output: `Switched to tier ${tier}: ${modelSpec}` };
+    return { output: `Switched to ${tier}: ${modelSpec}` };
   },
 };
 register(setModelTool);

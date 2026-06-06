@@ -64,7 +64,11 @@ describe("callContent", () => {
   });
 
   it("formats SetModel with tier", () => {
-    expect(callContent("SetModel", { tier: "2" })).toBe("SetModel(Tier 2)");
+    expect(callContent("SetModel", { tier: "flash" })).toBe("SetModel(Flash)");
+  });
+
+  it("formats SetModel with pro tier", () => {
+    expect(callContent("SetModel", { tier: "pro" })).toBe("SetModel(Pro)");
   });
 
   it("formats unknown tool with JSON summary", () => {

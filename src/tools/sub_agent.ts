@@ -20,7 +20,7 @@ export const agentTool: ToolDef = {
       tier: {
         type: "string" as const,
         description:
-          'Optional: run the sub-agent with the model mapped to this tier ("1", "2", or "3"). Overrides the parent model.',
+          'Optional: run the sub-agent with the model mapped to this tier ("pro" or "flash"). Overrides the parent model.',
       },
     },
     required: ["task"],

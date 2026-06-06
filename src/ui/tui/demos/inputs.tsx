@@ -20,7 +20,7 @@ function Demo() {
       {current === "chat" && <ChatInput value="" onChange={() => {}} onSubmit={(v) => console.log(v)} inputKey={0} />}
       {current === "effort" && <EffortSelectInput onExecute={(v) => console.log(v)} onCancel={() => {}} />}
       {current === "session" && <SessionListInput sessions={[{ name: "debug-auth" }, { name: "refactor-db" }, { name: "feature-login" }]} onExecute={(v) => console.log(v)} onCancel={() => {}} />}
-      {current === "model" && <ModelSelectInput providers={{ anthropic: { apiKey: "sk-...", models: { "claude-sonnet-4-5": {}, "claude-haiku-4-5": {} } } } as any} tiers={{ "1": "claude-haiku-4-5@anthropic", "2": "claude-sonnet-4-5@anthropic" }} onExecute={(v) => console.log(v)} onCancel={() => {}} />}
+      {current === "model" && <ModelSelectInput providers={{ anthropic: { apiKey: "sk-...", models: { "claude-sonnet-4-5": {}, "claude-haiku-4-5": {} } } } as any} tiers={{ "pro": "claude-sonnet-4-5@anthropic", "flash": "claude-haiku-4-5@anthropic" }} onExecute={(v) => console.log(v)} onCancel={() => {}} />}
       {current === "undo" && <UndoInput totalTurns={3} userMessages={["Fix login bug", "Add validation", "Write tests"]} entriesByTurn={[{ turnIdx: 1, entries: [{ path: "src/auth.ts", op: "edit", before: "..." } as any] }]} onExecute={(v) => console.log(v)} onCancel={() => {}} />}
     </Box>
   );

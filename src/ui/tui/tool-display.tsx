@@ -51,7 +51,8 @@ export function callContent(
       return `${name}("${input.question as string}")`;
     }
     case "SetModel": {
-      return `${name}(Tier ${input.tier as string})`;
+      const tier = input.tier as string;
+      return `${name}(${tier.charAt(0).toUpperCase() + tier.slice(1)})`;
     }
     default:
       return `${name}(${summary(input)})`;
