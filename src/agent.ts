@@ -20,13 +20,13 @@ import {
 } from "./utils/display.js";
 import type { SessionStats } from "./services/session-stats.js";
 import {
-  TokenManager,
   CompressionService,
   AgentRegistry,
   PermissionService,
   type PermissionMode,
 } from "./services/index.js";
 import { StreamingHandler } from "./services/streaming-handler.js";
+import { TokenTracker } from "./services/token-tracker.js";
 import { ChangeJournal } from "./services/change-journal.js";
 import { MessageStore } from "./messages.js";
 import { getAvailableSkills } from "./skills/index.js";
@@ -78,7 +78,7 @@ export class Agent {
   private modelProvider?: string;
   private contextLength: number;
   private compressionThresholdRatio: number;
-  private tokenManager: TokenManager;
+  private tokenTracker: TokenTracker;
   private compressionService: CompressionService;
   private streamingHandler: StreamingHandler;
   private changeJournal = new ChangeJournal();
@@ -166,7 +166,6 @@ export class Agent {
     this.compressionThresholdRatio = config.compressionThresholdRatio || 0.8;
     this.thinkingEnabled = config.thinkingEnabled || false;
     this.effort = config.effort;
-    this.tokenManager = new TokenManager();
     this.compressionService = new CompressionService();
     this.tools = config.subAgentMode
       ? getSubAgentTools()
@@ -190,6 +189,13 @@ export class Agent {
 
     this.events = new ConsoleEvents();
     this.prompter = new ConsolePrompter();
+    this.tokenTracker = new TokenTracker(
+      this.contextLength,
+      this.compressionThresholdRatio,
+      this.events,
+      this.store,
+      this.sessionStats,
+    );
     this.userPrompt = config.userPrompt || "";
     this.projectPromptFile = config.projectPromptFile || "";
 
@@ -209,7 +215,7 @@ export class Agent {
   private async saveStore(): Promise<void> {
     this.store.setMeta({
       model: this.model || "unknown",
-      totalTokens: this.tokenManager.getTotal(),
+      totalTokens: this.tokenTracker.getTotal(),
     });
     await this.store.save().catch((e) => {
       this.logger?.error({ error: String(e) }, "Failed to save session");
@@ -242,7 +248,7 @@ export class Agent {
     }
 
     this.isCompressing = true;
-    const totalTokens = this.tokenManager.getTotal();
+    const totalTokens = this.tokenTracker.getTotal();
     this.store.addStatus({
       role: "status",
       content: `(Compressing ${turns.length - recentCount} messages, ${totalTokens.toLocaleString()} tokens...)`,
@@ -278,7 +284,7 @@ export class Agent {
       }
 
       this.store.setTurns(compressed);
-      this.tokenManager.reset();
+      this.tokenTracker.reset();
       this.events.tokenUpdate(0);
 
       // Recalculate activeTurnIdx for the compressed conversation
@@ -347,50 +353,21 @@ export class Agent {
     this.systemPrompt = prompt;
   }
 
-  /** Handle streaming response: build assistant turn incrementally */
   /** Track token usage and trigger auto-compression */
   private async processTokenUsage(
     response: Anthropic.Messages.Message,
   ): Promise<void> {
     if (!response.usage) return;
 
-    this.tokenManager.updateUsage(
-      response.usage.input_tokens,
-      response.usage.output_tokens,
-      response.usage.cache_creation_input_tokens ?? 0,
-      response.usage.cache_read_input_tokens ?? 0,
-    );
-    this.sessionStats?.recordUsage(
+    const { shouldCompress } = this.tokenTracker.processUsage(
       this.model || "unknown",
       response.usage.input_tokens,
       response.usage.output_tokens,
       response.usage.cache_creation_input_tokens ?? 0,
       response.usage.cache_read_input_tokens ?? 0,
     );
-    this.events.tokenUpdate(this.tokenManager.getTotal());
-    const ratio = this.tokenManager.getRatio(this.contextLength);
-    const percentage = Math.floor(ratio * 100);
 
-    const thresholds = [25, 50, 75, 90];
-    const lastShown = this.tokenManager.getLastShownThreshold();
-    for (const t of thresholds) {
-      if (percentage >= t && lastShown < t) {
-        this.store.addStatus({
-          role: "status",
-          content: `[${percentage}% context]`,
-          timestamp: new Date(),
-        });
-        this.tokenManager.updateThreshold(t);
-        break;
-      }
-    }
-
-    if (
-      this.tokenManager.shouldCompress(
-        this.contextLength,
-        this.compressionThresholdRatio,
-      )
-    ) {
+    if (shouldCompress) {
       await this.compress();
     }
   }
@@ -618,7 +595,7 @@ export class Agent {
       this.logger?.info(
         {
           session: this.currentSession,
-          totalTokens: this.tokenManager.getTotal(),
+          totalTokens: this.tokenTracker.getTotal(),
         },
         "Session ended",
       );
@@ -651,20 +628,17 @@ export class Agent {
   }
 
   getTokenCount(): number {
-    return this.tokenManager.getTotal();
+    return this.tokenTracker.getTotal();
   }
 
   setTokenCount(count: number): void {
-    this.tokenManager.reset();
-    if (count > 0) {
-      this.tokenManager.updateUsage(count, 0);
-    }
-    this.events.tokenUpdate(this.tokenManager.getTotal());
+    this.tokenTracker.setCount(count);
+    this.events.tokenUpdate(this.tokenTracker.getTotal());
   }
 
   clearSession(): void {
     this.store.clear();
-    this.tokenManager.reset();
+    this.tokenTracker.reset();
     this.changeJournal.close();
     this.changeJournal = new ChangeJournal();
   }
