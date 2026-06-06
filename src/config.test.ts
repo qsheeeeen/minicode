@@ -68,45 +68,7 @@ describe("loadConfig", () => {
     expect(config.compressionThreshold).toBe(0.9);
   });
 
-  it("normalizes Viper lowercase keys to camelCase", async () => {
-    const fs = await import("fs/promises");
-    (fs.default.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(
-      JSON.stringify({
-        compressionthreshold: 0.8,
-        permissionmode: "yolo",
-        promptfile: "CUSTOM.md",
-        skillsdir: "skills",
-        providers: {
-          deepseek: {
-            apikey: "sk-test",
-            baseurl: "https://api.deepseek.com",
-            models: { "deepseek-v4": { contextlength: 1000000 } },
-          },
-        },
-      }),
-    );
-    const config = await loadConfig();
-    expect(config.compressionThreshold).toBe(0.8);
-    expect(config.permissionMode).toBe("yolo");
-    expect(config.promptFile).toBe("CUSTOM.md");
-    expect(config.skillsDir).toBe("skills");
-    expect(config.providers?.deepseek?.apiKey).toBe("sk-test");
-    expect(config.providers?.deepseek?.baseURL).toBe("https://api.deepseek.com");
-    expect(config.providers?.deepseek?.models?.["deepseek-v4"]?.contextLength).toBe(1000000);
-  });
 
-  it("merges top-level provider into providers", async () => {
-    const fs = await import("fs/promises");
-    (fs.default.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(
-      JSON.stringify({
-        providers: { deepseek: { apikey: "sk-d" } },
-        zhipu: { apikey: "zk-z", baseurl: "https://zhipu.ai" },
-      }),
-    );
-    const config = await loadConfig();
-    expect(config.providers?.zhipu?.apiKey).toBe("zk-z");
-    expect(config.providers?.deepseek?.apiKey).toBe("sk-d");
-  });
 });
 
 describe("loadConfigSync", () => {

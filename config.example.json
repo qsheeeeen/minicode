@@ -23,8 +23,9 @@
     "flash": "claude-haiku-4-5@anthropic"
   },
   "compressionThreshold": 0.8,
-  "thinking": false,
-  "effort": "medium",
+  "thinking": {
+    "effort": "medium"
+  },
   "promptFile": "AGENTS.md",
   "skillsDir": ".minicode/skills"
 }

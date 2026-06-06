@@ -7,31 +7,6 @@ import type { EffortLevel } from "./llm/anthropic.js";
 const CONFIG_DIR = path.join(os.homedir(), ".minicode");
 const CONFIG_PATH = path.join(CONFIG_DIR, "config.json");
 
-// Viper (Go) lowercases all keys when writing config.
-// Map known lowercase keys to their camelCase equivalents.
-const CAMEL_CASE_MAP: Record<string, string> = {
-  apikey: "apiKey",
-  baseurl: "baseURL",
-  contextlength: "contextLength",
-  compressionthreshold: "compressionThreshold",
-  permissionmode: "permissionMode",
-  promptfile: "promptFile",
-  skillsdir: "skillsDir",
-};
-
-function normalizeKeys(obj: unknown): unknown {
-  if (typeof obj !== "object" || obj === null) return obj;
-  if (Array.isArray(obj)) return obj.map(normalizeKeys);
-
-  const result: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(
-    obj as Record<string, unknown>,
-  )) {
-    const normalizedKey = CAMEL_CASE_MAP[key] ?? key;
-    result[normalizedKey] = normalizeKeys(value);
-  }
-  return result;
-}
 
 export interface ModelConfig {
   contextLength?: number;
@@ -64,38 +39,10 @@ export interface Config {
   promptFile?: string; // project prompt filename (default: AGENTS.md)
   permissionMode?: "manual" | "yolo" | "auto";
   skillsDir?: string; // project skills directory (default: .minicode/skills)
-  // Top-level provider keys (Go may write providers outside "providers" wrapper)
-  [key: string]: unknown;
 }
 
 let cachedConfig: Config | null = null;
 
-function mergeTopLevelProviders(raw: Record<string, unknown>): void {
-  // Go's Viper may write provider configs at the top level (e.g. "zhipu": {...})
-  // alongside the "providers" wrapper. Merge them in.
-  const providers = (raw.providers ?? {}) as Record<string, unknown>;
-  for (const key of Object.keys(raw)) {
-    if (key === "providers") continue;
-    const val = raw[key];
-    if (
-      typeof val === "object" &&
-      val !== null &&
-      !Array.isArray(val) &&
-      ("apikey" in val || "apiKey" in val)
-    ) {
-      if (!providers[key]) {
-        providers[key] = val;
-      }
-    }
-  }
-  raw.providers = providers;
-}
-
-function parseAndNormalize(content: string): Config {
-  const raw = JSON.parse(content) as Record<string, unknown>;
-  mergeTopLevelProviders(raw);
-  return normalizeKeys(raw) as Config;
-}
 
 export async function loadConfig(refresh = false): Promise<Config> {
   if (cachedConfig && !refresh) return cachedConfig;
@@ -103,7 +50,7 @@ export async function loadConfig(refresh = false): Promise<Config> {
   try {
     await fsPromises.mkdir(CONFIG_DIR, { recursive: true });
     const content = await fsPromises.readFile(CONFIG_PATH, "utf-8");
-    cachedConfig = parseAndNormalize(content);
+    cachedConfig = JSON.parse(content) as Config;
     return cachedConfig ?? {};
   } catch {
     // 配置文件不存在，返回空配置
@@ -134,7 +81,7 @@ export function parseModelSpecifier(
 export function loadConfigSync(): Config {
   try {
     const content = fs.readFileSync(CONFIG_PATH, "utf-8");
-    return parseAndNormalize(content);
+    return JSON.parse(content) as Config;
   } catch {
     return {};
   }
