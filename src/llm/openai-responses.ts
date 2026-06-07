@@ -19,7 +19,7 @@ const DEFAULT_MAX_TOKENS = 8192;
 // Effort mapping
 
 // Map our five-level effort to OpenAI's three-level reasoning effort.
-function mapEffort(effort: EffortLevel): any {
+function toOpenAIEffort(effort: EffortLevel): any {
   switch (effort) {
     case "none":
       return "none";
@@ -250,7 +250,7 @@ export class OpenAIResponsesClient implements LLMClient {
 
     // Reasoning effort
     if (options.effort) {
-      params.reasoning = { effort: mapEffort(options.effort) };
+      params.reasoning = { effort: toOpenAIEffort(options.effort) };
     }
 
     const streamPromise = this.client.responses.create(params, {

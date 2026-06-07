@@ -14,7 +14,7 @@ import type {
 import type { LLMClient, LLMToolDef, ChatOptions, LLMResponse, EffortLevel } from "./client.js";
 import type { MessageParam, ContentBlock } from "../messages.js";
 
-function mapEffort(effort: EffortLevel): any {
+function toAnthropicEffort(effort: EffortLevel): any {
   switch (effort) {
     case "none":
     case "minimal":
@@ -99,7 +99,7 @@ export class AnthropicClient implements LLMClient {
 
     if (options.effort) {
       params.output_config = {
-        effort: mapEffort(options.effort),
+        effort: toAnthropicEffort(options.effort),
       };
     }
 

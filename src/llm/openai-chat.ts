@@ -15,7 +15,7 @@ const DEFAULT_MAX_TOKENS = 8192;
 
 // Effort mapping (canonical → OpenAI reasoning_effort)
 
-function mapEffort(effort: EffortLevel): any {
+function toOpenAIEffort(effort: EffortLevel): any {
   switch (effort) {
     case "none":
       return "none";
@@ -241,7 +241,7 @@ export class OpenAIChatClient implements LLMClient {
     }
 
     if (options.effort) {
-      params.reasoning_effort = mapEffort(options.effort);
+      params.reasoning_effort = toOpenAIEffort(options.effort);
     }
 
     const streamPromise = this.client.chat.completions.create(params, {
