@@ -4,9 +4,9 @@ import { Agent } from "../agent.js";
 import type { MessageParam } from "../llm/anthropic.js";
 import type { ResolvedConfig } from "../config.js";
 import { CallbackEvents, CallbackPrompter } from "../utils/display.js";
-import { routeInput, runBash } from "./routing.js";
+import { routeInput } from "./routing.js";
 import { MessageStore } from "../messages.js";
-import { AgentRegistry, type AgentSession } from "../services/index.js";
+import { AgentRegistry, type AgentSession, runBash } from "../services/index.js";
 import type { SessionStats } from "../services/session-stats.js";
 import { Receipt } from "./tui/Receipt.js";
 
