@@ -1,16 +1,18 @@
+import type { TokenUsage } from "../llm/client.js";
+
 export interface PerModelTokens {
-  inputTokens: number;
-  outputTokens: number;
-  cacheCreation: number;
-  cacheRead: number;
+  input: number;
+  output: number;
+  cacheMiss: number;
+  cacheHit: number;
 }
 
 export interface ModelUsage {
   name: string;
-  inputTokens: number;
-  outputTokens: number;
-  cacheCreation: number;
-  cacheRead: number;
+  input: number;
+  output: number;
+  cacheMiss: number;
+  cacheHit: number;
   total: number;
 }
 
@@ -37,27 +39,21 @@ export class SessionStats {
     this.sessionNames = [initialSession];
   }
 
-  recordUsage(
-    model: string,
-    input: number,
-    output: number,
-    cacheCreation: number,
-    cacheRead: number,
-  ): void {
+  recordUsage(model: string, usage: TokenUsage): void {
     if (!this.perModel.has(model)) {
       this.perModel.set(model, {
-        inputTokens: 0,
-        outputTokens: 0,
-        cacheCreation: 0,
-        cacheRead: 0,
+        input: 0,
+        output: 0,
+        cacheMiss: 0,
+        cacheHit: 0,
       });
       this.modelsUsedInOrder.push(model);
     }
     const entry = this.perModel.get(model)!;
-    entry.inputTokens += input;
-    entry.outputTokens += output;
-    entry.cacheCreation += cacheCreation;
-    entry.cacheRead += cacheRead;
+    entry.input += usage.input.total;
+    entry.output += usage.output;
+    entry.cacheMiss += usage.input.cache_miss;
+    entry.cacheHit += usage.input.cache_hit;
   }
 
   incrementSessionCount(sessionName: string): void {
@@ -70,11 +66,11 @@ export class SessionStats {
       const t = this.perModel.get(name)!;
       return {
         name,
-        inputTokens: t.inputTokens,
-        outputTokens: t.outputTokens,
-        cacheCreation: t.cacheCreation,
-        cacheRead: t.cacheRead,
-        total: t.inputTokens + t.outputTokens + t.cacheCreation + t.cacheRead,
+        input: t.input,
+        output: t.output,
+        cacheMiss: t.cacheMiss,
+        cacheHit: t.cacheHit,
+        total: t.input + t.output,
       };
     });
     const totalTokens = models.reduce((sum, m) => sum + m.total, 0);

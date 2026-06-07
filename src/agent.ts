@@ -374,10 +374,7 @@ export class Agent {
 
     const { shouldCompress } = this.tokenTracker.processUsage(
       this.model || "unknown",
-      response.usage.input_tokens,
-      response.usage.output_tokens,
-      response.usage.cache_creation_input_tokens ?? 0,
-      response.usage.cache_read_input_tokens ?? 0,
+      response.usage,
     );
 
     if (shouldCompress) {
@@ -572,10 +569,8 @@ export class Agent {
         this.logger?.info(
           {
             session: this.currentSession,
-            inputTokens: response.usage?.input_tokens,
-            outputTokens: response.usage?.output_tokens,
-            cacheCreation: response.usage?.cache_creation_input_tokens ?? 0,
-            cacheRead: response.usage?.cache_read_input_tokens ?? 0,
+            input: response.usage?.input,
+            output: response.usage?.output,
             stopReason: response.stop_reason,
           },
           "LLM response",

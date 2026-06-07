@@ -1,17 +1,11 @@
+import type { TokenUsage } from "../llm/client.js";
+
 export class TokenCounter {
   private totalTokens = 0;
   private lastShownThreshold = 0;
 
-  updateUsage(
-    input: number,
-    output: number,
-    cacheCreation = 0,
-    cacheRead = 0,
-  ): void {
-    // input_tokens alone does NOT include cache tokens or output tokens.
-    // The actual context window usage is:
-    // input_tokens + output_tokens + cache_creation_input_tokens + cache_read_input_tokens
-    this.totalTokens = input + output + cacheCreation + cacheRead;
+  updateUsage(usage: TokenUsage): void {
+    this.totalTokens = usage.input.total + usage.output;
   }
 
   getTotal(): number {

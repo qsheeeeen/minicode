@@ -102,13 +102,13 @@ export function Receipt({ data, onDismiss }: ReceiptProps) {
           >
             <Box flexDirection="column" width={W}>
               <Text bold>{m.name}</Text>
-              <Field label="  Input:" value={fmtNum(m.inputTokens)} />
-              <Field label="  Output:" value={fmtNum(m.outputTokens)} />
-              {m.cacheCreation > 0 && (
-                <Field label="  Cache W:" value={fmtNum(m.cacheCreation)} />
+              <Field label="  Input:" value={fmtNum(m.input)} />
+              <Field label="  Output:" value={fmtNum(m.output)} />
+              {m.cacheMiss > 0 && (
+                <Field label="  Cache W:" value={fmtNum(m.cacheMiss)} />
               )}
-              {m.cacheRead > 0 && (
-                <Field label="  Cache R:" value={fmtNum(m.cacheRead)} />
+              {m.cacheHit > 0 && (
+                <Field label="  Cache R:" value={fmtNum(m.cacheHit)} />
               )}
               <Box width={W}>
                 <Box width={LABEL_W}>

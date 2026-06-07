@@ -5,7 +5,7 @@
 // Completions API format.
 
 import OpenAI from "openai";
-import type { LLMClient, LLMStream, StreamEvent, LLMToolDef, ChatOptions, LLMResponse, TokenUsage, EffortLevel } from "./client.js";
+import type { LLMClient, LLMStream, StreamEvent, LLMToolDef, ChatOptions, LLMResponse, EffortLevel } from "./client.js";
 import type { MessageParam, ContentBlock, TextBlock, ThinkingBlock, ToolUseBlock, ToolResultBlock } from "../messages.js";
 
 // Constants
@@ -196,8 +196,12 @@ function convertResponse(
     content,
     stop_reason: mapStopReason(choice.finish_reason),
     usage: {
-      input_tokens: usage?.prompt_tokens ?? 0,
-      output_tokens: usage?.completion_tokens ?? 0,
+      input: {
+        total: usage?.prompt_tokens ?? 0,
+        cache_miss: 0,
+        cache_hit: 0,
+      },
+      output: usage?.completion_tokens ?? 0,
     },
   };
 }
@@ -340,8 +344,12 @@ export class OpenAIChatClient implements LLMClient {
         content,
         stop_reason: mapStopReason(finishReason),
         usage: {
-          input_tokens: usage?.prompt_tokens ?? 0,
-          output_tokens: usage?.completion_tokens ?? 0,
+          input: {
+            total: usage?.prompt_tokens ?? 0,
+            cache_miss: 0,
+            cache_hit: 0,
+          },
+          output: usage?.completion_tokens ?? 0,
         },
       };
     }

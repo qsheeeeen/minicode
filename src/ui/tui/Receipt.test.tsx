@@ -12,10 +12,10 @@ const mockData: ReceiptData = {
   models: [
     {
       name: "claude-sonnet",
-      inputTokens: 1000,
-      outputTokens: 500,
-      cacheCreation: 100,
-      cacheRead: 200,
+      input: 1000,
+      output: 500,
+      cacheMiss: 100,
+      cacheHit: 200,
       total: 1800,
     },
   ],
@@ -72,10 +72,10 @@ describe("Receipt Component", () => {
       models: [
         {
           name: "model",
-          inputTokens: 100,
-          outputTokens: 50,
-          cacheCreation: 0,
-          cacheRead: 0,
+          input: 100,
+          output: 50,
+          cacheMiss: 0,
+          cacheHit: 0,
           total: 150,
         },
       ],

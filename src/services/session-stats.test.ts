@@ -1,39 +1,44 @@
 import { describe, it, expect } from "vitest";
 import { SessionStats } from "./session-stats.js";
+import type { TokenUsage } from "../llm/client.js";
+
+function usage(input: number, output: number, cacheMiss = 0, cacheHit = 0): TokenUsage {
+  return { input: { total: input, cache_miss: cacheMiss, cache_hit: cacheHit }, output };
+}
 
 describe("SessionStats", () => {
   it("accumulates token usage across calls", () => {
     const stats = new SessionStats();
     stats.init(1000, "test-project", "session-1");
 
-    stats.recordUsage("model-a", 100, 50, 10, 20);
-    stats.recordUsage("model-a", 200, 80, 0, 30);
+    stats.recordUsage("model-a", usage(100, 50, 10, 20));
+    stats.recordUsage("model-a", usage(200, 80, 0, 30));
 
     const data = stats.getStats();
     expect(data.models).toHaveLength(1);
     expect(data.models[0].name).toBe("model-a");
-    expect(data.models[0].inputTokens).toBe(300);
-    expect(data.models[0].outputTokens).toBe(130);
-    expect(data.models[0].cacheCreation).toBe(10);
-    expect(data.models[0].cacheRead).toBe(50);
-    expect(data.models[0].total).toBe(490);
-    expect(data.totalTokens).toBe(490);
+    expect(data.models[0].input).toBe(300);
+    expect(data.models[0].output).toBe(130);
+    expect(data.models[0].cacheMiss).toBe(10);
+    expect(data.models[0].cacheHit).toBe(50);
+    expect(data.models[0].total).toBe(430);
+    expect(data.totalTokens).toBe(430);
   });
 
   it("tracks usage per model separately", () => {
     const stats = new SessionStats();
     stats.init(1000, "test", "s1");
 
-    stats.recordUsage("model-a", 100, 50, 0, 0);
-    stats.recordUsage("model-b", 200, 80, 0, 0);
-    stats.recordUsage("model-a", 50, 25, 0, 0);
+    stats.recordUsage("model-a", usage(100, 50));
+    stats.recordUsage("model-b", usage(200, 80));
+    stats.recordUsage("model-a", usage(50, 25));
 
     const data = stats.getStats();
     expect(data.models).toHaveLength(2);
     expect(data.models[0].name).toBe("model-a");
-    expect(data.models[0].inputTokens).toBe(150);
+    expect(data.models[0].input).toBe(150);
     expect(data.models[1].name).toBe("model-b");
-    expect(data.models[1].inputTokens).toBe(200);
+    expect(data.models[1].input).toBe(200);
     expect(data.totalTokens).toBe(150 + 75 + 200 + 80);
   });
 
@@ -72,9 +77,9 @@ describe("SessionStats", () => {
     const stats = new SessionStats();
     stats.init(0, "test", "s1");
 
-    stats.recordUsage("z-model", 1, 0, 0, 0);
-    stats.recordUsage("a-model", 1, 0, 0, 0);
-    stats.recordUsage("m-model", 1, 0, 0, 0);
+    stats.recordUsage("z-model", usage(1, 0));
+    stats.recordUsage("a-model", usage(1, 0));
+    stats.recordUsage("m-model", usage(1, 0));
 
     const data = stats.getStats();
     expect(data.models.map((m) => m.name)).toEqual([

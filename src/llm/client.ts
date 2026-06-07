@@ -35,10 +35,8 @@ export interface ChatOptions {
 }
 
 export interface TokenUsage {
-  input_tokens: number;
-  output_tokens: number;
-  cache_creation_input_tokens?: number;
-  cache_read_input_tokens?: number;
+  input: { total: number; cache_miss: number; cache_hit: number };
+  output: number;
 }
 
 export interface LLMResponse {

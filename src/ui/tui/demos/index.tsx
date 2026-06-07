@@ -102,10 +102,10 @@ const receiptData = {
   models: [
     {
       name: "claude-sonnet-4-5",
-      inputTokens: 28500,
-      outputTokens: 6200,
-      cacheCreation: 8000,
-      cacheRead: 20000,
+      input: 28500,
+      output: 6200,
+      cacheMiss: 8000,
+      cacheHit: 20000,
       total: 34700,
     },
   ],

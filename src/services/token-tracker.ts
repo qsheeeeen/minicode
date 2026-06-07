@@ -2,6 +2,7 @@ import { TokenCounter } from "./token-counter.js";
 import type { SessionStats } from "./session-stats.js";
 import type { AgentEvents } from "../utils/display.js";
 import type { MessageStore } from "../messages.js";
+import type { TokenUsage } from "../llm/client.js";
 
 export class TokenTracker {
   private counter = new TokenCounter();
@@ -16,19 +17,10 @@ export class TokenTracker {
 
   processUsage(
     model: string,
-    input: number,
-    output: number,
-    cacheCreation: number,
-    cacheRead: number,
+    usage: TokenUsage,
   ): { percentage: number; shouldCompress: boolean } {
-    this.counter.updateUsage(input, output, cacheCreation, cacheRead);
-    this.sessionStats?.recordUsage(
-      model,
-      input,
-      output,
-      cacheCreation,
-      cacheRead,
-    );
+    this.counter.updateUsage(usage);
+    this.sessionStats?.recordUsage(model, usage);
     this.events.tokenUpdate(this.counter.getTotal());
 
     const ratio = this.counter.getRatio(this.contextLength);
@@ -68,7 +60,7 @@ export class TokenTracker {
   setCount(count: number): void {
     this.counter.reset();
     if (count > 0) {
-      this.counter.updateUsage(count, 0);
+      this.counter.updateUsage({ input: { total: count, cache_miss: 0, cache_hit: 0 }, output: 0 });
     }
   }
 

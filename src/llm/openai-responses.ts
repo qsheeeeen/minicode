@@ -204,8 +204,12 @@ function convertResponse(response: OpenAI.Responses.Response): LLMResponse {
 
   // Extract usage
   const usage: TokenUsage = {
-    input_tokens: response.usage?.input_tokens ?? 0,
-    output_tokens: response.usage?.output_tokens ?? 0,
+    input: {
+      total: response.usage?.input_tokens ?? 0,
+      cache_miss: 0,
+      cache_hit: 0,
+    },
+    output: response.usage?.output_tokens ?? 0,
   };
 
   return { content, stop_reason, usage };
@@ -336,7 +340,7 @@ export class OpenAIResponsesClient implements LLMClient {
       return {
         content: [],
         stop_reason: "error",
-        usage: { input_tokens: 0, output_tokens: 0 },
+        usage: { input: { total: 0, cache_miss: 0, cache_hit: 0 }, output: 0 },
       };
     }
 

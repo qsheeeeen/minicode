@@ -107,15 +107,20 @@ function toCanonicalContentBlock(
 }
 
 function toCanonicalResponse(msg: Anthropic.Messages.Message): LLMResponse {
+  const cacheMiss =
+    (msg.usage as any).cache_creation_input_tokens ?? 0;
+  const cacheHit =
+    (msg.usage as any).cache_read_input_tokens ?? 0;
   return {
     content: msg.content.map(toCanonicalContentBlock),
     stop_reason: msg.stop_reason ?? "end_turn",
     usage: {
-      input_tokens: msg.usage.input_tokens,
-      output_tokens: msg.usage.output_tokens,
-      cache_creation_input_tokens:
-        (msg.usage as any).cache_creation_input_tokens ?? 0,
-      cache_read_input_tokens: (msg.usage as any).cache_read_input_tokens ?? 0,
+      input: {
+        total: msg.usage.input_tokens,
+        cache_miss: cacheMiss,
+        cache_hit: cacheHit,
+      },
+      output: msg.usage.output_tokens,
     },
   };
 }
