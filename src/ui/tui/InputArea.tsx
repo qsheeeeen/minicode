@@ -4,7 +4,7 @@ import { useTuiState, useTuiDispatch } from "./store.js";
 import { getInputComponent } from "./inputs.js";
 import { getCommandList } from "../commands/index.js";
 import type { Agent } from "../../agent.js";
-import type { EffortLevel } from "../../llm/anthropic.js";
+import type { EffortLevel } from "../../llm/types.js";
 
 interface InputAreaProps {
   agentRef: React.MutableRefObject<Agent>;

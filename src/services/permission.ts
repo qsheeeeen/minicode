@@ -1,4 +1,4 @@
-import type { AnthropicClient } from "../llm/anthropic.js";
+import type { LLMClient } from "../llm/client.js";
 import type { UserPrompter } from "../utils/display.js";
 
 export type PermissionMode = "manual" | "yolo" | "auto";
@@ -7,13 +7,13 @@ const MODES: PermissionMode[] = ["manual", "yolo", "auto"];
 
 export class PermissionService {
   private mode: PermissionMode;
-  private client?: AnthropicClient;
+  private client?: LLMClient;
   private model?: string;
   private prompter?: UserPrompter;
 
   constructor(options: {
     initialMode: PermissionMode;
-    client?: AnthropicClient;
+    client?: LLMClient;
     model?: string;
   }) {
     this.mode = options.initialMode;

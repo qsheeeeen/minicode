@@ -1,10 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { CompressionService } from "./compression-service.js";
-import type { AnthropicClient, MessageParam } from "../llm/anthropic.js";
-
-vi.mock("../llm/anthropic.js", () => ({
-  AnthropicClient: vi.fn(),
-}));
+import type { LLMClient } from "../llm/client.js";
+import type { MessageParam } from "../llm/types.js";
 
 describe("CompressionService", () => {
   let service: CompressionService;
@@ -19,7 +16,7 @@ describe("CompressionService", () => {
         role: i % 2 === 0 ? "user" : "assistant",
         content: `message ${i}`,
       }));
-      const mockClient = {} as AnthropicClient;
+      const mockClient = {} as LLMClient;
       const result = await service.compress(messages, mockClient, "claude-3");
       expect(result).toEqual(messages);
     });
@@ -33,7 +30,7 @@ describe("CompressionService", () => {
         chat: vi.fn().mockResolvedValue({
           content: [{ type: "text", text: "Summary of conversation" }],
         }),
-      } as unknown as AnthropicClient;
+      } as unknown as LLMClient;
 
       const result = await service.compress(messages, mockClient, "claude-3");
 
@@ -52,7 +49,7 @@ describe("CompressionService", () => {
       }));
       const mockClient = {
         chat: vi.fn().mockRejectedValue(new Error("API error")),
-      } as unknown as AnthropicClient;
+      } as unknown as LLMClient;
 
       await expect(
         service.compress(messages, mockClient, "claude-3"),
@@ -68,7 +65,7 @@ describe("CompressionService", () => {
         chat: vi.fn().mockResolvedValue({
           content: [{ type: "text", text: "Summary" }],
         }),
-      } as unknown as AnthropicClient;
+      } as unknown as LLMClient;
 
       await service.compress(messages, mockClient, "claude-3");
 
@@ -93,7 +90,7 @@ describe("CompressionService", () => {
         chat: vi.fn().mockResolvedValue({
           content: [{ type: "text", text: "Summary" }],
         }),
-      } as unknown as AnthropicClient;
+      } as unknown as LLMClient;
 
       const result = await service.compress(messages, mockClient, undefined);
 

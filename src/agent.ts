@@ -1,10 +1,12 @@
-import {
-  AnthropicClient,
-  Anthropic,
-  type MessageParam,
-  type Tool,
-  type EffortLevel,
-} from "./llm/anthropic.js";
+import type { LLMClient } from "./llm/client.js";
+import { createClient } from "./llm/client.js";
+import type {
+  MessageParam,
+  LLMToolDef,
+  EffortLevel,
+  LLMResponse,
+  ToolUseBlock,
+} from "./llm/types.js";
 import {
   getAll,
   getSubAgentTools,
@@ -69,7 +71,7 @@ export interface AgentConfig {
 import type { StreamingResult } from "./services/streaming-handler.js";
 
 export class Agent {
-  private client: AnthropicClient;
+  private client: LLMClient;
   private tools: Map<string, ToolDef>;
   private store = new MessageStore();
   private model?: string;
@@ -141,7 +143,11 @@ export class Agent {
     if (apiKey !== undefined) this.apiKey = apiKey;
     if (baseURL !== undefined) this.baseURL = baseURL;
     if (contextLength !== undefined) this.contextLength = contextLength;
-    this.client = new AnthropicClient(this.apiKey, this.baseURL);
+    this.client = createClient(
+      this.modelProvider || "anthropic",
+      this.apiKey,
+      this.baseURL,
+    );
   }
 
   getModelName(): string | undefined {
@@ -154,10 +160,11 @@ export class Agent {
     return this.contextLength;
   }
 
+
+
   constructor(config: AgentConfig = {}) {
     this.apiKey = config.apiKey;
     this.baseURL = config.baseURL;
-    this.client = new AnthropicClient(this.apiKey, this.baseURL);
     this.model = config.model;
     this.displayName = config.displayName;
     this.modelProvider = config.provider;
@@ -173,10 +180,15 @@ export class Agent {
     this.agentRegistry = config.agentRegistry;
     this.currentAgentId = config.currentAgentId || "1";
     this.sessionStats = config.sessionStats;
+
+    this.client = createClient(
+      this.modelProvider || "anthropic",
+      this.apiKey,
+      this.baseURL,
+    );
+
     this.permissionService = new PermissionService({
       initialMode: "manual",
-      client: this.apiKey ? this.client : undefined,
-      model: this.model,
     });
 
     const availability = { agentRegistry: this.agentRegistry };
@@ -361,7 +373,7 @@ export class Agent {
 
   /** Track token usage and trigger auto-compression */
   private async processTokenUsage(
-    response: Anthropic.Messages.Message,
+    response: LLMResponse,
   ): Promise<void> {
     if (!response.usage) return;
 
@@ -423,7 +435,7 @@ export class Agent {
 
   /** Execute tool calls sequentially and push tool_result turns */
   private async executeToolCalls(
-    toolCalls: Array<{ block: Anthropic.Messages.ToolUseBlock; tool: ToolDef }>,
+    toolCalls: Array<{ block: ToolUseBlock; tool: ToolDef }>,
   ): Promise<void> {
     if (toolCalls.length === 0) return;
 
@@ -434,6 +446,7 @@ export class Agent {
         apiKey: this.apiKey,
         baseURL: this.baseURL,
         model: this.model,
+        provider: this.modelProvider,
         contextLength: this.contextLength,
         compressionThresholdRatio: this.compressionThresholdRatio,
         thinkingEnabled: this.thinkingEnabled,
@@ -533,7 +546,7 @@ export class Agent {
           name: t.name,
           description: t.description,
           input_schema: t.input_schema,
-        })) as Tool[];
+        })) as LLMToolDef[];
 
         const { response, toolCalls, hasToolCalls } =
           await this.streamingHandler.handle(

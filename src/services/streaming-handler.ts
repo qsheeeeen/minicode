@@ -1,10 +1,11 @@
-import type { AnthropicClient, Anthropic, ContentBlock } from "../llm/anthropic.js";
+import type { LLMClient, LLMStream } from "../llm/client.js";
+import type { ContentBlock, LLMResponse } from "../llm/types.js";
 import type { ToolDef } from "../tools/index.js";
 import type { MessageStore } from "../messages.js";
 
 export interface StreamingResult {
-  response: Anthropic.Messages.Message;
-  toolCalls: Array<{ block: Anthropic.Messages.ToolUseBlock; tool: ToolDef }>;
+  response: LLMResponse;
+  toolCalls: Array<{ block: ContentBlock & { type: "tool_use"; id: string; name: string; input: Record<string, unknown> }; tool: ToolDef }>;
   hasToolCalls: boolean;
 }
 
@@ -18,10 +19,10 @@ export class StreamingHandler {
   ) {}
 
   async handle(
-    client: AnthropicClient,
-    messages: Parameters<AnthropicClient["chatStream"]>[0],
-    toolDefs: Parameters<AnthropicClient["chatStream"]>[1],
-    options: Parameters<AnthropicClient["chatStream"]>[2],
+    client: LLMClient,
+    messages: Parameters<LLMClient["chatStream"]>[0],
+    toolDefs: Parameters<LLMClient["chatStream"]>[1],
+    options: Parameters<LLMClient["chatStream"]>[2],
     signal?: AbortSignal,
     currentStreamRef?: { current: any },
   ): Promise<StreamingResult> {
@@ -29,10 +30,7 @@ export class StreamingHandler {
     if (currentStreamRef) currentStreamRef.current = stream;
 
     let blockStreaming = false;
-    const toolCalls: Array<{
-      block: Anthropic.Messages.ToolUseBlock;
-      tool: ToolDef;
-    }> = [];
+    const toolCalls: StreamingResult["toolCalls"] = [];
     let hasToolCalls = false;
 
     const handleDelta = (field: TextField, delta: string) => {
@@ -65,7 +63,7 @@ export class StreamingHandler {
       }
       if (block.type === "tool_use") {
         hasToolCalls = true;
-        const toolBlock = block as Anthropic.Messages.ToolUseBlock;
+        const toolBlock = block as ContentBlock & { type: "tool_use"; id: string; name: string; input: Record<string, unknown> };
         const tool = this.tools.get(toolBlock.name);
         if (tool) {
           toolCalls.push({ block: toolBlock, tool });
@@ -80,12 +78,12 @@ export class StreamingHandler {
       }
     });
 
-    let response: Anthropic.Messages.Message;
+    let response: LLMResponse;
     try {
       const messagePromise = stream.finalMessage();
       if (signal?.aborted) throw new Error("Aborted");
 
-      response = await new Promise<Anthropic.Messages.Message>(
+      response = await new Promise<LLMResponse>(
         (resolve, reject) => {
           let settled = false;
           const done = (fn: () => void) => { if (!settled) { settled = true; fn(); } };

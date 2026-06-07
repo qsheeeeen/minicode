@@ -1,16 +1,18 @@
 import type {
-  AnthropicClient,
+  LLMClient,
+} from "../llm/client.js";
+import type {
   MessageParam,
-  Message,
-  Anthropic,
-} from "../llm/anthropic.js";
+  LLMResponse,
+  TextBlock,
+} from "../llm/types.js";
 
 export class CompressionService {
   private readonly recentCount = 10;
 
   async compress(
     messages: MessageParam[],
-    client: AnthropicClient,
+    client: LLMClient,
     model: string | undefined,
   ): Promise<MessageParam[]> {
     if (messages.length <= this.recentCount + 2) {
@@ -76,10 +78,10 @@ ${conversationText}`;
     return lines.join("\n");
   }
 
-  private extractSummaryText(summary: Message): string {
+  private extractSummaryText(summary: LLMResponse): string {
     for (const block of summary.content) {
       if (block.type === "text") {
-        return (block as Anthropic.TextBlock).text;
+        return (block as TextBlock).text;
       }
     }
     return "Conversation summary unavailable";

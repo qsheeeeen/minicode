@@ -4,7 +4,7 @@ import {
   toDisplayMessages,
   type StatusMessage,
 } from "./messages.js";
-import type { MessageParam } from "./llm/anthropic.js";
+import type { MessageParam } from "./llm/types.js";
 
 vi.mock("fs/promises", () => ({
   default: {

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { PermissionService } from "./permission.js";
-import type { AnthropicClient } from "../llm/anthropic.js";
+import type { LLMClient } from "../llm/client.js";
 
 describe("PermissionService", () => {
   describe("getMode", () => {
@@ -124,7 +124,7 @@ describe("PermissionService", () => {
       const mockChat = vi.fn().mockResolvedValue({
         content: [{ type: "text", text: "  yes  " }],
       });
-      const mockClient = { chat: mockChat } as unknown as AnthropicClient;
+      const mockClient = { chat: mockChat } as unknown as LLMClient;
       const service = new PermissionService({
         initialMode: "auto",
         client: mockClient,
@@ -147,7 +147,7 @@ describe("PermissionService", () => {
       const mockChat = vi.fn().mockResolvedValue({
         content: [{ type: "text", text: "no: this command is too dangerous" }],
       });
-      const mockClient = { chat: mockChat } as unknown as AnthropicClient;
+      const mockClient = { chat: mockChat } as unknown as LLMClient;
       const service = new PermissionService({
         initialMode: "auto",
         client: mockClient,
@@ -167,7 +167,7 @@ describe("PermissionService", () => {
       const mockChat = vi.fn().mockResolvedValue({
         content: [{ type: "text", text: "Yes, this is allowed." }],
       });
-      const mockClient = { chat: mockChat } as unknown as AnthropicClient;
+      const mockClient = { chat: mockChat } as unknown as LLMClient;
       const service = new PermissionService({
         initialMode: "auto",
         client: mockClient,
@@ -184,7 +184,7 @@ describe("PermissionService", () => {
       const mockChat = vi.fn().mockResolvedValue({
         content: [{ type: "text", text: "I think not." }],
       });
-      const mockClient = { chat: mockChat } as unknown as AnthropicClient;
+      const mockClient = { chat: mockChat } as unknown as LLMClient;
       const service = new PermissionService({
         initialMode: "auto",
         client: mockClient,
@@ -199,7 +199,7 @@ describe("PermissionService", () => {
 
     it("returns allowed: false and error reason on chat error", async () => {
       const mockChat = vi.fn().mockRejectedValue(new Error("API error"));
-      const mockClient = { chat: mockChat } as unknown as AnthropicClient;
+      const mockClient = { chat: mockChat } as unknown as LLMClient;
       const service = new PermissionService({
         initialMode: "auto",
         client: mockClient,

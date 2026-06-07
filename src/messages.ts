@@ -1,7 +1,7 @@
 import type {
   MessageParam,
   ContentBlock,
-} from "@anthropic-ai/sdk/resources/messages.js";
+} from "./llm/types.js";
 import fs from "fs/promises";
 import path from "path";
 import os from "os";

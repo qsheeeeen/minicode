@@ -2,23 +2,33 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { EventEmitter } from "events";
 
 class MockStream extends EventEmitter {
-  resolveFinal: (val: any) => void = () => {};
-  rejectFinal: (err: any) => void = () => {};
-  finalMessage() {
-    return new Promise((resolve, reject) => {
+  private _promise: Promise<any>;
+  resolveFinal!: (val: any) => void;
+  rejectFinal!: (err: any) => void;
+
+  constructor() {
+    super();
+    this._promise = new Promise((resolve, reject) => {
       this.resolveFinal = resolve;
       this.rejectFinal = reject;
     });
   }
+
+  finalMessage() {
+    return this._promise;
+  }
   abort() {}
 }
 
-const mockChatStream = vi.fn();
-const mockChat = vi.fn();
+const { mockChatStream, mockChat } = vi.hoisted(() => ({
+  mockChatStream: vi.fn(),
+  mockChat: vi.fn(),
+}));
 
-vi.mock("./llm/anthropic.js", () => ({
-  AnthropicClient: vi.fn().mockImplementation(function () {
-    return { chat: mockChat, chatStream: mockChatStream };
+vi.mock("./llm/client.js", () => ({
+  createClient: vi.fn().mockReturnValue({
+    chat: mockChat,
+    chatStream: mockChatStream,
   }),
 }));
 
@@ -165,6 +175,7 @@ describe("Agent", () => {
       mockChatStream.mockReturnValueOnce(stream);
       const agent = new Agent();
       const runPromise = agent.run("Hello agent");
+      await new Promise((r) => setTimeout(r, 10));
 
       stream.emit("text", "Hi ");
       stream.emit("text", "there!");
@@ -185,6 +196,7 @@ describe("Agent", () => {
       mockChatStream.mockReturnValueOnce(stream);
       const agent = new Agent({ thinkingEnabled: true });
       const runPromise = agent.run("Solve this");
+      await new Promise((r) => setTimeout(r, 10));
 
       stream.emit("thinking", "Hmm...");
       stream.emit("contentBlock", { type: "thinking" });
@@ -206,6 +218,7 @@ describe("Agent", () => {
 
       const agent = new Agent();
       const runPromise = agent.run("Use tool");
+      await new Promise((r) => setTimeout(r, 10));
 
       stream1.emit("contentBlock", {
         type: "tool_use",
@@ -267,6 +280,7 @@ describe("Agent", () => {
       mockChatStream.mockReturnValueOnce(stream);
       const agent = new Agent();
       const runPromise = agent.run("Hello");
+      await new Promise((r) => setTimeout(r, 10));
       agent.abort();
       await expect(runPromise).rejects.toThrow("Aborted");
     });
@@ -286,6 +300,7 @@ describe("Agent", () => {
       mockChatStream.mockReturnValueOnce(stream);
 
       const runPromise = agent.run("do something");
+      await new Promise((r) => setTimeout(r, 10));
 
       stream.emit("contentBlock", {
         type: "tool_use",
@@ -348,6 +363,7 @@ describe("Agent", () => {
       });
 
       const runPromise = agent.run("do something risky");
+      await new Promise((r) => setTimeout(r, 10));
 
       stream1.emit("contentBlock", {
         type: "tool_use",
