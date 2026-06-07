@@ -1,7 +1,5 @@
-/**
- * Standalone demo for ToolDisplay component.
- * Run: bun run src/ui/tui/demos/tool-display.tsx
- */
+// Standalone demo for ToolDisplay component.
+// Run: bun run src/ui/tui/demos/tool-display.tsx
 import React from "react";
 import { render, Box, Text } from "ink";
 import { ToolDisplay } from "../tool-display.js";

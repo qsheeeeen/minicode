@@ -15,14 +15,14 @@ export interface Prompt {
   multiSelect?: boolean;
 }
 
-/** Push notifications: agent → human */
+// Push notifications: agent → human
 export interface AgentEvents {
   status(msg: string): void;
   error(msg: string): void;
   tokenUpdate(tokens: number): void;
 }
 
-/** Request-response: agent asks, human answers */
+// Request-response: agent asks, human answers
 export interface UserPrompter {
   prompt(req: Prompt): Promise<string>;
 }

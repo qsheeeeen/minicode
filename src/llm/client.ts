@@ -1,9 +1,7 @@
-/**
- * LLMClient / LLMStream interfaces and factory.
- *
- * Every provider adapter implements these interfaces. The rest of the
- * codebase programs against these abstractions, never against a concrete SDK.
- */
+// LLMClient / LLMStream interfaces and factory.
+//
+// Every provider adapter implements these interfaces. The rest of the
+// codebase programs against these abstractions, never against a concrete SDK.
 
 import type {
   MessageParam,
@@ -31,7 +29,7 @@ export type LLMStream = AsyncGenerator<StreamEvent, LLMResponse, unknown>;
 export interface LLMClient {
 
 
-  /** Streaming completion — returns immediately, emits events as tokens arrive. */
+  // Streaming completion — returns immediately, emits events as tokens arrive.
   chatStream(
     messages: MessageParam[],
     tools: LLMToolDef[],

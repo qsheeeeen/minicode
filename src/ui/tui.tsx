@@ -34,7 +34,7 @@ export interface AppProps {
   sessionStats: SessionStats;
 }
 
-/** Hook: multi-agent coordination and switching using Global Store */
+// Hook: multi-agent coordination and switching using Global Store
 function useMultiAgent(
   registry: AgentRegistry,
   agentRef: React.MutableRefObject<Agent>,
@@ -102,7 +102,7 @@ function useMultiAgent(
   return { activeAgentIdRef };
 }
 
-/** Hook: attach display to agent, load initial session using Global Store */
+// Hook: attach display to agent, load initial session using Global Store
 function useDisplay(
   agent: Agent,
   initialSession: string,

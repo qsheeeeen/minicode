@@ -1,12 +1,10 @@
-/**
- * OpenAI Responses API adapter.
- *
- * Implements the canonical LLMClient / LLMStream interfaces, converting
- * between our provider-agnostic types and the OpenAI Responses API format.
- *
- * The Responses API (`client.responses.create()`) uses a flat `input` array
- * of items rather than the chat-completions message array.
- */
+// OpenAI Responses API adapter.
+//
+// Implements the canonical LLMClient / LLMStream interfaces, converting
+// between our provider-agnostic types and the OpenAI Responses API format.
+//
+// The Responses API (`client.responses.create()`) uses a flat `input` array
+// of items rather than the chat-completions message array.
 
 import OpenAI from "openai";
 
@@ -32,7 +30,7 @@ const DEFAULT_MAX_TOKENS = 8192;
 
 // Effort mapping
 
-/** Map our five-level effort to OpenAI's three-level reasoning effort. */
+// Map our five-level effort to OpenAI's three-level reasoning effort.
 function mapEffort(effort: EffortLevel): any {
   switch (effort) {
     case "none":
@@ -53,7 +51,7 @@ function mapEffort(effort: EffortLevel): any {
 
 // Tool definition conversion
 
-/** Convert a canonical LLMToolDef to an OpenAI Responses function tool. */
+// Convert a canonical LLMToolDef to an OpenAI Responses function tool.
 function convertToolDef(
   tool: LLMToolDef,
 ): OpenAI.Responses.FunctionTool {
@@ -70,7 +68,7 @@ function convertToolDef(
 
 type ResponseInputItem = OpenAI.Responses.ResponseInputItem;
 
-/** Convert canonical MessageParam[] to an OpenAI Responses `input` array. */
+// Convert canonical MessageParam[] to an OpenAI Responses `input` array.
 function convertMessages(messages: MessageParam[]): ResponseInputItem[] {
   const input: ResponseInputItem[] = [];
 
@@ -145,7 +143,7 @@ function convertMessages(messages: MessageParam[]): ResponseInputItem[] {
 
 // Response conversion (OpenAI Responses → canonical)
 
-/** Convert an OpenAI Responses response object to a canonical LLMResponse. */
+// Convert an OpenAI Responses response object to a canonical LLMResponse.
 function convertResponse(response: OpenAI.Responses.Response): LLMResponse {
   const content: ContentBlock[] = [];
   let hasToolCalls = false;
@@ -231,7 +229,7 @@ function convertResponse(response: OpenAI.Responses.Response): LLMResponse {
 
 // OpenAIResponsesClient
 
-/** LLMClient implementation backed by the OpenAI Responses API. */
+// LLMClient implementation backed by the OpenAI Responses API.
 export class OpenAIResponsesClient implements LLMClient {
   private client: OpenAI;
 

@@ -1,7 +1,5 @@
-/**
- * Standalone demo for Receipt component.
- * Run: bun run src/ui/tui/demos/receipt.tsx
- */
+// Standalone demo for Receipt component.
+// Run: bun run src/ui/tui/demos/receipt.tsx
 import { render, Box } from "ink";
 import { Receipt } from "../Receipt.js";
 

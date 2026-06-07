@@ -1,9 +1,7 @@
-/**
- * Barrel exports for the LLM layer.
- *
- * Consumers should import from here or from `./types.js` / `./client.js`.
- * Never import provider SDKs directly outside of `src/llm/`.
- */
+// Barrel exports for the LLM layer.
+//
+// Consumers should import from here or from `./types.js` / `./client.js`.
+// Never import provider SDKs directly outside of `src/llm/`.
 
 // Canonical types
 export type {

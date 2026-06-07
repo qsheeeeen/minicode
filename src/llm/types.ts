@@ -1,17 +1,14 @@
-/**
- * Provider-agnostic LLM types.
- *
- * Every adapter (Anthropic, OpenAI Chat, OpenAI Responses) converts between
- * its SDK types and these canonical types. The rest of the codebase only
- * depends on this file.
- */
+// Provider-agnostic LLM types.
+//
+// Every adapter (Anthropic, OpenAI Chat, OpenAI Responses) converts between
+// its SDK types and these canonical types. The rest of the codebase only
+// depends on this file.
 
 // Effort
 
-/** Superset of effort levels across providers.
- *  Anthropic: none | minimal | low | medium | high | xhigh | max
- *  OpenAI:    none | minimal | low | medium | high | xhigh
- */
+// Superset of effort levels across providers.
+// Anthropic: none | minimal | low | medium | high | xhigh | max
+// OpenAI:    none | minimal | low | medium | high | xhigh
 export type EffortLevel = "none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 
 // Content blocks
@@ -41,7 +38,7 @@ export interface ToolResultBlock {
 
 export type ContentBlock = TextBlock | ThinkingBlock | ToolUseBlock;
 
-/** Blocks that can appear in a user turn (including tool results). */
+// Blocks that can appear in a user turn (including tool results).
 export type UserContentBlock = ToolResultBlock;
 
 // Messages

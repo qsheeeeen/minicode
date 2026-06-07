@@ -1,7 +1,5 @@
-/**
- * Standalone demo for Status component.
- * Run: bun run src/ui/tui/demos/status.tsx
- */
+// Standalone demo for Status component.
+// Run: bun run src/ui/tui/demos/status.tsx
 import { render, Box } from "ink";
 import { TuiProvider } from "../store.js";
 import { Status } from "../Status.js";

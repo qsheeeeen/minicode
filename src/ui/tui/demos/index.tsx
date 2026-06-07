@@ -1,7 +1,5 @@
-/**
- * Composite demo showing all TUI components.
- * Run: bun run src/ui/tui/demos/index.tsx
- */
+// Composite demo showing all TUI components.
+// Run: bun run src/ui/tui/demos/index.tsx
 import { useState } from "react";
 import { render, Box, useInput } from "ink";
 import { TuiProvider } from "../store.js";

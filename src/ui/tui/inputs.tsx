@@ -14,7 +14,7 @@ export interface InputComponentProps {
   inputKey?: number;
 }
 
-/** Chat input - default text input */
+// Chat input - default text input
 export function ChatInput({
   onSubmit,
   value,
@@ -32,7 +32,7 @@ export function ChatInput({
   );
 }
 
-/** Effort selection input */
+// Effort selection input
 export function EffortSelectInput({
   onExecute,
   onCancel,
@@ -60,7 +60,7 @@ export function EffortSelectInput({
   );
 }
 
-/** Session list input */
+// Session list input
 export function SessionListInput({
   onExecute,
   onCancel,
@@ -91,7 +91,7 @@ function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-/** Model selection input - tier-based with optional edit flow */
+// Model selection input - tier-based with optional edit flow
 export function ModelSelectInput({
   onExecute,
   onCancel,
@@ -225,7 +225,7 @@ export function ModelSelectInput({
   );
 }
 
-/** Undo: two-step rollback UI (select turn → select scope) */
+// Undo: two-step rollback UI (select turn → select scope)
 export function UndoInput({
   onExecute: _onExecute,
   onCancel,
@@ -395,7 +395,7 @@ export function UndoInput({
   );
 }
 
-/** Input component registry */
+// Input component registry
 export interface InputComponentRegistration {
   name: string;
   Component: React.ComponentType<InputComponentProps>;

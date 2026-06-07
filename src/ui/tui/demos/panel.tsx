@@ -1,7 +1,5 @@
-/**
- * Standalone demo for Panel component.
- * Run: bun run src/ui/tui/demos/panel.tsx
- */
+// Standalone demo for Panel component.
+// Run: bun run src/ui/tui/demos/panel.tsx
 import { render, Box } from "ink";
 import { TuiProvider } from "../store.js";
 import { Panel } from "../Panel.js";

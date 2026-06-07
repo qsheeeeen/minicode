@@ -1,7 +1,5 @@
-/**
- * Standalone demo for Help component.
- * Run: bun run src/ui/tui/demos/help.tsx
- */
+// Standalone demo for Help component.
+// Run: bun run src/ui/tui/demos/help.tsx
 import { render, Box } from "ink";
 import { Help } from "../Help.js";
 

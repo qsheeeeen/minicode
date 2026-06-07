@@ -200,7 +200,7 @@ export class MessageStore {
     return [...this.turns];
   }
 
-  /** Remove the last turn if it matches the predicate. Returns true if removed. */
+  // Remove the last turn if it matches the predicate. Returns true if removed.
   removeLastTurn(predicate: (turn: MessageParam) => boolean): boolean {
     const last = this.turns[this.turns.length - 1];
     if (last && predicate(last)) {
@@ -213,14 +213,14 @@ export class MessageStore {
     return false;
   }
 
-  /** Replace all turns (for session resume / compression). */
+  // Replace all turns (for session resume / compression).
   setTurns(turns: MessageParam[]): void {
     this.turns = turns;
     this.displayOverrides.clear();
     this.notify();
   }
 
-  /** Get API-format messages for LLM. */
+  // Get API-format messages for LLM.
   toLLMMessages(): MessageParam[] {
     return this.turns as MessageParam[];
   }
@@ -236,13 +236,13 @@ export class MessageStore {
   }
 
 
-  /** Start a new assistant turn (empty content array). */
+  // Start a new assistant turn (empty content array).
   startAssistantTurn(): void {
     this.turns.push({ role: "assistant", content: [] });
     this.notify();
   }
 
-  /** Append a block to the last (open) assistant turn. Creates the turn if needed. */
+  // Append a block to the last (open) assistant turn. Creates the turn if needed.
   appendToLastAssistantTurn(block: ContentBlock): void {
     const last = this.turns[this.turns.length - 1];
     if (!last || last.role !== "assistant" || !Array.isArray(last.content)) {
@@ -253,7 +253,7 @@ export class MessageStore {
     this.notify();
   }
 
-  /** Get the last block in the last assistant turn (if any). */
+  // Get the last block in the last assistant turn (if any).
   getLastBlock(): ContentBlock | undefined {
     const last = this.turns[this.turns.length - 1];
     if (!last || last.role !== "assistant" || !Array.isArray(last.content))
@@ -262,7 +262,7 @@ export class MessageStore {
     return blocks[blocks.length - 1];
   }
 
-  /** Update the text/thinking content of the last block in the last assistant turn. */
+  // Update the text/thinking content of the last block in the last assistant turn.
   updateLastBlock(updates: { text?: string; thinking?: string }): void {
     const last = this.turns[this.turns.length - 1];
     if (!last || last.role !== "assistant" || !Array.isArray(last.content))
@@ -274,7 +274,7 @@ export class MessageStore {
   }
 
 
-  /** Add a user turn containing tool_result blocks. */
+  // Add a user turn containing tool_result blocks.
   addToolResults(results: Array<{ toolUseId: string; content: string }>): void {
     if (results.length === 0) return;
     const blocks = results.map((r) => ({
@@ -297,7 +297,7 @@ export class MessageStore {
     return this.statuses;
   }
 
-  /** Convenience: generate display messages from current state. */
+  // Convenience: generate display messages from current state.
   toDisplayMessages(): DisplayMessage[] {
     const msgs = toDisplayMessages(this.turns, this.statuses, this.displayOverrides);
     // Mark last non-empty text/thinking block as streaming

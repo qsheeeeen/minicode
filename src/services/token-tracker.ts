@@ -58,7 +58,7 @@ export class TokenTracker {
     this.counter.reset();
   }
 
-  /** Set token count directly (e.g. from loaded session data) */
+  // Set token count directly (e.g. from loaded session data)
   setCount(count: number): void {
     this.counter.reset();
     if (count > 0) {

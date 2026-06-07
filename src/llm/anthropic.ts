@@ -1,7 +1,5 @@
-/**
- * Anthropic adapter — wraps the `@anthropic-ai/sdk` and implements the
- * canonical `LLMClient` / `LLMStream` interfaces.
- */
+// Anthropic adapter — wraps the `@anthropic-ai/sdk` and implements the
+// canonical `LLMClient` / `LLMStream` interfaces.
 
 import Anthropic from "@anthropic-ai/sdk";
 import {
@@ -53,11 +51,9 @@ type AnthropicContentBlock = Anthropic.Messages.ContentBlock;
 
 // Conversion helpers
 
-/**
- * Convert canonical messages to Anthropic SDK format.
- * Since our canonical format is modeled after Anthropic's, the conversion
- * is mostly a pass-through.
- */
+// Convert canonical messages to Anthropic SDK format.
+// Since our canonical format is modeled after Anthropic's, the conversion
+// is mostly a pass-through.
 function toAnthropicMessages(messages: MessageParam[]): AnthropicMessageParam[] {
   return messages as unknown as AnthropicMessageParam[];
 }

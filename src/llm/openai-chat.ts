@@ -1,10 +1,8 @@
-/**
- * OpenAI Chat Completions adapter.
- *
- * Implements the provider-agnostic LLMClient / LLMStream interfaces and
- * converts between canonical types (./types.ts) and the OpenAI Chat
- * Completions API format.
- */
+// OpenAI Chat Completions adapter.
+//
+// Implements the provider-agnostic LLMClient / LLMStream interfaces and
+// converts between canonical types (./types.ts) and the OpenAI Chat
+// Completions API format.
 
 import OpenAI from "openai";
 import type { LLMClient, LLMStream, StreamEvent } from "./client.js";

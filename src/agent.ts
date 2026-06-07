@@ -342,7 +342,7 @@ export class Agent {
     this.refreshSystemPrompt();
   }
 
-  /** Build and cache the system prompt — call once per run or on explicit refresh */
+  // Build and cache the system prompt — call once per run or on explicit refresh
   refreshSystemPrompt(): void {
     let prompt = SYSTEM_PROMPT;
 
@@ -371,7 +371,7 @@ export class Agent {
     this.systemPrompt = prompt;
   }
 
-  /** Track token usage and trigger auto-compression */
+  // Track token usage and trigger auto-compression
   private async processTokenUsage(
     response: LLMResponse,
   ): Promise<void> {
@@ -390,7 +390,7 @@ export class Agent {
     }
   }
 
-  /** Run a single tool with permission check */
+  // Run a single tool with permission check
   private async runTool(
     tool: ToolDef,
     args: Record<string, unknown>,
@@ -433,7 +433,7 @@ export class Agent {
     return tool.execute(args, context);
   }
 
-  /** Execute tool calls sequentially and push tool_result turns */
+  // Execute tool calls sequentially and push tool_result turns
   private async executeToolCalls(
     toolCalls: Array<{ block: ToolUseBlock; tool?: ToolDef }>,
   ): Promise<void> {
@@ -640,7 +640,7 @@ export class Agent {
     return this.store.toLLMMessages();
   }
 
-  /** Restore messages from session. Stores turns directly — no conversion needed. */
+  // Restore messages from session. Stores turns directly — no conversion needed.
   setMessages(messages: MessageParam[]): void {
     this.store.setTurns(messages);
   }

@@ -1,7 +1,5 @@
-/**
- * Standalone demo for ModalPrompter.
- * Run: bun run src/ui/tui/demos/modal-prompter.tsx
- */
+// Standalone demo for ModalPrompter.
+// Run: bun run src/ui/tui/demos/modal-prompter.tsx
 import React, { useState } from "react";
 import { render, Box, Text, useInput } from "ink";
 import { TuiProvider } from "../store.js";

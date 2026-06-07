@@ -1,7 +1,5 @@
-/**
- * Standalone demo for InputArea component.
- * Run: bun run src/ui/tui/demos/input-area.tsx
- */
+// Standalone demo for InputArea component.
+// Run: bun run src/ui/tui/demos/input-area.tsx
 import { render, Box } from "ink";
 import { TuiProvider } from "../store.js";
 import { InputArea } from "../InputArea.js";

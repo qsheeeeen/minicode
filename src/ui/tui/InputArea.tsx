@@ -188,7 +188,6 @@ export function InputArea({
         <InputComponent {...inputProps} />
       </Box>
 
-      {/* Command autocomplete suggestions */}
       {matchingCommands.length > 0 && !isLoading && (
         <Box flexDirection="column" paddingX={2}>
           {matchingCommands.map((cmd, i) => (

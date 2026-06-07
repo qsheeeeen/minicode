@@ -1,7 +1,5 @@
-/**
- * Standalone demo for SubAgentBar component.
- * Run: bun run src/ui/tui/demos/sub-agent-bar.tsx
- */
+// Standalone demo for SubAgentBar component.
+// Run: bun run src/ui/tui/demos/sub-agent-bar.tsx
 import { render, Box } from "ink";
 import { TuiProvider } from "../store.js";
 import { SubAgentBar } from "../SubAgentBar.js";
