@@ -2,17 +2,15 @@
 // canonical `LLMClient` / `LLMStream` interfaces.
 
 import Anthropic from "@anthropic-ai/sdk";
-import { MessageStream } from "@anthropic-ai/sdk/lib/MessageStream.js";
 import type { MessageStreamEvent } from "@anthropic-ai/sdk/resources/messages.js";
 import type { LLMStream, StreamEvent } from "./client.js";
 import type {
-  MessageCreateParamsBase,
-  MessageCreateParamsNonStreaming,
+  MessageCreateParamsStreaming,
   OutputConfig,
 } from "@anthropic-ai/sdk/resources/messages.js";
 
 import type { LLMClient, LLMToolDef, ChatOptions, LLMResponse, EffortLevel } from "./client.js";
-import type { MessageParam, ContentBlock } from "../messages.js";
+import type { MessageParam, ContentBlock, ToolUseBlock, ToolResultBlock } from "../messages.js";
 
 function toAnthropicEffort(effort: EffortLevel): any {
   switch (effort) {
@@ -31,21 +29,49 @@ function toAnthropicEffort(effort: EffortLevel): any {
   }
 }
 
-// Anthropic-native types (used only inside this adapter)
-
-type AnthropicMessageParam = Anthropic.Messages.MessageParam;
 type AnthropicTool = Anthropic.Messages.Tool;
-type AnthropicContentBlock = Anthropic.Messages.ContentBlock;
-
-// Conversion helpers
+type AnthropicContentBlockParam = Anthropic.Messages.ContentBlockParam;
 
 // Convert canonical messages to Anthropic SDK format.
-// Since our canonical format is modeled after Anthropic's, the conversion
-// is mostly a pass-through.
+// Thinking blocks are filtered out — they're output-only and not accepted
+// as input by the API (adaptive thinking reconstructs context automatically).
 function toAnthropicMessages(
   messages: MessageParam[],
-): AnthropicMessageParam[] {
-  return messages as unknown as AnthropicMessageParam[];
+): Anthropic.Messages.MessageParam[] {
+  return messages.map((msg) => {
+    if (msg.role === "user") {
+      if (typeof msg.content === "string") {
+        return { role: "user" as const, content: msg.content };
+      }
+      // ToolResultBlock → Anthropic ToolResultBlockParam
+      const blocks = msg.content as ToolResultBlock[];
+      const content = blocks.map((b) => ({
+        type: "tool_result" as const,
+        tool_use_id: b.tool_use_id,
+        content: b.content,
+      }));
+      return { role: "user" as const, content };
+    }
+    // assistant — filter out thinking blocks (output-only)
+    if (typeof msg.content === "string") {
+      return { role: "assistant" as const, content: msg.content };
+    }
+    const content: AnthropicContentBlockParam[] = [];
+    for (const b of msg.content) {
+      if (b.type === "text") {
+        content.push({ type: "text" as const, text: b.text });
+      } else if (b.type === "tool_use") {
+        content.push({
+          type: "tool_use" as const,
+          id: b.id,
+          name: b.name,
+          input: b.input,
+        });
+      }
+      // thinking blocks are skipped — not accepted as input
+    }
+    return { role: "assistant" as const, content };
+  });
 }
 
 function toAnthropicTools(tools: LLMToolDef[]): AnthropicTool[] {
@@ -56,9 +82,33 @@ function toAnthropicTools(tools: LLMToolDef[]): AnthropicTool[] {
   }));
 }
 
+// Map SDK content blocks to canonical form.
+// SDK ThinkingBlock has extra fields (signature, redacted_thinking variants)
+// that our canonical ThinkingBlock doesn't carry.
+function toCanonicalContentBlock(
+  block: Anthropic.ContentBlock,
+): ContentBlock {
+  if (block.type === "text") {
+    return { type: "text", text: block.text };
+  }
+  if (block.type === "thinking") {
+    return { type: "thinking", thinking: block.thinking };
+  }
+  if (block.type === "tool_use") {
+    return {
+      type: "tool_use",
+      id: block.id,
+      name: block.name,
+      input: block.input as Record<string, unknown>,
+    };
+  }
+  // Fallback for unknown block types (server_tool_use, etc.)
+  return { type: "text", text: JSON.stringify(block) };
+}
+
 function toCanonicalResponse(msg: Anthropic.Messages.Message): LLMResponse {
   return {
-    content: msg.content as unknown as ContentBlock[],
+    content: msg.content.map(toCanonicalContentBlock),
     stop_reason: msg.stop_reason ?? "end_turn",
     usage: {
       input_tokens: msg.usage.input_tokens,
@@ -88,9 +138,10 @@ export class AnthropicClient implements LLMClient {
     tools: LLMToolDef[],
     options: ChatOptions = {},
   ): LLMStream {
-    const params: MessageCreateParamsBase = {
+    const params: MessageCreateParamsStreaming = {
       model: options.model || "claude-sonnet-4-5",
       max_tokens: options.maxTokens || 8192,
+      stream: true,
       system: options.system,
       messages: toAnthropicMessages(messages),
       tools: toAnthropicTools(tools),
@@ -105,7 +156,7 @@ export class AnthropicClient implements LLMClient {
 
     const stream = this.client.messages.stream(params, {
       signal: options.signal,
-    }) as unknown as MessageStream<null>;
+    });
 
     async function* run(): AsyncGenerator<StreamEvent, LLMResponse, unknown> {
       let currentToolCall: any = null;
