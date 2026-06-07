@@ -34,7 +34,6 @@ describe("StreamingHandler", () => {
     events["contentBlock"]?.({ type: "text", text: "Hello" });
 
     const result = await promise;
-    expect(result.hasToolCalls).toBe(false);
     expect(result.toolCalls).toHaveLength(0);
     expect(store.setStreaming).toHaveBeenCalledWith(true);
     expect(saveStore).toHaveBeenCalled();
@@ -61,7 +60,6 @@ describe("StreamingHandler", () => {
     });
 
     const result = await promise;
-    expect(result.hasToolCalls).toBe(true);
     expect(result.toolCalls).toHaveLength(1);
     expect(result.toolCalls[0].block.name).toBe("Read");
   });

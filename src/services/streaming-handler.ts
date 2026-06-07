@@ -5,8 +5,7 @@ import type { MessageStore } from "../messages.js";
 
 export interface StreamingResult {
   response: LLMResponse;
-  toolCalls: Array<{ block: ContentBlock & { type: "tool_use"; id: string; name: string; input: Record<string, unknown> }; tool: ToolDef }>;
-  hasToolCalls: boolean;
+  toolCalls: Array<{ block: ContentBlock & { type: "tool_use"; id: string; name: string; input: Record<string, unknown> }; tool?: ToolDef }>;
 }
 
 type TextField = "thinking" | "text";
@@ -31,7 +30,6 @@ export class StreamingHandler {
 
     let blockStreaming = false;
     const toolCalls: StreamingResult["toolCalls"] = [];
-    let hasToolCalls = false;
 
     const handleDelta = (field: TextField, delta: string) => {
       const block = field === "thinking"
@@ -62,12 +60,9 @@ export class StreamingHandler {
         this.saveStore();
       }
       if (block.type === "tool_use") {
-        hasToolCalls = true;
         const toolBlock = block as ContentBlock & { type: "tool_use"; id: string; name: string; input: Record<string, unknown> };
         const tool = this.tools.get(toolBlock.name);
-        if (tool) {
-          toolCalls.push({ block: toolBlock, tool });
-        }
+        toolCalls.push({ block: toolBlock, tool });
         this.store.appendToLastAssistantTurn({
           type: "tool_use",
           id: toolBlock.id,
@@ -122,6 +117,9 @@ export class StreamingHandler {
       this.store.setStreaming(false);
     }
 
-    return { response, toolCalls, hasToolCalls };
+    return {
+      response,
+      toolCalls,
+    };
   }
 }

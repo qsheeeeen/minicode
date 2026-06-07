@@ -435,7 +435,7 @@ export class Agent {
 
   /** Execute tool calls sequentially and push tool_result turns */
   private async executeToolCalls(
-    toolCalls: Array<{ block: ToolUseBlock; tool: ToolDef }>,
+    toolCalls: Array<{ block: ToolUseBlock; tool?: ToolDef }>,
   ): Promise<void> {
     if (toolCalls.length === 0) return;
 
@@ -471,6 +471,14 @@ export class Agent {
 
     for (let i = 0; i < toolCalls.length; i++) {
       const { block, tool } = toolCalls[i];
+      if (!tool) {
+        results.push({ toolUseId: block.id, content: `Error: Tool '${block.name}' not found or not available.` });
+        this.logger?.warn(
+          { session: this.currentSession, toolName: block.name },
+          "LLM attempted to use an unavailable tool",
+        );
+        continue;
+      }
       try {
         const result = await this.runTool(
           tool,
@@ -548,7 +556,7 @@ export class Agent {
           input_schema: t.input_schema,
         })) as LLMToolDef[];
 
-        const { response, toolCalls, hasToolCalls } =
+        const { response, toolCalls } =
           await this.streamingHandler.handle(
             this.client,
             this.store.toLLMMessages(),
@@ -592,11 +600,11 @@ export class Agent {
           throw e;
         }
 
-        if (hasToolCalls) {
+        if (toolCalls.length > 0) {
           await this.saveStore();
         }
 
-        if (!hasToolCalls) break;
+        if (toolCalls.length === 0) break;
       }
     } finally {
       this.isRunning = false;
