@@ -3,7 +3,7 @@
 // Every provider adapter implements these interfaces. The rest of the
 // codebase programs against these abstractions, never against a concrete SDK.
 
-import type { MessageParam, ContentBlock } from "../messages.js";
+import type { MessageParam, ContentBlock, ToolUseBlock } from "../messages.js";
 
 import { AnthropicClient } from "./anthropic.js";
 import { OpenAIChatClient } from "./openai-chat.js";
@@ -52,7 +52,7 @@ export interface LLMResponse {
 export type StreamEvent =
   | { type: "text"; text: string }
   | { type: "thinking"; thinking: string }
-  | { type: "tool_use"; block: ContentBlock & { type: "tool_use" } };
+  | { type: "tool_use"; block: ToolUseBlock };
 
 export type LLMStream = AsyncGenerator<StreamEvent, LLMResponse, unknown>;
 

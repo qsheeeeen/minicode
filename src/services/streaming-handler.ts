@@ -1,18 +1,12 @@
-import type { LLMClient, LLMStream } from "../llm/client.js";
-import type { LLMResponse } from "../llm/client.js";
-import type { ContentBlock } from "../messages.js";
+import type { LLMClient, LLMStream, LLMResponse } from "../llm/client.js";
+import type { ContentBlock, ToolUseBlock } from "../messages.js";
 import type { ToolDef } from "../tools/index.js";
 import type { MessageStore } from "../messages.js";
 
 export interface StreamingResult {
   response: LLMResponse;
   toolCalls: Array<{
-    block: ContentBlock & {
-      type: "tool_use";
-      id: string;
-      name: string;
-      input: Record<string, unknown>;
-    };
+    block: ToolUseBlock;
     tool?: ToolDef;
   }>;
 }
