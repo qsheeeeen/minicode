@@ -2,10 +2,8 @@
 // canonical `LLMClient` / `LLMStream` interfaces.
 
 import Anthropic from "@anthropic-ai/sdk";
-import {
-  MessageStreamEvent,
-  MessageStream,
-} from "@anthropic-ai/sdk/lib/MessageStream.js";
+import { MessageStream } from "@anthropic-ai/sdk/lib/MessageStream.js";
+import type { MessageStreamEvent } from "@anthropic-ai/sdk/resources/messages.js";
 import type { LLMStream, StreamEvent } from "./client.js";
 import type {
   MessageCreateParamsBase,
