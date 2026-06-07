@@ -63,7 +63,7 @@ if (!process.stdin.isTTY) {
 headless = !!headless;
 
 // Get configuration
-const config = await loadAllConfig(modelOverride ?? process.env.MODEL);
+const config = await loadAllConfig(modelOverride);
 
 if (!config.model) {
   console.error(

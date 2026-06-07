@@ -141,17 +141,10 @@ describe("loadAllConfig", () => {
     (fs.default.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(
       JSON.stringify({
         providers: { zhipu: { apiKey: "key" } },
-        model: "glm@zhipu",
+        model: "glm-4@zhipu",
       }),
     );
-    const originalModel = process.env.MODEL;
-    process.env.MODEL = "glm-4@zhipu";
     const config = await loadAllConfig();
-    if (originalModel !== undefined) {
-      process.env.MODEL = originalModel;
-    } else {
-      delete process.env.MODEL;
-    }
     expect(config.model?.model).toBe("glm-4");
   });
 });

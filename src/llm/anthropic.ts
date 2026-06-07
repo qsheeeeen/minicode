@@ -27,6 +27,7 @@ export class AnthropicClient {
   constructor(apiKey?: string, baseURL?: string) {
     this.client = new Anthropic({
       apiKey,
+      authToken: apiKey ?? null,
       baseURL,
     });
   }

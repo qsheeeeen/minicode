@@ -31,7 +31,6 @@ import { ChangeJournal } from "./services/change-journal.js";
 import { MessageStore } from "./messages.js";
 import { getAvailableSkills } from "./skills/index.js";
 import { callContent } from "./utils/tool-format.js";
-import { execSync } from "child_process";
 import type pino from "pino";
 
 export const SYSTEM_PROMPT = `You are an interactive CLI coding agent that helps users with software engineering tasks. Use the following instructions and available tools to assist the user.
@@ -199,8 +198,8 @@ export class Agent {
     this.userPrompt = config.userPrompt || "";
     this.projectPromptFile = config.projectPromptFile || "";
 
-    this.refreshEnvironment();
     this.refreshSystemPrompt();
+    this.refreshEnvironment(); // async, non-blocking
   }
 
   setEvents(events: AgentEvents): void {
@@ -309,12 +308,17 @@ export class Agent {
     }
   }
 
-  private refreshEnvironment(): void {
+  private envReady = false;
+
+  private async refreshEnvironment(): Promise<void> {
     let ctx = `Working directory: ${process.cwd()}\n`;
     try {
-      const status = execSync("git status", {
-        encoding: "utf-8",
-        timeout: 5000,
+      const { execFile } = await import("child_process");
+      const status = await new Promise<string>((resolve, reject) => {
+        execFile("git", ["status"], { encoding: "utf-8", timeout: 5000 }, (err, stdout) => {
+          if (err) reject(err);
+          else resolve(stdout);
+        });
       });
       ctx += `\n${status.trim()}\n`;
       ctx += `\nThis is the git status at the start of the conversation. Note that this status is a snapshot in time, and will not update during the conversation.`;
@@ -322,6 +326,8 @@ export class Agent {
       // Not a git repo or git unavailable — skip
     }
     this.environmentContext = ctx;
+    this.envReady = true;
+    this.refreshSystemPrompt();
   }
 
   /** Build and cache the system prompt — call once per run or on explicit refresh */

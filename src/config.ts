@@ -103,7 +103,7 @@ export async function loadAllConfig(
   modelSpecifier?: string,
 ): Promise<ResolvedConfig> {
   const config = await loadConfig();
-  const spec = modelSpecifier || process.env.MODEL || config.model;
+  const spec = modelSpecifier || config.model;
 
   let model: ResolvedConfig["model"] = null;
   if (spec) {
