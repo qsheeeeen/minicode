@@ -114,7 +114,11 @@ describe("Builtin commands", () => {
       });
       const ctx: Partial<CommandContext> = { agent: agentMock as any };
 
-      const result = await executeCommand("compress", [], ctx as CommandContext);
+      const result = await executeCommand(
+        "compress",
+        [],
+        ctx as CommandContext,
+      );
       expect(result.handled).toBe(true);
       expect(agentMock.compress).toHaveBeenCalled();
       expect(agentMock.__store.addStatus).toHaveBeenCalledWith(
@@ -160,7 +164,11 @@ describe("Builtin commands", () => {
         setCurrentSession: vi.fn(),
       };
 
-      const result = await executeCommand("new", ["my", "new", "session"], ctx as CommandContext);
+      const result = await executeCommand(
+        "new",
+        ["my", "new", "session"],
+        ctx as CommandContext,
+      );
       expect(result.handled).toBe(true);
       expect(agentMock.clearSession).toHaveBeenCalled();
       expect(agentMock.setSession).toHaveBeenCalledWith("my new session");
@@ -184,7 +192,11 @@ describe("Builtin commands", () => {
         setCurrentSession: vi.fn(),
       };
 
-      const result = await executeCommand("rename", ["new-session"], ctx as CommandContext);
+      const result = await executeCommand(
+        "rename",
+        ["new-session"],
+        ctx as CommandContext,
+      );
       expect(result.handled).toBe(true);
       expect(messageStoreMock.rename).toHaveBeenCalledWith(
         "old-session",
@@ -234,7 +246,11 @@ describe("Builtin commands", () => {
         setMessages: vi.fn(),
       };
 
-      const result = await executeCommand("resume", ["session-1"], ctx as CommandContext);
+      const result = await executeCommand(
+        "resume",
+        ["session-1"],
+        ctx as CommandContext,
+      );
       expect(result.handled).toBe(true);
       expect(messageStoreMock.load).toHaveBeenCalledWith("session-1");
       expect(agentMock.setMessages).toHaveBeenCalled();
@@ -253,7 +269,11 @@ describe("Builtin commands", () => {
         setMessages: vi.fn(),
       };
 
-      const result = await executeCommand("resume", ["unknown"], ctx as CommandContext);
+      const result = await executeCommand(
+        "resume",
+        ["unknown"],
+        ctx as CommandContext,
+      );
       expect(result.handled).toBe(true);
       expect(storeMock.addStatus).toHaveBeenCalledWith(
         expect.objectContaining({ role: "error" }),
@@ -285,7 +305,11 @@ describe("Builtin commands", () => {
       const ctx: Partial<CommandContext> = {
         setInputMode: vi.fn(),
       };
-      const result = await executeCommand("effort", ["invalid"], ctx as CommandContext);
+      const result = await executeCommand(
+        "effort",
+        ["invalid"],
+        ctx as CommandContext,
+      );
       expect(result.handled).toBe(true);
       expect(ctx.setInputMode).toHaveBeenCalledWith("effort-select");
     });
@@ -299,7 +323,11 @@ describe("Builtin commands", () => {
       const ctx: Partial<CommandContext> = {
         agent: agentMock as any,
       };
-      const result = await executeCommand("effort", ["high"], ctx as CommandContext);
+      const result = await executeCommand(
+        "effort",
+        ["high"],
+        ctx as CommandContext,
+      );
       expect(result.handled).toBe(true);
       expect(agentMock.setEffort).toHaveBeenCalledWith("high");
       expect(configMock.setEffort).toHaveBeenCalledWith("high");

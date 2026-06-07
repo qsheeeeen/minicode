@@ -68,7 +68,10 @@ export class ChangeJournal {
     this.cache = kept;
   }
 
-  async pruneAndRenumber(prunedCount: number, offsetAdded: number): Promise<void> {
+  async pruneAndRenumber(
+    prunedCount: number,
+    offsetAdded: number,
+  ): Promise<void> {
     const entries = await this.loadEntries();
     const kept = entries
       .filter((e) => e.turnIdx > prunedCount)

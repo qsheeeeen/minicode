@@ -5,7 +5,15 @@ import type { MessageStore } from "../messages.js";
 
 export interface StreamingResult {
   response: LLMResponse;
-  toolCalls: Array<{ block: ContentBlock & { type: "tool_use"; id: string; name: string; input: Record<string, unknown> }; tool?: ToolDef }>;
+  toolCalls: Array<{
+    block: ContentBlock & {
+      type: "tool_use";
+      id: string;
+      name: string;
+      input: Record<string, unknown>;
+    };
+    tool?: ToolDef;
+  }>;
 }
 
 type TextField = "thinking" | "text";
@@ -32,9 +40,10 @@ export class StreamingHandler {
     const toolCalls: StreamingResult["toolCalls"] = [];
 
     const handleDelta = (field: TextField, delta: string) => {
-      const block = field === "thinking"
-        ? { type: "thinking" as const, thinking: delta.trimStart() }
-        : { type: "text" as const, text: delta.trimStart() };
+      const block =
+        field === "thinking"
+          ? { type: "thinking" as const, thinking: delta.trimStart() }
+          : { type: "text" as const, text: delta.trimStart() };
       if (!blockStreaming) {
         blockStreaming = true;
         this.store.setStreaming(true);
@@ -55,13 +64,13 @@ export class StreamingHandler {
     try {
       while (true) {
         if (signal?.aborted) throw new Error("Aborted");
-        
+
         const next = await stream.next();
         if (next.done) {
           response = next.value as LLMResponse;
           break;
         }
-        
+
         const chunk = next.value;
         if (chunk.type === "text" || chunk.type === "thinking") {
           // @ts-expect-error - text or thinking fields exist based on type
@@ -73,7 +82,12 @@ export class StreamingHandler {
             this.saveStore();
           }
           if (block.type === "tool_use") {
-            const toolBlock = block as ContentBlock & { type: "tool_use"; id: string; name: string; input: Record<string, unknown> };
+            const toolBlock = block as ContentBlock & {
+              type: "tool_use";
+              id: string;
+              name: string;
+              input: Record<string, unknown>;
+            };
             const tool = this.tools.get(toolBlock.name);
             toolCalls.push({ block: toolBlock, tool });
             this.store.appendToLastAssistantTurn({

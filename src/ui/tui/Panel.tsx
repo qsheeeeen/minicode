@@ -10,8 +10,7 @@ interface PanelProps {
 }
 
 export function Panel({ agentRef, promptFiles = [] }: PanelProps) {
-  const { tokenCount, permissionMode, currentSession, status } =
-    useTuiState();
+  const { tokenCount, permissionMode, currentSession, status } = useTuiState();
 
   const contextLength = agentRef.current.getContextLength() || 200000;
   const percentage = Math.min(100, (tokenCount / contextLength) * 100);
@@ -26,18 +25,39 @@ export function Panel({ agentRef, promptFiles = [] }: PanelProps) {
   return (
     <Box flexDirection="column" overflow="hidden">
       <Box paddingX={1} overflow="hidden">
-        <Text wrap="truncate" color="green">{agentRef.current.getModelProvider()}</Text>
-        <Text wrap="truncate" dimColor>:</Text>
+        <Text wrap="truncate" color="green">
+          {agentRef.current.getModelProvider()}
+        </Text>
+        <Text wrap="truncate" dimColor>
+          :
+        </Text>
         <Text wrap="truncate">{agentRef.current.getModelName()}</Text>
-        <Text wrap="truncate" dimColor> | {currentSession}</Text>
+        <Text wrap="truncate" dimColor>
+          {" "}
+          | {currentSession}
+        </Text>
         {promptFiles.length > 0 && (
           <>
-            <Text wrap="truncate" dimColor> | </Text>
-            <Text wrap="truncate" dimColor>{promptFiles.join(", ")}</Text>
+            <Text wrap="truncate" dimColor>
+              {" "}
+              |{" "}
+            </Text>
+            <Text wrap="truncate" dimColor>
+              {promptFiles.join(", ")}
+            </Text>
           </>
         )}
-        {status && <Text wrap="truncate" dimColor> | </Text>}
-        {status && <Text wrap="truncate" color="magenta">{status}</Text>}
+        {status && (
+          <Text wrap="truncate" dimColor>
+            {" "}
+            |{" "}
+          </Text>
+        )}
+        {status && (
+          <Text wrap="truncate" color="magenta">
+            {status}
+          </Text>
+        )}
       </Box>
 
       <Box paddingX={1} gap={1} overflow="hidden">
@@ -47,8 +67,12 @@ export function Panel({ agentRef, promptFiles = [] }: PanelProps) {
         <Box flexBasis={20}>
           <ProgressBar value={percentage} />
         </Box>
-        <Text wrap="truncate" dimColor>{Math.floor(percentage)}% │ </Text>
-        <Text wrap="truncate" color={modeColor}>{permissionMode}</Text>
+        <Text wrap="truncate" dimColor>
+          {Math.floor(percentage)}% │{" "}
+        </Text>
+        <Text wrap="truncate" color={modeColor}>
+          {permissionMode}
+        </Text>
       </Box>
     </Box>
   );

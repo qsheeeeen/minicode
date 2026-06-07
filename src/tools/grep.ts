@@ -11,10 +11,14 @@ export const grepTool: ToolDef = {
   input_schema: {
     type: "object" as const,
     properties: {
-      pattern: { type: "string", description: "The regex pattern to search for" },
+      pattern: {
+        type: "string",
+        description: "The regex pattern to search for",
+      },
       path: {
         type: "string",
-        description: "Directory or file to search in (default: current directory)",
+        description:
+          "Directory or file to search in (default: current directory)",
       },
       recursive: {
         type: "boolean",
@@ -48,7 +52,9 @@ export const grepTool: ToolDef = {
 
     try {
       const output = await new Promise<string>((resolve) => {
-        const proc = spawn("grep", grepArgs, { stdio: ["pipe", "pipe", "pipe"] });
+        const proc = spawn("grep", grepArgs, {
+          stdio: ["pipe", "pipe", "pipe"],
+        });
 
         let stdout = "";
         let stderr = "";

@@ -11,9 +11,17 @@ import { MessageStore } from "./messages.js";
 import { createLogger } from "./utils/logger.js";
 import { parseArgs, type PermissionMode } from "./args.js";
 import { loadGlobalPrompt } from "./utils/prompts.js";
-import { loadSkills, getAvailableSkills as getSkills, getSkillBody } from "./skills/index.js";
+import {
+  loadSkills,
+  getAvailableSkills as getSkills,
+  getSkillBody,
+} from "./skills/index.js";
 import { App } from "./ui/tui.js";
-import { getCommandNames, registerCommand, executeCommand } from "./ui/commands/index.js";
+import {
+  getCommandNames,
+  registerCommand,
+  executeCommand,
+} from "./ui/commands/index.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -184,7 +192,13 @@ if (headless) {
   }
 
   const { runHeadless } = await import("./ui/headless.js");
-  await runHeadless(agent, initialPrompt, sessionName, resumeRecent, cmdContext);
+  await runHeadless(
+    agent,
+    initialPrompt,
+    sessionName,
+    resumeRecent,
+    cmdContext,
+  );
   process.exit(0);
 }
 

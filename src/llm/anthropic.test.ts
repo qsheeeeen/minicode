@@ -2,7 +2,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const mockCreate = vi
   .fn()
-  .mockResolvedValue({ id: "msg_1", role: "assistant", content: [], usage: { input_tokens: 10, output_tokens: 5 } });
+  .mockResolvedValue({
+    id: "msg_1",
+    role: "assistant",
+    content: [],
+    usage: { input_tokens: 10, output_tokens: 5 },
+  });
 const mockStream = vi.fn().mockReturnValue({});
 
 vi.mock("@anthropic-ai/sdk", () => {

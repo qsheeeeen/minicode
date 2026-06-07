@@ -27,8 +27,6 @@ export type LLMStream = AsyncGenerator<StreamEvent, LLMResponse, unknown>;
 // Client interface
 
 export interface LLMClient {
-
-
   // Streaming completion — returns immediately, emits events as tokens arrive.
   chatStream(
     messages: MessageParam[],

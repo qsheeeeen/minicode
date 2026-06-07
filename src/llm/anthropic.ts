@@ -52,7 +52,9 @@ type AnthropicContentBlock = Anthropic.Messages.ContentBlock;
 // Convert canonical messages to Anthropic SDK format.
 // Since our canonical format is modeled after Anthropic's, the conversion
 // is mostly a pass-through.
-function toAnthropicMessages(messages: MessageParam[]): AnthropicMessageParam[] {
+function toAnthropicMessages(
+  messages: MessageParam[],
+): AnthropicMessageParam[] {
   return messages as unknown as AnthropicMessageParam[];
 }
 
@@ -73,13 +75,10 @@ function toCanonicalResponse(msg: Anthropic.Messages.Message): LLMResponse {
       output_tokens: msg.usage.output_tokens,
       cache_creation_input_tokens:
         (msg.usage as any).cache_creation_input_tokens ?? 0,
-      cache_read_input_tokens:
-        (msg.usage as any).cache_read_input_tokens ?? 0,
+      cache_read_input_tokens: (msg.usage as any).cache_read_input_tokens ?? 0,
     },
   };
 }
-
-
 
 // Client
 

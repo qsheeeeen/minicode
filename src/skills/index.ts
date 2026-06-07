@@ -15,7 +15,10 @@ export function registerSkill(meta: SkillMeta): void {
   skills.set(meta.name, meta);
 }
 
-export function getAvailableSkills(): Pick<SkillMeta, "name" | "description">[] {
+export function getAvailableSkills(): Pick<
+  SkillMeta,
+  "name" | "description"
+>[] {
   return Array.from(skills.values()).map((s) => ({
     name: s.name,
     description: s.description,

@@ -23,7 +23,10 @@ class MockStream implements AsyncIterable<any> {
   }
 
   emit(event: string, payload: any) {
-    const chunk = event === "contentBlock" ? { type: "contentBlock", block: payload } : { type: event, [event]: payload };
+    const chunk =
+      event === "contentBlock"
+        ? { type: "contentBlock", block: payload }
+        : { type: event, [event]: payload };
     if (this.resolveNext) {
       this.resolveNext({ value: chunk, done: false });
       this.resolveNext = null;
@@ -43,7 +46,13 @@ class MockStream implements AsyncIterable<any> {
 
   async next() {
     if (this.queue.length > 0) return this.queue.shift()!;
-    if (this.isDone) return { value: this._promise ? await this._promise.catch(() => undefined) : undefined, done: true };
+    if (this.isDone)
+      return {
+        value: this._promise
+          ? await this._promise.catch(() => undefined)
+          : undefined,
+        done: true,
+      };
     return new Promise<IteratorResult<any>>((resolve) => {
       this.resolveNext = resolve;
     });

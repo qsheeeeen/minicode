@@ -14,7 +14,9 @@ vi.mock("fs/promises", () => ({
     writeFile: vi.fn().mockResolvedValue(undefined),
     unlink: vi.fn().mockResolvedValue(undefined),
     rename: vi.fn().mockResolvedValue(undefined),
-    stat: vi.fn().mockResolvedValue({ mtime: new Date("2024-01-01T10:00:00Z") }),
+    stat: vi
+      .fn()
+      .mockResolvedValue({ mtime: new Date("2024-01-01T10:00:00Z") }),
   },
 }));
 
@@ -185,7 +187,11 @@ describe("MessageStore session persistence", () => {
   describe("load", () => {
     it("returns parsed JSONL session data", async () => {
       const fsMod = await import("fs/promises");
-      const header = JSON.stringify({ model: "claude-3", totalTokens: 1000, msgCount: 1 });
+      const header = JSON.stringify({
+        model: "claude-3",
+        totalTokens: 1000,
+        msgCount: 1,
+      });
       const msg = JSON.stringify({ role: "user", content: "hello" });
       (fsMod.default.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(
         `${header}\n${msg}\n`,
@@ -198,7 +204,11 @@ describe("MessageStore session persistence", () => {
 
     it("skips malformed lines", async () => {
       const fsMod = await import("fs/promises");
-      const header = JSON.stringify({ model: "test", totalTokens: 0, msgCount: 2 });
+      const header = JSON.stringify({
+        model: "test",
+        totalTokens: 0,
+        msgCount: 2,
+      });
       (fsMod.default.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(
         `${header}\n{bad json}\n{"role":"user","content":"ok"}\n`,
       );
@@ -233,7 +243,7 @@ describe("MessageStore session persistence", () => {
       store.addUserMessage("test");
       const turns = store.getTurns();
       expect(turns).toHaveLength(1);
-      
+
       // Mutating the returned array should not affect the store
       turns.pop();
       expect(store.getTurns()).toHaveLength(1);
@@ -245,8 +255,10 @@ describe("MessageStore session persistence", () => {
       const store = new MessageStore();
       store.addUserMessage("msg1");
       store.addUserMessage("msg2");
-      
-      const removed = store.removeLastTurn(t => t.role === "user" && t.content === "msg2");
+
+      const removed = store.removeLastTurn(
+        (t) => t.role === "user" && t.content === "msg2",
+      );
       expect(removed).toBe(true);
       expect(store.getTurns()).toHaveLength(1);
       expect(store.getTurns()[0].content).toBe("msg1");
@@ -255,8 +267,10 @@ describe("MessageStore session persistence", () => {
     it("does not remove if predicate fails", () => {
       const store = new MessageStore();
       store.addUserMessage("msg1");
-      
-      const removed = store.removeLastTurn(t => t.role === "user" && t.content === "other");
+
+      const removed = store.removeLastTurn(
+        (t) => t.role === "user" && t.content === "other",
+      );
       expect(removed).toBe(false);
       expect(store.getTurns()).toHaveLength(1);
     });

@@ -1,12 +1,8 @@
-import type {
-  MessageParam,
-  ContentBlock,
-} from "./llm/types.js";
+import type { MessageParam, ContentBlock } from "./llm/types.js";
 import fs from "fs/promises";
 import path from "path";
 import os from "os";
 import crypto from "crypto";
-
 
 interface SessionHeader {
   model: string;
@@ -34,7 +30,11 @@ export interface StatusMessage {
   timestamp: Date;
   turnIndex?: number;
   element?: unknown;
-  toolDisplay?: { name: string; input: Record<string, unknown>; output?: string };
+  toolDisplay?: {
+    name: string;
+    input: Record<string, unknown>;
+    output?: string;
+  };
 }
 
 // Display layer — each role carries only the fields it needs
@@ -61,7 +61,11 @@ export type DisplayMessage =
       role: "status";
       content: string;
       element?: unknown;
-      toolDisplay?: { name: string; input: Record<string, unknown>; output?: string };
+      toolDisplay?: {
+        name: string;
+        input: Record<string, unknown>;
+        output?: string;
+      };
       timestamp?: Date;
     }
   | { role: "error"; content: string; timestamp?: Date };
@@ -115,8 +119,7 @@ export function toDisplayMessages(
     const turn = turns[i];
     if (turn.role === "user") {
       if (typeof turn.content === "string") {
-        const displayContent =
-          displayOverrides?.get(i) ?? turn.content;
+        const displayContent = displayOverrides?.get(i) ?? turn.content;
         result.push({ role: "user", content: displayContent });
       }
     } else if (turn.role === "assistant") {
@@ -143,7 +146,7 @@ export function toDisplayMessages(
         role: s.role,
         content: s.content,
         element: s.element,
-      toolDisplay: s.toolDisplay,
+        toolDisplay: s.toolDisplay,
         timestamp: s.timestamp,
       });
     }
@@ -156,7 +159,7 @@ export function toDisplayMessages(
         role: s.role,
         content: s.content,
         element: s.element,
-      toolDisplay: s.toolDisplay,
+        toolDisplay: s.toolDisplay,
         timestamp: s.timestamp,
       });
     }
@@ -171,7 +174,6 @@ export class MessageStore {
   private statuses: StatusMessage[] = [];
   private listeners = new Set<() => void>();
   private streaming = false;
-
 
   setStreaming(v: boolean): void {
     if (this.streaming !== v) {
@@ -225,7 +227,6 @@ export class MessageStore {
     return this.turns as MessageParam[];
   }
 
-
   addUserMessage(content: string, displayContent?: string): void {
     const msg: MessageParam = { role: "user", content } as MessageParam;
     if (displayContent !== undefined && displayContent !== content) {
@@ -234,7 +235,6 @@ export class MessageStore {
     this.turns.push(msg);
     this.notify();
   }
-
 
   // Start a new assistant turn (empty content array).
   startAssistantTurn(): void {
@@ -273,7 +273,6 @@ export class MessageStore {
     this.notify();
   }
 
-
   // Add a user turn containing tool_result blocks.
   addToolResults(results: Array<{ toolUseId: string; content: string }>): void {
     if (results.length === 0) return;
@@ -285,7 +284,6 @@ export class MessageStore {
     this.turns.push({ role: "user", content: blocks });
     this.notify();
   }
-
 
   addStatus(msg: StatusMessage): void {
     msg.turnIndex = this.turns.length;
@@ -299,7 +297,11 @@ export class MessageStore {
 
   // Convenience: generate display messages from current state.
   toDisplayMessages(): DisplayMessage[] {
-    const msgs = toDisplayMessages(this.turns, this.statuses, this.displayOverrides);
+    const msgs = toDisplayMessages(
+      this.turns,
+      this.statuses,
+      this.displayOverrides,
+    );
     // Mark last non-empty text/thinking block as streaming
     if (this.streaming) {
       for (let i = msgs.length - 1; i >= 0; i--) {
@@ -313,7 +315,6 @@ export class MessageStore {
     return msgs;
   }
 
-
   clear(): void {
     this.turns = [];
     this.displayOverrides.clear();
@@ -326,7 +327,6 @@ export class MessageStore {
     this.statuses = [];
     this.notify();
   }
-
 
   private sessionName = "";
   private meta = { model: "unknown", totalTokens: 0 };
@@ -348,7 +348,8 @@ export class MessageStore {
 
   setMeta(meta: { model?: string; totalTokens?: number }): void {
     if (meta.model !== undefined) this.meta.model = meta.model;
-    if (meta.totalTokens !== undefined) this.meta.totalTokens = meta.totalTokens;
+    if (meta.totalTokens !== undefined)
+      this.meta.totalTokens = meta.totalTokens;
   }
 
   getMeta(): { model: string; totalTokens: number } {
@@ -374,9 +375,7 @@ export class MessageStore {
     await fs.rename(tmpPath, filePath);
   }
 
-  static async load(
-    name: string,
-  ): Promise<SessionData | null> {
+  static async load(name: string): Promise<SessionData | null> {
     const dir = MessageStore.getSessionDir();
     await fs.mkdir(dir, { recursive: true });
     const filePath = path.join(dir, `${name}${MessageStore.EXT}`);

@@ -30,7 +30,9 @@ describe("CompressionService", () => {
         chatStream: vi.fn().mockReturnValue({
           next: vi.fn().mockResolvedValue({
             done: true,
-            value: { content: [{ type: "text", text: "Summary of conversation" }] },
+            value: {
+              content: [{ type: "text", text: "Summary of conversation" }],
+            },
           }),
         }),
       } as unknown as LLMClient;

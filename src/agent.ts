@@ -111,10 +111,7 @@ export class Agent {
   public setSession(sessionName: string): void {
     this._currentSession = sessionName;
     this.store.setSessionName(sessionName);
-    this.changeJournal.startSession(
-      MessageStore.getSessionDir(),
-      sessionName,
-    );
+    this.changeJournal.startSession(MessageStore.getSessionDir(), sessionName);
   }
 
   public setLogger(logger: pino.Logger): void {
@@ -160,8 +157,6 @@ export class Agent {
     return this.contextLength;
   }
 
-
-
   constructor(config: AgentConfig = {}) {
     this.apiKey = config.apiKey;
     this.baseURL = config.baseURL;
@@ -173,10 +168,10 @@ export class Agent {
     this.thinkingEnabled = config.thinkingEnabled || false;
     this.effort = config.effort;
     this.compressionService = new CompressionService();
-    this.tools = config.subAgentMode
-      ? getSubAgentTools()
-      : getAll();
-    this.streamingHandler = new StreamingHandler(this.store, this.tools, () => this.saveStore());
+    this.tools = config.subAgentMode ? getSubAgentTools() : getAll();
+    this.streamingHandler = new StreamingHandler(this.store, this.tools, () =>
+      this.saveStore(),
+    );
     this.agentRegistry = config.agentRegistry;
     this.currentAgentId = config.currentAgentId || "1";
     this.sessionStats = config.sessionStats;
@@ -270,7 +265,8 @@ export class Agent {
       // Count original user prompts before compression
       let originalUserPrompts = 0;
       for (const t of turns) {
-        if (t.role === "user" && typeof t.content === "string") originalUserPrompts++;
+        if (t.role === "user" && typeof t.content === "string")
+          originalUserPrompts++;
       }
 
       const compressed = await this.compressionService.compress(
@@ -283,7 +279,8 @@ export class Agent {
       let keptUserPrompts = 0;
       for (let i = 0; i < compressed.length; i++) {
         const t = compressed[i];
-        if (t.role === "user" && typeof t.content === "string") keptUserPrompts++;
+        if (t.role === "user" && typeof t.content === "string")
+          keptUserPrompts++;
       }
       // Summary adds 1 user prompt, so original kept = keptUserPrompts - 1
       const originalKept = keptUserPrompts - 1;
@@ -327,10 +324,15 @@ export class Agent {
     try {
       const { execFile } = await import("child_process");
       const status = await new Promise<string>((resolve, reject) => {
-        execFile("git", ["status"], { encoding: "utf-8", timeout: 5000 }, (err, stdout) => {
-          if (err) reject(err);
-          else resolve(stdout);
-        });
+        execFile(
+          "git",
+          ["status"],
+          { encoding: "utf-8", timeout: 5000 },
+          (err, stdout) => {
+            if (err) reject(err);
+            else resolve(stdout);
+          },
+        );
       });
       ctx += `\n${status.trim()}\n`;
       ctx += `\nThis is the git status at the start of the conversation. Note that this status is a snapshot in time, and will not update during the conversation.`;
@@ -372,9 +374,7 @@ export class Agent {
   }
 
   // Track token usage and trigger auto-compression
-  private async processTokenUsage(
-    response: LLMResponse,
-  ): Promise<void> {
+  private async processTokenUsage(response: LLMResponse): Promise<void> {
     if (!response.usage) return;
 
     const { shouldCompress } = this.tokenTracker.processUsage(
@@ -472,7 +472,10 @@ export class Agent {
     for (let i = 0; i < toolCalls.length; i++) {
       const { block, tool } = toolCalls[i];
       if (!tool) {
-        results.push({ toolUseId: block.id, content: `Error: Tool '${block.name}' not found or not available.` });
+        results.push({
+          toolUseId: block.id,
+          content: `Error: Tool '${block.name}' not found or not available.`,
+        });
         this.logger?.warn(
           { session: this.currentSession, toolName: block.name },
           "LLM attempted to use an unavailable tool",
@@ -556,20 +559,19 @@ export class Agent {
           input_schema: t.input_schema,
         })) as LLMToolDef[];
 
-        const { response, toolCalls } =
-          await this.streamingHandler.handle(
-            this.client,
-            this.store.toLLMMessages(),
-            toolDefs,
-            {
-              system: this.systemPrompt,
-              model: this.model,
-              signal: this.abortController?.signal,
-              effort: this.effort,
-            },
-            this.abortController?.signal,
-            this.currentStreamRef,
-          );
+        const { response, toolCalls } = await this.streamingHandler.handle(
+          this.client,
+          this.store.toLLMMessages(),
+          toolDefs,
+          {
+            system: this.systemPrompt,
+            model: this.model,
+            signal: this.abortController?.signal,
+            effort: this.effort,
+          },
+          this.abortController?.signal,
+          this.currentStreamRef,
+        );
 
         await this.processTokenUsage(response);
         this.logger?.info(
@@ -614,7 +616,7 @@ export class Agent {
           (last) =>
             last.role === "user" &&
             typeof last.content === "string" &&
-            last.content === userMessage
+            last.content === userMessage,
         );
       }
       this.abortController = null;
@@ -630,7 +632,6 @@ export class Agent {
     }
     return true;
   }
-
 
   getIsRunning(): boolean {
     return this.isRunning;

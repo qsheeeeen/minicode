@@ -1,7 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
 import { TokenTracker } from "./token-tracker.js";
 
-function createTracker(overrides: { contextLength?: number; ratio?: number } = {}) {
+function createTracker(
+  overrides: { contextLength?: number; ratio?: number } = {},
+) {
   const events = { tokenUpdate: vi.fn() };
   const store = { addStatus: vi.fn() };
   const sessionStats = { recordUsage: vi.fn(), incrementSessionCount: vi.fn() };
@@ -32,7 +34,13 @@ describe("TokenTracker", () => {
   it("records usage in sessionStats", () => {
     const { tracker, sessionStats } = createTracker();
     tracker.processUsage("model-a", 1000, 200, 50, 30);
-    expect(sessionStats.recordUsage).toHaveBeenCalledWith("model-a", 1000, 200, 50, 30);
+    expect(sessionStats.recordUsage).toHaveBeenCalledWith(
+      "model-a",
+      1000,
+      200,
+      50,
+      30,
+    );
   });
 
   it("notifies events with token count", () => {

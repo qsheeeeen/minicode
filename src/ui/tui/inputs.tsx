@@ -206,9 +206,10 @@ export function ModelSelectInput({
 
   // ── Edit: pick model ──
   const models = providers[selectedProvider]?.models ?? {};
-  const options = Object.keys(models).map(
-    (k) => ({ label: models[k]?.name || k, value: `${editTier}:${k}@${selectedProvider}` }),
-  );
+  const options = Object.keys(models).map((k) => ({
+    label: models[k]?.name || k,
+    value: `${editTier}:${k}@${selectedProvider}`,
+  }));
 
   return (
     <Box flexDirection="column">
@@ -272,7 +273,9 @@ export function UndoInput({
       const entry = entriesMap.get(i);
       let label = `${i}. "${summary}"`;
       if (entry) {
-        const files = entry.entries.map((e) => e.path.split("/").pop()).join(", ");
+        const files = entry.entries
+          .map((e) => e.path.split("/").pop())
+          .join(", ");
         label += ` — ${entry.entries.length} file${entry.entries.length > 1 ? "s" : ""} (${files})`;
       }
       options.push({ label, value: String(i) });
@@ -305,9 +308,7 @@ export function UndoInput({
   const hasFiles = turn && turn.entries.length > 0;
   const msg = userMessages[selectedTurnIdx - 1] || "(unknown)";
 
-  const scopeOptions = [
-    { label: "Conversation", value: "conversation" },
-  ];
+  const scopeOptions = [{ label: "Conversation", value: "conversation" }];
   if (hasFiles) {
     scopeOptions.push({ label: "Conversation + code", value: "both" });
   }
@@ -316,7 +317,8 @@ export function UndoInput({
   return (
     <Box flexDirection="column">
       <Text bold color="yellow">
-        Rollback to before turn {selectedTurnIdx}: "{msg.length > 50 ? msg.slice(0, 50) + "..." : msg}"
+        Rollback to before turn {selectedTurnIdx}: "
+        {msg.length > 50 ? msg.slice(0, 50) + "..." : msg}"
       </Text>
       {hasFiles && (
         <>
@@ -342,9 +344,8 @@ export function UndoInput({
           }
           setProcessing(true);
 
-          const { RollbackExecutor } = await import(
-            "../../services/rollback-executor.js"
-          );
+          const { RollbackExecutor } =
+            await import("../../services/rollback-executor.js");
           const executor = new RollbackExecutor();
           const journal = agent.getChangeJournal();
 

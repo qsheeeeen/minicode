@@ -27,13 +27,13 @@ describe("callContent", () => {
   });
 
   it("formats Edit with path", () => {
-    expect(callContent("Edit", { path: "src/app.ts" })).toBe("Edit(src/app.ts)");
+    expect(callContent("Edit", { path: "src/app.ts" })).toBe(
+      "Edit(src/app.ts)",
+    );
   });
 
   it("formats Bash with command", () => {
-    expect(callContent("Bash", { command: "npm test" })).toBe(
-      "Bash(npm test)",
-    );
+    expect(callContent("Bash", { command: "npm test" })).toBe("Bash(npm test)");
   });
 
   it("formats SubAgent with short task", () => {

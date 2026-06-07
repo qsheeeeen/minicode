@@ -53,7 +53,13 @@ describe("RollbackExecutor", () => {
   describe("rollbackFilesAndConversation", () => {
     it("restores files then truncates conversation then prunes", async () => {
       const entries = [
-        { turnIdx: 2, path: "a.ts", op: "edit", before: "old content", ts: 100 },
+        {
+          turnIdx: 2,
+          path: "a.ts",
+          op: "edit",
+          before: "old content",
+          ts: 100,
+        },
         { turnIdx: 3, path: "b.ts", op: "write", before: "", ts: 200 },
       ];
       const journal = makeMockJournal(entries);
@@ -65,7 +71,11 @@ describe("RollbackExecutor", () => {
 
       const { RollbackExecutor } = await import("./rollback-executor.js");
       const executor = new RollbackExecutor();
-      const result = await executor.rollbackFilesAndConversation(journal, store, 2);
+      const result = await executor.rollbackFilesAndConversation(
+        journal,
+        store,
+        2,
+      );
 
       // File with before content gets restored
       expect(result.filesRestored).toContain("a.ts");
@@ -88,13 +98,15 @@ describe("RollbackExecutor", () => {
       const journal = makeMockJournal([
         { turnIdx: 1, path: "a.ts", op: "edit", before: "old", ts: 100 },
       ]);
-      const store = makeMockMessageStore([
-        { role: "user", content: "first" },
-      ]);
+      const store = makeMockMessageStore([{ role: "user", content: "first" }]);
 
       const { RollbackExecutor } = await import("./rollback-executor.js");
       const executor = new RollbackExecutor();
-      const result = await executor.rollbackFilesAndConversation(journal, store, 5);
+      const result = await executor.rollbackFilesAndConversation(
+        journal,
+        store,
+        5,
+      );
 
       expect(result.filesRestored).toEqual([]);
       expect(result.filesDeleted).toEqual([]);
@@ -102,8 +114,20 @@ describe("RollbackExecutor", () => {
 
     it("uses earliest entry for each file path", async () => {
       const entries = [
-        { turnIdx: 2, path: "a.ts", op: "edit", before: "first-version", ts: 100 },
-        { turnIdx: 3, path: "a.ts", op: "edit", before: "second-version", ts: 200 },
+        {
+          turnIdx: 2,
+          path: "a.ts",
+          op: "edit",
+          before: "first-version",
+          ts: 100,
+        },
+        {
+          turnIdx: 3,
+          path: "a.ts",
+          op: "edit",
+          before: "second-version",
+          ts: 200,
+        },
       ];
       const journal = makeMockJournal(entries);
       const store = makeMockMessageStore([
@@ -117,7 +141,11 @@ describe("RollbackExecutor", () => {
 
       const fs = (await import("fs/promises")).default;
       // Should use the earliest entry (first-version), not second
-      expect(fs.writeFile).toHaveBeenCalledWith("a.ts", "first-version", "utf-8");
+      expect(fs.writeFile).toHaveBeenCalledWith(
+        "a.ts",
+        "first-version",
+        "utf-8",
+      );
     });
   });
 });

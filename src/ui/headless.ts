@@ -26,10 +26,7 @@ export async function runHeadless(
         agent.setTokenCount(totalTokens);
       }
       const { createLogger } = await import("../utils/logger.js");
-      const newLogger = await createLogger(
-        MessageStore.getProjectHash(),
-        name,
-      );
+      const newLogger = await createLogger(MessageStore.getProjectHash(), name);
       agent.setSession(name);
       agent.setLogger(newLogger);
     }
@@ -192,7 +189,9 @@ export async function runHeadless(
       if (s.role === "error") console.error(`[error] ${s.content}`);
       else if (s.toolDisplay) {
         const td = s.toolDisplay;
-        console.log(`(${td.name}(${JSON.stringify(td.input)}) → ${td.output ?? ""})`);
+        console.log(
+          `(${td.name}(${JSON.stringify(td.input)}) → ${td.output ?? ""})`,
+        );
       } else if (s.content) {
         console.log(s.content);
       }

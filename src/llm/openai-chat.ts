@@ -152,9 +152,7 @@ function convertMessages(
 
 // Tool definition conversion (canonical → OpenAI)
 
-function convertTools(
-  tools: LLMToolDef[],
-): OpenAI.ChatCompletionTool[] {
+function convertTools(tools: LLMToolDef[]): OpenAI.ChatCompletionTool[] {
   return tools.map((t) => ({
     type: "function" as const,
     function: {
@@ -175,7 +173,8 @@ function convertResponse(
   const msg = choice.message;
 
   // Reasoning content → ThinkingBlock (o1/o3/o4-mini models)
-  const reasoning = (msg as unknown as Record<string, unknown>).reasoning_content;
+  const reasoning = (msg as unknown as Record<string, unknown>)
+    .reasoning_content;
   if (typeof reasoning === "string" && reasoning.length > 0) {
     content.push({ type: "thinking", thinking: reasoning });
   }
@@ -266,7 +265,10 @@ export class OpenAIChatClient implements LLMClient {
 
       let textContent = "";
       let thinkingContent = "";
-      const pendingToolCalls: Map<number, { id: string; name: string; arguments: string }> = new Map();
+      const pendingToolCalls: Map<
+        number,
+        { id: string; name: string; arguments: string }
+      > = new Map();
       let finishReason: string | null = null;
       let usage: OpenAI.CompletionUsage | undefined;
 
@@ -315,7 +317,8 @@ export class OpenAIChatClient implements LLMClient {
 
             if (tc.id) pending.id = tc.id;
             if (tc.function?.name) pending.name = tc.function.name;
-            if (tc.function?.arguments) pending.arguments += tc.function.arguments;
+            if (tc.function?.arguments)
+              pending.arguments += tc.function.arguments;
           }
         }
       }
@@ -323,7 +326,10 @@ export class OpenAIChatClient implements LLMClient {
       const content: ContentBlock[] = [];
 
       if (thinkingContent.length > 0) {
-        const block: ThinkingBlock = { type: "thinking", thinking: thinkingContent };
+        const block: ThinkingBlock = {
+          type: "thinking",
+          thinking: thinkingContent,
+        };
         content.push(block);
         yield { type: "contentBlock", block };
       }

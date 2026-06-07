@@ -90,9 +90,7 @@ describe("loadSkills", () => {
     try {
       await loadSkills(baseDir);
 
-      const skills = getAvailableSkills().filter(
-        (s) => s.name === "my-skill",
-      );
+      const skills = getAvailableSkills().filter((s) => s.name === "my-skill");
       expect(skills).toHaveLength(1);
       expect(skills[0].name).toBe("my-skill");
       expect(skills[0].description).toBe("This is a test skill.");
@@ -124,10 +122,7 @@ describe("loadSkills", () => {
         (s) => s.name === "skill-a" || s.name === "skill-b",
       );
       expect(loaded).toHaveLength(2);
-      expect(loaded.map((s) => s.name).sort()).toEqual([
-        "skill-a",
-        "skill-b",
-      ]);
+      expect(loaded.map((s) => s.name).sort()).toEqual(["skill-a", "skill-b"]);
     } finally {
       await fs.rm(baseDir, { recursive: true, force: true });
     }
@@ -196,9 +191,7 @@ describe("loadSkills", () => {
     const baseDir = await createTempSkillDir("bad-yaml", content);
     try {
       await loadSkills(baseDir);
-      const loaded = getAvailableSkills().filter(
-        (s) => s.name === "bad-yaml",
-      );
+      const loaded = getAvailableSkills().filter((s) => s.name === "bad-yaml");
       expect(loaded).toHaveLength(0);
     } finally {
       await fs.rm(baseDir, { recursive: true, force: true });
@@ -266,9 +259,7 @@ describe("loadSkills", () => {
     try {
       await loadSkills(baseDir);
 
-      const loaded = getAvailableSkills().filter(
-        (s) => s.name === "no-name",
-      );
+      const loaded = getAvailableSkills().filter((s) => s.name === "no-name");
       expect(loaded).toHaveLength(0);
     } finally {
       await fs.rm(baseDir, { recursive: true, force: true });
@@ -282,9 +273,7 @@ describe("loadSkills", () => {
     try {
       await loadSkills(baseDir);
 
-      const loaded = getAvailableSkills().filter(
-        (s) => s.name === "no-desc",
-      );
+      const loaded = getAvailableSkills().filter((s) => s.name === "no-desc");
       expect(loaded).toHaveLength(0);
     } finally {
       await fs.rm(baseDir, { recursive: true, force: true });
@@ -298,9 +287,7 @@ describe("loadSkills", () => {
     try {
       await loadSkills(baseDir);
 
-      const loaded = getAvailableSkills().filter(
-        (s) => s.name === "array",
-      );
+      const loaded = getAvailableSkills().filter((s) => s.name === "array");
       expect(loaded).toHaveLength(0);
     } finally {
       await fs.rm(baseDir, { recursive: true, force: true });

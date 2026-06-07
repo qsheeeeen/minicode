@@ -7,7 +7,6 @@ import type { EffortLevel } from "./llm/types.js";
 const CONFIG_DIR = path.join(os.homedir(), ".minicode");
 const CONFIG_PATH = path.join(CONFIG_DIR, "config.json");
 
-
 export interface ModelConfig {
   contextLength?: number;
   name?: string;
@@ -40,7 +39,6 @@ export interface Config {
 }
 
 let cachedConfig: Config | null = null;
-
 
 export async function loadConfig(refresh = false): Promise<Config> {
   if (cachedConfig && !refresh) return cachedConfig;

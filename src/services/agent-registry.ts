@@ -66,8 +66,10 @@ export class AgentRegistry {
   ): void {
     const session = this.sessions.get(id);
     if (session) {
-      if (updates.tokenCount !== undefined) session.tokenCount = updates.tokenCount;
-      if (updates.toolCalls !== undefined) session.toolCalls = updates.toolCalls;
+      if (updates.tokenCount !== undefined)
+        session.tokenCount = updates.tokenCount;
+      if (updates.toolCalls !== undefined)
+        session.toolCalls = updates.toolCalls;
       this.notifyUpdate();
     }
   }

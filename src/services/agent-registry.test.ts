@@ -171,9 +171,9 @@ describe("AgentRegistry", () => {
       registry.setUpdateCallback(callback);
       registry.register(createMockSession("1", "main"));
       callback.mockClear();
-      
+
       registry.updateStatus("1", "completed");
-      
+
       expect(callback).toHaveBeenCalledTimes(1);
       expect(callback.mock.calls[0][0][0].status).toBe("completed");
     });
@@ -184,9 +184,9 @@ describe("AgentRegistry", () => {
       registry.setUpdateCallback(callback);
       registry.register(createMockSession("1", "main"));
       callback.mockClear();
-      
+
       registry.updateSummary("1", "done");
-      
+
       expect(callback).toHaveBeenCalledTimes(1);
       expect(callback.mock.calls[0][0][0].summary).toBe("done");
     });

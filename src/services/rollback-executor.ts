@@ -81,10 +81,7 @@ export class RollbackExecutor {
     let userPromptCount = 0;
     let cutAt = turns.length;
     for (let i = 0; i < turns.length; i++) {
-      if (
-        turns[i].role === "user" &&
-        typeof turns[i].content === "string"
-      ) {
+      if (turns[i].role === "user" && typeof turns[i].content === "string") {
         userPromptCount++;
         if (userPromptCount === fromTurnIdx) {
           cutAt = i;

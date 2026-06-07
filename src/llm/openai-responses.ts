@@ -52,9 +52,7 @@ function mapEffort(effort: EffortLevel): any {
 // Tool definition conversion
 
 // Convert a canonical LLMToolDef to an OpenAI Responses function tool.
-function convertToolDef(
-  tool: LLMToolDef,
-): OpenAI.Responses.FunctionTool {
+function convertToolDef(tool: LLMToolDef): OpenAI.Responses.FunctionTool {
   return {
     type: "function" as const,
     name: tool.name,
@@ -225,8 +223,6 @@ function convertResponse(response: OpenAI.Responses.Response): LLMResponse {
   return { content, stop_reason, usage };
 }
 
-
-
 // OpenAIResponsesClient
 
 // LLMClient implementation backed by the OpenAI Responses API.
@@ -239,7 +235,6 @@ export class OpenAIResponsesClient implements LLMClient {
       baseURL,
     });
   }
-
 
   chatStream(
     messages: MessageParam[],
@@ -272,7 +267,9 @@ export class OpenAIResponsesClient implements LLMClient {
 
     const streamPromise = this.client.responses.create(params, {
       signal: abortController.signal,
-    }) as unknown as Promise<AsyncIterable<OpenAI.Responses.ResponseStreamEvent>>;
+    }) as unknown as Promise<
+      AsyncIterable<OpenAI.Responses.ResponseStreamEvent>
+    >;
 
     async function* run(): AsyncGenerator<StreamEvent, LLMResponse, unknown> {
       const stream = await streamPromise;
@@ -295,7 +292,10 @@ export class OpenAIResponsesClient implements LLMClient {
             const text = (event as any).text as string | undefined;
             const finalText = text ?? currentText;
             if (finalText) {
-              yield { type: "contentBlock", block: { type: "text", text: finalText } };
+              yield {
+                type: "contentBlock",
+                block: { type: "text", text: finalText },
+              };
             }
             currentText = "";
             break;
@@ -310,7 +310,10 @@ export class OpenAIResponsesClient implements LLMClient {
           }
           case "response.reasoning.done": {
             if (currentThinking) {
-              yield { type: "contentBlock", block: { type: "thinking", thinking: currentThinking } };
+              yield {
+                type: "contentBlock",
+                block: { type: "thinking", thinking: currentThinking },
+              };
             }
             currentThinking = "";
             break;
@@ -320,7 +323,10 @@ export class OpenAIResponsesClient implements LLMClient {
             if (item && item.type === "function_call") {
               let parsedArgs: Record<string, unknown> = {};
               try {
-                parsedArgs = JSON.parse(item.arguments) as Record<string, unknown>;
+                parsedArgs = JSON.parse(item.arguments) as Record<
+                  string,
+                  unknown
+                >;
               } catch {
                 parsedArgs = { _raw: item.arguments };
               }
@@ -337,7 +343,9 @@ export class OpenAIResponsesClient implements LLMClient {
             break;
           }
           case "response.completed": {
-            const response = (event as any).response as OpenAI.Responses.Response | undefined;
+            const response = (event as any).response as
+              | OpenAI.Responses.Response
+              | undefined;
             if (response) {
               finalResult = convertResponse(response);
             }
@@ -349,12 +357,12 @@ export class OpenAIResponsesClient implements LLMClient {
       if (finalResult) {
         return finalResult;
       }
-      
+
       // Fallback if completed event didn't fire properly
       return {
         content: [],
         stop_reason: "error",
-        usage: { input_tokens: 0, output_tokens: 0 }
+        usage: { input_tokens: 0, output_tokens: 0 },
       };
     }
 

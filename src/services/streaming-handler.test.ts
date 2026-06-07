@@ -19,24 +19,41 @@ function mockStream(events: Record<string, Function>) {
   // Make the events available to tests to trigger yields
   events["text"] = (text: string) => {
     const chunk = { type: "text", text };
-    if (resolveNext) { resolveNext({ value: chunk, done: false }); resolveNext = null; }
-    else queue.push({ value: chunk, done: false });
+    if (resolveNext) {
+      resolveNext({ value: chunk, done: false });
+      resolveNext = null;
+    } else queue.push({ value: chunk, done: false });
   };
   events["contentBlock"] = (block: any) => {
     const chunk = { type: "contentBlock", block };
-    if (resolveNext) { resolveNext({ value: chunk, done: false }); resolveNext = null; }
-    else queue.push({ value: chunk, done: false });
+    if (resolveNext) {
+      resolveNext({ value: chunk, done: false });
+      resolveNext = null;
+    } else queue.push({ value: chunk, done: false });
   };
   events["end"] = () => {
     isDone = true;
-    if (resolveNext) { resolveNext({ value: { usage: { input_tokens: 10, output_tokens: 10 } }, done: true }); resolveNext = null; }
-    else queue.push({ value: { usage: { input_tokens: 10, output_tokens: 10 } }, done: true });
+    if (resolveNext) {
+      resolveNext({
+        value: { usage: { input_tokens: 10, output_tokens: 10 } },
+        done: true,
+      });
+      resolveNext = null;
+    } else
+      queue.push({
+        value: { usage: { input_tokens: 10, output_tokens: 10 } },
+        done: true,
+      });
   };
 
   return {
     async next() {
       if (queue.length > 0) return queue.shift()!;
-      if (isDone) return { value: { usage: { input_tokens: 10, output_tokens: 10 } }, done: true };
+      if (isDone)
+        return {
+          value: { usage: { input_tokens: 10, output_tokens: 10 } },
+          done: true,
+        };
       return new Promise<IteratorResult<any>>((resolve) => {
         resolveNext = resolve;
       });
@@ -44,7 +61,9 @@ function mockStream(events: Record<string, Function>) {
     [Symbol.asyncIterator]() {
       return this;
     },
-    finalMessage: vi.fn().mockResolvedValue({ usage: { input_tokens: 10, output_tokens: 10 } }),
+    finalMessage: vi
+      .fn()
+      .mockResolvedValue({ usage: { input_tokens: 10, output_tokens: 10 } }),
     abort: vi.fn(),
   };
 }
@@ -74,7 +93,12 @@ describe("StreamingHandler", () => {
   it("handles tool_use blocks", async () => {
     const store = mockStore();
     const saveStore = vi.fn();
-    const toolDef = { name: "Read", description: "Read file", input_schema: {}, execute: vi.fn() };
+    const toolDef = {
+      name: "Read",
+      description: "Read file",
+      input_schema: {},
+      execute: vi.fn(),
+    };
     const tools = new Map([["Read", toolDef]]);
     const handler = new StreamingHandler(store, tools, saveStore);
     const events: Record<string, Function> = {};
@@ -106,7 +130,14 @@ describe("StreamingHandler", () => {
     const streamRef = { current: stream };
 
     const client = { chatStream: vi.fn().mockReturnValue(stream) } as any;
-    const promise = handler.handle(client, [], [], undefined, undefined, streamRef);
+    const promise = handler.handle(
+      client,
+      [],
+      [],
+      undefined,
+      undefined,
+      streamRef,
+    );
     events["end"]?.();
     await promise;
 

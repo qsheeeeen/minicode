@@ -22,7 +22,13 @@ export class TokenTracker {
     cacheRead: number,
   ): { percentage: number; shouldCompress: boolean } {
     this.counter.updateUsage(input, output, cacheCreation, cacheRead);
-    this.sessionStats?.recordUsage(model, input, output, cacheCreation, cacheRead);
+    this.sessionStats?.recordUsage(
+      model,
+      input,
+      output,
+      cacheCreation,
+      cacheRead,
+    );
     this.events.tokenUpdate(this.counter.getTotal());
 
     const ratio = this.counter.getRatio(this.contextLength);

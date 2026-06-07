@@ -5,7 +5,9 @@ import { Header } from "./Header.js";
 
 describe("Header Component", () => {
   it("renders app name, version, and project path", () => {
-    const { lastFrame } = render(<Header version="11.11.11.11" projectPath="/home/user/project" />);
+    const { lastFrame } = render(
+      <Header version="11.11.11.11" projectPath="/home/user/project" />,
+    );
     const output = lastFrame();
     expect(output).toContain("MiniCode");
     expect(output).toContain("(v11.11.11.11)");

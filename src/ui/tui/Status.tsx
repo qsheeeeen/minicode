@@ -10,7 +10,10 @@ export function Status() {
 
   useEffect(() => {
     if (!isLoading) return;
-    const timer = setInterval(() => setFrame((f) => (f + 1) % FRAMES.length), 80);
+    const timer = setInterval(
+      () => setFrame((f) => (f + 1) % FRAMES.length),
+      80,
+    );
     return () => clearInterval(timer);
   }, [isLoading]);
 
@@ -20,7 +23,9 @@ export function Status() {
 
   return (
     <Box paddingX={1}>
-      <Text color="gray">{FRAMES[frame]} {label}</Text>
+      <Text color="gray">
+        {FRAMES[frame]} {label}
+      </Text>
     </Box>
   );
 }

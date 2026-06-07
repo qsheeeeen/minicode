@@ -22,7 +22,9 @@ describe("switchSession", () => {
     expect(agent.setSession).toHaveBeenCalledWith("test-session");
     expect(agent.setLogger).toHaveBeenCalled();
     expect(setCurrentSession).toHaveBeenCalledWith("test-session");
-    expect(sessionStats.incrementSessionCount).toHaveBeenCalledWith("test-session");
+    expect(sessionStats.incrementSessionCount).toHaveBeenCalledWith(
+      "test-session",
+    );
     expect(agent.getStore().addStatus).toHaveBeenCalledWith(
       expect.objectContaining({ role: "status", content: "Created session" }),
     );

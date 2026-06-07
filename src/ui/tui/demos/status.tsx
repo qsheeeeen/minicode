@@ -13,7 +13,11 @@ function Demo() {
       <TuiProvider
         initialState={{
           isLoading: true,
-          pendingPrompt: { message: "Pick one", options: [{ label: "A", value: "a" }], resolve: () => {} } as any,
+          pendingPrompt: {
+            message: "Pick one",
+            options: [{ label: "A", value: "a" }],
+            resolve: () => {},
+          } as any,
         }}
       >
         <Status />

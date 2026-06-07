@@ -26,7 +26,12 @@ function fmtDuration(ms: number): string {
   return `${h}h ${rm}m`;
 }
 
-function Field({ label, value, bold, color }: {
+function Field({
+  label,
+  value,
+  bold,
+  color,
+}: {
   label: string;
   value: string;
   bold?: boolean;
@@ -38,7 +43,9 @@ function Field({ label, value, bold, color }: {
         <Text dimColor>{label}</Text>
       </Box>
       <Box width={VALUE_W} justifyContent="flex-end">
-        <Text bold={bold} color={color}>{value}</Text>
+        <Text bold={bold} color={color}>
+          {value}
+        </Text>
       </Box>
     </Box>
   );
@@ -50,7 +57,9 @@ export function Receipt({ data, onDismiss }: ReceiptProps) {
     return () => clearTimeout(t);
   }, [onDismiss]);
 
-  const duration = data.startTime ? fmtDuration(Date.now() - data.startTime) : "—";
+  const duration = data.startTime
+    ? fmtDuration(Date.now() - data.startTime)
+    : "—";
 
   return (
     <Box
@@ -70,7 +79,12 @@ export function Receipt({ data, onDismiss }: ReceiptProps) {
         <Text dimColor>thank you for coding</Text>
       </Box>
 
-      <Box borderStyle="single" borderColor="gray" borderLeft={false} borderRight={false}>
+      <Box
+        borderStyle="single"
+        borderColor="gray"
+        borderLeft={false}
+        borderRight={false}
+      >
         <Box flexDirection="column">
           <Field label="Project:" value={data.projectName} />
           <Field label="Sessions:" value={String(data.sessionCount)} />
@@ -80,7 +94,12 @@ export function Receipt({ data, onDismiss }: ReceiptProps) {
 
       {data.models.map((m, i) => (
         <React.Fragment key={i}>
-          <Box borderStyle="single" borderColor="gray" borderLeft={false} borderRight={false}>
+          <Box
+            borderStyle="single"
+            borderColor="gray"
+            borderLeft={false}
+            borderRight={false}
+          >
             <Box flexDirection="column" width={W}>
               <Text bold>{m.name}</Text>
               <Field label="  Input:" value={fmtNum(m.inputTokens)} />
@@ -92,8 +111,12 @@ export function Receipt({ data, onDismiss }: ReceiptProps) {
                 <Field label="  Cache R:" value={fmtNum(m.cacheRead)} />
               )}
               <Box width={W}>
-                <Box width={LABEL_W}><Text dimColor>{"  ────────"}</Text></Box>
-                <Box width={VALUE_W} justifyContent="flex-end"><Text dimColor>{"─────────"}</Text></Box>
+                <Box width={LABEL_W}>
+                  <Text dimColor>{"  ────────"}</Text>
+                </Box>
+                <Box width={VALUE_W} justifyContent="flex-end">
+                  <Text dimColor>{"─────────"}</Text>
+                </Box>
               </Box>
               <Field label="  Subtotal:" value={fmtNum(m.total)} bold />
             </Box>
@@ -102,9 +125,19 @@ export function Receipt({ data, onDismiss }: ReceiptProps) {
         </React.Fragment>
       ))}
 
-      <Box borderStyle="single" borderColor="gray" borderLeft={false} borderRight={false}>
+      <Box
+        borderStyle="single"
+        borderColor="gray"
+        borderLeft={false}
+        borderRight={false}
+      >
         <Box flexDirection="column">
-          <Field label="TOTAL:" value={fmtNum(data.totalTokens)} bold color="green" />
+          <Field
+            label="TOTAL:"
+            value={fmtNum(data.totalTokens)}
+            bold
+            color="green"
+          />
           <Field label="Models:" value={String(data.models.length)} />
         </Box>
       </Box>

@@ -6,7 +6,11 @@ import type { ResolvedConfig } from "../config.js";
 import { CallbackEvents, CallbackPrompter } from "../utils/display.js";
 import { routeInput } from "./routing.js";
 import { MessageStore } from "../messages.js";
-import { AgentRegistry, type AgentSession, runBash } from "../services/index.js";
+import {
+  AgentRegistry,
+  type AgentSession,
+  runBash,
+} from "../services/index.js";
 import type { SessionStats } from "../services/session-stats.js";
 import { Receipt } from "./tui/Receipt.js";
 
@@ -85,8 +89,7 @@ function useMultiAgent(
       const currentIndex = sessions.findIndex(
         (s) => s.id === activeAgentIdRef.current,
       );
-      const prevIndex =
-        (currentIndex - 1 + sessions.length) % sessions.length;
+      const prevIndex = (currentIndex - 1 + sessions.length) % sessions.length;
       switchToSession(sessions[prevIndex]);
     }
 
@@ -172,13 +175,11 @@ function useDisplay(
             dispatch({ type: "SET_TOKEN_COUNT", payload: totalTokens });
           }
         } else if (sessionName) {
-          agent
-            .getStore()
-            .addStatus({
-              role: "status",
-              content: `Created new session: ${sessionName}`,
-              timestamp: new Date(),
-            });
+          agent.getStore().addStatus({
+            role: "status",
+            content: `Created new session: ${sessionName}`,
+            timestamp: new Date(),
+          });
         }
       }
     };
@@ -220,25 +221,28 @@ function AppContent({
     );
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const cmdContext = useCallback(() => ({
-    agent: agentRef.current,
-    sessionStats,
-    setMessages: (msgs: any) => {
-      if (typeof msgs !== "function") {
-        dispatch({ type: "SET_MESSAGES", payload: msgs });
-      }
-    },
-    setCurrentSession: (session: string) =>
-      dispatch({ type: "SET_CURRENT_SESSION", payload: session }),
-    setMode: () => {},
-    setInputMode: (mode: string, props?: Record<string, unknown>) =>
-      dispatch({ type: "SET_INPUT_MODE", payload: { mode, props } }),
-    setSessionList: (sessions: Array<{ name: string }>) =>
-      dispatch({ type: "SET_SESSION_LIST", payload: { sessions } }),
-    setSelectedIndex: (index: number) =>
-      dispatch({ type: "SET_SELECTED_SESSION_INDEX", payload: index }),
-    exit: () => dispatch({ type: "SET_SHOW_RECEIPT", payload: true }),
-  }), [dispatch]);
+  const cmdContext = useCallback(
+    () => ({
+      agent: agentRef.current,
+      sessionStats,
+      setMessages: (msgs: any) => {
+        if (typeof msgs !== "function") {
+          dispatch({ type: "SET_MESSAGES", payload: msgs });
+        }
+      },
+      setCurrentSession: (session: string) =>
+        dispatch({ type: "SET_CURRENT_SESSION", payload: session }),
+      setMode: () => {},
+      setInputMode: (mode: string, props?: Record<string, unknown>) =>
+        dispatch({ type: "SET_INPUT_MODE", payload: { mode, props } }),
+      setSessionList: (sessions: Array<{ name: string }>) =>
+        dispatch({ type: "SET_SESSION_LIST", payload: { sessions } }),
+      setSelectedIndex: (index: number) =>
+        dispatch({ type: "SET_SELECTED_SESSION_INDEX", payload: index }),
+      exit: () => dispatch({ type: "SET_SHOW_RECEIPT", payload: true }),
+    }),
+    [dispatch],
+  );
 
   const handleSubmit = useCallback(
     async (value: string): Promise<boolean> => {
@@ -252,14 +256,26 @@ function AppContent({
 
       if (route.action === "bash") {
         const output = runBash(route.promptText!);
-        agent.getStore().addUserMessage(`Ran: ${route.promptText}\n\n\`\`\`\n${output}\n\`\`\``, value.trim());
+        agent
+          .getStore()
+          .addUserMessage(
+            `Ran: ${route.promptText}\n\n\`\`\`\n${output}\n\`\`\``,
+            value.trim(),
+          );
         agent.getStore().addStatus({
           role: "status",
           content: `$ ${route.promptText}\n${output}`,
-          toolDisplay: { name: "Bash", input: { command: route.promptText! }, output },
+          toolDisplay: {
+            name: "Bash",
+            input: { command: route.promptText! },
+            output,
+          },
           timestamp: new Date(),
         });
-        dispatch({ type: "SET_MESSAGES", payload: agent.getStore().toDisplayMessages() });
+        dispatch({
+          type: "SET_MESSAGES",
+          payload: agent.getStore().toDisplayMessages(),
+        });
         return false;
       }
 
@@ -268,10 +284,18 @@ function AppContent({
           loadingRef.current = true;
           dispatch({ type: "SET_IS_LOADING", payload: true });
           try {
-            await agent.run(route.promptText, { displayContent: route.displayContent });
+            await agent.run(route.promptText, {
+              displayContent: route.displayContent,
+            });
           } catch (e) {
             if (e instanceof Error) {
-              agent.getStore().addStatus({ role: "error", content: `(Error: ${e.message})`, timestamp: new Date() });
+              agent
+                .getStore()
+                .addStatus({
+                  role: "error",
+                  content: `(Error: ${e.message})`,
+                  timestamp: new Date(),
+                });
             } else throw e;
           } finally {
             loadingRef.current = false;
@@ -279,7 +303,10 @@ function AppContent({
             dispatch({ type: "SET_STATUS", payload: "" });
           }
         }
-        dispatch({ type: "SET_MESSAGES", payload: agent.getStore().toDisplayMessages() });
+        dispatch({
+          type: "SET_MESSAGES",
+          payload: agent.getStore().toDisplayMessages(),
+        });
         return false;
       }
 
@@ -295,9 +322,21 @@ function AppContent({
         return true;
       } catch (e) {
         if (e instanceof Error && e.message === "Aborted") {
-          agent.getStore().addStatus({ role: "status", content: "(Aborted)", timestamp: new Date() });
+          agent
+            .getStore()
+            .addStatus({
+              role: "status",
+              content: "(Aborted)",
+              timestamp: new Date(),
+            });
         } else if (e instanceof Error) {
-          agent.getStore().addStatus({ role: "error", content: `(Error: ${e.message})`, timestamp: new Date() });
+          agent
+            .getStore()
+            .addStatus({
+              role: "error",
+              content: `(Error: ${e.message})`,
+              timestamp: new Date(),
+            });
         } else {
           throw e;
         }

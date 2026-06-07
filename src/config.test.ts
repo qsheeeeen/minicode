@@ -67,8 +67,6 @@ describe("loadConfig", () => {
     expect(config.model).toBe("glm-4.7@zhipu");
     expect(config.compressionThreshold).toBe(0.9);
   });
-
-
 });
 
 describe("loadConfigSync", () => {
@@ -159,13 +157,13 @@ describe("tiers", () => {
     const fs = await import("fs/promises");
     (fs.default.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(
       JSON.stringify({
-        tiers: { "pro": "claude-sonnet@anthropic", "flash": "glm-4.7@zhipu" },
+        tiers: { pro: "claude-sonnet@anthropic", flash: "glm-4.7@zhipu" },
       }),
     );
     const config = await loadConfig();
     expect(config.tiers).toEqual({
-      "pro": "claude-sonnet@anthropic",
-      "flash": "glm-4.7@zhipu",
+      pro: "claude-sonnet@anthropic",
+      flash: "glm-4.7@zhipu",
     });
   });
 

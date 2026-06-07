@@ -13,7 +13,11 @@ describe("ToolDisplay", () => {
 
   it("renders call and output for Bash", () => {
     const { lastFrame } = render(
-      <ToolDisplay name="Bash" input={{ command: "ls" }} output="file1\nfile2" />,
+      <ToolDisplay
+        name="Bash"
+        input={{ command: "ls" }}
+        output="file1\nfile2"
+      />,
     );
     const frame = lastFrame();
     expect(frame).toContain("Bash(ls)");
@@ -22,7 +26,11 @@ describe("ToolDisplay", () => {
 
   it("renders Read output as line/char summary", () => {
     const { lastFrame } = render(
-      <ToolDisplay name="Read" input={{ path: "f.ts" }} output="line1\nline2" />,
+      <ToolDisplay
+        name="Read"
+        input={{ path: "f.ts" }}
+        output="line1\nline2"
+      />,
     );
     expect(lastFrame()).toContain("Read");
     expect(lastFrame()).toContain("lines");

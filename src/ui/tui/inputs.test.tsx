@@ -59,7 +59,11 @@ describe("SessionListInput", () => {
 
   it("shows 'No sessions found' when empty", () => {
     const { lastFrame } = render(
-      <SessionListInput onExecute={() => {}} onCancel={() => {}} sessions={[]} />,
+      <SessionListInput
+        onExecute={() => {}}
+        onCancel={() => {}}
+        sessions={[]}
+      />,
     );
     expect(lastFrame()).toContain("No sessions found");
   });

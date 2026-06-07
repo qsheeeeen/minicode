@@ -20,7 +20,9 @@ describe("Message Component", () => {
 
   it("renders streaming text without trimming", () => {
     const { lastFrame } = render(
-      <Message msg={{ role: "text", content: "streaming...", isStreaming: true }} />,
+      <Message
+        msg={{ role: "text", content: "streaming...", isStreaming: true }}
+      />,
     );
     expect(lastFrame()).toContain("streaming...");
   });
@@ -59,7 +61,11 @@ describe("Message Component", () => {
   it("renders error message", () => {
     const { lastFrame } = render(
       <Message
-        msg={{ role: "error", content: "something failed", timestamp: new Date() }}
+        msg={{
+          role: "error",
+          content: "something failed",
+          timestamp: new Date(),
+        }}
       />,
     );
     expect(lastFrame()).toContain("something failed");
@@ -84,9 +90,7 @@ describe("Message Component", () => {
   });
 
   it("returns null for unknown role", () => {
-    const { lastFrame } = render(
-      <Message msg={{ role: "unknown" } as any} />,
-    );
+    const { lastFrame } = render(<Message msg={{ role: "unknown" } as any} />);
     expect(lastFrame()).toBe("");
   });
 });

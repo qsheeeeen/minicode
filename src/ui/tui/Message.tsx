@@ -27,7 +27,9 @@ export function Message({ msg }: { msg: DisplayMessage }) {
     case "text":
       return (
         <Box marginBottom={1}>
-          <Markdown showSharp styles={markdownStyles}>{msg.content.trim() || " "}</Markdown>
+          <Markdown showSharp styles={markdownStyles}>
+            {msg.content.trim() || " "}
+          </Markdown>
         </Box>
       );
 
@@ -64,7 +66,8 @@ export function Message({ msg }: { msg: DisplayMessage }) {
           </Box>
         );
       }
-      if (msg.element) return <Box marginBottom={1}>{msg.element as React.ReactElement}</Box>;
+      if (msg.element)
+        return <Box marginBottom={1}>{msg.element as React.ReactElement}</Box>;
       return (
         <Box marginBottom={1}>
           <StatusMessage variant="info">{msg.content}</StatusMessage>
@@ -82,4 +85,3 @@ export function Message({ msg }: { msg: DisplayMessage }) {
       return null;
   }
 }
-

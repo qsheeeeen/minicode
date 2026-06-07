@@ -12,17 +12,11 @@ export async function readPromptFile(filePath: string): Promise<string> {
 }
 
 export async function loadGlobalPrompt(): Promise<string> {
-  const globalPromptPath = path.join(
-    os.homedir(),
-    ".minicode",
-    "AGENTS.md",
-  );
+  const globalPromptPath = path.join(os.homedir(), ".minicode", "AGENTS.md");
   return readPromptFile(globalPromptPath);
 }
 
-export async function loadProjectPrompt(
-  cwd: string,
-): Promise<string> {
+export async function loadProjectPrompt(cwd: string): Promise<string> {
   const projectPromptPath = path.join(cwd, "AGENTS.md");
   return readPromptFile(projectPromptPath);
 }

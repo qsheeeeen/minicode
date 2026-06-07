@@ -1,11 +1,5 @@
-import type {
-  LLMClient,
-} from "../llm/client.js";
-import type {
-  MessageParam,
-  LLMResponse,
-  TextBlock,
-} from "../llm/types.js";
+import type { LLMClient } from "../llm/client.js";
+import type { MessageParam, LLMResponse, TextBlock } from "../llm/types.js";
 
 export class CompressionService {
   private readonly recentCount = 10;

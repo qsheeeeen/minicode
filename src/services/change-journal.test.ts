@@ -74,10 +74,24 @@ describe("ChangeJournal", () => {
   it("getEntries loads from file when no cache", async () => {
     const fs = (await import("fs/promises")).default;
     const lines = [
-      JSON.stringify({ turnIdx: 1, path: "a.ts", op: "edit", before: "old", ts: 100 }),
-      JSON.stringify({ turnIdx: 2, path: "b.ts", op: "write", before: "", ts: 200 }),
+      JSON.stringify({
+        turnIdx: 1,
+        path: "a.ts",
+        op: "edit",
+        before: "old",
+        ts: 100,
+      }),
+      JSON.stringify({
+        turnIdx: 2,
+        path: "b.ts",
+        op: "write",
+        before: "",
+        ts: 200,
+      }),
     ];
-    (fs.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(lines.join("\n"));
+    (fs.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(
+      lines.join("\n"),
+    );
 
     const { ChangeJournal } = await import("./change-journal.js");
     const journal = new ChangeJournal();
@@ -97,7 +111,13 @@ describe("ChangeJournal", () => {
 
   it("getEntries returns cache on second call", async () => {
     const fs = (await import("fs/promises")).default;
-    const line = JSON.stringify({ turnIdx: 1, path: "a.ts", op: "edit", before: "old", ts: 100 });
+    const line = JSON.stringify({
+      turnIdx: 1,
+      path: "a.ts",
+      op: "edit",
+      before: "old",
+      ts: 100,
+    });
     (fs.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(line);
 
     const { ChangeJournal } = await import("./change-journal.js");
@@ -119,11 +139,31 @@ describe("ChangeJournal", () => {
   it("getEntriesByTurn groups entries by turnIdx", async () => {
     const fs = (await import("fs/promises")).default;
     const lines = [
-      JSON.stringify({ turnIdx: 1, path: "a.ts", op: "edit", before: "old", ts: 100 }),
-      JSON.stringify({ turnIdx: 1, path: "b.ts", op: "write", before: "", ts: 200 }),
-      JSON.stringify({ turnIdx: 2, path: "c.ts", op: "edit", before: "x", ts: 300 }),
+      JSON.stringify({
+        turnIdx: 1,
+        path: "a.ts",
+        op: "edit",
+        before: "old",
+        ts: 100,
+      }),
+      JSON.stringify({
+        turnIdx: 1,
+        path: "b.ts",
+        op: "write",
+        before: "",
+        ts: 200,
+      }),
+      JSON.stringify({
+        turnIdx: 2,
+        path: "c.ts",
+        op: "edit",
+        before: "x",
+        ts: 300,
+      }),
     ];
-    (fs.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(lines.join("\n"));
+    (fs.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(
+      lines.join("\n"),
+    );
 
     const { ChangeJournal } = await import("./change-journal.js");
     const journal = new ChangeJournal();
@@ -142,11 +182,31 @@ describe("ChangeJournal", () => {
   it("pruneFrom removes entries at or after turnIdx", async () => {
     const fs = (await import("fs/promises")).default;
     const lines = [
-      JSON.stringify({ turnIdx: 1, path: "a.ts", op: "edit", before: "old", ts: 100 }),
-      JSON.stringify({ turnIdx: 2, path: "b.ts", op: "edit", before: "x", ts: 200 }),
-      JSON.stringify({ turnIdx: 3, path: "c.ts", op: "edit", before: "y", ts: 300 }),
+      JSON.stringify({
+        turnIdx: 1,
+        path: "a.ts",
+        op: "edit",
+        before: "old",
+        ts: 100,
+      }),
+      JSON.stringify({
+        turnIdx: 2,
+        path: "b.ts",
+        op: "edit",
+        before: "x",
+        ts: 200,
+      }),
+      JSON.stringify({
+        turnIdx: 3,
+        path: "c.ts",
+        op: "edit",
+        before: "y",
+        ts: 300,
+      }),
     ];
-    (fs.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(lines.join("\n"));
+    (fs.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(
+      lines.join("\n"),
+    );
 
     const { ChangeJournal } = await import("./change-journal.js");
     const journal = new ChangeJournal();
@@ -169,11 +229,31 @@ describe("ChangeJournal", () => {
   it("pruneAndRenumber filters and renumbers entries", async () => {
     const fs = (await import("fs/promises")).default;
     const lines = [
-      JSON.stringify({ turnIdx: 1, path: "a.ts", op: "edit", before: "old", ts: 100 }),
-      JSON.stringify({ turnIdx: 2, path: "b.ts", op: "edit", before: "x", ts: 200 }),
-      JSON.stringify({ turnIdx: 3, path: "c.ts", op: "edit", before: "y", ts: 300 }),
+      JSON.stringify({
+        turnIdx: 1,
+        path: "a.ts",
+        op: "edit",
+        before: "old",
+        ts: 100,
+      }),
+      JSON.stringify({
+        turnIdx: 2,
+        path: "b.ts",
+        op: "edit",
+        before: "x",
+        ts: 200,
+      }),
+      JSON.stringify({
+        turnIdx: 3,
+        path: "c.ts",
+        op: "edit",
+        before: "y",
+        ts: 300,
+      }),
     ];
-    (fs.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(lines.join("\n"));
+    (fs.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(
+      lines.join("\n"),
+    );
 
     const { ChangeJournal } = await import("./change-journal.js");
     const journal = new ChangeJournal();
@@ -186,8 +266,12 @@ describe("ChangeJournal", () => {
 
     await journal.pruneAndRenumber(1, 0);
 
-    const written = (fs.writeFile as ReturnType<typeof vi.fn>).mock.calls[0][1] as string;
-    const kept = written.trim().split("\n").map((l: string) => JSON.parse(l));
+    const written = (fs.writeFile as ReturnType<typeof vi.fn>).mock
+      .calls[0][1] as string;
+    const kept = written
+      .trim()
+      .split("\n")
+      .map((l: string) => JSON.parse(l));
     expect(kept).toHaveLength(2);
     expect(kept[0].turnIdx).toBe(1); // was 2, renumbered: 2 - 1 + 0 = 1
     expect(kept[1].turnIdx).toBe(2); // was 3, renumbered: 3 - 1 + 0 = 2

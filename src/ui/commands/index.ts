@@ -34,9 +34,7 @@ const commands = new Map<string, CommandHandler>();
 
 export function registerCommand(cmd: CommandHandler): void {
   if (!cmd.handler && !cmd.prompt) {
-    throw new Error(
-      `Command "${cmd.name}" must have either handler or prompt`,
-    );
+    throw new Error(`Command "${cmd.name}" must have either handler or prompt`);
   }
   if (cmd.handler && cmd.prompt) {
     throw new Error(
@@ -107,7 +105,6 @@ export function getHelp(): string {
   return lines.join("\n");
 }
 
-
 registerCommand({
   name: "exit",
   description: "Exit the application",
@@ -138,13 +135,11 @@ registerCommand({
   description: "Compress conversation history",
   handler: async (_args, ctx): Promise<void> => {
     await ctx.agent.compress();
-    ctx.agent
-      .getStore()
-      .addStatus({
-        role: "status",
-        content: "(Compression complete)",
-        timestamp: new Date(),
-      });
+    ctx.agent.getStore().addStatus({
+      role: "status",
+      content: "(Compression complete)",
+      timestamp: new Date(),
+    });
   },
 });
 
@@ -203,13 +198,11 @@ registerCommand({
       ctx.agent.setSession(newName);
       ctx.agent.setLogger(newLogger);
       ctx.setCurrentSession(newName);
-      ctx.agent
-        .getStore()
-        .addStatus({
-          role: "status",
-          content: `Renamed: ${oldName} -> ${newName}`,
-          timestamp: new Date(),
-        });
+      ctx.agent.getStore().addStatus({
+        role: "status",
+        content: `Renamed: ${oldName} -> ${newName}`,
+        timestamp: new Date(),
+      });
     }
   },
 });
@@ -238,13 +231,11 @@ registerCommand({
           statusMessage: `Loaded session: ${name}`,
         });
       } else {
-        ctx.agent
-          .getStore()
-          .addStatus({
-            role: "error",
-            content: `Session not found: ${name}`,
-            timestamp: new Date(),
-          });
+        ctx.agent.getStore().addStatus({
+          role: "error",
+          content: `Session not found: ${name}`,
+          timestamp: new Date(),
+        });
       }
     }
   },
@@ -272,13 +263,11 @@ registerCommand({
   handler: async (_args, ctx): Promise<void> => {
     const skills = getAvailableSkills();
     if (skills.length === 0) {
-      ctx.agent
-        .getStore()
-        .addStatus({
-          role: "status",
-          content: "(No skills available)",
-          timestamp: new Date(),
-        });
+      ctx.agent.getStore().addStatus({
+        role: "status",
+        content: "(No skills available)",
+        timestamp: new Date(),
+      });
       return;
     }
 
@@ -314,14 +303,12 @@ registerCommand({
       lines.push(`  /${skill.name} - ${skill.description}`);
     }
 
-    ctx.agent
-      .getStore()
-      .addStatus({
-        role: "status",
-        content: lines.join("\n"),
-        element,
-        timestamp: new Date(),
-      });
+    ctx.agent.getStore().addStatus({
+      role: "status",
+      content: lines.join("\n"),
+      element,
+      timestamp: new Date(),
+    });
   },
 });
 

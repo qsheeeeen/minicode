@@ -116,7 +116,8 @@ describe("grepTool", () => {
     (spawn as ReturnType<typeof vi.fn>).mockReturnValue(mockProc as any);
 
     await grepTool.execute({ pattern: "test", recursive: false });
-    const callArgs = (spawn as ReturnType<typeof vi.fn>).mock.calls[0][1] as string[];
+    const callArgs = (spawn as ReturnType<typeof vi.fn>).mock
+      .calls[0][1] as string[];
     expect(callArgs).not.toContain("-r");
   });
 });

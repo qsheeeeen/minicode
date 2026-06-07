@@ -110,7 +110,10 @@ Reply with exactly one of:
           break;
         }
       }
-      const text = response?.content[0]?.type === "text" ? response.content[0].text.trim() : "no: unknown error";
+      const text =
+        response?.content[0]?.type === "text"
+          ? response.content[0].text.trim()
+          : "no: unknown error";
 
       if (text.toLowerCase().startsWith("yes")) {
         return { allowed: true };

@@ -9,7 +9,14 @@
 // Superset of effort levels across providers.
 // Anthropic: none | minimal | low | medium | high | xhigh | max
 // OpenAI:    none | minimal | low | medium | high | xhigh
-export type EffortLevel = "none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
+export type EffortLevel =
+  | "none"
+  | "minimal"
+  | "low"
+  | "medium"
+  | "high"
+  | "xhigh"
+  | "max";
 
 // Content blocks
 

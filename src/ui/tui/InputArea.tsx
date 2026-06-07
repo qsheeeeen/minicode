@@ -22,9 +22,7 @@ export function InputArea({
 
   // Command autocomplete logic
   const commandList = useMemo(
-    () =>
-      getCommandList()
-        .sort((a, b) => a.name.localeCompare(b.name)),
+    () => getCommandList().sort((a, b) => a.name.localeCompare(b.name)),
     [],
   );
   const matchingCommands = useMemo(() => {
@@ -110,7 +108,8 @@ export function InputArea({
               config.providers ?? {},
             );
             if (parsed) {
-              const modelConfig = parsed.providerConfig.models?.[parsed.modelName];
+              const modelConfig =
+                parsed.providerConfig.models?.[parsed.modelName];
               agentRef.current.setModel(
                 parsed.modelName,
                 parsed.providerConfig.apiKey,
@@ -179,7 +178,12 @@ export function InputArea({
 
   return (
     <Box flexDirection="column">
-      <Box borderStyle="single" borderLeft={false} borderRight={false} paddingX={1}>
+      <Box
+        borderStyle="single"
+        borderLeft={false}
+        borderRight={false}
+        paddingX={1}
+      >
         <Box flexBasis={3} flexShrink={0}>
           <Text color="cyan" bold>
             {">"}

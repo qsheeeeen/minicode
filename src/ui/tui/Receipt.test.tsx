@@ -80,9 +80,7 @@ describe("Receipt Component", () => {
         },
       ],
     };
-    const { lastFrame } = render(
-      <Receipt data={data} onDismiss={() => {}} />,
-    );
+    const { lastFrame } = render(<Receipt data={data} onDismiss={() => {}} />);
     const output = lastFrame();
     expect(output).not.toContain("Cache W");
     expect(output).not.toContain("Cache R");

@@ -22,10 +22,7 @@ export interface ToolDef<TArgs = Record<string, unknown>> {
   name: string;
   description: string;
   input_schema: Record<string, unknown>;
-  execute: (
-    args: TArgs,
-    context?: ToolExecutionContext,
-  ) => Promise<ToolResult>;
+  execute: (args: TArgs, context?: ToolExecutionContext) => Promise<ToolResult>;
   requires?: ToolRequirement[];
   requiresPermission?: boolean;
   readOnly?: boolean;

@@ -7,24 +7,55 @@ import { ModalPrompter } from "../ModalPrompter.js";
 
 function Demo() {
   const [multi, setMulti] = useState(false);
-  useInput((_input, key) => { if (key.shift && key.tab) setMulti((m) => !m); });
+  useInput((_input, key) => {
+    if (key.shift && key.tab) setMulti((m) => !m);
+  });
 
   const state = {
     pendingPrompt: {
-      message: multi ? "Which features should be enabled?" : "Which approach do you prefer?",
+      message: multi
+        ? "Which features should be enabled?"
+        : "Which approach do you prefer?",
       options: multi
         ? [
-            { label: "Authentication", value: "auth", description: "JWT-based user auth" },
-            { label: "Rate Limiting", value: "rate-limit", description: "Request throttling" },
-            { label: "Caching", value: "cache", description: "Redis-based response caching" },
+            {
+              label: "Authentication",
+              value: "auth",
+              description: "JWT-based user auth",
+            },
+            {
+              label: "Rate Limiting",
+              value: "rate-limit",
+              description: "Request throttling",
+            },
+            {
+              label: "Caching",
+              value: "cache",
+              description: "Redis-based response caching",
+            },
           ]
         : [
-            { label: "Approach A", value: "a", description: "Use a REST API with Express" },
-            { label: "Approach B", value: "b", description: "Use GraphQL with Apollo" },
-            { label: "Approach C", value: "c", description: "Use tRPC for end-to-end type safety" },
+            {
+              label: "Approach A",
+              value: "a",
+              description: "Use a REST API with Express",
+            },
+            {
+              label: "Approach B",
+              value: "b",
+              description: "Use GraphQL with Apollo",
+            },
+            {
+              label: "Approach C",
+              value: "c",
+              description: "Use tRPC for end-to-end type safety",
+            },
           ],
       multiSelect: multi,
-      resolve: (value: string) => { console.log(`\nSelected: ${value}`); process.exit(0); },
+      resolve: (value: string) => {
+        console.log(`\nSelected: ${value}`);
+        process.exit(0);
+      },
     },
   };
 

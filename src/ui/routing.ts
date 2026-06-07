@@ -24,7 +24,11 @@ export async function routeInput(
     const parts = trimmed.slice(1).split(/\s+/);
     const result = await executeCommand(parts[0], parts.slice(1), cmdContext);
     if (result.handled && result.promptText) {
-      return { action: "command", promptText: result.promptText, displayContent: result.displayContent };
+      return {
+        action: "command",
+        promptText: result.promptText,
+        displayContent: result.displayContent,
+      };
     }
     return { action: "command" };
   }
