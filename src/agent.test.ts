@@ -38,8 +38,8 @@ vi.mock("./tools/index.js", async (importOriginal) => {
   };
 });
 
-vi.mock("./services/token-manager.js", () => ({
-  TokenManager: vi.fn().mockImplementation(function () {
+vi.mock("./services/token-counter.js", () => ({
+  TokenCounter: vi.fn().mockImplementation(function () {
     return {
       getTotal: vi.fn().mockReturnValue(100),
       updateUsage: vi.fn(),

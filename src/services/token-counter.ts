@@ -1,4 +1,4 @@
-export class TokenManager {
+export class TokenCounter {
   private totalTokens = 0;
   private lastShownThreshold = 0;
 

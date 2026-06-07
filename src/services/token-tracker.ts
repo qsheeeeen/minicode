@@ -1,10 +1,10 @@
-import { TokenManager } from "./token-manager.js";
+import { TokenCounter } from "./token-counter.js";
 import type { SessionStats } from "./session-stats.js";
 import type { AgentEvents } from "../utils/display.js";
 import type { MessageStore } from "../messages.js";
 
 export class TokenTracker {
-  private manager = new TokenManager();
+  private counter = new TokenCounter();
 
   constructor(
     private contextLength: number,
@@ -21,15 +21,15 @@ export class TokenTracker {
     cacheCreation: number,
     cacheRead: number,
   ): { percentage: number; shouldCompress: boolean } {
-    this.manager.updateUsage(input, output, cacheCreation, cacheRead);
+    this.counter.updateUsage(input, output, cacheCreation, cacheRead);
     this.sessionStats?.recordUsage(model, input, output, cacheCreation, cacheRead);
-    this.events.tokenUpdate(this.manager.getTotal());
+    this.events.tokenUpdate(this.counter.getTotal());
 
-    const ratio = this.manager.getRatio(this.contextLength);
+    const ratio = this.counter.getRatio(this.contextLength);
     const percentage = Math.floor(ratio * 100);
 
     const thresholds = [25, 50, 75, 90];
-    const lastShown = this.manager.getLastShownThreshold();
+    const lastShown = this.counter.getLastShownThreshold();
     for (const t of thresholds) {
       if (percentage >= t && lastShown < t) {
         this.store.addStatus({
@@ -37,12 +37,12 @@ export class TokenTracker {
           content: `[${percentage}% context]`,
           timestamp: new Date(),
         });
-        this.manager.updateThreshold(t);
+        this.counter.updateThreshold(t);
         break;
       }
     }
 
-    const shouldCompress = this.manager.shouldCompress(
+    const shouldCompress = this.counter.shouldCompress(
       this.contextLength,
       this.compressionThresholdRatio,
     );
@@ -51,18 +51,18 @@ export class TokenTracker {
   }
 
   getTotal(): number {
-    return this.manager.getTotal();
+    return this.counter.getTotal();
   }
 
   reset(): void {
-    this.manager.reset();
+    this.counter.reset();
   }
 
   /** Set token count directly (e.g. from loaded session data) */
   setCount(count: number): void {
-    this.manager.reset();
+    this.counter.reset();
     if (count > 0) {
-      this.manager.updateUsage(count, 0);
+      this.counter.updateUsage(count, 0);
     }
   }
 
