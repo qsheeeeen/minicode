@@ -4,14 +4,18 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk";
-import type { MessageStream } from "@anthropic-ai/sdk/lib/MessageStream.js";
+import {
+  MessageStreamEvent,
+  MessageStream,
+} from "@anthropic-ai/sdk/lib/MessageStream.js";
+import { GenericStream, type LLMStream, type StreamEvent } from "./client.js";
 import type {
   MessageCreateParamsBase,
   MessageCreateParamsNonStreaming,
   OutputConfig,
 } from "@anthropic-ai/sdk/resources/messages.js";
 
-import type { LLMClient, LLMStream } from "./client.js";
+import type { LLMClient } from "./client.js";
 import type {
   MessageParam,
   LLMToolDef,
@@ -81,28 +85,7 @@ function toCanonicalResponse(msg: Anthropic.Messages.Message): LLMResponse {
   };
 }
 
-// Stream wrapper
 
-class AnthropicStream implements LLMStream {
-  constructor(private stream: MessageStream<null>) {}
-
-  on(event: string, listener: (...args: any[]) => void): void {
-    if (event === "contentBlock") {
-      this.stream.on("contentBlock", listener as any);
-    } else {
-      this.stream.on(event as any, listener as any);
-    }
-  }
-
-  async finalMessage(): Promise<LLMResponse> {
-    const msg = await this.stream.finalMessage();
-    return toCanonicalResponse(msg);
-  }
-
-  abort(): void {
-    this.stream.abort();
-  }
-}
 
 // Client
 
@@ -141,6 +124,69 @@ export class AnthropicClient implements LLMClient {
       signal: options.signal,
     }) as unknown as MessageStream<null>;
 
-    return new AnthropicStream(stream);
+    async function* run(): AsyncGenerator<StreamEvent, LLMResponse, unknown> {
+      let currentToolCall: any = null;
+      let currentText = "";
+      let currentThinking = "";
+
+      for await (const chunk of stream) {
+        const event = chunk as MessageStreamEvent;
+        if (event.type === "content_block_start") {
+          if (event.content_block.type === "tool_use") {
+            currentToolCall = {
+              id: event.content_block.id,
+              name: event.content_block.name,
+              arguments: "",
+            };
+          }
+        } else if (event.type === "content_block_delta") {
+          if (event.delta.type === "text_delta") {
+            yield { type: "text", text: event.delta.text };
+            currentText += event.delta.text;
+          } else if (event.delta.type === "thinking_delta") {
+            yield { type: "thinking", thinking: event.delta.thinking };
+            currentThinking += event.delta.thinking;
+          } else if (event.delta.type === "input_json_delta") {
+            if (currentToolCall) {
+              currentToolCall.arguments += event.delta.partial_json;
+            }
+          }
+        } else if (event.type === "content_block_stop") {
+          if (currentToolCall) {
+            let input = {};
+            try {
+              input = JSON.parse(currentToolCall.arguments);
+            } catch {}
+            yield {
+              type: "contentBlock",
+              block: {
+                type: "tool_use",
+                id: currentToolCall.id,
+                name: currentToolCall.name,
+                input,
+              },
+            };
+            currentToolCall = null;
+          } else if (currentThinking) {
+            yield {
+              type: "contentBlock",
+              block: { type: "thinking", thinking: currentThinking },
+            };
+            currentThinking = "";
+          } else if (currentText) {
+            yield {
+              type: "contentBlock",
+              block: { type: "text", text: currentText },
+            };
+            currentText = "";
+          }
+        }
+      }
+
+      const finalMsg = await stream.finalMessage();
+      return toCanonicalResponse(finalMsg);
+    }
+
+    return new GenericStream(run(), () => stream.abort());
   }
 }

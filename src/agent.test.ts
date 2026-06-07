@@ -1,23 +1,64 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { EventEmitter } from "events";
 
-class MockStream extends EventEmitter {
+class MockStream implements AsyncIterable<any> {
   private _promise: Promise<any>;
   resolveFinal!: (val: any) => void;
   rejectFinal!: (err: any) => void;
 
+  private queue: IteratorResult<any>[] = [];
+  private resolveNext: ((v: IteratorResult<any>) => void) | null = null;
+  private isDone = false;
+
   constructor() {
-    super();
     this._promise = new Promise((resolve, reject) => {
-      this.resolveFinal = resolve;
+      this.resolveFinal = (val) => {
+        this.end();
+        resolve(val);
+      };
       this.rejectFinal = reject;
     });
+    // Prevent unhandled promise rejection warnings in tests
+    this._promise.catch(() => {});
+  }
+
+  emit(event: string, payload: any) {
+    const chunk = event === "contentBlock" ? { type: "contentBlock", block: payload } : { type: event, [event]: payload };
+    if (this.resolveNext) {
+      this.resolveNext({ value: chunk, done: false });
+      this.resolveNext = null;
+    } else {
+      this.queue.push({ value: chunk, done: false });
+    }
+  }
+
+  private end() {
+    this.isDone = true;
+    if (this.resolveNext) {
+      this.resolveNext({ value: undefined, done: true });
+      this.resolveNext = null;
+    }
+  }
+
+  [Symbol.asyncIterator]() {
+    return {
+      next: async () => {
+        if (this.queue.length > 0) return this.queue.shift()!;
+        if (this.isDone) return { value: undefined, done: true };
+        return new Promise<IteratorResult<any>>((resolve) => {
+          this.resolveNext = resolve;
+        });
+      }
+    };
   }
 
   finalMessage() {
     return this._promise;
   }
-  abort() {}
+  abort() {
+    this.end();
+    this.rejectFinal(new Error("Aborted"));
+  }
 }
 
 const { mockChatStream } = vi.hoisted(() => ({

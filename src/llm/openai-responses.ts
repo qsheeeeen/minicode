@@ -9,9 +9,8 @@
  */
 
 import OpenAI from "openai";
-import { EventEmitter } from "events";
 
-import type { LLMClient, LLMStream } from "./client.js";
+import { GenericStream, type LLMClient, type LLMStream, type StreamEvent } from "./client.js";
 import type {
   MessageParam,
   LLMToolDef,
@@ -228,164 +227,7 @@ function convertResponse(response: OpenAI.Responses.Response): LLMResponse {
   return { content, stop_reason, usage };
 }
 
-// OpenAIResponsesStream
 
-/** Streaming wrapper that consumes OpenAI Responses SSE and emits canonical events. */
-export class OpenAIResponsesStream extends EventEmitter implements LLMStream {
-  private abortController: AbortController;
-  private messagePromise: Promise<LLMResponse>;
-  private resolveMessage!: (response: LLMResponse) => void;
-  private rejectMessage!: (error: Error) => void;
-
-  constructor(
-    streamPromise: Promise<OpenAI.Responses.Response>,
-    abortController: AbortController,
-    private isStreaming: boolean,
-  ) {
-    super();
-    this.abortController = abortController;
-
-    this.messagePromise = new Promise<LLMResponse>((resolve, reject) => {
-      this.resolveMessage = resolve;
-      this.rejectMessage = reject;
-    });
-
-    if (isStreaming) {
-      // streamPromise is actually an async iterable stream
-      this.consume(streamPromise as unknown as AsyncIterable<OpenAI.Responses.ResponseStreamEvent>);
-    } else {
-      // Non-streaming: just await the response
-      streamPromise
-        .then((response) => {
-          const result = convertResponse(response);
-          // Emit contentBlock events for each block
-          for (const block of result.content) {
-            this.emit("contentBlock", block);
-          }
-          this.resolveMessage(result);
-        })
-        .catch((err: Error) => this.rejectMessage(err));
-    }
-  }
-
-  private async consume(
-    stream: AsyncIterable<OpenAI.Responses.ResponseStreamEvent>,
-  ): Promise<void> {
-    // Yield so callers can attach event listeners before we start consuming
-    await Promise.resolve();
-
-    // Track accumulated text for content parts
-    let currentText = "";
-    let currentThinking = "";
-
-    try {
-      for await (const event of stream) {
-        switch (event.type as string) {
-          case "response.output_text.delta": {
-            const delta = (event as any).delta as string;
-            if (delta) {
-              currentText += delta;
-              this.emit("text", delta);
-            }
-            break;
-          }
-
-          case "response.output_text.done": {
-            const text = (event as any).text as string | undefined;
-            const finalText = text ?? currentText;
-            if (finalText) {
-              const block: TextBlock = { type: "text", text: finalText };
-              this.emit("contentBlock", block);
-            }
-            currentText = "";
-            break;
-          }
-
-          case "response.reasoning.delta": {
-            const delta = (event as any).delta as string;
-            if (delta) {
-              currentThinking += delta;
-              this.emit("thinking", delta);
-            }
-            break;
-          }
-
-          case "response.reasoning.done": {
-            if (currentThinking) {
-              const block: ThinkingBlock = {
-                type: "thinking",
-                thinking: currentThinking,
-              };
-              this.emit("contentBlock", block);
-            }
-            currentThinking = "";
-            break;
-          }
-
-          case "response.function_call_arguments.delta": {
-            // We don't emit partial function call args; wait for done
-            break;
-          }
-
-          case "response.function_call_arguments.done": {
-            // The full function call is available on the output_item.done event
-            break;
-          }
-
-          case "response.output_item.done": {
-            const item = (event as any).item;
-            if (item && item.type === "function_call") {
-              let parsedArgs: Record<string, unknown> = {};
-              try {
-                parsedArgs = JSON.parse(item.arguments) as Record<
-                  string,
-                  unknown
-                >;
-              } catch {
-                parsedArgs = { _raw: item.arguments };
-              }
-              const block: ToolUseBlock = {
-                type: "tool_use",
-                id: item.id ?? item.call_id,
-                name: item.name,
-                input: parsedArgs,
-              };
-              this.emit("contentBlock", block);
-            }
-            break;
-          }
-
-          case "response.completed": {
-            const response = (event as any).response as
-              | OpenAI.Responses.Response
-              | undefined;
-            if (response) {
-              const result = convertResponse(response);
-              this.resolveMessage(result);
-            }
-            break;
-          }
-        }
-      }
-
-      // If the stream ended without a response.completed event, build a
-      // minimal response from what we accumulated.
-      // This is a safety net — normally response.completed fires.
-    } catch (err) {
-      this.rejectMessage(
-        err instanceof Error ? err : new Error(String(err)),
-      );
-    }
-  }
-
-  finalMessage(): Promise<LLMResponse> {
-    return this.messagePromise;
-  }
-
-  abort(): void {
-    this.abortController.abort();
-  }
-}
 
 // OpenAIResponsesClient
 
@@ -432,12 +274,92 @@ export class OpenAIResponsesClient implements LLMClient {
 
     const streamPromise = this.client.responses.create(params, {
       signal: abortController.signal,
-    });
+    }) as unknown as Promise<AsyncIterable<OpenAI.Responses.ResponseStreamEvent>>;
 
-    return new OpenAIResponsesStream(
-      streamPromise as unknown as Promise<OpenAI.Responses.Response>,
-      abortController,
-      true,
-    );
+    async function* run(): AsyncGenerator<StreamEvent, LLMResponse, unknown> {
+      const stream = await streamPromise;
+
+      let currentText = "";
+      let currentThinking = "";
+      let finalResult: LLMResponse | null = null;
+
+      for await (const event of stream) {
+        switch (event.type as string) {
+          case "response.output_text.delta": {
+            const delta = (event as any).delta as string;
+            if (delta) {
+              currentText += delta;
+              yield { type: "text", text: delta };
+            }
+            break;
+          }
+          case "response.output_text.done": {
+            const text = (event as any).text as string | undefined;
+            const finalText = text ?? currentText;
+            if (finalText) {
+              yield { type: "contentBlock", block: { type: "text", text: finalText } };
+            }
+            currentText = "";
+            break;
+          }
+          case "response.reasoning.delta": {
+            const delta = (event as any).delta as string;
+            if (delta) {
+              currentThinking += delta;
+              yield { type: "thinking", thinking: delta };
+            }
+            break;
+          }
+          case "response.reasoning.done": {
+            if (currentThinking) {
+              yield { type: "contentBlock", block: { type: "thinking", thinking: currentThinking } };
+            }
+            currentThinking = "";
+            break;
+          }
+          case "response.output_item.done": {
+            const item = (event as any).item;
+            if (item && item.type === "function_call") {
+              let parsedArgs: Record<string, unknown> = {};
+              try {
+                parsedArgs = JSON.parse(item.arguments) as Record<string, unknown>;
+              } catch {
+                parsedArgs = { _raw: item.arguments };
+              }
+              yield {
+                type: "contentBlock",
+                block: {
+                  type: "tool_use",
+                  id: item.id ?? item.call_id,
+                  name: item.name,
+                  input: parsedArgs,
+                },
+              };
+            }
+            break;
+          }
+          case "response.completed": {
+            const response = (event as any).response as OpenAI.Responses.Response | undefined;
+            if (response) {
+              finalResult = convertResponse(response);
+            }
+            break;
+          }
+        }
+      }
+
+      if (finalResult) {
+        return finalResult;
+      }
+      
+      // Fallback if completed event didn't fire properly
+      return {
+        content: [],
+        stop_reason: "error",
+        usage: { input_tokens: 0, output_tokens: 0 }
+      };
+    }
+
+    return new GenericStream(run(), () => abortController.abort());
   }
 }

@@ -19,18 +19,42 @@ import { OpenAIResponsesClient } from "./openai-responses.js";
 
 // Stream interface
 
-/** Provider-agnostic stream that emits canonical content events. */
-export interface LLMStream {
-  on(event: "text", listener: (delta: string) => void): void;
-  on(event: "thinking", listener: (delta: string) => void): void;
-  on(event: "contentBlock", listener: (block: ContentBlock) => void): void;
-  on(event: string, listener: (...args: any[]) => void): void;
+export type StreamEvent =
+  | { type: "text"; text: string }
+  | { type: "thinking"; thinking: string }
+  | { type: "contentBlock"; block: ContentBlock };
+
+/** Provider-agnostic stream that yields canonical content events. */
+export interface LLMStream extends AsyncIterable<StreamEvent> {
 
   /** Resolves with the full response once the stream finishes. */
   finalMessage(): Promise<LLMResponse>;
 
   /** Abort the in-flight request. */
   abort(): void;
+}
+
+export class GenericStream implements LLMStream {
+  constructor(
+    private generator: AsyncGenerator<StreamEvent, LLMResponse, unknown>,
+    private abortFn: () => void
+  ) {}
+
+  [Symbol.asyncIterator]() {
+    return this.generator;
+  }
+
+  async finalMessage(): Promise<LLMResponse> {
+    let result: IteratorResult<StreamEvent, LLMResponse>;
+    do {
+      result = await this.generator.next();
+    } while (!result.done);
+    return result.value;
+  }
+
+  abort(): void {
+    this.abortFn();
+  }
 }
 
 // Client interface

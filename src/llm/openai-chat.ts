@@ -7,8 +7,7 @@
  */
 
 import OpenAI from "openai";
-import { EventEmitter } from "events";
-import type { LLMClient, LLMStream } from "./client.js";
+import { GenericStream, type LLMClient, type LLMStream, type StreamEvent } from "./client.js";
 import type {
   MessageParam,
   LLMToolDef,
@@ -218,173 +217,6 @@ function convertResponse(
   };
 }
 
-// OpenAIChatStream
-
-/** Accumulated state for a single in-flight tool call. */
-interface PendingToolCall {
-  id: string;
-  name: string;
-  arguments: string;
-}
-
-export class OpenAIChatStream extends EventEmitter implements LLMStream {
-  private resolve!: (value: LLMResponse) => void;
-  private reject!: (reason: unknown) => void;
-  private promise: Promise<LLMResponse>;
-  private abortController: AbortController;
-
-  constructor(
-    streamPromise: Promise<AsyncIterable<OpenAI.ChatCompletionChunk>>,
-    abortController: AbortController,
-  ) {
-    super();
-    this.abortController = abortController;
-    this.promise = new Promise<LLMResponse>((res, rej) => {
-      this.resolve = res;
-      this.reject = rej;
-    });
-    this.consume(streamPromise);
-  }
-
-  finalMessage(): Promise<LLMResponse> {
-    return this.promise;
-  }
-
-  abort(): void {
-    this.abortController.abort();
-  }
-
-  private async consume(
-    streamPromise: Promise<AsyncIterable<OpenAI.ChatCompletionChunk>>,
-  ): Promise<void> {
-    // Yield to the event loop so callers can attach listeners before
-    // consumption begins.
-    await Promise.resolve();
-
-    try {
-      const stream = await streamPromise;
-
-      let textContent = "";
-      let thinkingContent = "";
-      const pendingToolCalls: Map<number, PendingToolCall> = new Map();
-      let finishReason: string | null = null;
-      let usage: OpenAI.CompletionUsage | undefined;
-
-      for await (const chunk of stream) {
-        // Usage comes on the final chunk when stream_options.include_usage is set
-        if (chunk.usage) {
-          usage = chunk.usage;
-        }
-
-        const delta = chunk.choices?.[0]?.delta;
-        if (!delta) {
-          // Final chunk may have no choices
-          if (chunk.choices?.[0]?.finish_reason) {
-            finishReason = chunk.choices[0].finish_reason;
-          }
-          continue;
-        }
-
-        if (chunk.choices[0].finish_reason) {
-          finishReason = chunk.choices[0].finish_reason;
-        }
-
-        // Text content
-        if (delta.content) {
-          textContent += delta.content;
-          this.emit("text", delta.content);
-        }
-
-        // Reasoning content (o1/o3/o4-mini reasoning models)
-        const reasoning = (delta as Record<string, unknown>).reasoning_content;
-        if (typeof reasoning === "string" && reasoning.length > 0) {
-          thinkingContent += reasoning;
-          this.emit("thinking", reasoning);
-        }
-
-        // Tool calls (incremental)
-        if (delta.tool_calls) {
-          for (const tc of delta.tool_calls) {
-            const idx = tc.index;
-            let pending = pendingToolCalls.get(idx);
-
-            if (!pending) {
-              // New tool call starting
-              pending = {
-                id: tc.id ?? "",
-                name: tc.function?.name ?? "",
-                arguments: "",
-              };
-              pendingToolCalls.set(idx, pending);
-            }
-
-            if (tc.id) {
-              pending.id = tc.id;
-            }
-            if (tc.function?.name) {
-              pending.name = tc.function.name;
-            }
-            if (tc.function?.arguments) {
-              pending.arguments += tc.function.arguments;
-            }
-          }
-        }
-      }
-
-
-      const content: ContentBlock[] = [];
-
-      // Emit completed thinking block
-      if (thinkingContent.length > 0) {
-        const block: ThinkingBlock = {
-          type: "thinking",
-          thinking: thinkingContent,
-        };
-        content.push(block);
-        this.emit("contentBlock", block);
-      }
-
-      // Emit completed text block
-      if (textContent.length > 0) {
-        const block: TextBlock = { type: "text", text: textContent };
-        content.push(block);
-        this.emit("contentBlock", block);
-      }
-
-      // Emit completed tool call blocks
-      for (const [, pending] of pendingToolCalls) {
-        let input: Record<string, unknown> = {};
-        try {
-          input = JSON.parse(pending.arguments);
-        } catch {
-          // malformed JSON — keep empty object
-        }
-        const block: ToolUseBlock = {
-          type: "tool_use",
-          id: pending.id,
-          name: pending.name,
-          input,
-        };
-        content.push(block);
-        this.emit("contentBlock", block);
-      }
-
-      const response: LLMResponse = {
-        content,
-        stop_reason: mapStopReason(finishReason),
-        usage: {
-          input_tokens: usage?.prompt_tokens ?? 0,
-          output_tokens: usage?.completion_tokens ?? 0,
-        },
-      };
-
-      this.resolve(response);
-    } catch (err) {
-      this.reject(err);
-    }
-  }
-}
-
 // OpenAIChatClient
 
 export class OpenAIChatClient implements LLMClient {
@@ -429,8 +261,106 @@ export class OpenAIChatClient implements LLMClient {
 
     const streamPromise = this.client.chat.completions.create(params, {
       signal: abortController.signal,
-    }) as Promise<AsyncIterable<OpenAI.ChatCompletionChunk>>;
+    });
 
-    return new OpenAIChatStream(streamPromise, abortController);
+    async function* run(): AsyncGenerator<StreamEvent, LLMResponse, unknown> {
+      const stream = await streamPromise;
+
+      let textContent = "";
+      let thinkingContent = "";
+      const pendingToolCalls: Map<number, { id: string; name: string; arguments: string }> = new Map();
+      let finishReason: string | null = null;
+      let usage: OpenAI.CompletionUsage | undefined;
+
+      for await (const chunk of stream) {
+        if (chunk.usage) {
+          usage = chunk.usage;
+        }
+
+        const delta = chunk.choices?.[0]?.delta;
+        if (!delta) {
+          if (chunk.choices?.[0]?.finish_reason) {
+            finishReason = chunk.choices[0].finish_reason;
+          }
+          continue;
+        }
+
+        if (chunk.choices[0].finish_reason) {
+          finishReason = chunk.choices[0].finish_reason;
+        }
+
+        if (delta.content) {
+          textContent += delta.content;
+          yield { type: "text", text: delta.content };
+        }
+
+        // @ts-expect-error - reasoning_content not yet in types
+        const reasoning = delta.reasoning_content;
+        if (typeof reasoning === "string" && reasoning.length > 0) {
+          thinkingContent += reasoning;
+          yield { type: "thinking", thinking: reasoning };
+        }
+
+        if (delta.tool_calls) {
+          for (const tc of delta.tool_calls) {
+            const idx = tc.index;
+            let pending = pendingToolCalls.get(idx);
+
+            if (!pending) {
+              pending = {
+                id: tc.id ?? "",
+                name: tc.function?.name ?? "",
+                arguments: "",
+              };
+              pendingToolCalls.set(idx, pending);
+            }
+
+            if (tc.id) pending.id = tc.id;
+            if (tc.function?.name) pending.name = tc.function.name;
+            if (tc.function?.arguments) pending.arguments += tc.function.arguments;
+          }
+        }
+      }
+
+      const content: ContentBlock[] = [];
+
+      if (thinkingContent.length > 0) {
+        const block: ThinkingBlock = { type: "thinking", thinking: thinkingContent };
+        content.push(block);
+        yield { type: "contentBlock", block };
+      }
+
+      if (textContent.length > 0) {
+        const block: TextBlock = { type: "text", text: textContent };
+        content.push(block);
+        yield { type: "contentBlock", block };
+      }
+
+      for (const [, pending] of pendingToolCalls) {
+        let input: Record<string, unknown> = {};
+        try {
+          input = JSON.parse(pending.arguments);
+        } catch {}
+        const block: ToolUseBlock = {
+          type: "tool_use",
+          id: pending.id,
+          name: pending.name,
+          input,
+        };
+        content.push(block);
+        yield { type: "contentBlock", block };
+      }
+
+      return {
+        content,
+        stop_reason: mapStopReason(finishReason),
+        usage: {
+          input_tokens: usage?.prompt_tokens ?? 0,
+          output_tokens: usage?.completion_tokens ?? 0,
+        },
+      };
+    }
+
+    return new GenericStream(run(), () => abortController.abort());
   }
 }

@@ -51,64 +51,40 @@ export class StreamingHandler {
       }
     };
 
-    stream.on("thinking", (delta: string) => handleDelta("thinking", delta));
-    stream.on("text", (delta: string) => handleDelta("text", delta));
-
-    stream.on("contentBlock", (block: ContentBlock) => {
-      blockStreaming = false;
-      if (block.type === "thinking" || block.type === "text") {
-        this.saveStore();
-      }
-      if (block.type === "tool_use") {
-        const toolBlock = block as ContentBlock & { type: "tool_use"; id: string; name: string; input: Record<string, unknown> };
-        const tool = this.tools.get(toolBlock.name);
-        toolCalls.push({ block: toolBlock, tool });
-        this.store.appendToLastAssistantTurn({
-          type: "tool_use",
-          id: toolBlock.id,
-          name: toolBlock.name,
-          input: toolBlock.input,
-        } as ContentBlock);
-        this.saveStore();
-      }
-    });
-
     let response: LLMResponse;
     try {
-      const messagePromise = stream.finalMessage();
+      const timer = setTimeout(() => stream.abort(), 300_000);
+      try {
+        for await (const chunk of stream) {
+          if (chunk.type === "text" || chunk.type === "thinking") {
+            // @ts-expect-error - text or thinking fields exist based on type
+            handleDelta(chunk.type, chunk[chunk.type]);
+          } else if (chunk.type === "contentBlock") {
+            const block = chunk.block;
+            blockStreaming = false;
+            if (block.type === "thinking" || block.type === "text") {
+              this.saveStore();
+            }
+            if (block.type === "tool_use") {
+              const toolBlock = block as ContentBlock & { type: "tool_use"; id: string; name: string; input: Record<string, unknown> };
+              const tool = this.tools.get(toolBlock.name);
+              toolCalls.push({ block: toolBlock, tool });
+              this.store.appendToLastAssistantTurn({
+                type: "tool_use",
+                id: toolBlock.id,
+                name: toolBlock.name,
+                input: toolBlock.input,
+              } as ContentBlock);
+              this.saveStore();
+            }
+          }
+        }
+      } finally {
+        clearTimeout(timer);
+      }
+
       if (signal?.aborted) throw new Error("Aborted");
-
-      response = await new Promise<LLMResponse>(
-        (resolve, reject) => {
-          let settled = false;
-          const done = (fn: () => void) => { if (!settled) { settled = true; fn(); } };
-
-          const onAbort = () => {
-            signal!.removeEventListener("abort", onAbort);
-            clearTimeout(timer);
-            done(() => reject(new Error("Aborted")));
-          };
-          signal?.addEventListener("abort", onAbort);
-
-          const timer = setTimeout(() => {
-            signal?.removeEventListener("abort", onAbort);
-            done(() => reject(new Error("LLM request timed out")));
-          }, 300_000);
-
-          messagePromise.then(
-            (val) => {
-              signal?.removeEventListener("abort", onAbort);
-              clearTimeout(timer);
-              done(() => resolve(val));
-            },
-            (err) => {
-              signal?.removeEventListener("abort", onAbort);
-              clearTimeout(timer);
-              done(() => reject(err));
-            },
-          );
-        },
-      );
+      response = await stream.finalMessage();
     } catch (e) {
       if (signal?.aborted) throw new Error("Aborted");
       throw e;
