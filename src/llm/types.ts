@@ -6,9 +6,7 @@
  * depends on this file.
  */
 
-// ---------------------------------------------------------------------------
 // Effort
-// ---------------------------------------------------------------------------
 
 /** Superset of effort levels across providers.
  *  Anthropic: none | minimal | low | medium | high | xhigh | max
@@ -16,9 +14,7 @@
  */
 export type EffortLevel = "none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 
-// ---------------------------------------------------------------------------
 // Content blocks
-// ---------------------------------------------------------------------------
 
 export interface TextBlock {
   type: "text";
@@ -48,18 +44,14 @@ export type ContentBlock = TextBlock | ThinkingBlock | ToolUseBlock;
 /** Blocks that can appear in a user turn (including tool results). */
 export type UserContentBlock = ToolResultBlock;
 
-// ---------------------------------------------------------------------------
 // Messages
-// ---------------------------------------------------------------------------
 
 export interface MessageParam {
   role: "user" | "assistant";
   content: string | ContentBlock[] | UserContentBlock[];
 }
 
-// ---------------------------------------------------------------------------
 // Tool definitions (passed to the LLM)
-// ---------------------------------------------------------------------------
 
 export interface LLMToolDef {
   name: string;
@@ -67,9 +59,7 @@ export interface LLMToolDef {
   input_schema: Record<string, unknown>;
 }
 
-// ---------------------------------------------------------------------------
 // Chat options
-// ---------------------------------------------------------------------------
 
 export interface ChatOptions {
   model?: string;
@@ -79,9 +69,7 @@ export interface ChatOptions {
   signal?: AbortSignal;
 }
 
-// ---------------------------------------------------------------------------
 // Response
-// ---------------------------------------------------------------------------
 
 export interface TokenUsage {
   input_tokens: number;

@@ -41,17 +41,13 @@ function mapEffort(effort: EffortLevel): any {
   }
 }
 
-// ---------------------------------------------------------------------------
 // Anthropic-native types (used only inside this adapter)
-// ---------------------------------------------------------------------------
 
 type AnthropicMessageParam = Anthropic.Messages.MessageParam;
 type AnthropicTool = Anthropic.Messages.Tool;
 type AnthropicContentBlock = Anthropic.Messages.ContentBlock;
 
-// ---------------------------------------------------------------------------
 // Conversion helpers
-// ---------------------------------------------------------------------------
 
 /**
  * Convert canonical messages to Anthropic SDK format.
@@ -85,9 +81,7 @@ function toCanonicalResponse(msg: Anthropic.Messages.Message): LLMResponse {
   };
 }
 
-// ---------------------------------------------------------------------------
 // Stream wrapper
-// ---------------------------------------------------------------------------
 
 class AnthropicStream implements LLMStream {
   constructor(private stream: MessageStream<null>) {}
@@ -110,9 +104,7 @@ class AnthropicStream implements LLMStream {
   }
 }
 
-// ---------------------------------------------------------------------------
 // Client
-// ---------------------------------------------------------------------------
 
 export class AnthropicClient implements LLMClient {
   private client: Anthropic;

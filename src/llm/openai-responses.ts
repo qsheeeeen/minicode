@@ -26,16 +26,12 @@ import type {
   EffortLevel,
 } from "./types.js";
 
-// ---------------------------------------------------------------------------
 // Constants
-// ---------------------------------------------------------------------------
 
 const DEFAULT_MODEL = "gpt-4.1";
 const DEFAULT_MAX_TOKENS = 8192;
 
-// ---------------------------------------------------------------------------
 // Effort mapping
-// ---------------------------------------------------------------------------
 
 /** Map our five-level effort to OpenAI's three-level reasoning effort. */
 function mapEffort(effort: EffortLevel): any {
@@ -56,9 +52,7 @@ function mapEffort(effort: EffortLevel): any {
   }
 }
 
-// ---------------------------------------------------------------------------
 // Tool definition conversion
-// ---------------------------------------------------------------------------
 
 /** Convert a canonical LLMToolDef to an OpenAI Responses function tool. */
 function convertToolDef(
@@ -73,9 +67,7 @@ function convertToolDef(
   };
 }
 
-// ---------------------------------------------------------------------------
 // Message conversion (canonical → OpenAI Responses input)
-// ---------------------------------------------------------------------------
 
 type ResponseInputItem = OpenAI.Responses.ResponseInputItem;
 
@@ -152,9 +144,7 @@ function convertMessages(messages: MessageParam[]): ResponseInputItem[] {
   return input;
 }
 
-// ---------------------------------------------------------------------------
 // Response conversion (OpenAI Responses → canonical)
-// ---------------------------------------------------------------------------
 
 /** Convert an OpenAI Responses response object to a canonical LLMResponse. */
 function convertResponse(response: OpenAI.Responses.Response): LLMResponse {
@@ -238,9 +228,7 @@ function convertResponse(response: OpenAI.Responses.Response): LLMResponse {
   return { content, stop_reason, usage };
 }
 
-// ---------------------------------------------------------------------------
 // OpenAIResponsesStream
-// ---------------------------------------------------------------------------
 
 /** Streaming wrapper that consumes OpenAI Responses SSE and emits canonical events. */
 export class OpenAIResponsesStream extends EventEmitter implements LLMStream {
@@ -293,7 +281,6 @@ export class OpenAIResponsesStream extends EventEmitter implements LLMStream {
     try {
       for await (const event of stream) {
         switch (event.type as string) {
-          // --- Text deltas ---
           case "response.output_text.delta": {
             const delta = (event as any).delta as string;
             if (delta) {
@@ -303,7 +290,6 @@ export class OpenAIResponsesStream extends EventEmitter implements LLMStream {
             break;
           }
 
-          // --- Text content done ---
           case "response.output_text.done": {
             const text = (event as any).text as string | undefined;
             const finalText = text ?? currentText;
@@ -315,7 +301,6 @@ export class OpenAIResponsesStream extends EventEmitter implements LLMStream {
             break;
           }
 
-          // --- Reasoning deltas ---
           case "response.reasoning.delta": {
             const delta = (event as any).delta as string;
             if (delta) {
@@ -325,7 +310,6 @@ export class OpenAIResponsesStream extends EventEmitter implements LLMStream {
             break;
           }
 
-          // --- Reasoning done ---
           case "response.reasoning.done": {
             if (currentThinking) {
               const block: ThinkingBlock = {
@@ -338,19 +322,16 @@ export class OpenAIResponsesStream extends EventEmitter implements LLMStream {
             break;
           }
 
-          // --- Function call arguments streaming ---
           case "response.function_call_arguments.delta": {
             // We don't emit partial function call args; wait for done
             break;
           }
 
-          // --- Function call done ---
           case "response.function_call_arguments.done": {
             // The full function call is available on the output_item.done event
             break;
           }
 
-          // --- Output item completed (catches function_call items) ---
           case "response.output_item.done": {
             const item = (event as any).item;
             if (item && item.type === "function_call") {
@@ -374,7 +355,6 @@ export class OpenAIResponsesStream extends EventEmitter implements LLMStream {
             break;
           }
 
-          // --- Full response completed ---
           case "response.completed": {
             const response = (event as any).response as
               | OpenAI.Responses.Response
@@ -407,9 +387,7 @@ export class OpenAIResponsesStream extends EventEmitter implements LLMStream {
   }
 }
 
-// ---------------------------------------------------------------------------
 // OpenAIResponsesClient
-// ---------------------------------------------------------------------------
 
 /** LLMClient implementation backed by the OpenAI Responses API. */
 export class OpenAIResponsesClient implements LLMClient {

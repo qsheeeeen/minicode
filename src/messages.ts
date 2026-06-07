@@ -7,7 +7,6 @@ import path from "path";
 import os from "os";
 import crypto from "crypto";
 
-// -- Session types --
 
 interface SessionHeader {
   model: string;
@@ -173,7 +172,6 @@ export class MessageStore {
   private listeners = new Set<() => void>();
   private streaming = false;
 
-  // -- Streaming state (for TUI cursor animation) --
 
   setStreaming(v: boolean): void {
     if (this.streaming !== v) {
@@ -227,7 +225,6 @@ export class MessageStore {
     return this.turns as MessageParam[];
   }
 
-  // -- User messages --
 
   addUserMessage(content: string, displayContent?: string): void {
     const msg: MessageParam = { role: "user", content } as MessageParam;
@@ -238,7 +235,6 @@ export class MessageStore {
     this.notify();
   }
 
-  // -- Streaming: building assistant turns incrementally --
 
   /** Start a new assistant turn (empty content array). */
   startAssistantTurn(): void {
@@ -277,7 +273,6 @@ export class MessageStore {
     this.notify();
   }
 
-  // -- Tool results --
 
   /** Add a user turn containing tool_result blocks. */
   addToolResults(results: Array<{ toolUseId: string; content: string }>): void {
@@ -291,7 +286,6 @@ export class MessageStore {
     this.notify();
   }
 
-  // -- Status / error messages --
 
   addStatus(msg: StatusMessage): void {
     msg.turnIndex = this.turns.length;
@@ -319,7 +313,6 @@ export class MessageStore {
     return msgs;
   }
 
-  // -- Lifecycle --
 
   clear(): void {
     this.turns = [];
@@ -334,7 +327,6 @@ export class MessageStore {
     this.notify();
   }
 
-  // -- Session persistence --
 
   private sessionName = "";
   private meta = { model: "unknown", totalTokens: 0 };

@@ -17,9 +17,7 @@ import { AnthropicClient } from "./anthropic.js";
 import { OpenAIChatClient } from "./openai-chat.js";
 import { OpenAIResponsesClient } from "./openai-responses.js";
 
-// ---------------------------------------------------------------------------
 // Stream interface
-// ---------------------------------------------------------------------------
 
 /** Provider-agnostic stream that emits canonical content events. */
 export interface LLMStream {
@@ -35,9 +33,7 @@ export interface LLMStream {
   abort(): void;
 }
 
-// ---------------------------------------------------------------------------
 // Client interface
-// ---------------------------------------------------------------------------
 
 export interface LLMClient {
 
@@ -50,9 +46,7 @@ export interface LLMClient {
   ): LLMStream;
 }
 
-// ---------------------------------------------------------------------------
 // Factory
-// ---------------------------------------------------------------------------
 
 export function createClient(
   provider: string,

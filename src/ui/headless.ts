@@ -82,7 +82,6 @@ export async function runHeadless(
           const blockKey = `${ti}:${bi}`;
           const isLastBlock = isLastTurn && bi === blocks.length - 1;
 
-          // --- thinking: stream incrementally ---
           if (block.type === "thinking") {
             const prevLen = streamedChars.get(blockKey) || 0;
             if (block.thinking.length > prevLen) {
@@ -102,7 +101,6 @@ export async function runHeadless(
             }
           }
 
-          // --- text: stream incrementally ---
           if (block.type === "text") {
             const prevLen = streamedChars.get(blockKey) || 0;
             if (block.text.length > prevLen) {
@@ -120,7 +118,6 @@ export async function runHeadless(
             }
           }
 
-          // --- tool_use: print call line + immediate result ---
           if (block.type === "tool_use" && !printedToolUses.has(block.id)) {
             printedToolUses.add(block.id);
             const callText = `${block.name}(${JSON.stringify(block.input)})`;

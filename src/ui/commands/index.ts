@@ -107,7 +107,6 @@ export function getHelp(): string {
   return lines.join("\n");
 }
 
-// -- builtin commands ---------------------------------------------------------
 
 registerCommand({
   name: "exit",

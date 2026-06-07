@@ -27,7 +27,6 @@ export interface UserPrompter {
   prompt(req: Prompt): Promise<string>;
 }
 
-// -- console implementations ------------------------------------------------
 
 export class ConsoleEvents implements AgentEvents {
   status(msg: string): void {
@@ -49,7 +48,6 @@ export class ConsolePrompter implements UserPrompter {
   }
 }
 
-// -- recording implementations (for tests) ----------------------------------
 
 export interface EventRecord {
   type: "status" | "error" | "tokenUpdate";
@@ -88,7 +86,6 @@ export class RecordPrompter implements UserPrompter {
   }
 }
 
-// -- TUI callbacks ----------------------------------------------------------
 
 type TuiCallbacks = {
   onStatus?: (msg: DisplayMessage) => void;

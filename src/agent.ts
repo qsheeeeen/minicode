@@ -631,7 +631,6 @@ export class Agent {
     return true;
   }
 
-  // -- Public accessors --
 
   getIsRunning(): boolean {
     return this.isRunning;

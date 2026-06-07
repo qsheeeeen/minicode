@@ -23,16 +23,12 @@ import type {
   EffortLevel,
 } from "./types.js";
 
-// ---------------------------------------------------------------------------
 // Constants
-// ---------------------------------------------------------------------------
 
 const DEFAULT_MODEL = "gpt-4.1";
 const DEFAULT_MAX_TOKENS = 8192;
 
-// ---------------------------------------------------------------------------
 // Effort mapping (canonical → OpenAI reasoning_effort)
-// ---------------------------------------------------------------------------
 
 function mapEffort(effort: EffortLevel): any {
   switch (effort) {
@@ -52,9 +48,7 @@ function mapEffort(effort: EffortLevel): any {
   }
 }
 
-// ---------------------------------------------------------------------------
 // Stop reason mapping (OpenAI → canonical)
-// ---------------------------------------------------------------------------
 
 function mapStopReason(reason: string | null): string {
   switch (reason) {
@@ -69,9 +63,7 @@ function mapStopReason(reason: string | null): string {
   }
 }
 
-// ---------------------------------------------------------------------------
 // Message conversion (canonical → OpenAI)
-// ---------------------------------------------------------------------------
 
 type OpenAIMessage =
   | OpenAI.ChatCompletionSystemMessageParam
@@ -161,9 +153,7 @@ function convertMessages(
   return out;
 }
 
-// ---------------------------------------------------------------------------
 // Tool definition conversion (canonical → OpenAI)
-// ---------------------------------------------------------------------------
 
 function convertTools(
   tools: LLMToolDef[],
@@ -178,9 +168,7 @@ function convertTools(
   }));
 }
 
-// ---------------------------------------------------------------------------
 // Response conversion (OpenAI → canonical)
-// ---------------------------------------------------------------------------
 
 function convertResponse(
   choice: OpenAI.ChatCompletion.Choice,
@@ -230,9 +218,7 @@ function convertResponse(
   };
 }
 
-// ---------------------------------------------------------------------------
 // OpenAIChatStream
-// ---------------------------------------------------------------------------
 
 /** Accumulated state for a single in-flight tool call. */
 interface PendingToolCall {
@@ -345,7 +331,6 @@ export class OpenAIChatStream extends EventEmitter implements LLMStream {
         }
       }
 
-      // --- Stream ended: build final response ---
 
       const content: ContentBlock[] = [];
 
@@ -400,9 +385,7 @@ export class OpenAIChatStream extends EventEmitter implements LLMStream {
   }
 }
 
-// ---------------------------------------------------------------------------
 // OpenAIChatClient
-// ---------------------------------------------------------------------------
 
 export class OpenAIChatClient implements LLMClient {
   private client: OpenAI;
