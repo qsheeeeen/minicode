@@ -20,14 +20,12 @@ class MockStream extends EventEmitter {
   abort() {}
 }
 
-const { mockChatStream, mockChat } = vi.hoisted(() => ({
+const { mockChatStream } = vi.hoisted(() => ({
   mockChatStream: vi.fn(),
-  mockChat: vi.fn(),
 }));
 
 vi.mock("./llm/client.js", () => ({
   createClient: vi.fn().mockReturnValue({
-    chat: mockChat,
     chatStream: mockChatStream,
   }),
 }));

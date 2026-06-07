@@ -33,11 +33,11 @@ Conversation:
 ${conversationText}`;
 
     try {
-      const summary = await client.chat(
+      const summary = await client.chatStream(
         [{ role: "user", content: summaryPrompt }],
         [],
         { model, maxTokens: 1000 },
-      );
+      ).finalMessage();
 
       const summaryText = this.extractSummaryText(summary);
       return [

@@ -411,37 +411,6 @@ export class OpenAIChatClient implements LLMClient {
     this.client = new OpenAI({ apiKey, baseURL });
   }
 
-  async chat(
-    messages: MessageParam[],
-    tools: LLMToolDef[],
-    options: ChatOptions = {},
-  ): Promise<LLMResponse> {
-    const model = options.model ?? DEFAULT_MODEL;
-    const oaiMessages = convertMessages(messages, options.system);
-    const oaiTools = convertTools(tools);
-
-    const params: OpenAI.ChatCompletionCreateParamsNonStreaming = {
-      model,
-      max_completion_tokens: options.maxTokens ?? DEFAULT_MAX_TOKENS,
-      messages: oaiMessages,
-      stream: false,
-    };
-
-    if (oaiTools.length > 0) {
-      params.tools = oaiTools;
-    }
-
-    if (options.effort) {
-      params.reasoning_effort = mapEffort(options.effort);
-    }
-
-    const completion = await this.client.chat.completions.create(params, {
-      signal: options.signal,
-    });
-
-    return convertResponse(completion.choices[0], completion.usage);
-  }
-
   chatStream(
     messages: MessageParam[],
     tools: LLMToolDef[],

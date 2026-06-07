@@ -422,34 +422,6 @@ export class OpenAIResponsesClient implements LLMClient {
     });
   }
 
-  async chat(
-    messages: MessageParam[],
-    tools: LLMToolDef[],
-    options: ChatOptions = {},
-  ): Promise<LLMResponse> {
-    const model = options.model || DEFAULT_MODEL;
-    const input = convertMessages(messages);
-    const oaiTools = tools.length > 0 ? tools.map(convertToolDef) : undefined;
-
-    const params: OpenAI.Responses.ResponseCreateParamsNonStreaming = {
-      model,
-      input,
-      ...(oaiTools && { tools: oaiTools }),
-      ...(options.maxTokens && { max_output_tokens: options.maxTokens }),
-      ...(options.system && { instructions: options.system }),
-    };
-
-    // Reasoning effort
-    if (options.effort) {
-      params.reasoning = { effort: mapEffort(options.effort) };
-    }
-
-    const response = await this.client.responses.create(params, {
-      signal: options.signal,
-    });
-
-    return convertResponse(response);
-  }
 
   chatStream(
     messages: MessageParam[],

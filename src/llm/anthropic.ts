@@ -125,33 +125,6 @@ export class AnthropicClient implements LLMClient {
     });
   }
 
-  async chat(
-    messages: MessageParam[],
-    tools: LLMToolDef[],
-    options: ChatOptions = {},
-  ): Promise<LLMResponse> {
-    const params: MessageCreateParamsNonStreaming = {
-      model: options.model || "claude-sonnet-4-5",
-      max_tokens: options.maxTokens || 8192,
-      system: options.system,
-      messages: toAnthropicMessages(messages),
-      tools: toAnthropicTools(tools),
-      thinking: { type: "adaptive" },
-    };
-
-    if (options.effort) {
-      params.output_config = {
-        effort: mapEffort(options.effort),
-      };
-    }
-
-    const msg = await this.client.messages.create(params, {
-      signal: options.signal,
-    });
-
-    return toCanonicalResponse(msg);
-  }
-
   chatStream(
     messages: MessageParam[],
     tools: LLMToolDef[],

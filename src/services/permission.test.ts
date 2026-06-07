@@ -124,7 +124,7 @@ describe("PermissionService", () => {
       const mockChat = vi.fn().mockResolvedValue({
         content: [{ type: "text", text: "  yes  " }],
       });
-      const mockClient = { chat: mockChat } as unknown as LLMClient;
+      const mockClient = { chatStream: vi.fn().mockReturnValue({ finalMessage: mockChat }) } as unknown as LLMClient;
       const service = new PermissionService({
         initialMode: "auto",
         client: mockClient,
@@ -136,7 +136,7 @@ describe("PermissionService", () => {
       });
 
       expect(result).toEqual({ allowed: true });
-      expect(mockChat).toHaveBeenCalledWith(
+      expect(mockClient.chatStream).toHaveBeenCalledWith(
         expect.arrayContaining([expect.objectContaining({ role: "user" })]),
         [],
         expect.objectContaining({ model: "claude-3", maxTokens: 100 }),
@@ -147,7 +147,7 @@ describe("PermissionService", () => {
       const mockChat = vi.fn().mockResolvedValue({
         content: [{ type: "text", text: "no: this command is too dangerous" }],
       });
-      const mockClient = { chat: mockChat } as unknown as LLMClient;
+      const mockClient = { chatStream: vi.fn().mockReturnValue({ finalMessage: mockChat }) } as unknown as LLMClient;
       const service = new PermissionService({
         initialMode: "auto",
         client: mockClient,
@@ -167,7 +167,7 @@ describe("PermissionService", () => {
       const mockChat = vi.fn().mockResolvedValue({
         content: [{ type: "text", text: "Yes, this is allowed." }],
       });
-      const mockClient = { chat: mockChat } as unknown as LLMClient;
+      const mockClient = { chatStream: vi.fn().mockReturnValue({ finalMessage: mockChat }) } as unknown as LLMClient;
       const service = new PermissionService({
         initialMode: "auto",
         client: mockClient,
@@ -184,7 +184,7 @@ describe("PermissionService", () => {
       const mockChat = vi.fn().mockResolvedValue({
         content: [{ type: "text", text: "I think not." }],
       });
-      const mockClient = { chat: mockChat } as unknown as LLMClient;
+      const mockClient = { chatStream: vi.fn().mockReturnValue({ finalMessage: mockChat }) } as unknown as LLMClient;
       const service = new PermissionService({
         initialMode: "auto",
         client: mockClient,
@@ -199,7 +199,7 @@ describe("PermissionService", () => {
 
     it("returns allowed: false and error reason on chat error", async () => {
       const mockChat = vi.fn().mockRejectedValue(new Error("API error"));
-      const mockClient = { chat: mockChat } as unknown as LLMClient;
+      const mockClient = { chatStream: vi.fn().mockReturnValue({ finalMessage: mockChat }) } as unknown as LLMClient;
       const service = new PermissionService({
         initialMode: "auto",
         client: mockClient,

@@ -29,16 +29,16 @@ describe("AnthropicClient", () => {
     vi.restoreAllMocks();
   });
 
-  describe("chat", () => {
-    it("sends correct parameters to client.messages.create", async () => {
+  describe("chatStream", () => {
+    it("sends correct parameters to client.messages.stream", async () => {
       const client = new AnthropicClient("test-key");
-      await client.chat([{ role: "user", content: "hello" }], [], {
+      client.chatStream([{ role: "user", content: "hello" }], [], {
         model: "custom-model",
         maxTokens: 1000,
         system: "test system",
       });
 
-      expect(mockCreate).toHaveBeenCalledWith(
+      expect(mockStream).toHaveBeenCalledWith(
         expect.objectContaining({
           model: "custom-model",
           max_tokens: 1000,
@@ -55,11 +55,11 @@ describe("AnthropicClient", () => {
 
     it("includes effort in output_config when provided", async () => {
       const client = new AnthropicClient();
-      await client.chat([], [], {
+      client.chatStream([], [], {
         effort: "xhigh",
       });
 
-      expect(mockCreate).toHaveBeenCalledWith(
+      expect(mockStream).toHaveBeenCalledWith(
         expect.objectContaining({
           thinking: { type: "adaptive" },
           output_config: { effort: "xhigh" },

@@ -27,8 +27,10 @@ describe("CompressionService", () => {
         content: `message ${i}`,
       }));
       const mockClient = {
-        chat: vi.fn().mockResolvedValue({
-          content: [{ type: "text", text: "Summary of conversation" }],
+        chatStream: vi.fn().mockReturnValue({
+          finalMessage: vi.fn().mockResolvedValue({
+            content: [{ type: "text", text: "Summary of conversation" }],
+          }),
         }),
       } as unknown as LLMClient;
 
@@ -48,7 +50,9 @@ describe("CompressionService", () => {
         content: `message ${i}`,
       }));
       const mockClient = {
-        chat: vi.fn().mockRejectedValue(new Error("API error")),
+        chatStream: vi.fn().mockReturnValue({
+          finalMessage: vi.fn().mockRejectedValue(new Error("API error")),
+        }),
       } as unknown as LLMClient;
 
       await expect(
@@ -62,14 +66,16 @@ describe("CompressionService", () => {
         content: `message ${i}`,
       }));
       const mockClient = {
-        chat: vi.fn().mockResolvedValue({
-          content: [{ type: "text", text: "Summary" }],
+        chatStream: vi.fn().mockReturnValue({
+          finalMessage: vi.fn().mockResolvedValue({
+            content: [{ type: "text", text: "Summary" }],
+          }),
         }),
       } as unknown as LLMClient;
 
       await service.compress(messages, mockClient, "claude-3");
 
-      expect(mockClient.chat).toHaveBeenCalledWith(
+      expect(mockClient.chatStream).toHaveBeenCalledWith(
         expect.arrayContaining([
           expect.objectContaining({
             role: "user",
@@ -87,8 +93,10 @@ describe("CompressionService", () => {
         content: `msg${i}`,
       }));
       const mockClient = {
-        chat: vi.fn().mockResolvedValue({
-          content: [{ type: "text", text: "Summary" }],
+        chatStream: vi.fn().mockReturnValue({
+          finalMessage: vi.fn().mockResolvedValue({
+            content: [{ type: "text", text: "Summary" }],
+          }),
         }),
       } as unknown as LLMClient;
 

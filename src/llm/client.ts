@@ -40,12 +40,7 @@ export interface LLMStream {
 // ---------------------------------------------------------------------------
 
 export interface LLMClient {
-  /** Non-streaming completion. */
-  chat(
-    messages: MessageParam[],
-    tools: LLMToolDef[],
-    options?: ChatOptions,
-  ): Promise<LLMResponse>;
+
 
   /** Streaming completion — returns immediately, emits events as tokens arrive. */
   chatStream(

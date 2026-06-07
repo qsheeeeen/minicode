@@ -96,11 +96,11 @@ Reply with exactly one of:
 - "yes"
 - "no: <reason explaining why it was denied>"`;
 
-      const response = await this.client.chat(
+      const response = await this.client.chatStream(
         [{ role: "user", content: prompt }],
         [],
         { model: this.model, maxTokens: 100 },
-      );
+      ).finalMessage();
 
       const textBlock = response.content.find((b) => b.type === "text");
       const text = textBlock && "text" in textBlock ? textBlock.text.trim() : "no: unknown error";
