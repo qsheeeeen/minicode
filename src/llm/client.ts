@@ -52,7 +52,7 @@ export interface LLMResponse {
 export type StreamEvent =
   | { type: "text"; text: string }
   | { type: "thinking"; thinking: string }
-  | { type: "contentBlock"; block: ContentBlock };
+  | { type: "tool_use"; block: ContentBlock & { type: "tool_use" } };
 
 export type LLMStream = AsyncGenerator<StreamEvent, LLMResponse, unknown>;
 

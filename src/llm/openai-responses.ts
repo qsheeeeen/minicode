@@ -277,14 +277,6 @@ export class OpenAIResponsesClient implements LLMClient {
             break;
           }
           case "response.output_text.done": {
-            const text = (event as any).text as string | undefined;
-            const finalText = text ?? currentText;
-            if (finalText) {
-              yield {
-                type: "contentBlock",
-                block: { type: "text", text: finalText },
-              };
-            }
             currentText = "";
             break;
           }
@@ -297,12 +289,6 @@ export class OpenAIResponsesClient implements LLMClient {
             break;
           }
           case "response.reasoning.done": {
-            if (currentThinking) {
-              yield {
-                type: "contentBlock",
-                block: { type: "thinking", thinking: currentThinking },
-              };
-            }
             currentThinking = "";
             break;
           }
@@ -319,7 +305,7 @@ export class OpenAIResponsesClient implements LLMClient {
                 parsedArgs = { _raw: item.arguments };
               }
               yield {
-                type: "contentBlock",
+                type: "tool_use",
                 block: {
                   type: "tool_use",
                   id: item.id ?? item.call_id,

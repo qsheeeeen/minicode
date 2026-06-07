@@ -76,29 +76,13 @@ export class StreamingHandler {
         if (chunk.type === "text" || chunk.type === "thinking") {
           // @ts-expect-error - text or thinking fields exist based on type
           handleDelta(chunk.type, chunk[chunk.type]);
-        } else if (chunk.type === "contentBlock") {
+        } else if (chunk.type === "tool_use") {
           const block = chunk.block;
           blockStreaming = false;
-          if (block.type === "thinking" || block.type === "text") {
-            this.saveStore();
-          }
-          if (block.type === "tool_use") {
-            const toolBlock = block as ContentBlock & {
-              type: "tool_use";
-              id: string;
-              name: string;
-              input: Record<string, unknown>;
-            };
-            const tool = this.tools.get(toolBlock.name);
-            toolCalls.push({ block: toolBlock, tool });
-            this.store.appendToLastAssistantTurn({
-              type: "tool_use",
-              id: toolBlock.id,
-              name: toolBlock.name,
-              input: toolBlock.input,
-            } as ContentBlock);
-            this.saveStore();
-          }
+          const tool = this.tools.get(block.name);
+          toolCalls.push({ block, tool });
+          this.store.appendToLastAssistantTurn(block as ContentBlock);
+          this.saveStore();
         }
       }
 
@@ -110,6 +94,7 @@ export class StreamingHandler {
       if (signal?.aborted) throw new Error("Aborted");
       throw e;
     } finally {
+      this.saveStore();
       if (currentStreamRef) currentStreamRef.current = null;
       this.store.setStreaming(false);
     }

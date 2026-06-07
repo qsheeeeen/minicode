@@ -24,8 +24,8 @@ class MockStream implements AsyncIterable<any> {
 
   emit(event: string, payload: any) {
     const chunk =
-      event === "contentBlock"
-        ? { type: "contentBlock", block: payload }
+      event === "tool_use"
+        ? { type: "tool_use", block: payload }
         : { type: event, [event]: payload };
     if (this.resolveNext) {
       this.resolveNext({ value: chunk, done: false });
@@ -228,7 +228,6 @@ describe("Agent", () => {
 
       stream.emit("text", "Hi ");
       stream.emit("text", "there!");
-      stream.emit("contentBlock", { type: "text" });
       stream.resolveFinal({
         usage: { input_tokens: 10, output_tokens: 20 },
         stop_reason: "end_turn",
@@ -248,7 +247,6 @@ describe("Agent", () => {
       await new Promise((r) => setTimeout(r, 10));
 
       stream.emit("thinking", "Hmm...");
-      stream.emit("contentBlock", { type: "thinking" });
       stream.resolveFinal({
         usage: { input_tokens: 10, output_tokens: 20 },
         stop_reason: "end_turn",
@@ -269,7 +267,7 @@ describe("Agent", () => {
       const runPromise = agent.run("Use tool");
       await new Promise((r) => setTimeout(r, 10));
 
-      stream1.emit("contentBlock", {
+      stream1.emit("tool_use", {
         type: "tool_use",
         id: "call_1",
         name: "testTool",
@@ -351,7 +349,7 @@ describe("Agent", () => {
       const runPromise = agent.run("do something");
       await new Promise((r) => setTimeout(r, 10));
 
-      stream.emit("contentBlock", {
+      stream.emit("tool_use", {
         type: "tool_use",
         id: "call_1",
         name: "testTool",
@@ -397,10 +395,6 @@ describe("Agent", () => {
         if (callCount === 2) {
           setImmediate(() => {
             stream2.emit("text", "I cannot do that because it is too risky.");
-            stream2.emit("contentBlock", {
-              type: "text",
-              text: "I cannot do that because it is too risky.",
-            });
             stream2.resolveFinal({
               usage: { input_tokens: 5, output_tokens: 10 },
               stop_reason: "end_turn",
@@ -414,7 +408,7 @@ describe("Agent", () => {
       const runPromise = agent.run("do something risky");
       await new Promise((r) => setTimeout(r, 10));
 
-      stream1.emit("contentBlock", {
+      stream1.emit("tool_use", {
         type: "tool_use",
         id: "call_1",
         name: "testTool",

@@ -314,18 +314,11 @@ export class OpenAIChatClient implements LLMClient {
       const content: ContentBlock[] = [];
 
       if (thinkingContent.length > 0) {
-        const block: ThinkingBlock = {
-          type: "thinking",
-          thinking: thinkingContent,
-        };
-        content.push(block);
-        yield { type: "contentBlock", block };
+        content.push({ type: "thinking", thinking: thinkingContent });
       }
 
       if (textContent.length > 0) {
-        const block: TextBlock = { type: "text", text: textContent };
-        content.push(block);
-        yield { type: "contentBlock", block };
+        content.push({ type: "text", text: textContent });
       }
 
       for (const [, pending] of pendingToolCalls) {
@@ -340,7 +333,7 @@ export class OpenAIChatClient implements LLMClient {
           input,
         };
         content.push(block);
-        yield { type: "contentBlock", block };
+        yield { type: "tool_use", block };
       }
 
       return {

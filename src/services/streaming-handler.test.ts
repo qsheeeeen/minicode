@@ -24,8 +24,8 @@ function mockStream(events: Record<string, Function>) {
       resolveNext = null;
     } else queue.push({ value: chunk, done: false });
   };
-  events["contentBlock"] = (block: any) => {
-    const chunk = { type: "contentBlock", block };
+  events["tool_use"] = (block: any) => {
+    const chunk = { type: "tool_use", block };
     if (resolveNext) {
       resolveNext({ value: chunk, done: false });
       resolveNext = null;
@@ -79,9 +79,8 @@ describe("StreamingHandler", () => {
     const client = { chatStream: vi.fn().mockReturnValue(stream) } as any;
     const promise = handler.handle(client, [], [], {});
 
-    // Simulate text delta then content block end
+    // Simulate text delta then stream end
     events["text"]?.("Hello");
-    events["contentBlock"]?.({ type: "text", text: "Hello" });
     events["end"]?.();
 
     const result = await promise;
@@ -107,8 +106,7 @@ describe("StreamingHandler", () => {
     const client = { chatStream: vi.fn().mockReturnValue(stream) } as any;
     const promise = handler.handle(client, [], [], {});
 
-    events["tool_use"] = true; // mark for contentBlock
-    events["contentBlock"]?.({
+    events["tool_use"]?.({
       type: "tool_use",
       id: "tu-1",
       name: "Read",

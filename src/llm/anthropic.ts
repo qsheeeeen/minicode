@@ -141,7 +141,7 @@ export class AnthropicClient implements LLMClient {
               input = JSON.parse(currentToolCall.arguments);
             } catch {}
             yield {
-              type: "contentBlock",
+              type: "tool_use",
               block: {
                 type: "tool_use",
                 id: currentToolCall.id,
@@ -151,16 +151,8 @@ export class AnthropicClient implements LLMClient {
             };
             currentToolCall = null;
           } else if (currentThinking) {
-            yield {
-              type: "contentBlock",
-              block: { type: "thinking", thinking: currentThinking },
-            };
             currentThinking = "";
           } else if (currentText) {
-            yield {
-              type: "contentBlock",
-              block: { type: "text", text: currentText },
-            };
             currentText = "";
           }
         }
