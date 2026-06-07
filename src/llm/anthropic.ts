@@ -8,7 +8,7 @@ import {
   MessageStreamEvent,
   MessageStream,
 } from "@anthropic-ai/sdk/lib/MessageStream.js";
-import { GenericStream, type LLMStream, type StreamEvent } from "./client.js";
+import type { LLMStream, StreamEvent } from "./client.js";
 import type {
   MessageCreateParamsBase,
   MessageCreateParamsNonStreaming,
@@ -187,6 +187,6 @@ export class AnthropicClient implements LLMClient {
       return toCanonicalResponse(finalMsg);
     }
 
-    return new GenericStream(run(), () => stream.abort());
+    return run();
   }
 }

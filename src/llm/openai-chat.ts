@@ -7,7 +7,7 @@
  */
 
 import OpenAI from "openai";
-import { GenericStream, type LLMClient, type LLMStream, type StreamEvent } from "./client.js";
+import type { LLMClient, LLMStream, StreamEvent } from "./client.js";
 import type {
   MessageParam,
   LLMToolDef,
@@ -361,6 +361,6 @@ export class OpenAIChatClient implements LLMClient {
       };
     }
 
-    return new GenericStream(run(), () => abortController.abort());
+    return run();
   }
 }

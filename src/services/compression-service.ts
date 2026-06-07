@@ -33,13 +33,22 @@ Conversation:
 ${conversationText}`;
 
     try {
-      const summary = await client.chatStream(
+      const stream = client.chatStream(
         [{ role: "user", content: summaryPrompt }],
         [],
         { model, maxTokens: 1000 },
-      ).finalMessage();
+      );
 
-      const summaryText = this.extractSummaryText(summary);
+      let response: LLMResponse | undefined;
+      while (true) {
+        const next = await stream.next();
+        if (next.done) {
+          response = next.value as LLMResponse;
+          break;
+        }
+      }
+
+      const summaryText = this.extractSummaryText(response!);
       return [
         {
           role: "user",

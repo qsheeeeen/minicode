@@ -28,8 +28,9 @@ describe("CompressionService", () => {
       }));
       const mockClient = {
         chatStream: vi.fn().mockReturnValue({
-          finalMessage: vi.fn().mockResolvedValue({
-            content: [{ type: "text", text: "Summary of conversation" }],
+          next: vi.fn().mockResolvedValue({
+            done: true,
+            value: { content: [{ type: "text", text: "Summary of conversation" }] },
           }),
         }),
       } as unknown as LLMClient;
@@ -67,8 +68,9 @@ describe("CompressionService", () => {
       }));
       const mockClient = {
         chatStream: vi.fn().mockReturnValue({
-          finalMessage: vi.fn().mockResolvedValue({
-            content: [{ type: "text", text: "Summary" }],
+          next: vi.fn().mockResolvedValue({
+            done: true,
+            value: { content: [{ type: "text", text: "Summary" }] },
           }),
         }),
       } as unknown as LLMClient;
@@ -94,8 +96,9 @@ describe("CompressionService", () => {
       }));
       const mockClient = {
         chatStream: vi.fn().mockReturnValue({
-          finalMessage: vi.fn().mockResolvedValue({
-            content: [{ type: "text", text: "Summary" }],
+          next: vi.fn().mockResolvedValue({
+            done: true,
+            value: { content: [{ type: "text", text: "Summary" }] },
           }),
         }),
       } as unknown as LLMClient;

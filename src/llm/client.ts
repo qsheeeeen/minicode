@@ -24,38 +24,7 @@ export type StreamEvent =
   | { type: "thinking"; thinking: string }
   | { type: "contentBlock"; block: ContentBlock };
 
-/** Provider-agnostic stream that yields canonical content events. */
-export interface LLMStream extends AsyncIterable<StreamEvent> {
-
-  /** Resolves with the full response once the stream finishes. */
-  finalMessage(): Promise<LLMResponse>;
-
-  /** Abort the in-flight request. */
-  abort(): void;
-}
-
-export class GenericStream implements LLMStream {
-  constructor(
-    private generator: AsyncGenerator<StreamEvent, LLMResponse, unknown>,
-    private abortFn: () => void
-  ) {}
-
-  [Symbol.asyncIterator]() {
-    return this.generator;
-  }
-
-  async finalMessage(): Promise<LLMResponse> {
-    let result: IteratorResult<StreamEvent, LLMResponse>;
-    do {
-      result = await this.generator.next();
-    } while (!result.done);
-    return result.value;
-  }
-
-  abort(): void {
-    this.abortFn();
-  }
-}
+export type LLMStream = AsyncGenerator<StreamEvent, LLMResponse, unknown>;
 
 // Client interface
 

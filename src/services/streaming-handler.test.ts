@@ -29,26 +29,22 @@ function mockStream(events: Record<string, Function>) {
   };
   events["end"] = () => {
     isDone = true;
-    if (resolveNext) { resolveNext({ value: undefined, done: true }); resolveNext = null; }
-    else queue.push({ value: undefined, done: true });
+    if (resolveNext) { resolveNext({ value: { usage: { input_tokens: 10, output_tokens: 10 } }, done: true }); resolveNext = null; }
+    else queue.push({ value: { usage: { input_tokens: 10, output_tokens: 10 } }, done: true });
   };
 
   return {
-    [Symbol.asyncIterator]() {
-      return {
-        next: async () => {
-          if (queue.length > 0) return queue.shift()!;
-          if (isDone) return { value: undefined, done: true };
-          return new Promise<IteratorResult<any>>((resolve) => {
-            resolveNext = resolve;
-          });
-        }
-      };
+    async next() {
+      if (queue.length > 0) return queue.shift()!;
+      if (isDone) return { value: { usage: { input_tokens: 10, output_tokens: 10 } }, done: true };
+      return new Promise<IteratorResult<any>>((resolve) => {
+        resolveNext = resolve;
+      });
     },
-    finalMessage: vi.fn(() => {
-      events["end"]?.(); // finish the stream when final message is asked
-      return Promise.resolve({ id: "msg-1", role: "assistant", content: [], model: "test", stop_reason: "end_turn", type: "message", usage: { input_tokens: 0, output_tokens: 0 } });
-    }),
+    [Symbol.asyncIterator]() {
+      return this;
+    },
+    finalMessage: vi.fn().mockResolvedValue({ usage: { input_tokens: 10, output_tokens: 10 } }),
     abort: vi.fn(),
   };
 }

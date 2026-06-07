@@ -34,22 +34,23 @@ class MockStream implements AsyncIterable<any> {
 
   private end() {
     this.isDone = true;
+    const fakeResponse = { usage: { input_tokens: 10, output_tokens: 10 } };
     if (this.resolveNext) {
-      this.resolveNext({ value: undefined, done: true });
+      this.resolveNext({ value: fakeResponse, done: true });
       this.resolveNext = null;
     }
   }
 
+  async next() {
+    if (this.queue.length > 0) return this.queue.shift()!;
+    if (this.isDone) return { value: this._promise ? await this._promise.catch(() => undefined) : undefined, done: true };
+    return new Promise<IteratorResult<any>>((resolve) => {
+      this.resolveNext = resolve;
+    });
+  }
+
   [Symbol.asyncIterator]() {
-    return {
-      next: async () => {
-        if (this.queue.length > 0) return this.queue.shift()!;
-        if (this.isDone) return { value: undefined, done: true };
-        return new Promise<IteratorResult<any>>((resolve) => {
-          this.resolveNext = resolve;
-        });
-      }
-    };
+    return this;
   }
 
   finalMessage() {

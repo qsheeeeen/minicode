@@ -96,14 +96,20 @@ Reply with exactly one of:
 - "yes"
 - "no: <reason explaining why it was denied>"`;
 
-      const response = await this.client.chatStream(
+      const stream = this.client.chatStream(
         [{ role: "user", content: prompt }],
         [],
         { model: this.model, maxTokens: 100 },
-      ).finalMessage();
-
-      const textBlock = response.content.find((b) => b.type === "text");
-      const text = textBlock && "text" in textBlock ? textBlock.text.trim() : "no: unknown error";
+      );
+      let response: LLMResponse | undefined;
+      while (true) {
+        const next = await stream.next();
+        if (next.done) {
+          response = next.value as LLMResponse;
+          break;
+        }
+      }
+      const text = response?.content[0]?.type === "text" ? response.content[0].text.trim() : "no: unknown error";
 
       if (text.toLowerCase().startsWith("yes")) {
         return { allowed: true };

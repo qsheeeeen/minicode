@@ -51,40 +51,46 @@ export class StreamingHandler {
       }
     };
 
-    let response: LLMResponse;
+    let response: LLMResponse | undefined;
     try {
-      const timer = setTimeout(() => stream.abort(), 300_000);
-      try {
-        for await (const chunk of stream) {
-          if (chunk.type === "text" || chunk.type === "thinking") {
-            // @ts-expect-error - text or thinking fields exist based on type
-            handleDelta(chunk.type, chunk[chunk.type]);
-          } else if (chunk.type === "contentBlock") {
-            const block = chunk.block;
-            blockStreaming = false;
-            if (block.type === "thinking" || block.type === "text") {
-              this.saveStore();
-            }
-            if (block.type === "tool_use") {
-              const toolBlock = block as ContentBlock & { type: "tool_use"; id: string; name: string; input: Record<string, unknown> };
-              const tool = this.tools.get(toolBlock.name);
-              toolCalls.push({ block: toolBlock, tool });
-              this.store.appendToLastAssistantTurn({
-                type: "tool_use",
-                id: toolBlock.id,
-                name: toolBlock.name,
-                input: toolBlock.input,
-              } as ContentBlock);
-              this.saveStore();
-            }
+      while (true) {
+        if (signal?.aborted) throw new Error("Aborted");
+        
+        const next = await stream.next();
+        if (next.done) {
+          response = next.value as LLMResponse;
+          break;
+        }
+        
+        const chunk = next.value;
+        if (chunk.type === "text" || chunk.type === "thinking") {
+          // @ts-expect-error - text or thinking fields exist based on type
+          handleDelta(chunk.type, chunk[chunk.type]);
+        } else if (chunk.type === "contentBlock") {
+          const block = chunk.block;
+          blockStreaming = false;
+          if (block.type === "thinking" || block.type === "text") {
+            this.saveStore();
+          }
+          if (block.type === "tool_use") {
+            const toolBlock = block as ContentBlock & { type: "tool_use"; id: string; name: string; input: Record<string, unknown> };
+            const tool = this.tools.get(toolBlock.name);
+            toolCalls.push({ block: toolBlock, tool });
+            this.store.appendToLastAssistantTurn({
+              type: "tool_use",
+              id: toolBlock.id,
+              name: toolBlock.name,
+              input: toolBlock.input,
+            } as ContentBlock);
+            this.saveStore();
           }
         }
-      } finally {
-        clearTimeout(timer);
       }
 
       if (signal?.aborted) throw new Error("Aborted");
-      response = await stream.finalMessage();
+      if (!response) {
+        throw new Error("Stream closed without returning a response");
+      }
     } catch (e) {
       if (signal?.aborted) throw new Error("Aborted");
       throw e;
