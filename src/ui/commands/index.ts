@@ -1,6 +1,6 @@
 import type { Agent } from "../../agent.js";
 import type { DisplayMessage } from "../../utils/display.js";
-import type { EffortLevel } from "../../llm/types.js";
+import type { EffortLevel } from "../../llm/client.js";
 import type { SessionStats } from "../../services/session-stats.js";
 import { MessageStore } from "../../messages.js";
 import { getSkillBody, getAvailableSkills } from "../../skills/index.js";

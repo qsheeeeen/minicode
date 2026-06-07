@@ -1,11 +1,10 @@
 // Barrel exports for the LLM layer.
 //
-// Consumers should import from here or from `./types.js` / `./client.js`.
+// Consumers should import from here or from `./client.js`.
 // Never import provider SDKs directly outside of `src/llm/`.
 
-// Canonical types
+// Message types (owned by messages.ts)
 export type {
-  EffortLevel,
   TextBlock,
   ThinkingBlock,
   ToolUseBlock,
@@ -13,14 +12,18 @@ export type {
   ContentBlock,
   UserContentBlock,
   MessageParam,
+} from "../messages.js";
+
+// LLM interface types + factory
+export type {
+  EffortLevel,
   LLMToolDef,
   ChatOptions,
   TokenUsage,
   LLMResponse,
-} from "./types.js";
-
-// Client interface + factory
-export type { LLMClient, LLMStream } from "./client.js";
+  LLMClient,
+  LLMStream,
+} from "./client.js";
 export { createClient } from "./client.js";
 
 // Concrete adapters (for direct instantiation)

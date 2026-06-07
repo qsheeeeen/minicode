@@ -1,12 +1,7 @@
 import type { LLMClient } from "./llm/client.js";
 import { createClient } from "./llm/client.js";
-import type {
-  MessageParam,
-  LLMToolDef,
-  EffortLevel,
-  LLMResponse,
-  ToolUseBlock,
-} from "./llm/types.js";
+import type { MessageParam, ToolUseBlock } from "./messages.js";
+import type { LLMToolDef, EffortLevel, LLMResponse } from "./llm/client.js";
 import {
   getAll,
   getSubAgentTools,

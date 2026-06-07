@@ -3,17 +3,49 @@
 // Every provider adapter implements these interfaces. The rest of the
 // codebase programs against these abstractions, never against a concrete SDK.
 
-import type {
-  MessageParam,
-  LLMToolDef,
-  ChatOptions,
-  LLMResponse,
-  ContentBlock,
-} from "./types.js";
+import type { MessageParam, ContentBlock } from "../messages.js";
 
 import { AnthropicClient } from "./anthropic.js";
 import { OpenAIChatClient } from "./openai-chat.js";
 import { OpenAIResponsesClient } from "./openai-responses.js";
+
+// LLM interface types (owned by the client layer)
+
+export type EffortLevel =
+  | "none"
+  | "minimal"
+  | "low"
+  | "medium"
+  | "high"
+  | "xhigh"
+  | "max";
+
+export interface LLMToolDef {
+  name: string;
+  description: string;
+  input_schema: Record<string, unknown>;
+}
+
+export interface ChatOptions {
+  model?: string;
+  maxTokens?: number;
+  system?: string;
+  effort?: EffortLevel;
+  signal?: AbortSignal;
+}
+
+export interface TokenUsage {
+  input_tokens: number;
+  output_tokens: number;
+  cache_creation_input_tokens?: number;
+  cache_read_input_tokens?: number;
+}
+
+export interface LLMResponse {
+  content: ContentBlock[];
+  stop_reason: string;
+  usage: TokenUsage;
+}
 
 // Stream interface
 

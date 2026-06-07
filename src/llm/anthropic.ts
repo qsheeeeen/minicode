@@ -11,18 +11,8 @@ import type {
   OutputConfig,
 } from "@anthropic-ai/sdk/resources/messages.js";
 
-import type { LLMClient } from "./client.js";
-import type {
-  MessageParam,
-  LLMToolDef,
-  ChatOptions,
-  LLMResponse,
-  ContentBlock,
-  EffortLevel,
-} from "./types.js";
-
-// Re-export EffortLevel for backward compat in config.ts etc.
-export type { EffortLevel };
+import type { LLMClient, LLMToolDef, ChatOptions, LLMResponse, EffortLevel } from "./client.js";
+import type { MessageParam, ContentBlock } from "../messages.js";
 
 function mapEffort(effort: EffortLevel): any {
   switch (effort) {

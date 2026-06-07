@@ -1,5 +1,5 @@
 import type { LLMClient } from "../llm/client.js";
-import type { LLMResponse } from "../llm/types.js";
+import type { LLMResponse } from "../llm/client.js";
 import type { UserPrompter } from "../utils/display.js";
 
 export type PermissionMode = "manual" | "yolo" | "auto";

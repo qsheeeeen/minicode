@@ -1,5 +1,5 @@
 import type { Agent } from "../agent.js";
-import type { MessageParam, ContentBlock } from "../llm/types.js";
+import type { MessageParam, ContentBlock } from "../messages.js";
 import type { CommandContext } from "./commands/index.js";
 import { routeInput } from "./routing.js";
 import { runBash } from "../services/index.js";

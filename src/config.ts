@@ -2,7 +2,7 @@ import fs from "fs";
 import fsPromises from "fs/promises";
 import path from "path";
 import os from "os";
-import type { EffortLevel } from "./llm/types.js";
+import type { EffortLevel } from "./llm/client.js";
 
 const CONFIG_DIR = path.join(os.homedir(), ".minicode");
 const CONFIG_PATH = path.join(CONFIG_DIR, "config.json");

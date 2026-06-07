@@ -1,7 +1,7 @@
 import React, { useCallback, useRef, useEffect } from "react";
 import { Box, useInput, useApp } from "ink";
 import { Agent } from "../agent.js";
-import type { MessageParam } from "../llm/types.js";
+import type { MessageParam } from "../messages.js";
 import type { ResolvedConfig } from "../config.js";
 import { CallbackEvents, CallbackPrompter } from "../utils/display.js";
 import { routeInput } from "./routing.js";

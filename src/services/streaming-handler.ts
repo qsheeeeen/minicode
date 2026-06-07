@@ -1,5 +1,6 @@
 import type { LLMClient, LLMStream } from "../llm/client.js";
-import type { ContentBlock, LLMResponse } from "../llm/types.js";
+import type { LLMResponse } from "../llm/client.js";
+import type { ContentBlock } from "../messages.js";
 import type { ToolDef } from "../tools/index.js";
 import type { MessageStore } from "../messages.js";
 

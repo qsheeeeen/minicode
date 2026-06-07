@@ -5,20 +5,8 @@
 // Completions API format.
 
 import OpenAI from "openai";
-import type { LLMClient, LLMStream, StreamEvent } from "./client.js";
-import type {
-  MessageParam,
-  LLMToolDef,
-  ChatOptions,
-  LLMResponse,
-  ContentBlock,
-  TextBlock,
-  ThinkingBlock,
-  ToolUseBlock,
-  ToolResultBlock,
-  TokenUsage,
-  EffortLevel,
-} from "./types.js";
+import type { LLMClient, LLMStream, StreamEvent, LLMToolDef, ChatOptions, LLMResponse, TokenUsage, EffortLevel } from "./client.js";
+import type { MessageParam, ContentBlock, TextBlock, ThinkingBlock, ToolUseBlock, ToolResultBlock } from "../messages.js";
 
 // Constants
 

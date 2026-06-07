@@ -1,6 +1,6 @@
 import type { ToolDef, ToolResult, ToolExecutionContext } from "./registry.js";
 import type { AgentConfig } from "../agent.js";
-import type { MessageParam, ContentBlock } from "../llm/types.js";
+import type { MessageParam, ContentBlock } from "../messages.js";
 import { Agent } from "../agent.js";
 import { register } from "./registry.js";
 

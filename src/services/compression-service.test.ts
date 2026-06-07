@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { CompressionService } from "./compression-service.js";
 import type { LLMClient } from "../llm/client.js";
-import type { MessageParam } from "../llm/types.js";
+import type { MessageParam } from "../messages.js";
 
 describe("CompressionService", () => {
   let service: CompressionService;
