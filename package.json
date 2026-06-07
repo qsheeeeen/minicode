@@ -18,7 +18,8 @@
     "start": "bun dist/cli.js",
     "prepublishOnly": "npm run build",
     "test": "vitest",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "format": "prettier --write src/"
   },
   "keywords": [],
   "author": "",
