@@ -1,5 +1,4 @@
 import type { SessionStats } from "./session-stats.js";
-import type { AgentEvents } from "../utils/display.js";
 import type { MessageStore } from "../messages.js";
 import type { TokenUsage } from "../llm/client.js";
 
@@ -10,14 +9,9 @@ export class TokenTracker {
   constructor(
     private contextLength: number,
     private compressionThresholdRatio: number,
-    private events: AgentEvents,
     private store: MessageStore,
     private sessionStats?: SessionStats,
   ) {}
-
-  setEvents(events: AgentEvents): void {
-    this.events = events;
-  }
 
   processUsage(
     model: string,
@@ -25,7 +19,6 @@ export class TokenTracker {
   ): { percentage: number; shouldCompress: boolean } {
     this.totalTokens = usage.input.total + usage.output;
     this.sessionStats?.recordUsage(model, usage);
-    this.events.tokenUpdate(this.totalTokens);
 
     const ratio = this.totalTokens / this.contextLength;
     const percentage = Math.floor(ratio * 100);

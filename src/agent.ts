@@ -208,7 +208,6 @@ export class Agent {
     this.tokenTracker = new TokenTracker(
       this.contextLength,
       this.compressionThresholdRatio,
-      this.events,
       this.store,
       this.sessionStats,
     );
@@ -223,7 +222,6 @@ export class Agent {
 
   setEvents(events: AgentEvents): void {
     this.events = events;
-    this.tokenTracker.setEvents(events);
   }
 
   setPrompter(prompter: UserPrompter): void {
@@ -394,6 +392,8 @@ export class Agent {
       this.model || "unknown",
       response.usage,
     );
+
+    this.events.tokenUpdate(this.tokenTracker.getTotal());
 
     if (shouldCompress) {
       await this.compress();
