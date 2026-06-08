@@ -22,7 +22,7 @@ import {
   PermissionService,
   type PermissionMode,
 } from "./services/index.js";
-import { StreamingHandler } from "./services/streaming-handler.js";
+import type { ContentBlock } from "./messages.js";
 import { TokenTracker } from "./services/token-tracker.js";
 import { ChangeJournal } from "./services/change-journal.js";
 import { MessageStore } from "./messages.js";
@@ -63,7 +63,6 @@ export interface AgentConfig {
   sessionStats?: SessionStats;
 }
 
-import type { StreamingResult } from "./services/streaming-handler.js";
 
 export class Agent {
   private client: LLMClient;
@@ -76,7 +75,6 @@ export class Agent {
   private compressionThresholdRatio: number;
   private tokenTracker: TokenTracker;
   private compressionService: CompressionService;
-  private streamingHandler: StreamingHandler;
   private changeJournal = new ChangeJournal();
   private activeTurnIdx = 0;
   private _currentSession = `session-${Date.now()}`;
@@ -164,9 +162,6 @@ export class Agent {
     this.effort = config.effort;
     this.compressionService = new CompressionService();
     this.tools = config.subAgentMode ? getSubAgentTools() : getAll();
-    this.streamingHandler = new StreamingHandler(this.store, this.tools, () =>
-      this.saveStore(),
-    );
     this.agentRegistry = config.agentRegistry;
     this.currentAgentId = config.currentAgentId || "1";
     this.sessionStats = config.sessionStats;
@@ -425,6 +420,83 @@ export class Agent {
     return tool.execute(args, context);
   }
 
+  // Stream LLM response, updating MessageStore in real-time.
+  // Returns the final response and any tool calls the LLM requested.
+  private async streamLLM(toolDefs: LLMToolDef[]) {
+    const stream = this.client.chatStream(
+      this.store.toLLMMessages(),
+      toolDefs,
+      {
+        system: this.systemPrompt,
+        model: this.model,
+        signal: this.abortController?.signal,
+        effort: this.effort,
+      },
+    );
+    if (this.currentStreamRef) this.currentStreamRef.current = stream;
+
+    let blockStreaming = false;
+    const toolCalls: Array<{ block: ToolUseBlock; tool?: ToolDef }> = [];
+
+    const handleDelta = (field: "text" | "thinking", delta: string) => {
+      const block =
+        field === "thinking"
+          ? { type: "thinking" as const, thinking: delta.trimStart() }
+          : { type: "text" as const, text: delta.trimStart() };
+      if (!blockStreaming) {
+        blockStreaming = true;
+        this.store.setStreaming(true);
+        this.store.appendToLastAssistantTurn(block as ContentBlock);
+      } else {
+        const last = this.store.getLastBlock();
+        if (last?.type === field && field in last) {
+          const currentText = (last as any)[field] as string;
+          const newText = currentText === "" ? delta.trimStart() : delta;
+          this.store.updateLastBlock({ [field]: currentText + newText });
+        } else {
+          this.store.appendToLastAssistantTurn(block as ContentBlock);
+        }
+      }
+    };
+
+    let response: LLMResponse | undefined;
+    try {
+      while (true) {
+        if (this.abortController?.signal.aborted) throw new Error("Aborted");
+
+        const next = await stream.next();
+        if (next.done) {
+          response = next.value as LLMResponse;
+          break;
+        }
+
+        const chunk = next.value;
+        if (chunk.type === "text" || chunk.type === "thinking") {
+          // @ts-expect-error - text or thinking fields exist based on type
+          handleDelta(chunk.type, chunk[chunk.type]);
+        } else if (chunk.type === "tool_use") {
+          blockStreaming = false;
+          const tool = this.tools.get(chunk.block.name);
+          toolCalls.push({ block: chunk.block, tool });
+          this.store.appendToLastAssistantTurn(chunk.block as ContentBlock);
+          this.saveStore();
+        }
+      }
+
+      if (this.abortController?.signal.aborted) throw new Error("Aborted");
+      if (!response) throw new Error("Stream closed without returning a response");
+    } catch (e) {
+      if (this.abortController?.signal.aborted) throw new Error("Aborted");
+      throw e;
+    } finally {
+      this.saveStore();
+      if (this.currentStreamRef) this.currentStreamRef.current = null;
+      this.store.setStreaming(false);
+    }
+
+    return { response, toolCalls };
+  }
+
   // Execute tool calls sequentially and push tool_result turns
   private async executeToolCalls(
     toolCalls: Array<{ block: ToolUseBlock; tool?: ToolDef }>,
@@ -551,19 +623,7 @@ export class Agent {
           input_schema: t.input_schema,
         })) as LLMToolDef[];
 
-        const { response, toolCalls } = await this.streamingHandler.handle(
-          this.client,
-          this.store.toLLMMessages(),
-          toolDefs,
-          {
-            system: this.systemPrompt,
-            model: this.model,
-            signal: this.abortController?.signal,
-            effort: this.effort,
-          },
-          this.abortController?.signal,
-          this.currentStreamRef,
-        );
+        const { response, toolCalls } = await this.streamLLM(toolDefs);
 
         await this.processTokenUsage(response);
         this.logger?.info(
