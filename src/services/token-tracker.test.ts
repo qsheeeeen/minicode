@@ -89,4 +89,31 @@ describe("TokenTracker", () => {
     tracker.setCount(0);
     expect(tracker.getTotal()).toBe(0);
   });
+
+  it("replaces total on each call (not accumulates)", () => {
+    const { tracker } = createTracker();
+    tracker.processUsage("model", usage(1000, 200));
+    tracker.processUsage("model", usage(500, 100));
+    expect(tracker.getTotal()).toBe(600);
+  });
+
+  it("input.total includes cache tokens", () => {
+    const { tracker } = createTracker();
+    tracker.processUsage("model", usage(1800, 200, 500, 300));
+    expect(tracker.getTotal()).toBe(2000);
+  });
+
+  it("shouldCompress uses floor for threshold", () => {
+    const { tracker } = createTracker({ contextLength: 100000, ratio: 0.75 });
+    let r = tracker.processUsage("model", usage(74999, 0));
+    expect(r.shouldCompress).toBe(false);
+    r = tracker.processUsage("model", usage(75001, 0));
+    expect(r.shouldCompress).toBe(true);
+  });
+
+  it("returns 0 percentage when no tokens", () => {
+    const { tracker } = createTracker({ contextLength: 100000 });
+    tracker.setCount(0);
+    expect(tracker.getTotal()).toBe(0);
+  });
 });

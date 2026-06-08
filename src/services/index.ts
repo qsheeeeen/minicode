@@ -1,4 +1,3 @@
-export { TokenCounter } from "./token-counter.js";
 export { CompressionService } from "./compression-service.js";
 export { AgentRegistry, type AgentSession } from "./agent-registry.js";
 export { PermissionService, type PermissionMode } from "./permission.js";
