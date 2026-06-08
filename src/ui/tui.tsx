@@ -3,7 +3,7 @@ import { Box, useInput, useApp } from "ink";
 import { Agent } from "../agent.js";
 import type { MessageParam } from "../messages.js";
 import type { ResolvedConfig } from "../config.js";
-import { CallbackEvents, CallbackPrompter } from "../utils/display.js";
+import { CallbackPrompter } from "../utils/display.js";
 import { routeInput } from "./routing.js";
 import { MessageStore } from "../messages.js";
 import {
@@ -116,12 +116,8 @@ function useDisplay(
   const dispatch = useTuiDispatch();
 
   useEffect(() => {
-    agent.setEvents(
-      new CallbackEvents({
-        onStatus: (msg) => dispatch({ type: "ADD_MESSAGE", payload: msg }),
-        onTokenUpdate: (count) =>
-          dispatch({ type: "SET_TOKEN_COUNT", payload: count }),
-      }),
+    const unsubToken = agent.tokenCount$.subscribe((count) =>
+      dispatch({ type: "SET_TOKEN_COUNT", payload: count }),
     );
 
     agent.setPrompter(
@@ -136,7 +132,7 @@ function useDisplay(
       ),
     );
 
-    agent.getStore().onChange(() => {
+    const unsubStore = agent.getStore().onChange(() => {
       dispatch({
         type: "SET_MESSAGES",
         payload: agent.getStore().toDisplayMessages(),
@@ -185,7 +181,10 @@ function useDisplay(
     };
     loadInitial();
 
-    return () => {};
+    return () => {
+      unsubToken();
+      unsubStore();
+    };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 }
 

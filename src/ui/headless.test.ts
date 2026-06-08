@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const mockRun = vi.fn();
-const mockSetEvents = vi.fn();
 const mockSetPrompter = vi.fn();
 const mockOnChange = vi.fn().mockReturnValue(() => {});
 const mockGetTurns = vi.fn().mockReturnValue([]);
@@ -9,7 +8,6 @@ const mockGetStatuses = vi.fn().mockReturnValue([]);
 
 const mockAgent = {
   run: mockRun,
-  setEvents: mockSetEvents,
   setPrompter: mockSetPrompter,
   getStore: vi.fn().mockReturnValue({
     onChange: mockOnChange,
@@ -36,7 +34,7 @@ describe("runHeadless", () => {
   it("sets headless events and prompter on agent", async () => {
     mockRun.mockResolvedValueOnce(undefined);
     await runHeadless(mockAgent as any, "test prompt");
-    expect(mockSetEvents).toHaveBeenCalled();
+
     expect(mockSetPrompter).toHaveBeenCalled();
     const prompterArg = mockSetPrompter.mock.calls[0][0];
     expect(typeof prompterArg.prompt).toBe("function");

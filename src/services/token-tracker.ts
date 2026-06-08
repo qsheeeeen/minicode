@@ -1,14 +1,15 @@
 import type { SessionStats } from "./session-stats.js";
 import type { MessageStore } from "../messages.js";
 import type { TokenUsage } from "../llm/client.js";
+import type { Signal } from "../utils/signal.js";
 
 export class TokenTracker {
-  private totalTokens = 0;
   private lastShownThreshold = 0;
 
   constructor(
     private contextLength: number,
     private compressionThresholdRatio: number,
+    private tokenCount: Signal<number>,
     private store: MessageStore,
     private sessionStats?: SessionStats,
   ) {}
@@ -17,10 +18,11 @@ export class TokenTracker {
     model: string,
     usage: TokenUsage,
   ): { percentage: number; shouldCompress: boolean } {
-    this.totalTokens = usage.input.total + usage.output;
+    const total = usage.input.total + usage.output;
     this.sessionStats?.recordUsage(model, usage);
+    this.tokenCount.set(total);
 
-    const ratio = this.totalTokens / this.contextLength;
+    const ratio = total / this.contextLength;
     const percentage = Math.floor(ratio * 100);
 
     const thresholds = [25, 50, 75, 90];
@@ -37,22 +39,22 @@ export class TokenTracker {
     }
 
     const threshold = Math.floor(this.contextLength * this.compressionThresholdRatio);
-    const shouldCompress = this.totalTokens > threshold;
+    const shouldCompress = total > threshold;
 
     return { percentage, shouldCompress };
   }
 
   getTotal(): number {
-    return this.totalTokens;
+    return this.tokenCount.get();
   }
 
   reset(): void {
-    this.totalTokens = 0;
+    this.tokenCount.set(0);
     this.lastShownThreshold = 0;
   }
 
   setCount(count: number): void {
-    this.totalTokens = count;
+    this.tokenCount.set(count);
     this.lastShownThreshold = 0;
   }
 

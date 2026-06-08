@@ -10,11 +10,10 @@ import {
   ToolDeniedError,
 } from "./tools/index.js";
 import {
-  ConsoleEvents,
   ConsolePrompter,
-  type AgentEvents,
   type UserPrompter,
 } from "./utils/display.js";
+import { Signal } from "./utils/signal.js";
 import type { SessionStats } from "./services/session-stats.js";
 import {
   CompressionService,
@@ -91,7 +90,7 @@ export class Agent {
   }
   private thinkingEnabled: boolean;
   private effort?: EffortLevel;
-  private events: AgentEvents;
+  public readonly tokenCount$ = new Signal(0);
   private prompter: UserPrompter;
   private userPrompt: string;
   private projectPromptFile: string;
@@ -203,11 +202,11 @@ export class Agent {
       }
     }
 
-    this.events = new ConsoleEvents();
     this.prompter = new ConsolePrompter();
     this.tokenTracker = new TokenTracker(
       this.contextLength,
       this.compressionThresholdRatio,
+      this.tokenCount$,
       this.store,
       this.sessionStats,
     );
@@ -220,9 +219,6 @@ export class Agent {
     }
   }
 
-  setEvents(events: AgentEvents): void {
-    this.events = events;
-  }
 
   setPrompter(prompter: UserPrompter): void {
     this.prompter = prompter;
@@ -304,7 +300,6 @@ export class Agent {
 
       this.store.setTurns(compressed);
       this.tokenTracker.reset();
-      this.events.tokenUpdate(0);
 
       // Recalculate activeTurnIdx for the compressed conversation
       let newActiveIdx = 0;
@@ -392,8 +387,6 @@ export class Agent {
       this.model || "unknown",
       response.usage,
     );
-
-    this.events.tokenUpdate(this.tokenTracker.getTotal());
 
     if (shouldCompress) {
       await this.compress();
@@ -733,7 +726,6 @@ export class Agent {
 
   setTokenCount(count: number): void {
     this.tokenTracker.setCount(count);
-    this.events.tokenUpdate(this.tokenTracker.getTotal());
   }
 
   clearSession(): void {

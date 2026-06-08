@@ -32,12 +32,7 @@ export async function runHeadless(
     }
   }
 
-  // Set headless events and prompter
-  agent.setEvents({
-    status: () => {},
-    error: (msg) => console.error(`[error] ${msg}`),
-    tokenUpdate: () => {},
-  });
+
   agent.setPrompter({
     prompt: async (req) => {
       console.log(

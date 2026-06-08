@@ -6,7 +6,7 @@ import {
   defaultTextResponse,
   toolUseResponse,
 } from "./tools/testing.js";
-import { RecordEvents, CallbackPrompter } from "./utils/display.js";
+import { ConsolePrompter, CallbackPrompter } from "./utils/display.js";
 import type { ScriptedResponse } from "./tools/testing.js";
 import type { ToolDef } from "./tools/registry.js";
 
@@ -27,8 +27,6 @@ function createTestAgent(options?: {
         ),
       ],
     ]);
-  const events = new RecordEvents();
-
   const agent = new Agent({
     client,
     tools,
@@ -36,9 +34,7 @@ function createTestAgent(options?: {
     skipEnvironmentRefresh: true,
   });
 
-  agent.setEvents(events);
-
-  return { agent, events };
+  return { agent };
 }
 
 describe("Agent virtual integration", () => {
@@ -220,8 +216,6 @@ describe("Agent virtual integration", () => {
       skipEnvironmentRefresh: true,
     });
 
-    const events = new RecordEvents();
-    agent.setEvents(events);
     agent.setPrompter(prompter);
 
     const completed = await agent.run("Do something dangerous");

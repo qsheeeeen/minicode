@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { TokenTracker } from "./token-tracker.js";
 import type { TokenUsage } from "../llm/client.js";
+import { Signal } from "../utils/signal.js";
 
 function usage(input: number, output: number, cacheMiss = 0, cacheHit = 0): TokenUsage {
   return { input: { total: input, cache_miss: cacheMiss, cache_hit: cacheHit }, output };
@@ -9,17 +10,17 @@ function usage(input: number, output: number, cacheMiss = 0, cacheHit = 0): Toke
 function createTracker(
   overrides: { contextLength?: number; ratio?: number } = {},
 ) {
-  const events = { tokenUpdate: vi.fn() };
+  const tokenCount = new Signal(0);
   const store = { addStatus: vi.fn() };
   const sessionStats = { recordUsage: vi.fn(), incrementSessionCount: vi.fn() };
   const tracker = new TokenTracker(
     overrides.contextLength ?? 100000,
     overrides.ratio ?? 0.8,
-    events as any,
+    tokenCount,
     store as any,
     sessionStats as any,
   );
-  return { tracker, events, store, sessionStats };
+  return { tracker, tokenCount, store, sessionStats };
 }
 
 describe("TokenTracker", () => {
@@ -43,10 +44,10 @@ describe("TokenTracker", () => {
     expect(sessionStats.recordUsage).toHaveBeenCalledWith("model-a", u);
   });
 
-  it("notifies events with token count", () => {
-    const { tracker, events } = createTracker();
+  it("notifies signal with token count", () => {
+    const { tracker, tokenCount } = createTracker();
     tracker.processUsage("model", usage(50000, 0));
-    expect(events.tokenUpdate).toHaveBeenCalledWith(50000);
+    expect(tokenCount.get()).toBe(50000);
   });
 
   it("adds status when crossing threshold boundary", () => {

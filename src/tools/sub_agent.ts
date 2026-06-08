@@ -98,12 +98,8 @@ export const agentTool: ToolDef = {
 
     // Track progress during execution
     let toolCallCount = 0;
-    subAgent.setEvents({
-      status: () => {},
-      error: () => {},
-      tokenUpdate: (count: number) => {
-        registry.updateProgress(subId, { tokenCount: count });
-      },
+    subAgent.tokenCount$.subscribe((count: number) => {
+      registry.updateProgress(subId, { tokenCount: count });
     });
     subAgent.getStore().onChange(() => {
       const turns = subAgent.getStore().getTurns();
