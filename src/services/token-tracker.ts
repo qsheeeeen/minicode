@@ -15,6 +15,10 @@ export class TokenTracker {
     private sessionStats?: SessionStats,
   ) {}
 
+  setEvents(events: AgentEvents): void {
+    this.events = events;
+  }
+
   processUsage(
     model: string,
     usage: TokenUsage,

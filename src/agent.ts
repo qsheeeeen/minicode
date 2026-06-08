@@ -223,6 +223,7 @@ export class Agent {
 
   setEvents(events: AgentEvents): void {
     this.events = events;
+    this.tokenTracker.setEvents(events);
   }
 
   setPrompter(prompter: UserPrompter): void {
