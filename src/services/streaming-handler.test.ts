@@ -35,13 +35,13 @@ function mockStream(events: Record<string, Function>) {
     isDone = true;
     if (resolveNext) {
       resolveNext({
-        value: { usage: { input_tokens: 10, output_tokens: 10 } },
+        value: { usage: { input: { total: 10, cache_miss: 0, cache_hit: 0 }, output: 10 } },
         done: true,
       });
       resolveNext = null;
     } else
       queue.push({
-        value: { usage: { input_tokens: 10, output_tokens: 10 } },
+        value: { usage: { input: { total: 10, cache_miss: 0, cache_hit: 0 }, output: 10 } },
         done: true,
       });
   };
@@ -51,7 +51,7 @@ function mockStream(events: Record<string, Function>) {
       if (queue.length > 0) return queue.shift()!;
       if (isDone)
         return {
-          value: { usage: { input_tokens: 10, output_tokens: 10 } },
+          value: { usage: { input: { total: 10, cache_miss: 0, cache_hit: 0 }, output: 10 } },
           done: true,
         };
       return new Promise<IteratorResult<any>>((resolve) => {
@@ -63,7 +63,7 @@ function mockStream(events: Record<string, Function>) {
     },
     finalMessage: vi
       .fn()
-      .mockResolvedValue({ usage: { input_tokens: 10, output_tokens: 10 } }),
+      .mockResolvedValue({ usage: { input: { total: 10, cache_miss: 0, cache_hit: 0 }, output: 10 } }),
     abort: vi.fn(),
   };
 }

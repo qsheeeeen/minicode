@@ -37,7 +37,7 @@ class MockStream implements AsyncIterable<any> {
 
   private end() {
     this.isDone = true;
-    const fakeResponse = { usage: { input_tokens: 10, output_tokens: 10 } };
+    const fakeResponse = { usage: { input: { total: 10, cache_miss: 0, cache_hit: 0 }, output: 10 } };
     if (this.resolveNext) {
       this.resolveNext({ value: fakeResponse, done: true });
       this.resolveNext = null;
@@ -229,7 +229,7 @@ describe("Agent", () => {
       stream.emit("text", "Hi ");
       stream.emit("text", "there!");
       stream.resolveFinal({
-        usage: { input_tokens: 10, output_tokens: 20 },
+        usage: { input: { total: 10, cache_miss: 0, cache_hit: 0 }, output: 20 },
         stop_reason: "end_turn",
       });
 
@@ -248,7 +248,7 @@ describe("Agent", () => {
 
       stream.emit("thinking", "Hmm...");
       stream.resolveFinal({
-        usage: { input_tokens: 10, output_tokens: 20 },
+        usage: { input: { total: 10, cache_miss: 0, cache_hit: 0 }, output: 20 },
         stop_reason: "end_turn",
       });
 
@@ -274,13 +274,13 @@ describe("Agent", () => {
         input: {},
       });
       stream1.resolveFinal({
-        usage: { input_tokens: 10, output_tokens: 20 },
+        usage: { input: { total: 10, cache_miss: 0, cache_hit: 0 }, output: 20 },
         stop_reason: "tool_use",
       });
 
       setImmediate(() => {
         stream2.resolveFinal({
-          usage: { input_tokens: 10, output_tokens: 20 },
+          usage: { input: { total: 10, cache_miss: 0, cache_hit: 0 }, output: 20 },
           stop_reason: "end_turn",
         });
       });
@@ -305,7 +305,7 @@ describe("Agent", () => {
       const run2 = agent.run("Second message");
       await expect(run2).resolves.toBe(false);
       stream.resolveFinal({
-        usage: { input_tokens: 10, output_tokens: 20 },
+        usage: { input: { total: 10, cache_miss: 0, cache_hit: 0 }, output: 20 },
         stop_reason: "end_turn",
       });
       await run1;
@@ -314,7 +314,7 @@ describe("Agent", () => {
       mockChatStream.mockReturnValueOnce(stream2);
       const run3 = agent.run("Third message");
       stream2.resolveFinal({
-        usage: { input_tokens: 10, output_tokens: 20 },
+        usage: { input: { total: 10, cache_miss: 0, cache_hit: 0 }, output: 20 },
         stop_reason: "end_turn",
       });
       await expect(run3).resolves.toBe(true);
@@ -356,7 +356,7 @@ describe("Agent", () => {
         input: {},
       });
       stream.resolveFinal({
-        usage: { input_tokens: 10, output_tokens: 20 },
+        usage: { input: { total: 10, cache_miss: 0, cache_hit: 0 }, output: 20 },
         stop_reason: "tool_use",
       });
 
@@ -396,7 +396,7 @@ describe("Agent", () => {
           setImmediate(() => {
             stream2.emit("text", "I cannot do that because it is too risky.");
             stream2.resolveFinal({
-              usage: { input_tokens: 5, output_tokens: 10 },
+              usage: { input: { total: 5, cache_miss: 0, cache_hit: 0 }, output: 10 },
               stop_reason: "end_turn",
             });
           });
@@ -415,7 +415,7 @@ describe("Agent", () => {
         input: {},
       });
       stream1.resolveFinal({
-        usage: { input_tokens: 10, output_tokens: 20 },
+        usage: { input: { total: 10, cache_miss: 0, cache_hit: 0 }, output: 20 },
         stop_reason: "tool_use",
       });
 
