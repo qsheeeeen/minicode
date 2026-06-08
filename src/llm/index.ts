@@ -24,7 +24,11 @@ export type {
   LLMClient,
   LLMStream,
 } from "./client.js";
-export { createClient } from "./client.js";
+export { createClient, registerProtocol } from "./client.js";
 
 // Concrete adapters (for direct instantiation)
 export { AnthropicClient } from "./anthropic.js";
+
+// Virtual protocol (for testing)
+export { VirtualLLMClient } from "./virtual.js";
+export type { ScriptedResponse, VirtualLLMOptions } from "./virtual.js";

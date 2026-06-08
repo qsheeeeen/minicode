@@ -61,6 +61,14 @@ export interface AgentConfig {
   agentRegistry?: AgentRegistry;
   currentAgentId?: string;
   sessionStats?: SessionStats;
+  /** LLM client. Defaults to creating one from model/provider config. */
+  client?: LLMClient;
+  /** Available tools. Defaults to the built-in tool set. */
+  tools?: Map<string, ToolDef>;
+  /** Permission mode for tool execution. */
+  permissionMode?: PermissionMode;
+  /** Whether to skip loading git status and environment context on init. */
+  skipEnvironmentRefresh?: boolean;
 }
 
 
@@ -99,6 +107,7 @@ export class Agent {
 
   private isCompressing: boolean = false;
   private isRunning: boolean = false;
+  private clientInjected: boolean = false;
   private environmentContext = "";
   private systemPrompt = "";
   public setSession(sessionName: string): void {
@@ -133,11 +142,13 @@ export class Agent {
     if (apiKey !== undefined) this.apiKey = apiKey;
     if (baseURL !== undefined) this.baseURL = baseURL;
     if (contextLength !== undefined) this.contextLength = contextLength;
-    this.client = createClient(
-      this.modelProvider || "anthropic",
-      this.apiKey,
-      this.baseURL,
-    );
+    if (!this.clientInjected) {
+      this.client = createClient(
+        this.modelProvider || "anthropic",
+        this.apiKey,
+        this.baseURL,
+      );
+    }
   }
 
   getModelName(): string | undefined {
@@ -161,19 +172,28 @@ export class Agent {
     this.thinkingEnabled = config.thinkingEnabled || false;
     this.effort = config.effort;
     this.compressionService = new CompressionService();
-    this.tools = config.subAgentMode ? getSubAgentTools() : getAll();
+    this.tools = config.tools
+      ? new Map(config.tools)
+      : config.subAgentMode
+        ? getSubAgentTools()
+        : getAll();
     this.agentRegistry = config.agentRegistry;
     this.currentAgentId = config.currentAgentId || "1";
     this.sessionStats = config.sessionStats;
 
-    this.client = createClient(
-      this.modelProvider || "anthropic",
-      this.apiKey,
-      this.baseURL,
-    );
+    if (config.client) {
+      this.client = config.client;
+      this.clientInjected = true;
+    } else {
+      this.client = createClient(
+        this.modelProvider || "anthropic",
+        this.apiKey,
+        this.baseURL,
+      );
+    }
 
     this.permissionService = new PermissionService({
-      initialMode: "manual",
+      initialMode: config.permissionMode ?? "manual",
     });
 
     const availability = { agentRegistry: this.agentRegistry };
@@ -196,7 +216,9 @@ export class Agent {
     this.projectPromptFile = config.projectPromptFile || "";
 
     this.refreshSystemPrompt();
-    this.refreshEnvironment(); // async, non-blocking
+    if (!config.skipEnvironmentRefresh) {
+      this.refreshEnvironment(); // async, non-blocking
+    }
   }
 
   setEvents(events: AgentEvents): void {

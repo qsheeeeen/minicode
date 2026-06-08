@@ -36,5 +36,4 @@ export const readTool: ToolDef = {
     }
   },
 };
-
 register(readTool);

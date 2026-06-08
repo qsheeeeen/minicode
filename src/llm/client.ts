@@ -9,6 +9,19 @@ import { AnthropicClient } from "./anthropic.js";
 import { OpenAIChatClient } from "./openai-chat.js";
 import { OpenAIResponsesClient } from "./openai-responses.js";
 
+// Protocol registry
+
+type LLMClientFactory = (apiKey?: string, baseURL?: string) => LLMClient;
+
+const protocols = new Map<string, LLMClientFactory>();
+
+export function registerProtocol(
+  name: string,
+  factory: LLMClientFactory,
+): void {
+  protocols.set(name, factory);
+}
+
 // LLM interface types (owned by the client layer)
 
 export type EffortLevel =
@@ -68,20 +81,18 @@ export interface LLMClient {
 // Factory
 
 export function createClient(
-  provider: string,
+  protocol: string,
   apiKey?: string,
   baseURL?: string,
 ): LLMClient {
-  switch (provider) {
-    case "anthropic":
-    case "zhipu":
-      return new AnthropicClient(apiKey, baseURL);
-    case "openai":
-      return new OpenAIChatClient(apiKey, baseURL);
-    case "openai-responses":
-      return new OpenAIResponsesClient(apiKey, baseURL);
-    default:
-      // Default: treat as Anthropic-compatible
-      return new AnthropicClient(apiKey, baseURL);
-  }
+  const factory = protocols.get(protocol);
+  if (factory) return factory(apiKey, baseURL);
+  // Default: treat as Anthropic-compatible
+  return new AnthropicClient(apiKey, baseURL);
 }
+
+// Built-in protocol registrations
+registerProtocol("anthropic", (apiKey, baseURL) => new AnthropicClient(apiKey, baseURL));
+registerProtocol("zhipu", (apiKey, baseURL) => new AnthropicClient(apiKey, baseURL));
+registerProtocol("openai", (apiKey, baseURL) => new OpenAIChatClient(apiKey, baseURL));
+registerProtocol("openai-responses", (apiKey, baseURL) => new OpenAIResponsesClient(apiKey, baseURL));

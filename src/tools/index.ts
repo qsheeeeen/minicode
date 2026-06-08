@@ -11,7 +11,8 @@ export type {
   ToolRequirement,
 } from "./registry.js";
 
-// Self-registering tool imports
+// Side-effect imports: each tool file registers itself via register()
+// imported from registry.ts at module scope.
 import "./read.js";
 import "./write.js";
 import "./edit.js";
