@@ -34,7 +34,7 @@ function formatResult(name: string, output: string): React.ReactElement | null {
     case "SubAgent": {
       return React.createElement(Text, { dimColor: true }, output);
     }
-    case "ActivateSkill": {
+    case "LoadSkill": {
       return React.createElement(Text, { dimColor: true }, "Loaded");
     }
     default:

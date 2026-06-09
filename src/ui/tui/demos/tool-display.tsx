@@ -40,7 +40,7 @@ function Demo() {
         output="Found 5 files."
       />
       <ToolDisplay
-        name="ActivateSkill"
+        name="LoadSkill"
         input={{ name: "code-review" }}
         output="Loaded"
       />

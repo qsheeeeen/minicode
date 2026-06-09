@@ -371,7 +371,7 @@ export class Agent {
         prompt += `  <skill>\n    <name>${skill.name}</name>\n    <description>${skill.description}</description>\n  </skill>\n`;
       });
       prompt += `</available_skills>\n`;
-      prompt += `\nTo activate a skill and receive its detailed instructions, use the ActivateSkill tool with the skill's name.\n`;
+      prompt += `\nTo load a skill and receive its detailed instructions, use the LoadSkill tool with the skill's name.\n`;
     }
 
     this.systemPrompt = prompt;

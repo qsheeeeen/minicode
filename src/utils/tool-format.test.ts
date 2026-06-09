@@ -49,9 +49,9 @@ describe("callContent", () => {
     );
   });
 
-  it("formats ActivateSkill with name", () => {
-    expect(callContent("ActivateSkill", { name: "tdd" })).toBe(
-      "ActivateSkill(tdd)",
+  it("formats LoadSkill with name", () => {
+    expect(callContent("LoadSkill", { name: "tdd" })).toBe(
+      "LoadSkill(tdd)",
     );
   });
 

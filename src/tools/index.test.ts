@@ -18,7 +18,7 @@ describe("tool registry", () => {
     const names = [...safe.keys()];
     expect(names).toContain("Read");
     expect(names).toContain("Grep");
-    expect(names).toContain("ActivateSkill");
+    expect(names).toContain("LoadSkill");
     expect(names).not.toContain("Bash");
     expect(names).not.toContain("Write");
     expect(names).not.toContain("Edit");

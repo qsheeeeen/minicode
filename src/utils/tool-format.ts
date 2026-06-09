@@ -33,7 +33,7 @@ export function callContent(
       const preview = task.length > 30 ? task.slice(0, 30) + "..." : task;
       return `${name}(${preview})`;
     }
-    case "ActivateSkill": {
+    case "LoadSkill": {
       return `${name}(${input.name as string})`;
     }
     case "AskUser": {

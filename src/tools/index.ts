@@ -19,6 +19,6 @@ import "./edit.js";
 import "./bash.js";
 import "./grep.js";
 import "./sub_agent.js";
-import "./activate_skill.js";
+import "./load_skill.js";
 import "./ask_user.js";
 import "./set_model.js";

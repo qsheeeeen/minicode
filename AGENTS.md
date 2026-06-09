@@ -58,7 +58,7 @@ src/
 │   ├── bash.ts           # child_process.spawn with streaming
 │   ├── read.ts / write.ts / edit.ts / grep.ts
 │   ├── sub_agent.ts      # Spawns child Agent with restricted tool set
-│   ├── activate_skill.ts / ask_user.ts / set_model.ts
+│   ├── load_skill.ts / ask_user.ts / set_model.ts
 ├── skills/index.ts       # Loads SKILL.md from skills directories (built-in + external)
 ├── ui/
 │   ├── tui.tsx           # Root <App> component, Ink render
@@ -105,7 +105,7 @@ src/
 
 **Permission modes:** `manual` (prompt per call), `yolo` (allow all), `auto` (LLM decides safety). Shift+Tab cycles in TUI.
 
-**Skills:** Progressive disclosure — `getAvailableSkills()` returns name+description only; `getSkillBody()` loads full content on demand when `ActivateSkill` tool runs. Built-in: `skill-creator`, `init`. External: directories with `SKILL.md` (YAML frontmatter + body).
+**Skills:** Progressive disclosure — `getAvailableSkills()` returns name+description only; `getSkillBody()` loads full content on demand when `LoadSkill` tool runs. Built-in: `skill-creator`, `init`. External: directories with `SKILL.md` (YAML frontmatter + body).
 
 **Undo/rollback:** `/undo` command with two scopes — conversation-only or conversation+files. `ChangeJournal` records before-state of each file edit/write as JSONL. `RollbackExecutor` restores files and truncates conversation to a chosen turn.
 
