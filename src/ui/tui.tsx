@@ -7,7 +7,7 @@ import { routeInput } from "./routing.js";
 import {
   AgentRegistry,
   type AgentSession,
-  runBash,
+  runShell,
 } from "../services/index.js";
 import type { SessionStats } from "../services/session-stats.js";
 import { Receipt } from "./tui/Receipt.js";
@@ -169,8 +169,8 @@ function AppContent({
 
       if (route.action === "none") return false;
 
-      if (route.action === "bash") {
-        const output = runBash(route.promptText!);
+      if (route.action === "shell") {
+        const output = runShell(route.promptText!);
         agent
           .getStore()
           .addUserMessage(
@@ -181,7 +181,7 @@ function AppContent({
           role: "status",
           content: `$ ${route.promptText}\n${output}`,
           toolDisplay: {
-            name: "Bash",
+            name: "Shell",
             input: { command: route.promptText! },
             output,
           },

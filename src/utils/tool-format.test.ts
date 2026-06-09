@@ -32,8 +32,8 @@ describe("callContent", () => {
     );
   });
 
-  it("formats Bash with command", () => {
-    expect(callContent("Bash", { command: "npm test" })).toBe("Bash(npm test)");
+  it("formats Shell with command", () => {
+    expect(callContent("Shell", { command: "npm test" })).toBe("Shell(npm test)");
   });
 
   it("formats SubAgent with short task", () => {

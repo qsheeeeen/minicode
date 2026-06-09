@@ -28,7 +28,7 @@ function Demo() {
         }
       />
       <ToolDisplay
-        name="Bash"
+        name="Shell"
         input={{ command: "bun test" }}
         output={"✓ 12 tests passed, 0 failed"}
       />

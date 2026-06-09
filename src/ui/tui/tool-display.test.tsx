@@ -6,21 +6,21 @@ import { ToolDisplay } from "./tool-display.js";
 describe("ToolDisplay", () => {
   it("renders call only when no output", () => {
     const { lastFrame } = render(
-      <ToolDisplay name="Bash" input={{ command: "ls" }} />,
+      <ToolDisplay name="Shell" input={{ command: "ls" }} />,
     );
-    expect(lastFrame()).toContain("Bash(ls)");
+    expect(lastFrame()).toContain("Shell(ls)");
   });
 
-  it("renders call and output for Bash", () => {
+  it("renders call and output for Shell", () => {
     const { lastFrame } = render(
       <ToolDisplay
-        name="Bash"
+        name="Shell"
         input={{ command: "ls" }}
         output="file1\nfile2"
       />,
     );
     const frame = lastFrame();
-    expect(frame).toContain("Bash(ls)");
+    expect(frame).toContain("Shell(ls)");
     expect(frame).toContain("file1");
   });
 

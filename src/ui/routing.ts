@@ -2,7 +2,7 @@ import type { CommandContext } from "./commands/index.js";
 import { executeCommand } from "./commands/index.js";
 
 export interface RouteResult {
-  action: "none" | "bash" | "command" | "llm";
+  action: "none" | "shell" | "command" | "llm";
   promptText?: string;
   displayContent?: string;
 }
@@ -17,7 +17,7 @@ export async function routeInput(
   if (trimmed.startsWith("!")) {
     const cmd = trimmed.slice(1).trim();
     if (!cmd) return { action: "none" };
-    return { action: "bash", promptText: cmd };
+    return { action: "shell", promptText: cmd };
   }
 
   if (trimmed.startsWith("/")) {

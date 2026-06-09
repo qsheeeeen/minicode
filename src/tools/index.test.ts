@@ -8,7 +8,7 @@ describe("tool registry", () => {
     expect(tools.has("Read")).toBe(true);
     expect(tools.has("Write")).toBe(true);
     expect(tools.has("Edit")).toBe(true);
-    expect(tools.has("Bash")).toBe(true);
+    expect(tools.has("Shell")).toBe(true);
     expect(tools.has("Grep")).toBe(true);
     expect(tools.has("SubAgent")).toBe(true);
   });
@@ -19,7 +19,7 @@ describe("tool registry", () => {
     expect(names).toContain("Read");
     expect(names).toContain("Grep");
     expect(names).toContain("LoadSkill");
-    expect(names).not.toContain("Bash");
+    expect(names).not.toContain("Shell");
     expect(names).not.toContain("Write");
     expect(names).not.toContain("Edit");
     expect(names).not.toContain("AskUser");

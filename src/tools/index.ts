@@ -16,7 +16,7 @@ export type {
 import "./read.js";
 import "./write.js";
 import "./edit.js";
-import "./bash.js";
+import "./shell.js";
 import "./grep.js";
 import "./sub_agent.js";
 import "./load_skill.js";

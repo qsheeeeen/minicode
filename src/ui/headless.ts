@@ -2,7 +2,7 @@ import type { Agent } from "../agent.js";
 import type { MessageParam, ContentBlock } from "../messages.js";
 import type { CommandContext } from "./commands/index.js";
 import { routeInput } from "./routing.js";
-import { runBash } from "../services/index.js";
+import { runShell } from "../services/index.js";
 import { MessageStore } from "../messages.js";
 
 export async function runHeadless(
@@ -221,8 +221,8 @@ export async function runHeadless(
     return;
   }
 
-  if (route.action === "bash") {
-    const output = runBash(route.promptText!);
+  if (route.action === "shell") {
+    const output = runShell(route.promptText!);
     console.log(`$ ${route.promptText}\n${output}`);
     unsubscribe();
     return;

@@ -46,7 +46,7 @@ describe("PermissionService", () => {
     it("yolo always returns allowed: true", async () => {
       const service = new PermissionService({ initialMode: "yolo" });
       const result = await service.check(
-        "Bash",
+        "Shell",
         { command: "rm -rf /" },
         "Dangerous command",
       );
@@ -58,7 +58,7 @@ describe("PermissionService", () => {
       const promptMock = vi.fn().mockResolvedValue("yes");
       service.setPrompter({ prompt: promptMock });
       const result = await service.check(
-        "Bash",
+        "Shell",
         { command: "ls" },
         "List files",
       );
@@ -72,7 +72,7 @@ describe("PermissionService", () => {
     it("manual returns allowed: false and reason when prompter is undefined (no UI to ask)", async () => {
       const service = new PermissionService({ initialMode: "manual" });
       const result = await service.check(
-        "Bash",
+        "Shell",
         { command: "ls" },
         "List files",
       );
@@ -84,7 +84,7 @@ describe("PermissionService", () => {
       const promptMock = vi.fn().mockResolvedValue("no");
       service.setPrompter({ prompt: promptMock });
       const result = await service.check(
-        "Bash",
+        "Shell",
         { command: "ls" },
         "List files",
       );
@@ -96,7 +96,7 @@ describe("PermissionService", () => {
       const promptMock = vi.fn().mockResolvedValue("");
       service.setPrompter({ prompt: promptMock });
       const result = await service.check(
-        "Bash",
+        "Shell",
         { command: "ls" },
         "List files",
       );
@@ -111,7 +111,7 @@ describe("PermissionService", () => {
 
     it("returns allowed: false and reason when client is not set", async () => {
       const service = new PermissionService({ initialMode: "auto" });
-      const result = await (service as any).autoDecide("Bash", {
+      const result = await (service as any).autoDecide("Shell", {
         command: "ls",
       });
       expect(result).toEqual({
@@ -165,7 +165,7 @@ describe("PermissionService", () => {
         client: mockClient,
       });
 
-      const result = await (service as any).autoDecide("Bash", {
+      const result = await (service as any).autoDecide("Shell", {
         command: "rm -rf /",
       });
 
@@ -191,7 +191,7 @@ describe("PermissionService", () => {
         client: mockClient,
       });
 
-      const result = await (service as any).autoDecide("Bash", {
+      const result = await (service as any).autoDecide("Shell", {
         command: "echo hello",
       });
 
@@ -212,7 +212,7 @@ describe("PermissionService", () => {
         client: mockClient,
       });
 
-      const result = await (service as any).autoDecide("Bash", {
+      const result = await (service as any).autoDecide("Shell", {
         command: "ls",
       });
 
@@ -230,7 +230,7 @@ describe("PermissionService", () => {
         client: mockClient,
       });
 
-      const result = await (service as any).autoDecide("Bash", {
+      const result = await (service as any).autoDecide("Shell", {
         command: "ls",
       });
 

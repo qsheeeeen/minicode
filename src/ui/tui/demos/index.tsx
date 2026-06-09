@@ -26,7 +26,7 @@ const messages = [
   },
   {
     role: "tool" as const,
-    name: "Bash",
+    name: "Shell",
     input: { command: "npm init -y" },
     output: "Wrote to package.json",
     slotId: "s1",

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("../services/index.js", () => ({
-  runBash: vi.fn().mockReturnValue("bash output"),
+  runShell: vi.fn().mockReturnValue("shell output"),
 }));
 
 vi.mock("./commands/index.js", () => ({
@@ -25,10 +25,10 @@ describe("routeInput", () => {
     expect(result).toEqual({ action: "none" });
   });
 
-  it("routes '!' prefix to bash", async () => {
+  it("routes '!' prefix to shell", async () => {
     const { routeInput } = await import("./routing.js");
     const result = await routeInput("!echo hello", {} as any);
-    expect(result).toEqual({ action: "bash", promptText: "echo hello" });
+    expect(result).toEqual({ action: "shell", promptText: "echo hello" });
   });
 
   it("returns 'none' for '!' with no command", async () => {

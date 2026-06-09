@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { bashTool } from "./bash.js";
+import { shellTool } from "./shell.js";
 
 vi.mock("child_process", () => ({
   spawn: vi.fn(),
 }));
 
-describe("bashTool", () => {
+describe("shellTool", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -23,7 +23,7 @@ describe("bashTool", () => {
       };
       (spawn as ReturnType<typeof vi.fn>).mockReturnValue(mockProc as any);
 
-      const result = await bashTool.execute({ command: "echo hello" });
+      const result = await shellTool.execute({ command: "echo hello" });
       expect(result.output).toBe("output");
     });
 
@@ -39,7 +39,7 @@ describe("bashTool", () => {
       };
       (spawn as ReturnType<typeof vi.fn>).mockReturnValue(mockProc as any);
 
-      const result = await bashTool.execute({ command: "exit 1" });
+      const result = await shellTool.execute({ command: "exit 1" });
       expect(result.output).toContain("Exit code 1");
     });
 
@@ -57,7 +57,7 @@ describe("bashTool", () => {
       };
       (spawn as ReturnType<typeof vi.fn>).mockReturnValue(mockProc as any);
 
-      const result = await bashTool.execute({ command: "nonexistent_cmd" });
+      const result = await shellTool.execute({ command: "nonexistent_cmd" });
       expect(result.output).toContain("127");
     });
   });

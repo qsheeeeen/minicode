@@ -28,7 +28,7 @@ function formatResult(name: string, output: string): React.ReactElement | null {
     case "Edit": {
       return renderDiff(output);
     }
-    case "Bash": {
+    case "Shell": {
       return React.createElement(Text, { dimColor: true }, output);
     }
     case "SubAgent": {

@@ -1,6 +1,6 @@
 import { execSync } from "child_process";
 
-export function runBash(cmd: string): string {
+export function runShell(cmd: string): string {
   try {
     const output = execSync(cmd, {
       encoding: "utf-8",

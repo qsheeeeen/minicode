@@ -25,7 +25,7 @@ export function callContent(
     case "Edit": {
       return `${name}(${input.path as string})`;
     }
-    case "Bash": {
+    case "Shell": {
       return `${name}(${input.command as string})`;
     }
     case "SubAgent": {

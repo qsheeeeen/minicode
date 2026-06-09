@@ -6,10 +6,10 @@ function stripAnsiCodes(text: string): string {
   return text.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");
 }
 
-export const bashTool: ToolDef = {
-  name: "Bash",
+export const shellTool: ToolDef = {
+  name: "Shell",
   description:
-    "Execute a bash command in the current working directory. Returns stdout and stderr. Optionally provide a timeout in seconds.",
+    "Execute a shell command in the current working directory. Returns stdout and stderr. Optionally provide a timeout in seconds.",
   requiresPermission: true,
   readOnly: false,
   input_schema: {
@@ -70,4 +70,4 @@ export const bashTool: ToolDef = {
     }
   },
 };
-register(bashTool);
+register(shellTool);

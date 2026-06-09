@@ -40,13 +40,13 @@ describe("Message Component", () => {
       <Message
         msg={{
           role: "tool",
-          name: "Bash",
+          name: "Shell",
           input: { command: "ls" },
           output: "file1",
         }}
       />,
     );
-    expect(lastFrame()).toContain("Bash(ls)");
+    expect(lastFrame()).toContain("Shell(ls)");
   });
 
   it("renders status message", () => {

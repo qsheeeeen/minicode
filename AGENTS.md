@@ -47,7 +47,7 @@ src/
 │   ├── compression-service.ts  # LLM-based context compression (keeps last 10 turns)
 │   ├── session-lifecycle.ts # Session switching helper (switchSession)
 │   ├── permission.ts     # manual/yolo/auto permission modes
-│   ├── bash.ts           # Synchronous execSync wrapper for slash commands
+│   ├── shell.ts           # Synchronous execSync wrapper for slash commands
 │   ├── change-journal.ts # JSONL change tracking (before-state per file edit/write)
 │   ├── rollback-executor.ts # Conversation + file rollback using change journal
 │   └── session-stats.ts  # Per-model token usage tracking, receipt data
@@ -55,7 +55,7 @@ src/
 │   ├── registry.ts       # ToolDef interface, self-registering pattern via register()
 │   ├── index.ts          # Barrel: imports all tool modules to trigger registration
 │   ├── testing.ts        # createVirtualLLM() and createVirtualTool() test helpers
-│   ├── bash.ts           # child_process.spawn with streaming
+│   ├── shell.ts           # child_process.spawn with streaming
 │   ├── read.ts / write.ts / edit.ts / grep.ts
 │   ├── sub_agent.ts      # Spawns child Agent with restricted tool set
 │   ├── load_skill.ts / ask_user.ts / set_model.ts
@@ -63,7 +63,7 @@ src/
 ├── ui/
 │   ├── tui.tsx           # Root <App> component, Ink render
 │   ├── headless.ts       # Non-interactive stdout renderer
-│   ├── routing.ts        # Input router: slash commands / bash escapes / agent
+│   ├── routing.ts        # Input router: slash commands / shell escapes / agent
 │   ├── commands/index.ts # Slash command registry (handler vs prompt types)
 │   └── tui/
 │       ├── store.tsx          # Zustand store wrapping tuiReducer
@@ -84,7 +84,7 @@ src/
 ### Core Flow
 
 1. `cli.tsx` loads config, skills, creates Agent → branches to TUI (`render(<App>)`) or headless (`runHeadless()`)
-2. Input routed through `routeInput()`: slash command → `executeCommand()`, `!` prefix → `runBash()`, else → `agent.run()`
+2. Input routed through `routeInput()`: slash command → `executeCommand()`, `!` prefix → `runShell()`, else → `agent.run()`
 3. `Agent.run()` enters loop: `client.chatStream()` → accumulate `StreamEvent` via AsyncGenerator → execute tool calls → repeat
 4. `connectAgent()` bridges Agent observables (Signal, MessageStore) to Zustand store; TUI components read via Zustand selectors
 5. `TokenTracker` tracks usage via `Signal<number>`; auto-triggers `CompressionService` when exceeding threshold ratio
