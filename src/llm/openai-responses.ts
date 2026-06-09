@@ -1,7 +1,7 @@
 // OpenAI Responses API adapter.
 //
-// Implements the canonical LLMClient / LLMStream interfaces, converting
-// between our provider-agnostic types and the OpenAI Responses API format.
+// Implements the provider-agnostic LLMClient / LLMStream interfaces, converting
+// between internal types and the OpenAI Responses API format.
 //
 // The Responses API (`client.responses.create()`) uses a flat `input` array
 // of items rather than the chat-completions message array.
@@ -19,7 +19,7 @@ const DEFAULT_MAX_TOKENS = 8192;
 // Effort mapping
 
 // Map our five-level effort to OpenAI's three-level reasoning effort.
-function toOpenAIEffort(effort: EffortLevel): any {
+function toSdkEffort(effort: EffortLevel): any {
   switch (effort) {
     case "none":
       return "none";
@@ -39,23 +39,23 @@ function toOpenAIEffort(effort: EffortLevel): any {
 
 // Tool definition conversion
 
-// Convert a canonical LLMToolDef to an OpenAI Responses function tool.
-function convertToolDef(tool: LLMToolDef): OpenAI.Responses.FunctionTool {
-  return {
+// Convert LLMToolDef[] to OpenAI Responses function tools.
+function toSdkTools(tools: LLMToolDef[]): OpenAI.Responses.FunctionTool[] {
+  return tools.map((t) => ({
     type: "function" as const,
-    name: tool.name,
-    description: tool.description,
-    parameters: tool.input_schema as OpenAI.FunctionParameters,
+    name: t.name,
+    description: t.description,
+    parameters: t.input_schema as OpenAI.FunctionParameters,
     strict: false,
-  };
+  }));
 }
 
-// Message conversion (canonical → OpenAI Responses input)
+// Message conversion (internal → OpenAI Responses input)
 
 type ResponseInputItem = OpenAI.Responses.ResponseInputItem;
 
-// Convert canonical MessageParam[] to an OpenAI Responses `input` array.
-function convertMessages(messages: MessageParam[]): ResponseInputItem[] {
+// Convert MessageParam[] to an OpenAI Responses `input` array.
+function toSdkMessages(messages: MessageParam[]): ResponseInputItem[] {
   const input: ResponseInputItem[] = [];
 
   for (const msg of messages) {
@@ -127,10 +127,10 @@ function convertMessages(messages: MessageParam[]): ResponseInputItem[] {
   return input;
 }
 
-// Response conversion (OpenAI Responses → canonical)
+// Response conversion (SDK → internal)
 
-// Convert an OpenAI Responses response object to a canonical LLMResponse.
-function convertResponse(response: OpenAI.Responses.Response): LLMResponse {
+// Convert an OpenAI Responses response object to LLMResponse.
+function toLLMResponse(response: OpenAI.Responses.Response): LLMResponse {
   const content: ContentBlock[] = [];
   let hasToolCalls = false;
 
@@ -234,8 +234,8 @@ export class OpenAIResponsesClient implements LLMClient {
     options: ChatOptions = {},
   ): LLMStream {
     const model = options.model || DEFAULT_MODEL;
-    const input = convertMessages(messages);
-    const oaiTools = tools.length > 0 ? tools.map(convertToolDef) : undefined;
+    const input = toSdkMessages(messages);
+    const oaiTools = tools.length > 0 ? toSdkTools(tools) : undefined;
     const abortController = new AbortController();
 
     // If the caller provided a signal, forward abort
@@ -254,7 +254,7 @@ export class OpenAIResponsesClient implements LLMClient {
 
     // Reasoning effort
     if (options.effort) {
-      params.reasoning = { effort: toOpenAIEffort(options.effort) };
+      params.reasoning = { effort: toSdkEffort(options.effort) };
     }
 
     const streamPromise = this.client.responses.create(params, {
@@ -325,7 +325,7 @@ export class OpenAIResponsesClient implements LLMClient {
               | OpenAI.Responses.Response
               | undefined;
             if (response) {
-              finalResult = convertResponse(response);
+              finalResult = toLLMResponse(response);
             }
             break;
           }

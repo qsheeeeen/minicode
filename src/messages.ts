@@ -3,7 +3,7 @@ import path from "path";
 import os from "os";
 import crypto from "crypto";
 
-// Content blocks (canonical LLM types — owned by the message layer)
+// Content blocks — provider-agnostic types owned by the message layer.
 
 export interface TextBlock {
   type: "text";

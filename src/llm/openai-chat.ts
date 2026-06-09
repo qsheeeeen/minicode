@@ -1,8 +1,7 @@
 // OpenAI Chat Completions adapter.
 //
 // Implements the provider-agnostic LLMClient / LLMStream interfaces and
-// converts between canonical types (./types.ts) and the OpenAI Chat
-// Completions API format.
+// converts between internal types and the OpenAI Chat Completions API format.
 
 import OpenAI from "openai";
 import type { LLMClient, LLMStream, StreamEvent, LLMToolDef, ChatOptions, LLMResponse, EffortLevel } from "./client.js";
@@ -13,9 +12,9 @@ import type { MessageParam, ContentBlock, TextBlock, ThinkingBlock, ToolUseBlock
 const DEFAULT_MODEL = "gpt-4.1";
 const DEFAULT_MAX_TOKENS = 8192;
 
-// Effort mapping (canonical → OpenAI reasoning_effort)
+// Effort mapping (internal → SDK reasoning_effort)
 
-function toOpenAIEffort(effort: EffortLevel): any {
+function toSdkEffort(effort: EffortLevel): any {
   switch (effort) {
     case "none":
       return "none";
@@ -33,7 +32,7 @@ function toOpenAIEffort(effort: EffortLevel): any {
   }
 }
 
-// Stop reason mapping (OpenAI → canonical)
+// Stop reason mapping (OpenAI → internal)
 
 function mapStopReason(reason: string | null): string {
   switch (reason) {
@@ -48,7 +47,7 @@ function mapStopReason(reason: string | null): string {
   }
 }
 
-// Message conversion (canonical → OpenAI)
+// Message conversion (internal → SDK)
 
 type OpenAIMessage =
   | OpenAI.ChatCompletionSystemMessageParam
@@ -56,7 +55,7 @@ type OpenAIMessage =
   | OpenAI.ChatCompletionAssistantMessageParam
   | OpenAI.ChatCompletionToolMessageParam;
 
-function convertMessages(
+function toSdkMessages(
   messages: MessageParam[],
   system?: string,
 ): OpenAIMessage[] {
@@ -138,9 +137,9 @@ function convertMessages(
   return out;
 }
 
-// Tool definition conversion (canonical → OpenAI)
+// Tool definition conversion (internal → SDK)
 
-function convertTools(tools: LLMToolDef[]): OpenAI.ChatCompletionTool[] {
+function toSdkTools(tools: LLMToolDef[]): OpenAI.ChatCompletionTool[] {
   return tools.map((t) => ({
     type: "function" as const,
     function: {
@@ -151,9 +150,9 @@ function convertTools(tools: LLMToolDef[]): OpenAI.ChatCompletionTool[] {
   }));
 }
 
-// Response conversion (OpenAI → canonical)
+// Response conversion (SDK → internal)
 
-function convertResponse(
+function toLLMResponse(
   choice: OpenAI.ChatCompletion.Choice,
   usage: OpenAI.CompletionUsage | undefined,
 ): LLMResponse {
@@ -221,8 +220,8 @@ export class OpenAIChatClient implements LLMClient {
     options: ChatOptions = {},
   ): LLMStream {
     const model = options.model ?? DEFAULT_MODEL;
-    const oaiMessages = convertMessages(messages, options.system);
-    const oaiTools = convertTools(tools);
+    const oaiMessages = toSdkMessages(messages, options.system);
+    const oaiTools = toSdkTools(tools);
     const abortController = new AbortController();
 
     // Wire external signal into our controller
@@ -245,7 +244,7 @@ export class OpenAIChatClient implements LLMClient {
     }
 
     if (options.effort) {
-      params.reasoning_effort = toOpenAIEffort(options.effort);
+      params.reasoning_effort = toSdkEffort(options.effort);
     }
 
     const streamPromise = this.client.chat.completions.create(params, {

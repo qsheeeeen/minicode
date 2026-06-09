@@ -15,7 +15,7 @@ type LLMClientFactory = (apiKey?: string, baseURL?: string) => LLMClient;
 
 const protocols = new Map<string, LLMClientFactory>();
 
-export function registerProtocol(
+function registerProtocol(
   name: string,
   factory: LLMClientFactory,
 ): void {
@@ -87,8 +87,9 @@ export function createClient(
 ): LLMClient {
   const factory = protocols.get(protocol);
   if (factory) return factory(apiKey, baseURL);
-  // Default: treat as Anthropic-compatible
-  return new AnthropicClient(apiKey, baseURL);
+  throw new Error(
+    `Unknown LLM protocol: "${protocol}". Registered: ${[...protocols.keys()].join(", ")}`,
+  );
 }
 
 // Built-in protocol registrations
