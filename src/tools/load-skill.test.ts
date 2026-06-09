@@ -4,7 +4,7 @@ vi.mock("../skills/index.js", () => ({
   getSkillBody: vi.fn(),
 }));
 
-import { loadSkillTool } from "./load_skill.js";
+import { loadSkillTool } from "./load-skill.js";
 import { getSkillBody } from "../skills/index.js";
 
 const mockGetSkillBody = vi.mocked(getSkillBody);

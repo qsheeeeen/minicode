@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { agentTool } from "./sub_agent.js";
+import { agentTool } from "./sub-agent.js";
 
 describe("agentTool", () => {
   describe("execute", () => {

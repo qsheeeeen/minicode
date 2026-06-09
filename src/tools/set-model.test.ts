@@ -10,7 +10,7 @@ vi.mock("../config.js", () => ({
   setModel: mockSetModel,
 }));
 
-import { setModelTool } from "./set_model.js";
+import { setModelTool } from "./set-model.js";
 
 const mockSetModelOnAgent = vi.fn();
 const mockAgent = { setModel: mockSetModelOnAgent };

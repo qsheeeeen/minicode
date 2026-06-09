@@ -57,8 +57,8 @@ src/
 │   ├── testing.ts        # createVirtualLLM() and createVirtualTool() test helpers
 │   ├── shell.ts           # child_process.spawn with streaming
 │   ├── read.ts / write.ts / edit.ts / grep.ts
-│   ├── sub_agent.ts      # Spawns child Agent with restricted tool set
-│   ├── load_skill.ts / ask_user.ts / set_model.ts
+│   ├── sub-agent.ts      # Spawns child Agent with restricted tool set
+│   ├── load-skill.ts / ask-user.ts / set-model.ts
 ├── skills/index.ts       # Loads SKILL.md from skills directories (built-in + external)
 ├── ui/
 │   ├── tui.tsx           # Root <App> component, Ink render
