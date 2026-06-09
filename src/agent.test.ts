@@ -81,7 +81,8 @@ vi.mock("./llm/client.js", () => ({
   }),
 }));
 
-vi.mock("./tools/index.js", () => {
+vi.mock("./tools/index.js", async (importOriginal) => {
+  const original = await importOriginal() as any;
   const testTool = {
     name: "testTool",
     description: "Test Tool",
@@ -90,16 +91,7 @@ vi.mock("./tools/index.js", () => {
     execute: vi.fn().mockResolvedValue({ output: "success" }),
   };
   return {
-    ToolDeniedError: class ToolDeniedError extends Error {
-      constructor(
-        public toolName: string,
-        public displayText: string,
-        public reason?: string,
-      ) {
-        super(reason ?? "Tool denied");
-      }
-    },
-    register: vi.fn(),
+    ...original,
     getAll: () => new Map([[testTool.name, testTool]]),
     getSubAgentTools: () => new Map([[testTool.name, testTool]]),
   };

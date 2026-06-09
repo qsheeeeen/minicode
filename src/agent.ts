@@ -9,6 +9,7 @@ import {
   ToolExecutionContext,
   ToolDeniedError,
 } from "./tools/index.js";
+import { ToolExecutor, type ToolCall } from "./tools/executor.js";
 import {
   ConsolePrompter,
   type UserPrompter,
@@ -25,24 +26,8 @@ import type { ContentBlock } from "./messages.js";
 import { TokenTracker } from "./services/token-tracker.js";
 import { ChangeJournal } from "./services/change-journal.js";
 import { MessageStore } from "./messages.js";
-import { getAvailableSkills } from "./skills/index.js";
-import { callContent } from "./utils/tool-format.js";
+import { buildSystemPrompt, getEnvironmentContext } from "./utils/prompts.js";
 import type pino from "pino";
-
-export const SYSTEM_PROMPT = `You are an interactive CLI coding agent that helps users with software engineering tasks. Use the following instructions and available tools to assist the user.
-
-# Guidelines:
-- Always think and respond in the language the user first spoke at the start of the conversation
-- Use Bash for file operations like ls, grep, find
-- Read files with Read before editing
-- Use Write only when creating new files or fully rewriting
-- When summarizing actions, output plain text directly - do not use cat or Bash to show what you did
-- Keep responses concise and precise - do not use metaphors
-- Show file paths clearly when operating on files
-- Assess impact before operations and confirm irreversible actions with the user; confirmations are single-use
-- You may call multiple tools in a single response
-- Parallelize appropriately to improve efficiency
-- Use read-only subagents for parallel investigation tasks: code exploration, code review, debugging research, documentation generation, and dependency analysis. Do not use subagents for simple lookups or when a direct grep/find suffices.`;
 
 export interface AgentConfig {
   apiKey?: string;
@@ -83,6 +68,7 @@ export class Agent {
   private tokenTracker: TokenTracker;
   private compressionService: CompressionService;
   private changeJournal = new ChangeJournal();
+  private toolExecutor: ToolExecutor;
   private activeTurnIdx = 0;
   private _currentSession = `session-${Date.now()}`;
   get currentSession(): string {
@@ -202,6 +188,11 @@ export class Agent {
     }
 
     this.prompter = new ConsolePrompter();
+    this.toolExecutor = new ToolExecutor({
+      permissionService: this.permissionService,
+      changeJournal: this.changeJournal,
+      store: this.store,
+    });
     this.tokenTracker = new TokenTracker(
       this.contextLength,
       this.compressionThresholdRatio,
@@ -324,57 +315,18 @@ export class Agent {
   private envReady = false;
 
   private async refreshEnvironment(): Promise<void> {
-    let ctx = `Working directory: ${process.cwd()}\n`;
-    try {
-      const { execFile } = await import("child_process");
-      const status = await new Promise<string>((resolve, reject) => {
-        execFile(
-          "git",
-          ["status"],
-          { encoding: "utf-8", timeout: 5000 },
-          (err, stdout) => {
-            if (err) reject(err);
-            else resolve(stdout);
-          },
-        );
-      });
-      ctx += `\n${status.trim()}\n`;
-      ctx += `\nThis is the git status at the start of the conversation. Note that this status is a snapshot in time, and will not update during the conversation.`;
-    } catch {
-      // Not a git repo or git unavailable — skip
-    }
-    this.environmentContext = ctx;
+    this.environmentContext = await getEnvironmentContext();
     this.envReady = true;
     this.refreshSystemPrompt();
   }
 
-  // Build and cache the system prompt — call once per run or on explicit refresh
+  // Rebuild system prompt from current state
   refreshSystemPrompt(): void {
-    let prompt = SYSTEM_PROMPT;
-
-    if (this.environmentContext) {
-      prompt += `\n\n# Environment\n${this.environmentContext}`;
-    }
-
-    if (this.userPrompt) {
-      prompt += `\n\n# Additional Instructions\n${this.userPrompt}`;
-    }
-
-    if (this.projectPromptFile) {
-      prompt += `\n\n# Workspace Information\nThis workspace's description is in \`${this.projectPromptFile}\`. Use the Read tool to load it at the start of each conversation. Note: the description may be outdated — always verify against the actual code when in doubt.`;
-    }
-
-    const availableSkills = getAvailableSkills();
-    if (availableSkills.length > 0) {
-      prompt += `\n\n<available_skills>\n`;
-      availableSkills.forEach((skill) => {
-        prompt += `  <skill>\n    <name>${skill.name}</name>\n    <description>${skill.description}</description>\n  </skill>\n`;
-      });
-      prompt += `</available_skills>\n`;
-      prompt += `\nTo load a skill and receive its detailed instructions, use the LoadSkill tool with the skill's name.\n`;
-    }
-
-    this.systemPrompt = prompt;
+    this.systemPrompt = buildSystemPrompt({
+      environmentContext: this.environmentContext,
+      userPrompt: this.userPrompt,
+      projectPromptFile: this.projectPromptFile,
+    });
   }
 
   // Track token usage and trigger auto-compression
@@ -389,49 +341,6 @@ export class Agent {
     if (shouldCompress) {
       await this.compress();
     }
-  }
-
-  // Run a single tool with permission check
-  private async runTool(
-    tool: ToolDef,
-    args: Record<string, unknown>,
-    context: ToolExecutionContext,
-  ): Promise<import("./tools/index.js").ToolResult> {
-    if (!(tool.readOnly ?? !tool.requiresPermission)) {
-      const displayText = callContent(tool.name, args);
-      const { allowed, reason } = await this.permissionService.check(
-        tool.name,
-        args,
-        displayText,
-      );
-      if (!allowed) {
-        if (this.permissionService.getMode() === "auto") {
-          return {
-            output: `Tool execution denied by auto-gate: ${reason || "unknown reason"}`,
-          };
-        }
-        throw new ToolDeniedError(tool.name, displayText, reason);
-      }
-    }
-
-    if (tool.trackChanges && args.path && this.activeTurnIdx > 0) {
-      const filePath = args.path as string;
-      let before = "";
-      try {
-        const fs = await import("fs/promises");
-        before = await fs.readFile(filePath, "utf-8");
-      } catch {
-        // File doesn't exist yet — before stays ""
-      }
-      this.changeJournal.recordBefore(
-        this.activeTurnIdx,
-        filePath,
-        tool.changeOp ?? "write",
-        before,
-      );
-    }
-
-    return tool.execute(args, context);
   }
 
   // Stream LLM response, updating MessageStore in real-time.
@@ -449,7 +358,7 @@ export class Agent {
     );
 
     let blockStreaming = false;
-    const toolCalls: Array<{ block: ToolUseBlock; tool?: ToolDef }> = [];
+    const toolCalls: ToolCall[] = [];
 
     const handleDelta = (field: "text" | "thinking", delta: string) => {
       const block =
@@ -509,99 +418,6 @@ export class Agent {
     return { response, toolCalls };
   }
 
-  // Execute tool calls sequentially and push tool_result turns
-  private async executeToolCalls(
-    toolCalls: Array<{ block: ToolUseBlock; tool?: ToolDef }>,
-  ): Promise<void> {
-    if (toolCalls.length === 0) return;
-
-    const context: ToolExecutionContext = {
-      registry: this.agentRegistry,
-      signal: this.abortController?.signal,
-      config: {
-        apiKey: this.apiKey,
-        baseURL: this.baseURL,
-        model: this.model,
-        provider: this.modelProvider,
-        contextLength: this.contextLength,
-        compressionThresholdRatio: this.compressionThresholdRatio,
-        thinkingEnabled: this.thinkingEnabled,
-        effort: this.effort,
-        userPrompt: this.userPrompt,
-      },
-      currentAgentId: this.currentAgentId,
-      permissionService: this.permissionService,
-      prompter: this.prompter,
-    };
-
-    this.logger?.info(
-      {
-        session: this.currentSession,
-        toolCount: toolCalls.length,
-        tools: toolCalls.map((t) => t.block.name),
-      },
-      "Executing tools sequentially",
-    );
-
-    const results: Array<{ toolUseId: string; content: string }> = [];
-
-    for (let i = 0; i < toolCalls.length; i++) {
-      const { block, tool } = toolCalls[i];
-      if (!tool) {
-        results.push({
-          toolUseId: block.id,
-          content: `Error: Tool '${block.name}' not found or not available.`,
-        });
-        this.logger?.warn(
-          { session: this.currentSession, toolName: block.name },
-          "LLM attempted to use an unavailable tool",
-        );
-        continue;
-      }
-      try {
-        const result = await this.runTool(
-          tool,
-          block.input as Record<string, unknown>,
-          context,
-        );
-        results.push({ toolUseId: block.id, content: result.output });
-        this.logger?.info(
-          {
-            session: this.currentSession,
-            toolName: tool.name,
-            toolInput: block.input,
-          },
-          "Tool result",
-        );
-      } catch (reason) {
-        if (reason instanceof ToolDeniedError) {
-          results.push({ toolUseId: block.id, content: reason.reason });
-          for (let j = i + 1; j < toolCalls.length; j++) {
-            results.push({
-              toolUseId: toolCalls[j].block.id,
-              content: reason.reason,
-            });
-          }
-          this.store.addToolResults(results);
-          throw reason;
-        }
-        const error = `Error: ${reason instanceof Error ? reason.message : String(reason)}`;
-        results.push({ toolUseId: block.id, content: error });
-        this.logger?.error(
-          {
-            session: this.currentSession,
-            toolName: tool.name,
-            error: String(reason),
-          },
-          "Tool error",
-        );
-      }
-    }
-
-    // Push all tool results as a single user turn
-    this.store.addToolResults(results);
-  }
-
   async run(
     userMessage: string,
     opts?: { displayContent?: string },
@@ -650,8 +466,27 @@ export class Agent {
 
         this.throwIfAborted();
 
+        const toolContext: ToolExecutionContext = {
+          registry: this.agentRegistry,
+          signal: this.abortController?.signal,
+          config: {
+            apiKey: this.apiKey,
+            baseURL: this.baseURL,
+            model: this.model,
+            provider: this.modelProvider,
+            contextLength: this.contextLength,
+            compressionThresholdRatio: this.compressionThresholdRatio,
+            thinkingEnabled: this.thinkingEnabled,
+            effort: this.effort,
+            userPrompt: this.userPrompt,
+          },
+          currentAgentId: this.currentAgentId,
+          permissionService: this.permissionService,
+          prompter: this.prompter,
+        };
+
         try {
-          await this.executeToolCalls(toolCalls);
+          await this.toolExecutor.execute(toolCalls, toolContext, this.activeTurnIdx);
         } catch (e) {
           if (e instanceof ToolDeniedError) {
             this.store.addStatus({
