@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Box, Text, useInput } from "ink";
-import { useTuiStore, type TuiState } from "./store.js";
+import { useTuiStore, type TuiState, type TuiAction } from "./store.js";
 import type { PromptOption } from "../../utils/display.js";
 
 function OptionList({
@@ -82,7 +82,7 @@ function SinglePrompt({
   dispatch,
 }: {
   prompt: NonNullable<TuiState["pendingPrompt"]>;
-  dispatch: (action: any) => void;
+  dispatch: (action: TuiAction) => void;
 }) {
   const [cursor, setCursor] = useState(0);
 
@@ -126,7 +126,7 @@ function MultiPrompt({
   dispatch,
 }: {
   prompt: NonNullable<TuiState["pendingPrompt"]>;
-  dispatch: (action: any) => void;
+  dispatch: (action: TuiAction) => void;
 }) {
   const [cursor, setCursor] = useState(0);
   const [selected, setSelected] = useState(new Set<string>());

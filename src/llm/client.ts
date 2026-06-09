@@ -15,7 +15,7 @@ type LLMClientFactory = (apiKey?: string, baseURL?: string) => LLMClient;
 
 const protocols = new Map<string, LLMClientFactory>();
 
-function registerProtocol(
+export function registerProtocol(
   name: string,
   factory: LLMClientFactory,
 ): void {

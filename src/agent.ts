@@ -1,6 +1,6 @@
 import type { LLMClient } from "./llm/client.js";
 import { createClient } from "./llm/client.js";
-import type { MessageParam, ToolUseBlock } from "./messages.js";
+import type { MessageParam, ToolUseBlock, TextBlock, ThinkingBlock } from "./messages.js";
 import type { LLMToolDef, EffortLevel, LLMResponse } from "./llm/client.js";
 import {
   getAll,
@@ -101,7 +101,6 @@ export class Agent {
   private sessionStats?: SessionStats;
   private permissionService: PermissionService;
   private abortController: AbortController | null = null;
-  private currentStreamRef: { current: any } = { current: null };
   private logger?: pino.Logger;
 
   private isCompressing: boolean = false;
@@ -237,7 +236,6 @@ export class Agent {
 
   abort(): void {
     this.abortController?.abort();
-    this.currentStreamRef.current?.abort();
   }
 
   private throwIfAborted(): void {
@@ -449,7 +447,6 @@ export class Agent {
         effort: this.effort,
       },
     );
-    if (this.currentStreamRef) this.currentStreamRef.current = stream;
 
     let blockStreaming = false;
     const toolCalls: Array<{ block: ToolUseBlock; tool?: ToolDef }> = [];
@@ -466,7 +463,7 @@ export class Agent {
       } else {
         const last = this.store.getLastBlock();
         if (last?.type === field && field in last) {
-          const currentText = (last as any)[field] as string;
+          const currentText = (field === "text" ? (last as TextBlock).text : (last as ThinkingBlock).thinking);
           const newText = currentText === "" ? delta.trimStart() : delta;
           this.store.updateLastBlock({ [field]: currentText + newText });
         } else {
@@ -506,7 +503,6 @@ export class Agent {
       throw e;
     } finally {
       this.saveStore();
-      if (this.currentStreamRef) this.currentStreamRef.current = null;
       this.store.setStreaming(false);
     }
 
@@ -686,7 +682,6 @@ export class Agent {
         );
       }
       this.abortController = null;
-      this.currentStreamRef.current = null;
       this.logger?.info(
         {
           session: this.currentSession,

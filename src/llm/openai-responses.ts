@@ -11,6 +11,26 @@ import OpenAI from "openai";
 import type { LLMClient, LLMStream, StreamEvent, LLMToolDef, ChatOptions, LLMResponse, TokenUsage, EffortLevel } from "./client.js";
 import type { MessageParam, ContentBlock, TextBlock, ThinkingBlock, ToolUseBlock, ToolResultBlock } from "../messages.js";
 
+// The OpenAI SDK's ResponseStreamEvent union doesn't cover all streaming event
+// types (delta, output_item.done, etc.). These interfaces fill the gap.
+interface StreamDeltaEvent {
+  delta: string;
+}
+
+interface StreamOutputItemDoneEvent {
+  item: {
+    type: string;
+    id?: string;
+    call_id?: string;
+    name: string;
+    arguments: string;
+  };
+}
+
+interface StreamCompletedEvent {
+  response: OpenAI.Responses.Response;
+}
+
 // Constants
 
 const DEFAULT_MODEL = "gpt-4.1";
@@ -19,7 +39,7 @@ const DEFAULT_MAX_TOKENS = 8192;
 // Effort mapping
 
 // Map our five-level effort to OpenAI's three-level reasoning effort.
-function toSdkEffort(effort: EffortLevel): any {
+function toSdkEffort(effort: EffortLevel): OpenAI.ReasoningEffort {
   switch (effort) {
     case "none":
       return "none";
@@ -273,7 +293,7 @@ export class OpenAIResponsesClient implements LLMClient {
       for await (const event of stream) {
         switch (event.type as string) {
           case "response.output_text.delta": {
-            const delta = (event as any).delta as string;
+            const delta = (event as unknown as StreamDeltaEvent).delta;
             if (delta) {
               currentText += delta;
               yield { type: "text", text: delta };
@@ -285,7 +305,7 @@ export class OpenAIResponsesClient implements LLMClient {
             break;
           }
           case "response.reasoning.delta": {
-            const delta = (event as any).delta as string;
+            const delta = (event as unknown as StreamDeltaEvent).delta;
             if (delta) {
               currentThinking += delta;
               yield { type: "thinking", thinking: delta };
@@ -297,7 +317,7 @@ export class OpenAIResponsesClient implements LLMClient {
             break;
           }
           case "response.output_item.done": {
-            const item = (event as any).item;
+            const item = (event as unknown as StreamOutputItemDoneEvent).item;
             if (item && item.type === "function_call") {
               let parsedArgs: Record<string, unknown> = {};
               try {
@@ -312,7 +332,7 @@ export class OpenAIResponsesClient implements LLMClient {
                 type: "tool_use",
                 block: {
                   type: "tool_use",
-                  id: item.id ?? item.call_id,
+                  id: item.id ?? item.call_id ?? "",
                   name: item.name,
                   input: parsedArgs,
                 },
@@ -321,9 +341,7 @@ export class OpenAIResponsesClient implements LLMClient {
             break;
           }
           case "response.completed": {
-            const response = (event as any).response as
-              | OpenAI.Responses.Response
-              | undefined;
+            const response = (event as unknown as StreamCompletedEvent).response;
             if (response) {
               finalResult = toLLMResponse(response);
             }

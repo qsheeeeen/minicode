@@ -8,7 +8,7 @@ export function runBash(cmd: string): string {
       cwd: process.cwd(),
     });
     return output.trim() || "(no output)";
-  } catch (e: any) {
-    return `Error: ${e.message}`;
+  } catch (e: unknown) {
+    return `Error: ${e instanceof Error ? e.message : String(e)}`;
   }
 }

@@ -19,9 +19,7 @@ export interface CommandHandler {
 export interface CommandContext {
   agent: Agent;
   sessionStats: SessionStats;
-  setMessages: (
-    msg: DisplayMessage[] | ((prev: DisplayMessage[]) => DisplayMessage[]),
-  ) => void;
+  setMessages: (msg: DisplayMessage[]) => void;
   setCurrentSession: (name: string) => void;
   setMode: (mode: "chat" | "session-list" | "effort-select") => void;
   setInputMode: (mode: string, props?: Record<string, unknown>) => void;

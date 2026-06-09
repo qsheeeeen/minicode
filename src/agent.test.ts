@@ -330,7 +330,13 @@ describe("Agent", () => {
   describe("abort", () => {
     it("aborts the current run", async () => {
       const stream = new MockStream();
-      mockChatStream.mockReturnValueOnce(stream);
+      mockChatStream.mockImplementationOnce(
+        (_msgs: any, _tools: any, opts: any) => {
+          // Wire the AbortSignal to the mock stream's abort method
+          opts?.signal?.addEventListener("abort", () => stream.abort());
+          return stream;
+        },
+      );
       const agent = new Agent();
       const runPromise = agent.run("Hello");
       await new Promise((r) => setTimeout(r, 10));

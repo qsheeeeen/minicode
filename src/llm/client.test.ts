@@ -52,9 +52,10 @@ describe("createClient", () => {
     expect(client.apiKey).toBe("key-3");
   });
 
-  it("falls back to AnthropicClient for unknown protocol", () => {
-    const client = createClient("unknown-protocol") as any;
-    expect(client.name).toBe("anthropic");
+  it("throws on unknown protocol", () => {
+    expect(() => createClient("unknown-protocol")).toThrow(
+      'Unknown LLM protocol: "unknown-protocol"',
+    );
   });
 });
 

@@ -299,7 +299,7 @@ export class MessageStore {
     const last = this.turns[this.turns.length - 1];
     if (!last || last.role !== "assistant" || !Array.isArray(last.content))
       return;
-    const blocks = last.content as any[];
+    const blocks = last.content as ContentBlock[];
     if (blocks.length === 0) return;
     Object.assign(blocks[blocks.length - 1], updates);
     this.notify();

@@ -12,7 +12,7 @@ import type {
 import type { LLMClient, LLMToolDef, ChatOptions, LLMResponse, EffortLevel } from "./client.js";
 import type { MessageParam, ContentBlock, ToolUseBlock, ToolResultBlock } from "../messages.js";
 
-function toSdkEffort(effort: EffortLevel): any {
+function toSdkEffort(effort: EffortLevel): "low" | "medium" | "high" | "xhigh" | "max" {
   switch (effort) {
     case "none":
     case "minimal":
@@ -106,11 +106,16 @@ function toContentBlock(
   return { type: "text", text: JSON.stringify(block) };
 }
 
+// Anthropic usage includes cache token fields not in the standard type.
+interface AnthropicCacheUsage {
+  cache_creation_input_tokens?: number;
+  cache_read_input_tokens?: number;
+}
+
 function toLLMResponse(msg: Anthropic.Messages.Message): LLMResponse {
-  const cacheMiss =
-    (msg.usage as any).cache_creation_input_tokens ?? 0;
-  const cacheHit =
-    (msg.usage as any).cache_read_input_tokens ?? 0;
+  const cacheUsage = msg.usage as typeof msg.usage & AnthropicCacheUsage;
+  const cacheMiss = cacheUsage.cache_creation_input_tokens ?? 0;
+  const cacheHit = cacheUsage.cache_read_input_tokens ?? 0;
   return {
     content: msg.content.map(toContentBlock),
     stop_reason: msg.stop_reason ?? "end_turn",
@@ -164,7 +169,7 @@ export class AnthropicClient implements LLMClient {
     });
 
     async function* run(): AsyncGenerator<StreamEvent, LLMResponse, unknown> {
-      let currentToolCall: any = null;
+      let currentToolCall: { id: string; name: string; arguments: string } | null = null;
       let currentText = "";
       let currentThinking = "";
 

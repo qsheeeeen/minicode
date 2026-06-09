@@ -14,7 +14,7 @@ const DEFAULT_MAX_TOKENS = 8192;
 
 // Effort mapping (internal → SDK reasoning_effort)
 
-function toSdkEffort(effort: EffortLevel): any {
+function toSdkEffort(effort: EffortLevel): OpenAI.ReasoningEffort {
   switch (effort) {
     case "none":
       return "none";

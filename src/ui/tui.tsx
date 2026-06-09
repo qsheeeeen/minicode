@@ -2,6 +2,7 @@ import React, { useCallback, useRef, useEffect } from "react";
 import { Box, useInput, useApp } from "ink";
 import { Agent } from "../agent.js";
 import type { ResolvedConfig } from "../config.js";
+import type { DisplayMessage } from "../messages.js";
 import { routeInput } from "./routing.js";
 import {
   AgentRegistry,
@@ -141,10 +142,8 @@ function AppContent({
     () => ({
       agent: agentRef.current,
       sessionStats,
-      setMessages: (msgs: any) => {
-        if (typeof msgs !== "function") {
-          dispatch({ type: "SET_MESSAGES", payload: msgs });
-        }
+      setMessages: (msgs: DisplayMessage[]) => {
+        dispatch({ type: "SET_MESSAGES", payload: msgs });
       },
       setCurrentSession: (session: string) =>
         dispatch({ type: "SET_CURRENT_SESSION", payload: session }),
