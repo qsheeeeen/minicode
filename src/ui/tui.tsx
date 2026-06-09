@@ -4,10 +4,10 @@ import { Agent } from "../agent.js";
 import type { ResolvedConfig } from "../config.js";
 import type { DisplayMessage } from "../messages.js";
 import { routeInput } from "./routing.js";
+import { processRoute } from "./route-handler.js";
 import {
   AgentRegistry,
   type AgentSession,
-  runShell,
 } from "../services/index.js";
 import type { SessionStats } from "../services/session-stats.js";
 import { Receipt } from "./tui/Receipt.js";
@@ -166,70 +166,25 @@ function AppContent({
 
       const agent = agentRef.current;
       const route = await routeInput(value, cmdContext());
+      const processed = processRoute(route, value, agent);
 
-      if (route.action === "none") return false;
-
-      if (route.action === "shell") {
-        const output = runShell(route.promptText!);
-        agent
-          .getStore()
-          .addUserMessage(
-            `Ran: ${route.promptText}\n\n\`\`\`\n${output}\n\`\`\``,
-            value.trim(),
-          );
-        agent.getStore().addStatus({
-          role: "status",
-          content: `$ ${route.promptText}\n${output}`,
-          toolDisplay: {
-            name: "Shell",
-            input: { command: route.promptText! },
-            output,
-          },
-          timestamp: new Date(),
-        });
-        dispatch({
-          type: "SET_MESSAGES",
-          payload: agent.getStore().toDisplayMessages(),
-        });
-        return false;
-      }
-
-      if (route.action === "command") {
-        if (route.promptText) {
-          loadingRef.current = true;
-          dispatch({ type: "SET_IS_LOADING", payload: true });
-          try {
-            await agent.run(route.promptText, {
-              displayContent: route.displayContent,
-            });
-          } catch (e) {
-            if (e instanceof Error) {
-              agent
-                .getStore()
-                .addStatus({
-                  role: "error",
-                  content: `(Error: ${e.message})`,
-                  timestamp: new Date(),
-                });
-            } else throw e;
-          } finally {
-            loadingRef.current = false;
-            dispatch({ type: "SET_IS_LOADING", payload: false });
-            dispatch({ type: "SET_STATUS", payload: "" });
-          }
+      if (processed.type === "done") {
+        if (processed.shellOutput) {
+          dispatch({
+            type: "SET_MESSAGES",
+            payload: agent.getStore().toDisplayMessages(),
+          });
         }
-        dispatch({
-          type: "SET_MESSAGES",
-          payload: agent.getStore().toDisplayMessages(),
-        });
         return false;
       }
 
-      // Plain text → LLM
+      // "run" — command with prompt or plain LLM input
       loadingRef.current = true;
       dispatch({ type: "SET_IS_LOADING", payload: true });
       try {
-        const sent = await agent.run(route.promptText!);
+        const sent = await agent.run(processed.promptText, {
+          displayContent: processed.displayContent,
+        });
         if (!sent) {
           dispatch({ type: "SET_IS_LOADING", payload: false });
           return false;

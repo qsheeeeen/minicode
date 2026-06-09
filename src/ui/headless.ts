@@ -2,7 +2,7 @@ import type { Agent } from "../agent.js";
 import type { MessageParam, ContentBlock } from "../messages.js";
 import type { CommandContext } from "./commands/index.js";
 import { routeInput } from "./routing.js";
-import { runShell } from "../services/index.js";
+import { processRoute } from "./route-handler.js";
 import { MessageStore } from "../messages.js";
 
 export async function runHeadless(
@@ -215,27 +215,19 @@ export async function runHeadless(
   }
 
   const route = await routeInput(initialPrompt, cmdContext);
+  const processed = processRoute(route, initialPrompt, agent);
 
-  if (route.action === "none") {
-    unsubscribe();
-    return;
-  }
-
-  if (route.action === "shell") {
-    const output = runShell(route.promptText!);
-    console.log(`$ ${route.promptText}\n${output}`);
-    unsubscribe();
-    return;
-  }
-
-  if (route.action === "command" && !route.promptText) {
+  if (processed.type === "done") {
+    if (processed.shellOutput) {
+      console.log(`$ ${processed.shellOutput.command}\n${processed.shellOutput.output}`);
+    }
     render(true);
     unsubscribe();
     return;
   }
 
   try {
-    await agent.run(route.promptText!);
+    await agent.run(processed.promptText);
     render(true);
   } catch (e) {
     if (e instanceof Error && e.message === "Aborted") {
