@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useCallback } from "react";
 import { Box, Text, useInput } from "ink";
-import { useTuiState, useTuiDispatch } from "./store.js";
+import { useTuiStore } from "./store.js";
 import { getInputComponent } from "./inputs.js";
 import { getCommandList } from "../commands/index.js";
 import type { Agent } from "../../agent.js";
@@ -17,8 +17,10 @@ export function InputArea({
   handleSubmit,
   loadingRef,
 }: InputAreaProps) {
-  const { input, pendingPrompt, isLoading } = useTuiState();
-  const dispatch = useTuiDispatch();
+  const input = useTuiStore((s) => s.input);
+  const pendingPrompt = useTuiStore((s) => s.pendingPrompt);
+  const isLoading = useTuiStore((s) => s.isLoading);
+  const dispatch = useTuiStore((s) => s.dispatch);
 
   // Command autocomplete logic
   const commandList = useMemo(

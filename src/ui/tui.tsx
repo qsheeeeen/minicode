@@ -1,11 +1,8 @@
 import React, { useCallback, useRef, useEffect } from "react";
 import { Box, useInput, useApp } from "ink";
 import { Agent } from "../agent.js";
-import type { MessageParam } from "../messages.js";
 import type { ResolvedConfig } from "../config.js";
-import { CallbackPrompter } from "../utils/display.js";
 import { routeInput } from "./routing.js";
-import { MessageStore } from "../messages.js";
 import {
   AgentRegistry,
   type AgentSession,
@@ -14,7 +11,8 @@ import {
 import type { SessionStats } from "../services/session-stats.js";
 import { Receipt } from "./tui/Receipt.js";
 
-import { TuiProvider, useTuiState, useTuiDispatch } from "./tui/store.js";
+import { useTuiStore } from "./tui/store.js";
+import { connectAgent } from "./tui/connect-agent.js";
 import { Header } from "./tui/Header.js";
 import { MessageList } from "./tui/MessageList.js";
 import { ModalPrompter } from "./tui/ModalPrompter.js";
@@ -43,8 +41,8 @@ function useMultiAgent(
   registry: AgentRegistry,
   agentRef: React.MutableRefObject<Agent>,
 ) {
-  const { activeAgentId } = useTuiState();
-  const dispatch = useTuiDispatch();
+  const activeAgentId = useTuiStore((s) => s.activeAgentId);
+  const dispatch = useTuiStore((s) => s.dispatch);
   const activeAgentIdRef = useRef(activeAgentId);
 
   useEffect(() => {
@@ -105,89 +103,6 @@ function useMultiAgent(
   return { activeAgentIdRef };
 }
 
-// Hook: attach display to agent, load initial session using Global Store
-function useDisplay(
-  agent: Agent,
-  initialSession: string,
-  sessionName: string | undefined,
-  resumeRecent: boolean,
-  registry: AgentRegistry,
-) {
-  const dispatch = useTuiDispatch();
-
-  useEffect(() => {
-    const unsubToken = agent.tokenCount$.subscribe((count) =>
-      dispatch({ type: "SET_TOKEN_COUNT", payload: count }),
-    );
-
-    agent.setPrompter(
-      new CallbackPrompter(
-        (req) =>
-          new Promise<string>((resolve) => {
-            dispatch({
-              type: "SET_PENDING_PROMPT",
-              payload: { ...req, resolve },
-            });
-          }),
-      ),
-    );
-
-    const unsubStore = agent.getStore().onChange(() => {
-      dispatch({
-        type: "SET_MESSAGES",
-        payload: agent.getStore().toDisplayMessages(),
-      });
-    });
-
-    registry.register({
-      id: "1",
-      type: "main",
-      agent,
-      status: "idle",
-    });
-
-    dispatch({
-      type: "SET_AGENT_SESSIONS",
-      payload: [
-        {
-          id: "1",
-          type: "main",
-          agent,
-          status: "idle",
-        },
-      ],
-    });
-
-    const loadInitial = async () => {
-      agent.setSession(initialSession);
-      dispatch({ type: "SET_CURRENT_SESSION", payload: initialSession });
-      if (sessionName || resumeRecent) {
-        const data = await MessageStore.load(initialSession);
-        if (data) {
-          agent.setMessages(data.messages as MessageParam[]);
-          const totalTokens = data.totalTokens || 0;
-          if (totalTokens > 0) {
-            agent.setTokenCount(totalTokens);
-            dispatch({ type: "SET_TOKEN_COUNT", payload: totalTokens });
-          }
-        } else if (sessionName) {
-          agent.getStore().addStatus({
-            role: "status",
-            content: `Created new session: ${sessionName}`,
-            timestamp: new Date(),
-          });
-        }
-      }
-    };
-    loadInitial();
-
-    return () => {
-      unsubToken();
-      unsubStore();
-    };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-}
-
 function AppContent({
   agent,
   version,
@@ -201,8 +116,11 @@ function AppContent({
   sessionStats,
 }: Omit<AppProps, "config">) {
   const { exit } = useApp();
-  const dispatch = useTuiDispatch();
-  const { input, pendingPrompt, isLoading, showReceipt } = useTuiState();
+  const dispatch = useTuiStore((s) => s.dispatch);
+  const input = useTuiStore((s) => s.input);
+  const pendingPrompt = useTuiStore((s) => s.pendingPrompt);
+  const isLoading = useTuiStore((s) => s.isLoading);
+  const showReceipt = useTuiStore((s) => s.showReceipt);
   const agentRef = useRef<Agent>(agent);
 
   const [autoSubmitPending, setAutoSubmitPending] =
@@ -210,7 +128,6 @@ function AppContent({
   const loadingRef = useRef(false);
 
   useMultiAgent(agentRegistry, agentRef);
-  useDisplay(agent, initialSession, sessionName, resumeRecent, agentRegistry);
 
   useEffect(() => {
     sessionStats.init(
@@ -424,14 +341,25 @@ function AppContent({
 }
 
 export function App(props: AppProps) {
-  return (
-    <TuiProvider
-      initialState={{
-        permissionMode:
-          props.agent.getPermissionService()?.getMode() ?? "manual",
-      }}
-    >
-      <AppContent {...props} />
-    </TuiProvider>
-  );
+  // Set initial permission mode on Zustand store (replaces TuiProvider initialState)
+  useEffect(() => {
+    useTuiStore.setState({
+      permissionMode:
+        props.agent.getPermissionService()?.getMode() ?? "manual",
+    });
+  }, []);
+
+  // Bridge Agent domain observables to Zustand (replaces useDisplay hook)
+  useEffect(() => {
+    const cleanup = connectAgent({
+      agent: props.agent,
+      initialSession: props.initialSession,
+      sessionName: props.sessionName,
+      resumeRecent: props.resumeRecent,
+      registry: props.agentRegistry,
+    });
+    return cleanup;
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return <AppContent {...props} />;
 }

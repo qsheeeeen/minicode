@@ -1,9 +1,10 @@
 import React from "react";
 import { Box, Text } from "ink";
-import { useTuiState } from "./store.js";
+import { useTuiStore } from "./store.js";
 
 export function SubAgentBar() {
-  const { agentSessions, activeAgentId } = useTuiState();
+  const agentSessions = useTuiStore((s) => s.agentSessions);
+  const activeAgentId = useTuiStore((s) => s.activeAgentId);
 
   if (agentSessions.length <= 1) return null;
 

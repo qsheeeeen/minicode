@@ -1,7 +1,7 @@
 // Standalone demo for Panel component.
 // Run: bun run src/ui/tui/demos/panel.tsx
 import { render, Box } from "ink";
-import { TuiProvider } from "../store.js";
+import { useTuiStore } from "../store.js";
 import { Panel } from "../Panel.js";
 
 function mkAgent(model: string, provider: string, ctx: number) {
@@ -14,44 +14,35 @@ function mkAgent(model: string, provider: string, ctx: number) {
   };
 }
 
-function Demo() {
-  return (
-    <Box flexDirection="column" padding={1}>
-      <TuiProvider
-        initialState={{
-          tokenCount: 24000,
-          currentSession: "debug-auth",
-          permissionMode: "manual",
-          status: "",
-        }}
-      >
-        <Panel
-          agentRef={mkAgent("claude-sonnet-4-5", "anthropic", 200000)}
-          promptFiles={["AGENTS.md"]}
-        />
-      </TuiProvider>
-      <TuiProvider
-        initialState={{
-          tokenCount: 110000,
-          currentSession: "refactor-db",
-          permissionMode: "yolo",
-          status: "",
-        }}
-      >
-        <Panel agentRef={mkAgent("claude-opus-4-7", "anthropic", 200000)} />
-      </TuiProvider>
-      <TuiProvider
-        initialState={{
-          tokenCount: 178000,
-          currentSession: "feature-x",
-          permissionMode: "auto",
-          status: "Compressing...",
-        }}
-      >
-        <Panel agentRef={mkAgent("gpt-4o", "openai", 200000)} />
-      </TuiProvider>
-    </Box>
-  );
-}
-
-render(<Demo />);
+useTuiStore.setState({
+  tokenCount: 24000,
+  currentSession: "debug-auth",
+  permissionMode: "manual",
+  status: "",
+});
+const p1 = render(
+  <Box flexDirection="column" padding={1}>
+    <Panel
+      agentRef={mkAgent("claude-sonnet-4-5", "anthropic", 200000)}
+      promptFiles={["AGENTS.md"]}
+    />
+  </Box>,
+);
+useTuiStore.setState({
+  tokenCount: 110000,
+  currentSession: "refactor-db",
+  permissionMode: "yolo",
+  status: "",
+});
+const p2 = render(
+  <Panel agentRef={mkAgent("claude-opus-4-7", "anthropic", 200000)} />,
+);
+useTuiStore.setState({
+  tokenCount: 178000,
+  currentSession: "feature-x",
+  permissionMode: "auto",
+  status: "Compressing...",
+});
+const p3 = render(
+  <Panel agentRef={mkAgent("gpt-4o", "openai", 200000)} />,
+);

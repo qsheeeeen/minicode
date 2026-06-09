@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Box, Text, useInput } from "ink";
-import { useTuiState, useTuiDispatch } from "./store.js";
+import { useTuiStore, type TuiState } from "./store.js";
 import type { PromptOption } from "../../utils/display.js";
 
 function OptionList({
@@ -65,8 +65,8 @@ function MultiOptionList({
 }
 
 export function ModalPrompter() {
-  const { pendingPrompt } = useTuiState();
-  const dispatch = useTuiDispatch();
+  const pendingPrompt = useTuiStore((s) => s.pendingPrompt);
+  const dispatch = useTuiStore((s) => s.dispatch);
 
   if (!pendingPrompt) return null;
 
@@ -81,8 +81,8 @@ function SinglePrompt({
   prompt,
   dispatch,
 }: {
-  prompt: NonNullable<ReturnType<typeof useTuiState>["pendingPrompt"]>;
-  dispatch: React.Dispatch<any>;
+  prompt: NonNullable<TuiState["pendingPrompt"]>;
+  dispatch: (action: any) => void;
 }) {
   const [cursor, setCursor] = useState(0);
 
@@ -125,8 +125,8 @@ function MultiPrompt({
   prompt,
   dispatch,
 }: {
-  prompt: NonNullable<ReturnType<typeof useTuiState>["pendingPrompt"]>;
-  dispatch: React.Dispatch<any>;
+  prompt: NonNullable<TuiState["pendingPrompt"]>;
+  dispatch: (action: any) => void;
 }) {
   const [cursor, setCursor] = useState(0);
   const [selected, setSelected] = useState(new Set<string>());

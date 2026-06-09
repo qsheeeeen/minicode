@@ -2,7 +2,7 @@
 // Run: bun run src/ui/tui/demos/index.tsx
 import { useState } from "react";
 import { render, Box, useInput } from "ink";
-import { TuiProvider } from "../store.js";
+import { useTuiStore } from "../store.js";
 import { Header } from "../Header.js";
 import { Help } from "../Help.js";
 import { Status } from "../Status.js";
@@ -122,66 +122,64 @@ function Demo() {
 
   const mode = inputModes[inputIdx];
 
+  useTuiStore.setState({
+    messages,
+    agentSessions,
+    activeAgentId: "1",
+    tokenCount: 34700,
+    currentSession: "session-1231231123123",
+    isLoading: true,
+    permissionMode: "manual" as const,
+    status: "",
+    pendingPrompt: null,
+    input: { mode, value: "", props: {}, key: 0 },
+  });
+
   return (
     <Box flexDirection="column">
       <Header version="0.1.0" projectPath="/home/user/express-ts-app" />
-      <TuiProvider
-        initialState={{
-          messages,
-          agentSessions,
-          activeAgentId: "1",
-          tokenCount: 34700,
-          currentSession: "session-1231231123123",
-          isLoading: true,
-          permissionMode: "manual" as const,
-          status: "",
-          pendingPrompt: null,
-          input: { mode, value: "", props: {}, key: 0 },
-        }}
-      >
-        <MessageList />
-        <Status />
-        {mode === "chat" ? (
-          <InputArea
-            agentRef={agentRef}
-            handleSubmit={async (v) => {
-              console.log(v);
-              return true;
-            }}
-            loadingRef={{ current: false }}
+      <MessageList />
+      <Status />
+      {mode === "chat" ? (
+        <InputArea
+          agentRef={agentRef}
+          handleSubmit={async (v) => {
+            console.log(v);
+            return true;
+          }}
+          loadingRef={{ current: false }}
+        />
+      ) : mode === "effort" ? (
+        <Box
+          borderStyle="single"
+          borderLeft={false}
+          borderRight={false}
+          paddingX={1}
+        >
+          <EffortSelectInput
+            onExecute={(v) => console.log(v)}
+            onCancel={() => setInputIdx(0)}
           />
-        ) : mode === "effort" ? (
-          <Box
-            borderStyle="single"
-            borderLeft={false}
-            borderRight={false}
-            paddingX={1}
-          >
-            <EffortSelectInput
-              onExecute={(v) => console.log(v)}
-              onCancel={() => setInputIdx(0)}
-            />
-          </Box>
-        ) : (
-          <Box
-            borderStyle="single"
-            borderLeft={false}
-            borderRight={false}
-            paddingX={1}
-          >
-            <SessionListInput
-              sessions={[
-                { name: "session-1231231123123" },
-                { name: "session-4564564456456" },
-              ]}
-              onExecute={(v) => console.log(v)}
-              onCancel={() => setInputIdx(0)}
-            />
-          </Box>
-        )}
-        <SubAgentBar />
-        <Panel agentRef={agentRef} />
-      </TuiProvider>
+        </Box>
+      ) : (
+        <Box
+          borderStyle="single"
+          borderLeft={false}
+          borderRight={false}
+          paddingX={1}
+        >
+          <SessionListInput
+            sessions={[
+              { name: "session-1231231123123" },
+              { name: "session-4564564456456" },
+            ]}
+            onExecute={(v) => console.log(v)}
+            onCancel={() => setInputIdx(0)}
+          />
+        </Box>
+      )}
+      <SubAgentBar />
+      <Panel agentRef={agentRef} />
       <Help />
       <Receipt data={receiptData} onDismiss={() => {}} />
     </Box>

@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useReducer, ReactNode } from "react";
+import React from "react";
+import { create } from "zustand";
 import type { DisplayMessage, Prompt } from "../../utils/display.js";
 import type { AgentSession, PermissionMode } from "../../services/index.js";
 
@@ -158,44 +159,14 @@ export function tuiReducer(state: TuiState, action: TuiAction): TuiState {
   }
 }
 
-const TuiStateContext = createContext<TuiState | undefined>(undefined);
-const TuiDispatchContext = createContext<React.Dispatch<TuiAction> | undefined>(
-  undefined,
-);
+// --- Zustand store ---
 
-export function TuiProvider({
-  children,
-  initialState: init = initialState,
-}: {
-  children: ReactNode;
-  initialState?: Partial<TuiState>;
-}) {
-  const [state, dispatch] = useReducer(tuiReducer, {
-    ...initialState,
-    ...init,
-  });
-
-  return (
-    <TuiStateContext.Provider value={state}>
-      <TuiDispatchContext.Provider value={dispatch}>
-        {children}
-      </TuiDispatchContext.Provider>
-    </TuiStateContext.Provider>
-  );
+interface TuiStore extends TuiState {
+  dispatch: (action: TuiAction) => void;
 }
 
-export function useTuiState() {
-  const context = useContext(TuiStateContext);
-  if (context === undefined) {
-    throw new Error("useTuiState must be used within a TuiProvider");
-  }
-  return context;
-}
+export const useTuiStore = create<TuiStore>((set) => ({
+  ...initialState,
+  dispatch: (action) => set((state) => tuiReducer(state, action)),
+}));
 
-export function useTuiDispatch() {
-  const context = useContext(TuiDispatchContext);
-  if (context === undefined) {
-    throw new Error("useTuiDispatch must be used within a TuiProvider");
-  }
-  return context;
-}

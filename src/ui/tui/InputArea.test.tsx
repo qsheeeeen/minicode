@@ -1,8 +1,8 @@
 import React, { createRef } from "react";
 import { render } from "ink-testing-library";
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { InputArea } from "./InputArea.js";
-import { TuiProvider } from "./store.js";
+import { useTuiStore, initialState } from "./store.js";
 
 describe("InputArea Component", () => {
   const mockLoadingRef = (
@@ -13,27 +13,29 @@ describe("InputArea Component", () => {
     return ref;
   };
 
+  beforeEach(() => {
+    useTuiStore.setState(initialState, true);
+  });
+
   it("renders nothing when there is a pending prompt (isModal = true)", () => {
     const mockAgentRef = { current: {} } as any;
 
+    useTuiStore.setState({
+      pendingPrompt: {
+        message: "hi",
+        type: "text",
+        options: [],
+        resolve: vi.fn(),
+      },
+      input: { mode: "chat", value: "", props: {}, key: 0 },
+    });
+
     const { lastFrame } = render(
-      <TuiProvider
-        initialState={{
-          pendingPrompt: {
-            message: "hi",
-            type: "text",
-            options: [],
-            resolve: vi.fn(),
-          },
-          input: { mode: "chat", value: "", props: {}, key: 0 },
-        }}
-      >
-        <InputArea
-          agentRef={mockAgentRef}
-          handleSubmit={vi.fn()}
-          loadingRef={mockLoadingRef(false)}
-        />
-      </TuiProvider>,
+      <InputArea
+        agentRef={mockAgentRef}
+        handleSubmit={vi.fn()}
+        loadingRef={mockLoadingRef(false)}
+      />,
     );
 
     expect(lastFrame()).toBe("");
@@ -44,19 +46,17 @@ describe("InputArea Component", () => {
       current: { getStore: () => ({ addStatus: vi.fn() }) },
     } as any;
 
+    useTuiStore.setState({
+      pendingPrompt: null,
+      input: { mode: "chat", value: "", props: {}, key: 0 },
+    });
+
     const { lastFrame } = render(
-      <TuiProvider
-        initialState={{
-          pendingPrompt: null,
-          input: { mode: "chat", value: "", props: {}, key: 0 },
-        }}
-      >
-        <InputArea
-          agentRef={mockAgentRef}
-          handleSubmit={vi.fn()}
-          loadingRef={mockLoadingRef(false)}
-        />
-      </TuiProvider>,
+      <InputArea
+        agentRef={mockAgentRef}
+        handleSubmit={vi.fn()}
+        loadingRef={mockLoadingRef(false)}
+      />,
     );
 
     const output = lastFrame();
@@ -69,20 +69,18 @@ describe("InputArea Component", () => {
       current: { getStore: () => ({ addStatus: vi.fn() }) },
     } as any;
 
+    useTuiStore.setState({
+      pendingPrompt: null,
+      input: { mode: "chat", value: "", props: {}, key: 0 },
+      isLoading: true,
+    });
+
     const { lastFrame } = render(
-      <TuiProvider
-        initialState={{
-          pendingPrompt: null,
-          input: { mode: "chat", value: "", props: {}, key: 0 },
-          isLoading: true,
-        }}
-      >
-        <InputArea
-          agentRef={mockAgentRef}
-          handleSubmit={vi.fn()}
-          loadingRef={mockLoadingRef(true)}
-        />
-      </TuiProvider>,
+      <InputArea
+        agentRef={mockAgentRef}
+        handleSubmit={vi.fn()}
+        loadingRef={mockLoadingRef(true)}
+      />,
     );
 
     const output = lastFrame();

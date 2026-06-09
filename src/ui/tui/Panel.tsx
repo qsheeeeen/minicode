@@ -1,7 +1,7 @@
 import React from "react";
 import { Box, Text } from "ink";
 import { ProgressBar } from "@inkjs/ui";
-import { useTuiState } from "./store.js";
+import { useTuiStore } from "./store.js";
 import type { Agent } from "../../agent.js";
 
 interface PanelProps {
@@ -10,7 +10,10 @@ interface PanelProps {
 }
 
 export function Panel({ agentRef, promptFiles = [] }: PanelProps) {
-  const { tokenCount, permissionMode, currentSession, status } = useTuiState();
+  const tokenCount = useTuiStore((s) => s.tokenCount);
+  const permissionMode = useTuiStore((s) => s.permissionMode);
+  const currentSession = useTuiStore((s) => s.currentSession);
+  const status = useTuiStore((s) => s.status);
 
   const contextLength = agentRef.current.getContextLength() || 200000;
   const percentage = Math.min(100, (tokenCount / contextLength) * 100);
