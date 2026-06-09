@@ -15,8 +15,8 @@ describe("parseArgs", () => {
   });
 
   it("parses --model", () => {
-    const result = parseArgs(["node", "minicode", "--model", "glm-4.7@zhipu"]);
-    expect(result.modelOverride).toBe("glm-4.7@zhipu");
+    const result = parseArgs(["node", "minicode", "--model", "claude-sonnet-4-5@anthropic"]);
+    expect(result.modelOverride).toBe("claude-sonnet-4-5@anthropic");
   });
 
   it("parses --session", () => {

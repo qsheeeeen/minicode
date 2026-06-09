@@ -20,7 +20,7 @@ export function parseArgs(argv: string[]): CliArgs {
     .option("model", {
       alias: "m",
       type: "string",
-      description: "Model specification (e.g., glm-4.7@zhipu)",
+      description: "Model specification (e.g., claude-sonnet-4-5@anthropic)",
     })
     .option("session", {
       alias: "s",

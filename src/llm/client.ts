@@ -93,6 +93,5 @@ export function createClient(
 
 // Built-in protocol registrations
 registerProtocol("anthropic", (apiKey, baseURL) => new AnthropicClient(apiKey, baseURL));
-registerProtocol("zhipu", (apiKey, baseURL) => new AnthropicClient(apiKey, baseURL));
 registerProtocol("openai", (apiKey, baseURL) => new OpenAIChatClient(apiKey, baseURL));
 registerProtocol("openai-responses", (apiKey, baseURL) => new OpenAIResponsesClient(apiKey, baseURL));

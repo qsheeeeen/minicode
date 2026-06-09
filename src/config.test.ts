@@ -61,10 +61,10 @@ describe("loadConfig", () => {
   it("parses valid JSON config", async () => {
     const fs = await import("fs/promises");
     (fs.default.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(
-      '{"model": "glm-4.7@zhipu", "compressionThreshold": 0.9}',
+      '{"model": "claude-sonnet-4-5@anthropic", "compressionThreshold": 0.9}',
     );
     const config = await loadConfig();
-    expect(config.model).toBe("glm-4.7@zhipu");
+    expect(config.model).toBe("claude-sonnet-4-5@anthropic");
     expect(config.compressionThreshold).toBe(0.9);
   });
 });
@@ -83,10 +83,10 @@ describe("loadConfigSync", () => {
 
   it("parses valid JSON config", () => {
     vi.mocked(fs.readFileSync).mockReturnValue(
-      '{"model": "glm-4.7@zhipu", "compressionThreshold": 0.9}',
+      '{"model": "claude-sonnet-4-5@anthropic", "compressionThreshold": 0.9}',
     );
     const config = loadConfigSync();
-    expect(config.model).toBe("glm-4.7@zhipu");
+    expect(config.model).toBe("claude-sonnet-4-5@anthropic");
     expect(config.compressionThreshold).toBe(0.9);
   });
 });
@@ -138,12 +138,12 @@ describe("loadAllConfig", () => {
     const fs = await import("fs/promises");
     (fs.default.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(
       JSON.stringify({
-        providers: { zhipu: { apiKey: "key" } },
-        model: "glm-4@zhipu",
+        providers: { openai: { apiKey: "key" } },
+        model: "gpt-4o@openai",
       }),
     );
     const config = await loadAllConfig();
-    expect(config.model?.model).toBe("glm-4");
+    expect(config.model?.model).toBe("gpt-4o");
   });
 });
 
@@ -157,13 +157,13 @@ describe("tiers", () => {
     const fs = await import("fs/promises");
     (fs.default.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(
       JSON.stringify({
-        tiers: { pro: "claude-sonnet@anthropic", flash: "glm-4.7@zhipu" },
+        tiers: { pro: "claude-sonnet@anthropic", flash: "gpt-4o@openai" },
       }),
     );
     const config = await loadConfig();
     expect(config.tiers).toEqual({
       pro: "claude-sonnet@anthropic",
-      flash: "glm-4.7@zhipu",
+      flash: "gpt-4o@openai",
     });
   });
 

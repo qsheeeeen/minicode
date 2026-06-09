@@ -20,7 +20,6 @@ export interface ProviderConfig {
 
 export interface Providers {
   anthropic?: ProviderConfig;
-  zhipu?: ProviderConfig;
   [key: string]: ProviderConfig | undefined;
 }
 
@@ -30,8 +29,8 @@ export interface ThinkingConfig {
 
 export interface Config {
   providers?: Providers;
-  model?: string; // format: model@provider, e.g. "glm-4.7@zhipu"
-  tiers?: Record<string, string>; // tier -> model@provider, e.g. { "pro": "claude-sonnet@anthropic", "flash": "glm-4.7@zhipu" }
+  model?: string; // format: model@provider, e.g. "claude-sonnet-4-5@anthropic"
+  tiers?: Record<string, string>; // tier -> model@provider, e.g. { "pro": "claude-sonnet@anthropic", "flash": "gpt-4o@openai" }
   compressionThreshold?: number; // 0-1, compress at this ratio of context
   thinking?: ThinkingConfig; // thinking configuration (Go writes { effort: "high" })
   effort?: EffortLevel; // legacy: top-level effort, now nested under thinking

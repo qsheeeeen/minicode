@@ -377,7 +377,7 @@ describe("Builtin commands", () => {
 
     it("/model shows model select UI", async () => {
       configMock.loadConfig.mockResolvedValue({
-        providers: { anthropic: {}, zhipu: {} },
+        providers: { anthropic: {}, openai: {} },
       });
       const ctx: Partial<CommandContext> = {
         setInputMode: vi.fn(),
@@ -385,7 +385,7 @@ describe("Builtin commands", () => {
       const result = await executeCommand("model", [], ctx as CommandContext);
       expect(result.handled).toBe(true);
       expect(ctx.setInputMode).toHaveBeenCalledWith("model-select", {
-        providers: { anthropic: {}, zhipu: {} },
+        providers: { anthropic: {}, openai: {} },
         tiers: {},
       });
     });

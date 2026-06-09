@@ -40,11 +40,6 @@ describe("createClient", () => {
     expect(client.baseURL).toBe("https://api.test");
   });
 
-  it("returns AnthropicClient for 'zhipu'", () => {
-    const client = createClient("zhipu") as any;
-    expect(client.name).toBe("anthropic");
-  });
-
   it("returns OpenAIChatClient for 'openai'", () => {
     const client = createClient("openai", "key-2") as any;
     expect(client.name).toBe("openai");

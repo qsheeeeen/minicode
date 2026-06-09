@@ -95,7 +95,7 @@ src/
 
 **Zustand + connect-agent bridge:** TUI state lives in a Zustand store (`store.tsx`) that wraps a `tuiReducer`. `connectAgent()` wires Agent-domain observables to Zustand dispatches — components are pure views reading via selectors. No React Context.
 
-**Multi-provider LLM:** `LLMClient` interface with protocol registry in `client.ts`. Registered protocols: `anthropic`, `zhipu` (Anthropic-compatible), `openai` (Chat Completions), `openai-responses` (Responses API). `createClient(protocol, apiKey, baseURL)` factory. `LLMStream` is `AsyncGenerator<StreamEvent, LLMResponse, unknown>` — providers return real async generators, not wrapper objects.
+**Multi-provider LLM:** `LLMClient` interface with protocol registry in `client.ts`. Registered protocols: `anthropic`, `openai` (Chat Completions), `openai-responses` (Responses API). Unknown protocols fall back to Anthropic-compatible. `createClient(protocol, apiKey, baseURL)` factory. `LLMStream` is `AsyncGenerator<StreamEvent, LLMResponse, unknown>` — providers return real async generators, not wrapper objects.
 
 **Agent dependency injection:** Agent constructor accepts optional `client?: LLMClient` and `tools?: Map<string, ToolDef>`. Combined with `VirtualLLMClient` and `createVirtualTool()` in `tools/testing.ts`, this enables full agent loop testing without real LLM calls.
 
@@ -111,7 +111,7 @@ src/
 
 ## Config
 
-`~/.minicode/config.json` — model specifier format: `model@provider` (e.g., `claude-sonnet-4-5@anthropic`, `glm-4.7@zhipu`). Resolution order: CLI `-m` > `MODEL` env > config `model` field. Supports tiers: `"pro"` and `"flash"`, each mapping to a `model@provider`.
+`~/.minicode/config.json` — model specifier format: `model@provider` (e.g., `claude-sonnet-4-5@anthropic`). Resolution order: CLI `-m` > `MODEL` env > config `model` field. Supports tiers: `"pro"` and `"flash"`, each mapping to a `model@provider`.
 
 Providers config supports arbitrary keys — any `model@provider` resolves via `createClient()` protocol registry or falls back to Anthropic-compatible.
 
