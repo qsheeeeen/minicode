@@ -1,5 +1,4 @@
 import type { ToolDef, ToolResult, ToolExecutionContext } from "./registry.js";
-import type { AgentConfig } from "../agent.js";
 import type { MessageParam, ContentBlock } from "../messages.js";
 import { Agent } from "../agent.js";
 import { register } from "./registry.js";
@@ -45,15 +44,8 @@ export const agentTool: ToolDef = {
 
     const subId = registry.allocateSubId();
 
-    const subConfig: AgentConfig = {
-      model: config.model,
-      userPrompt: config.userPrompt,
-      subAgentMode: true,
-      agentRegistry: registry,
-      currentAgentId: subId,
-    };
-
-    // Override model from tier mapping
+    // Resolve model (optionally override via tier)
+    let subModel = config.model;
     if (tier) {
       const { loadConfig } = await import("../config.js");
       const { ModelFactory } = await import("../llm/model.js");
@@ -63,12 +55,20 @@ export const agentTool: ToolDef = {
         const factory = new ModelFactory(appConfig.providers ?? {});
         const tierModel = factory.fromSpec(modelSpec);
         if (tierModel) {
-          subConfig.model = tierModel;
+          subModel = tierModel;
         }
       }
     }
 
-    const subAgent = new Agent(subConfig);
+    const subAgent = new Agent(
+      subModel,
+      config.userPrompt,
+      undefined, // projectPromptFile
+      undefined, // compressionThresholdRatio
+      registry,
+      subId,
+      true, // subAgentMode
+    );
 
     context?.signal?.addEventListener("abort", () => {
       subAgent.abort();

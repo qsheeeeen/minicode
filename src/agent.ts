@@ -24,24 +24,6 @@ import { SessionManager } from "./services/session-manager.js";
 import { ContextManager } from "./services/context-manager.js";
 import type pino from "pino";
 
-export interface AgentConfig {
-  model: Model;
-  compressionThresholdRatio?: number;
-  userPrompt?: string;
-  projectPromptFile?: string;
-  subAgentMode?: boolean;
-  agentRegistry?: AgentRegistry;
-  currentAgentId?: string;
-  sessionStats?: SessionStats;
-  /** Available tools. Defaults to the built-in tool set. */
-  tools?: Map<string, ToolDef>;
-  /** Permission mode for tool execution. */
-  permissionMode?: PermissionMode;
-  /** Whether to skip loading git status and environment context on init. */
-  skipEnvironmentRefresh?: boolean;
-}
-
-
 export class Agent {
   private model: Model;
   private sessionManager: SessionManager;
@@ -89,49 +71,59 @@ export class Agent {
     return this.model;
   }
 
-  constructor(config: AgentConfig) {
-    this.model = config.model;
-    this.sessionManager = new SessionManager({
-      sessionStats: config.sessionStats,
-    });
+  constructor(
+    model: Model,
+    userPrompt?: string,
+    projectPromptFile?: string,
+    compressionThresholdRatio?: number,
+    agentRegistry?: AgentRegistry,
+    currentAgentId?: string,
+    subAgentMode?: boolean,
+    sessionStats?: SessionStats,
+    tools?: Map<string, ToolDef>,
+    permissionMode?: PermissionMode,
+    skipEnvironmentRefresh?: boolean,
+  ) {
+    this.model = model;
+    this.sessionManager = new SessionManager({ sessionStats });
     this.contextManager = new ContextManager({
       contextLength: this.model.getContextLength(),
-      compressionThresholdRatio: config.compressionThresholdRatio || 0.8,
+      compressionThresholdRatio: compressionThresholdRatio || 0.8,
       tokenCount$: this.tokenCount$,
       store: this.store,
       sessionStats: this.sessionManager.getSessionStats(),
     });
-    const tools = config.tools
-      ? new Map(config.tools)
-      : config.subAgentMode
+    const resolvedTools = tools
+      ? new Map(tools)
+      : subAgentMode
         ? getSubAgentTools()
         : getAll();
-    this.agentRegistry = config.agentRegistry;
-    this.currentAgentId = config.currentAgentId || "1";
+    this.agentRegistry = agentRegistry;
+    this.currentAgentId = currentAgentId || "1";
 
     const permissionService = new PermissionService({
-      initialMode: config.permissionMode ?? "manual",
+      initialMode: permissionMode ?? "manual",
     });
 
     const availability = { agentRegistry: this.agentRegistry };
-    for (const [name, tool] of tools) {
+    for (const [name, tool] of resolvedTools) {
       if (tool.requires?.some((r) => !availability[r])) {
-        tools.delete(name);
+        resolvedTools.delete(name);
       }
     }
 
     this.prompter = new ConsolePrompter();
     this.toolExecutor = new ToolExecutor({
-      tools,
+      tools: resolvedTools,
       permissionService,
       changeJournal: this.sessionManager.getChangeJournal(),
       store: this.store,
     });
     this.promptManager = new PromptManager({
-      userPrompt: config.userPrompt,
-      projectPromptFile: config.projectPromptFile,
+      userPrompt,
+      projectPromptFile,
     });
-    if (!config.skipEnvironmentRefresh) {
+    if (!skipEnvironmentRefresh) {
       this.promptManager.refreshEnvironment(); // async, non-blocking
     }
   }

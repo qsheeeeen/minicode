@@ -12,12 +12,26 @@ function makeTestModel() {
   );
 }
 
-function makeAgent(overrides?: Record<string, any>) {
-  return new Agent({
-    model: makeTestModel(),
-    skipEnvironmentRefresh: true,
-    ...overrides,
-  });
+function makeAgent(overrides?: {
+  model?: Model;
+  userPrompt?: string;
+  compressionThresholdRatio?: number;
+  permissionMode?: any;
+}) {
+  const o = overrides ?? {};
+  return new Agent(
+    o.model ?? makeTestModel(),
+    o.userPrompt,
+    undefined, // projectPromptFile
+    o.compressionThresholdRatio,
+    undefined, // agentRegistry
+    undefined, // currentAgentId
+    undefined, // subAgentMode
+    undefined, // sessionStats
+    undefined, // tools
+    o.permissionMode,
+    true, // skipEnvironmentRefresh
+  );
 }
 
 class MockStream implements AsyncIterable<any> {

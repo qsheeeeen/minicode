@@ -158,14 +158,16 @@ const initialModel = new Model(
   config.thinking.effort,
   config.model!.displayName,
 );
-const agent = new Agent({
-  model: initialModel,
-  compressionThresholdRatio: config.compressionThreshold,
+const agent = new Agent(
+  initialModel,
   userPrompt,
   projectPromptFile,
-  agentRegistry: sharedAgentRegistry,
-  sessionStats: sharedSessionStats,
-});
+  config.compressionThreshold,
+  sharedAgentRegistry,
+  undefined, // currentAgentId
+  undefined, // subAgentMode
+  sharedSessionStats,
+);
 agent.setSession(initialSession);
 agent.setLogger(logger);
 agent.setPermissionMode(permissionMode);

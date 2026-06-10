@@ -29,12 +29,19 @@ function createTestAgent(options?: {
       ],
     ]);
   const model = new Model(client, "test-model", "test-provider", 200000);
-  const agent = new Agent({
+  const agent = new Agent(
     model,
+    undefined, // userPrompt
+    undefined, // projectPromptFile
+    undefined, // compressionThresholdRatio
+    undefined, // agentRegistry
+    undefined, // currentAgentId
+    undefined, // subAgentMode
+    undefined, // sessionStats
     tools,
-    permissionMode: options?.permissionMode ?? "yolo",
-    skipEnvironmentRefresh: true,
-  });
+    options?.permissionMode ?? "yolo",
+    true, // skipEnvironmentRefresh
+  );
 
   return { agent };
 }
@@ -209,8 +216,8 @@ describe("Agent virtual integration", () => {
 
     const prompter = new CallbackPrompter(async () => "no");
 
-    const agent = new Agent({
-      model: new Model(
+    const agent = new Agent(
+      new Model(
         new VirtualLLMClient([
           toolUseResponse("call_1", "Dangerous", { action: "delete" }),
         ]),
@@ -218,10 +225,17 @@ describe("Agent virtual integration", () => {
         "test-provider",
         200000,
       ),
+      undefined, // userPrompt
+      undefined, // projectPromptFile
+      undefined, // compressionThresholdRatio
+      undefined, // agentRegistry
+      undefined, // currentAgentId
+      undefined, // subAgentMode
+      undefined, // sessionStats
       tools,
-      permissionMode: "manual",
-      skipEnvironmentRefresh: true,
-    });
+      "manual",
+      true, // skipEnvironmentRefresh
+    );
 
     agent.setPrompter(prompter);
 
