@@ -89,7 +89,7 @@ export class ToolExecutor {
 
     this.deps.logger?.info(
       {
-        session: context.config.model,
+        session: context.config.model.getName(),
         toolCount: toolCalls.length,
         tools: toolCalls.map((t) => t.block.name),
       },
