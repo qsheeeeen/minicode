@@ -1,11 +1,11 @@
 import type { Model } from "./llm/model.js";
-import type { MessageParam, TextBlock, ThinkingBlock } from "./messages.js";
+import type { MessageParam, TextBlock, ThinkingBlock, MessageStore } from "./messages.js";
 import type { LLMToolDef, EffortLevel, LLMResponse } from "./llm/client.js";
 import {
   getAll,
   getSubAgentTools,
-  ToolDef,
-  ToolExecutionContext,
+  type ToolDef,
+  type ToolExecutionContext,
   ToolDeniedError,
 } from "./tools/index.js";
 import { ToolExecutor, type ToolCall } from "./tools/executor.js";
@@ -15,14 +15,10 @@ import {
 } from "./utils/display.js";
 import { Signal } from "./utils/signal.js";
 import type { SessionStats } from "./services/session-stats.js";
-import {
-  AgentRegistry,
-  PermissionService,
-  type PermissionMode,
-} from "./services/index.js";
+import { PermissionService, type PermissionMode } from "./services/permission.js";
+import type { AgentRegistry } from "./services/agent-registry.js";
+import type { ChangeJournal } from "./services/change-journal.js";
 import type { ContentBlock } from "./messages.js";
-import { ChangeJournal } from "./services/change-journal.js";
-import { MessageStore } from "./messages.js";
 import { PromptManager } from "./services/prompt-manager.js";
 import { SessionManager } from "./services/session-manager.js";
 import { ContextManager } from "./services/context-manager.js";
@@ -60,6 +56,12 @@ export class Agent {
   private logger?: pino.Logger;
 
   private isRunning: boolean = false;
+
+  /** Cached access to the message store. */
+  private get store(): MessageStore {
+    return this.sessionManager.getStore();
+  }
+
   get currentSession(): string {
     return this.sessionManager.getSessionName();
   }
@@ -96,7 +98,7 @@ export class Agent {
       contextLength: this.model.getContextLength(),
       compressionThresholdRatio: config.compressionThresholdRatio || 0.8,
       tokenCount$: this.tokenCount$,
-      store: this.sessionManager.getStore(),
+      store: this.store,
       sessionStats: this.sessionManager.getSessionStats(),
     });
     const tools = config.tools
@@ -123,7 +125,7 @@ export class Agent {
       tools,
       permissionService,
       changeJournal: this.sessionManager.getChangeJournal(),
-      store: this.sessionManager.getStore(),
+      store: this.store,
     });
     this.promptManager = new PromptManager({
       userPrompt: config.userPrompt,
@@ -161,7 +163,7 @@ export class Agent {
 
   async compress(): Promise<void> {
     const newTurnIdx = await this.contextManager.compress({
-      store: this.sessionManager.getStore(),
+      store: this.store,
       model: this.model,
       changeJournal: this.sessionManager.getChangeJournal(),
       activeTurnIdx: this.sessionManager.getActiveTurnIdx(),
@@ -187,7 +189,7 @@ export class Agent {
   // Returns the final response and any tool calls the LLM requested.
   private async streamLLM(toolDefs: LLMToolDef[]) {
     const stream = this.model.getClient().chatStream(
-      this.sessionManager.getStore().toLLMMessages(),
+      this.store.toLLMMessages(),
       toolDefs,
       {
         system: this.promptManager.getSystemPrompt(),
@@ -207,16 +209,16 @@ export class Agent {
           : { type: "text" as const, text: delta.trimStart() };
       if (!blockStreaming) {
         blockStreaming = true;
-        this.sessionManager.getStore().setStreaming(true);
-        this.sessionManager.getStore().appendToLastAssistantTurn(block as ContentBlock);
+        this.store.setStreaming(true);
+        this.store.appendToLastAssistantTurn(block as ContentBlock);
       } else {
-        const last = this.sessionManager.getStore().getLastBlock();
+        const last = this.store.getLastBlock();
         if (last?.type === field && field in last) {
           const currentText = (field === "text" ? (last as TextBlock).text : (last as ThinkingBlock).thinking);
           const newText = currentText === "" ? delta.trimStart() : delta;
-          this.sessionManager.getStore().updateLastBlock({ [field]: currentText + newText });
+          this.store.updateLastBlock({ [field]: currentText + newText });
         } else {
-          this.sessionManager.getStore().appendToLastAssistantTurn(block as ContentBlock);
+          this.store.appendToLastAssistantTurn(block as ContentBlock);
         }
       }
     };
@@ -240,7 +242,7 @@ export class Agent {
           blockStreaming = false;
           const tool = this.toolExecutor.getTools().get(chunk.block.name);
           toolCalls.push({ block: chunk.block, tool });
-          this.sessionManager.getStore().appendToLastAssistantTurn(chunk.block as ContentBlock);
+          this.store.appendToLastAssistantTurn(chunk.block as ContentBlock);
           this.saveStore();
         }
       }
@@ -252,7 +254,7 @@ export class Agent {
       throw e;
     } finally {
       this.saveStore();
-      this.sessionManager.getStore().setStreaming(false);
+      this.store.setStreaming(false);
     }
 
     return { response, toolCalls };
@@ -265,10 +267,10 @@ export class Agent {
     if (this.isRunning) return false;
 
     this.isRunning = true;
-    this.sessionManager.getStore().addUserMessage(userMessage, opts?.displayContent);
+    this.store.addUserMessage(userMessage, opts?.displayContent);
 
     // Count user prompts to determine current turn index
-    const turns = this.sessionManager.getStore().getTurns();
+    const turns = this.store.getTurns();
     let promptCount = 0;
     for (const t of turns) {
       if (t.role === "user" && typeof t.content === "string") promptCount++;
@@ -322,7 +324,7 @@ export class Agent {
           await this.toolExecutor.execute(toolCalls, toolContext, this.sessionManager.getActiveTurnIdx());
         } catch (e) {
           if (e instanceof ToolDeniedError) {
-            this.sessionManager.getStore().addStatus({
+            this.store.addStatus({
               role: "error",
               content: `Tool "${e.toolName}" was denied by user`,
               timestamp: new Date(),
@@ -342,7 +344,7 @@ export class Agent {
       this.isRunning = false;
       if (this.abortController?.signal.aborted) {
         // Remove the last user message that triggered this aborted run
-        this.sessionManager.getStore().removeLastTurn(
+        this.store.removeLastTurn(
           (last) =>
             last.role === "user" &&
             typeof last.content === "string" &&
@@ -367,16 +369,16 @@ export class Agent {
   }
 
   getMessages(): MessageParam[] {
-    return this.sessionManager.getStore().toLLMMessages();
+    return this.store.toLLMMessages();
   }
 
   // Restore messages from session. Stores turns directly — no conversion needed.
   setMessages(messages: MessageParam[]): void {
-    this.sessionManager.getStore().setTurns(messages);
+    this.store.setTurns(messages);
   }
 
   getStore(): MessageStore {
-    return this.sessionManager.getStore();
+    return this.store;
   }
 
   getChangeJournal(): ChangeJournal {

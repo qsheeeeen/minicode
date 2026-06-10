@@ -6,10 +6,8 @@
 // It returns the new activeTurnIdx so the caller (Agent) can update
 // SessionManager.
 
-import type { LLMClient } from "../llm/client.js";
+import type { LLMClient, TokenUsage } from "../llm/client.js";
 import type { Model } from "../llm/model.js";
-import type { TokenUsage } from "../llm/client.js";
-import type { MessageParam } from "../messages.js";
 import type { SessionStats } from "./session-stats.js";
 import { Signal } from "../utils/signal.js";
 import { TokenTracker } from "./token-tracker.js";
@@ -33,14 +31,12 @@ export interface CompressDeps {
 }
 
 export class ContextManager {
-  private compressionThresholdRatio: number;
   private tokenTracker: TokenTracker;
   private compressionService = new CompressionService();
   private isCompressing = false;
   readonly tokenCount$: Signal<number>;
 
   constructor(opts: ContextManagerOpts) {
-    this.compressionThresholdRatio = opts.compressionThresholdRatio;
     this.tokenCount$ = opts.tokenCount$;
     this.tokenTracker = new TokenTracker(
       opts.contextLength,
