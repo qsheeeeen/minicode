@@ -26,6 +26,7 @@ import { TokenTracker } from "./services/token-tracker.js";
 import { ChangeJournal } from "./services/change-journal.js";
 import { MessageStore } from "./messages.js";
 import { PromptManager } from "./services/prompt-manager.js";
+import { SessionManager } from "./services/session-manager.js";
 import type pino from "pino";
 
 export interface AgentConfig {
@@ -49,33 +50,27 @@ export interface AgentConfig {
 export class Agent {
   private model: Model;
   private tools: Map<string, ToolDef>;
-  private store = new MessageStore();
+  private sessionManager: SessionManager;
   private compressionThresholdRatio: number;
   private tokenTracker: TokenTracker;
   private compressionService: CompressionService;
-  private changeJournal = new ChangeJournal();
   private toolExecutor: ToolExecutor;
-  private activeTurnIdx = 0;
-  private _currentSession = `session-${Date.now()}`;
-  get currentSession(): string {
-    return this._currentSession;
-  }
   public readonly tokenCount$ = new Signal(0);
   private prompter: UserPrompter;
   private promptManager: PromptManager;
   private agentRegistry?: AgentRegistry;
   private currentAgentId: string;
-  private sessionStats?: SessionStats;
   private permissionService: PermissionService;
   private abortController: AbortController | null = null;
   private logger?: pino.Logger;
 
   private isCompressing: boolean = false;
   private isRunning: boolean = false;
+  get currentSession(): string {
+    return this.sessionManager.getSessionName();
+  }
   public setSession(sessionName: string): void {
-    this._currentSession = sessionName;
-    this.store.setSessionName(sessionName);
-    this.changeJournal.startSession(MessageStore.getSessionDir(), sessionName);
+    this.sessionManager.setSession(sessionName);
   }
 
   public setLogger(logger: pino.Logger): void {
@@ -102,6 +97,9 @@ export class Agent {
     this.model = config.model;
     this.compressionThresholdRatio = config.compressionThresholdRatio || 0.8;
     this.compressionService = new CompressionService();
+    this.sessionManager = new SessionManager({
+      sessionStats: config.sessionStats,
+    });
     this.tools = config.tools
       ? new Map(config.tools)
       : config.subAgentMode
@@ -109,7 +107,6 @@ export class Agent {
         : getAll();
     this.agentRegistry = config.agentRegistry;
     this.currentAgentId = config.currentAgentId || "1";
-    this.sessionStats = config.sessionStats;
 
     this.permissionService = new PermissionService({
       initialMode: config.permissionMode ?? "manual",
@@ -125,15 +122,15 @@ export class Agent {
     this.prompter = new ConsolePrompter();
     this.toolExecutor = new ToolExecutor({
       permissionService: this.permissionService,
-      changeJournal: this.changeJournal,
-      store: this.store,
+      changeJournal: this.sessionManager.getChangeJournal(),
+      store: this.sessionManager.getStore(),
     });
     this.tokenTracker = new TokenTracker(
       this.model.getContextLength(),
       this.compressionThresholdRatio,
       this.tokenCount$,
-      this.store,
-      this.sessionStats,
+      this.sessionManager.getStore(),
+      this.sessionManager.getSessionStats(),
     );
     this.promptManager = new PromptManager({
       userPrompt: config.userPrompt,
@@ -151,11 +148,10 @@ export class Agent {
   }
 
   private async saveStore(): Promise<void> {
-    this.store.setMeta({
+    await this.sessionManager.saveStore({
       model: this.model.getName(),
       totalTokens: this.tokenTracker.getTotal(),
-    });
-    await this.store.save().catch((e) => {
+    }).catch((e: unknown) => {
       this.logger?.error({ error: String(e) }, "Failed to save session");
     });
   }
@@ -174,9 +170,9 @@ export class Agent {
     if (this.isCompressing) return;
 
     const recentCount = 10;
-    const turns = this.store.getTurns();
+    const turns = this.sessionManager.getStore().getTurns();
     if (turns.length <= recentCount + 2) {
-      this.store.addStatus({
+      this.sessionManager.getStore().addStatus({
         role: "status",
         content: "(Not enough messages to compress)",
         timestamp: new Date(),
@@ -186,7 +182,7 @@ export class Agent {
 
     this.isCompressing = true;
     const totalTokens = this.tokenTracker.getTotal();
-    this.store.addStatus({
+    this.sessionManager.getStore().addStatus({
       role: "status",
       content: `(Compressing ${turns.length - recentCount} messages, ${totalTokens.toLocaleString()} tokens...)`,
       timestamp: new Date(),
@@ -201,7 +197,7 @@ export class Agent {
       }
 
       const compressed = await this.compressionService.compress(
-        this.store.toLLMMessages(),
+        this.sessionManager.getStore().toLLMMessages(),
         this.model.getClient(),
         this.model.getName(),
       );
@@ -219,10 +215,10 @@ export class Agent {
 
       if (prunedCount > 0) {
         // Remove entries for compressed-away turns, renumber kept entries
-        await this.changeJournal.pruneAndRenumber(prunedCount, 1);
+        await this.sessionManager.getChangeJournal().pruneAndRenumber(prunedCount, 1);
       }
 
-      this.store.setTurns(compressed);
+      this.sessionManager.getStore().setTurns(compressed);
       this.tokenTracker.reset();
 
       // Recalculate activeTurnIdx for the compressed conversation
@@ -230,14 +226,14 @@ export class Agent {
       for (const t of compressed) {
         if (t.role === "user" && typeof t.content === "string") newActiveIdx++;
       }
-      this.activeTurnIdx = newActiveIdx;
-      this.store.addStatus({
+      this.sessionManager.setActiveTurnIdx(newActiveIdx);
+      this.sessionManager.getStore().addStatus({
         role: "status",
         content: `(Compressed to ${compressed.length} turns)`,
         timestamp: new Date(),
       });
     } catch (e) {
-      this.store.addStatus({
+      this.sessionManager.getStore().addStatus({
         role: "error",
         content: `(Compression failed: ${(e as Error).message})`,
         timestamp: new Date(),
@@ -265,7 +261,7 @@ export class Agent {
   // Returns the final response and any tool calls the LLM requested.
   private async streamLLM(toolDefs: LLMToolDef[]) {
     const stream = this.model.getClient().chatStream(
-      this.store.toLLMMessages(),
+      this.sessionManager.getStore().toLLMMessages(),
       toolDefs,
       {
         system: this.promptManager.getSystemPrompt(),
@@ -285,16 +281,16 @@ export class Agent {
           : { type: "text" as const, text: delta.trimStart() };
       if (!blockStreaming) {
         blockStreaming = true;
-        this.store.setStreaming(true);
-        this.store.appendToLastAssistantTurn(block as ContentBlock);
+        this.sessionManager.getStore().setStreaming(true);
+        this.sessionManager.getStore().appendToLastAssistantTurn(block as ContentBlock);
       } else {
-        const last = this.store.getLastBlock();
+        const last = this.sessionManager.getStore().getLastBlock();
         if (last?.type === field && field in last) {
           const currentText = (field === "text" ? (last as TextBlock).text : (last as ThinkingBlock).thinking);
           const newText = currentText === "" ? delta.trimStart() : delta;
-          this.store.updateLastBlock({ [field]: currentText + newText });
+          this.sessionManager.getStore().updateLastBlock({ [field]: currentText + newText });
         } else {
-          this.store.appendToLastAssistantTurn(block as ContentBlock);
+          this.sessionManager.getStore().appendToLastAssistantTurn(block as ContentBlock);
         }
       }
     };
@@ -318,7 +314,7 @@ export class Agent {
           blockStreaming = false;
           const tool = this.tools.get(chunk.block.name);
           toolCalls.push({ block: chunk.block, tool });
-          this.store.appendToLastAssistantTurn(chunk.block as ContentBlock);
+          this.sessionManager.getStore().appendToLastAssistantTurn(chunk.block as ContentBlock);
           this.saveStore();
         }
       }
@@ -330,7 +326,7 @@ export class Agent {
       throw e;
     } finally {
       this.saveStore();
-      this.store.setStreaming(false);
+      this.sessionManager.getStore().setStreaming(false);
     }
 
     return { response, toolCalls };
@@ -343,15 +339,15 @@ export class Agent {
     if (this.isRunning) return false;
 
     this.isRunning = true;
-    this.store.addUserMessage(userMessage, opts?.displayContent);
+    this.sessionManager.getStore().addUserMessage(userMessage, opts?.displayContent);
 
     // Count user prompts to determine current turn index
-    const turns = this.store.getTurns();
+    const turns = this.sessionManager.getStore().getTurns();
     let promptCount = 0;
     for (const t of turns) {
       if (t.role === "user" && typeof t.content === "string") promptCount++;
     }
-    this.activeTurnIdx = promptCount;
+    this.sessionManager.setActiveTurnIdx(promptCount);
 
     this.abortController = new AbortController();
     this.logger?.info(
@@ -398,10 +394,10 @@ export class Agent {
         };
 
         try {
-          await this.toolExecutor.execute(toolCalls, toolContext, this.activeTurnIdx);
+          await this.toolExecutor.execute(toolCalls, toolContext, this.sessionManager.getActiveTurnIdx());
         } catch (e) {
           if (e instanceof ToolDeniedError) {
-            this.store.addStatus({
+            this.sessionManager.getStore().addStatus({
               role: "error",
               content: `Tool "${e.toolName}" was denied by user`,
               timestamp: new Date(),
@@ -421,7 +417,7 @@ export class Agent {
       this.isRunning = false;
       if (this.abortController?.signal.aborted) {
         // Remove the last user message that triggered this aborted run
-        this.store.removeLastTurn(
+        this.sessionManager.getStore().removeLastTurn(
           (last) =>
             last.role === "user" &&
             typeof last.content === "string" &&
@@ -446,20 +442,20 @@ export class Agent {
   }
 
   getMessages(): MessageParam[] {
-    return this.store.toLLMMessages();
+    return this.sessionManager.getStore().toLLMMessages();
   }
 
   // Restore messages from session. Stores turns directly — no conversion needed.
   setMessages(messages: MessageParam[]): void {
-    this.store.setTurns(messages);
+    this.sessionManager.getStore().setTurns(messages);
   }
 
   getStore(): MessageStore {
-    return this.store;
+    return this.sessionManager.getStore();
   }
 
   getChangeJournal(): ChangeJournal {
-    return this.changeJournal;
+    return this.sessionManager.getChangeJournal();
   }
 
   getTokenCount(): number {
@@ -471,10 +467,8 @@ export class Agent {
   }
 
   clearSession(): void {
-    this.store.clear();
+    this.sessionManager.clearSession();
     this.tokenTracker.reset();
-    this.changeJournal.close();
-    this.changeJournal = new ChangeJournal();
   }
 
   getTools(): Map<string, ToolDef> {
