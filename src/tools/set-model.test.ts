@@ -54,6 +54,7 @@ describe("setModelTool", () => {
       "anthropic",
       undefined,
       undefined,
+      undefined,
     );
     expect(mockSetModel).toHaveBeenCalledWith("claude-sonnet-4-5@anthropic");
   });
@@ -137,6 +138,7 @@ describe("setModelTool", () => {
       "anthropic",
       200000,
       "Claude Opus",
+      undefined,
     );
   });
 });

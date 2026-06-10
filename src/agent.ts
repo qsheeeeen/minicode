@@ -34,6 +34,7 @@ export interface AgentConfig {
   baseURL?: string;
   model?: string;
   provider?: string;
+  protocol?: string;
   displayName?: string;
   contextLength?: number;
   compressionThresholdRatio?: number;
@@ -63,6 +64,7 @@ export class Agent {
   private model?: string;
   private displayName?: string;
   private modelProvider?: string;
+  private protocol: string;
   private contextLength: number;
   private compressionThresholdRatio: number;
   private tokenTracker: TokenTracker;
@@ -119,6 +121,7 @@ export class Agent {
     provider?: string,
     contextLength?: number,
     displayName?: string,
+    protocol?: string,
   ): void {
     this.model = model;
     this.displayName = displayName;
@@ -126,9 +129,10 @@ export class Agent {
     if (apiKey !== undefined) this.apiKey = apiKey;
     if (baseURL !== undefined) this.baseURL = baseURL;
     if (contextLength !== undefined) this.contextLength = contextLength;
+    if (protocol !== undefined) this.protocol = protocol;
     if (!this.clientInjected) {
       this.client = createClient(
-        this.modelProvider || "anthropic",
+        this.protocol,
         this.apiKey,
         this.baseURL,
       );
@@ -151,6 +155,7 @@ export class Agent {
     this.model = config.model;
     this.displayName = config.displayName;
     this.modelProvider = config.provider;
+    this.protocol = config.protocol || "anthropic";
     this.contextLength = config.contextLength || 200000;
     this.compressionThresholdRatio = config.compressionThresholdRatio || 0.8;
     this.thinkingEnabled = config.thinkingEnabled || false;
@@ -170,7 +175,7 @@ export class Agent {
       this.clientInjected = true;
     } else {
       this.client = createClient(
-        this.modelProvider || "anthropic",
+        this.protocol,
         this.apiKey,
         this.baseURL,
       );

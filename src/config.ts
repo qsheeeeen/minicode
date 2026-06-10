@@ -15,6 +15,7 @@ export interface ModelConfig {
 export interface ProviderConfig {
   apiKey?: string;
   baseURL?: string;
+  protocol?: string; // "anthropic" | "openai" | "openai-responses" — defaults to "anthropic"
   models?: Record<string, ModelConfig>;
 }
 
@@ -85,6 +86,7 @@ export function loadConfigSync(): Config {
 export interface ResolvedConfig {
   model: {
     provider: string;
+    protocol: string;
     model: string;
     apiKey: string;
     baseURL?: string;
@@ -109,6 +111,7 @@ export async function loadAllConfig(
       const modelConfig = parsed.providerConfig.models?.[parsed.modelName];
       model = {
         provider: parsed.providerName,
+        protocol: parsed.providerConfig.protocol || "anthropic",
         model: parsed.modelName,
         apiKey: parsed.providerConfig.apiKey!,
         baseURL: parsed.providerConfig.baseURL,

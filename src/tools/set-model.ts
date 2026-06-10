@@ -46,6 +46,7 @@ export const setModelTool: ToolDef = {
         parsed.providerName,
         modelConfig?.contextLength,
         modelConfig?.name,
+        parsed.providerConfig.protocol,
       );
     }
     await setModel(modelSpec);
