@@ -9,7 +9,7 @@
 import OpenAI from "openai";
 
 import type { LLMClient, LLMStream, StreamEvent, LLMToolDef, ChatOptions, LLMResponse, TokenUsage, EffortLevel } from "./client.js";
-import type { MessageParam, ContentBlock, TextBlock, ThinkingBlock, ToolUseBlock, ToolResultBlock } from "../messages.js";
+import type { MessageParam, ContentBlock, TextBlock, ToolUseBlock, ToolResultBlock } from "../messages.js";
 
 // The OpenAI SDK's ResponseStreamEvent union doesn't cover all streaming event
 // types (delta, output_item.done, etc.). These interfaces fill the gap.
@@ -34,7 +34,6 @@ interface StreamCompletedEvent {
 // Constants
 
 const DEFAULT_MODEL = "gpt-4.1";
-const DEFAULT_MAX_TOKENS = 8192;
 
 // Effort mapping
 

@@ -1,6 +1,5 @@
 // Standalone demo for Message component.
 // Run: bun run src/ui/tui/demos/message.tsx
-import React from "react";
 import { render, Box } from "ink";
 import { Message } from "../Message.js";
 

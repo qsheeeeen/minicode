@@ -1,6 +1,6 @@
 import type { LLMClient } from "./llm/client.js";
 import { createClient } from "./llm/client.js";
-import type { MessageParam, ToolUseBlock, TextBlock, ThinkingBlock } from "./messages.js";
+import type { MessageParam, TextBlock, ThinkingBlock } from "./messages.js";
 import type { LLMToolDef, EffortLevel, LLMResponse } from "./llm/client.js";
 import {
   getAll,
@@ -312,11 +312,8 @@ export class Agent {
     }
   }
 
-  private envReady = false;
-
   private async refreshEnvironment(): Promise<void> {
     this.environmentContext = await getEnvironmentContext();
-    this.envReady = true;
     this.refreshSystemPrompt();
   }
 

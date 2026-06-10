@@ -20,7 +20,6 @@ import { App } from "./ui/tui.js";
 import {
   getCommandNames,
   registerCommand,
-  executeCommand,
 } from "./ui/commands/index.js";
 
 const __filename = fileURLToPath(import.meta.url);

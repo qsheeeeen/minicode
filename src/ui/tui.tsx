@@ -110,8 +110,6 @@ function AppContent({
   promptFiles,
   initialSession,
   initialPrompt,
-  sessionName,
-  resumeRecent,
   agentRegistry,
   programStartTime,
   sessionStats,

@@ -10,7 +10,7 @@ const CONTEXT_LINES = 3;
 
 // Generate unified-style diff with context lines and line numbers
 export function generateDiffSummary(
-  filePath: string,
+  _filePath: string,
   oldText: string,
   newText: string,
 ): DiffLine[] {

@@ -1,5 +1,5 @@
 import type { Agent } from "../agent.js";
-import type { MessageParam, ContentBlock } from "../messages.js";
+import type { ContentBlock } from "../messages.js";
 import type { CommandContext } from "./commands/index.js";
 import { routeInput } from "./routing.js";
 import { processRoute } from "./route-handler.js";

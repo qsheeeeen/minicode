@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Box, Text, useInput } from "ink";
 import { useTuiStore, type TuiState, type TuiAction } from "./store.js";
 import type { PromptOption } from "../../utils/display.js";

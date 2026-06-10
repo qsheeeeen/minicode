@@ -6,11 +6,10 @@ import type { MessageStreamEvent } from "@anthropic-ai/sdk/resources/messages.js
 import type { LLMStream, StreamEvent } from "./client.js";
 import type {
   MessageCreateParamsStreaming,
-  OutputConfig,
 } from "@anthropic-ai/sdk/resources/messages.js";
 
 import type { LLMClient, LLMToolDef, ChatOptions, LLMResponse, EffortLevel } from "./client.js";
-import type { MessageParam, ContentBlock, ToolUseBlock, ToolResultBlock } from "../messages.js";
+import type { MessageParam, ContentBlock, ToolResultBlock } from "../messages.js";
 
 function toSdkEffort(effort: EffortLevel): "low" | "medium" | "high" | "xhigh" | "max" {
   switch (effort) {

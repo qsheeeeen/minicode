@@ -1,6 +1,6 @@
 // Standalone demo for all input components.
 // Run: bun run src/ui/tui/demos/inputs.tsx
-import React, { useState } from "react";
+import { useState } from "react";
 import { render, Box, Text, useInput } from "ink";
 import {
   ChatInput,

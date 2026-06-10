@@ -9,7 +9,7 @@
  */
 import { create } from "zustand";
 import { render, Box, Text } from "ink";
-import React, { useEffect } from "react";
+import { useEffect } from "react";
 
 // Zustand store created outside React tree — this is the key pattern
 const useTestStore = create<{ count: number; inc: () => void }>((set) => ({

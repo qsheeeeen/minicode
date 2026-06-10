@@ -20,7 +20,7 @@ useTuiStore.setState({
   permissionMode: "manual",
   status: "",
 });
-const p1 = render(
+render(
   <Box flexDirection="column" padding={1}>
     <Panel
       agentRef={mkAgent("claude-sonnet-4-5", "anthropic", 200000)}
@@ -34,7 +34,7 @@ useTuiStore.setState({
   permissionMode: "yolo",
   status: "",
 });
-const p2 = render(
+render(
   <Panel agentRef={mkAgent("claude-opus-4-7", "anthropic", 200000)} />,
 );
 useTuiStore.setState({
@@ -43,6 +43,6 @@ useTuiStore.setState({
   permissionMode: "auto",
   status: "Compressing...",
 });
-const p3 = render(
+render(
   <Panel agentRef={mkAgent("gpt-4o", "openai", 200000)} />,
 );

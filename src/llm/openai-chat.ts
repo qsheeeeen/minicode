@@ -5,7 +5,7 @@
 
 import OpenAI from "openai";
 import type { LLMClient, LLMStream, StreamEvent, LLMToolDef, ChatOptions, LLMResponse, EffortLevel } from "./client.js";
-import type { MessageParam, ContentBlock, TextBlock, ThinkingBlock, ToolUseBlock, ToolResultBlock } from "../messages.js";
+import type { MessageParam, ContentBlock, TextBlock, ToolUseBlock, ToolResultBlock } from "../messages.js";
 
 // Constants
 
@@ -148,61 +148,6 @@ function toSdkTools(tools: LLMToolDef[]): OpenAI.ChatCompletionTool[] {
       parameters: t.input_schema,
     },
   }));
-}
-
-// Response conversion (SDK → internal)
-
-function toLLMResponse(
-  choice: OpenAI.ChatCompletion.Choice,
-  usage: OpenAI.CompletionUsage | undefined,
-): LLMResponse {
-  const content: ContentBlock[] = [];
-  const msg = choice.message;
-
-  // Reasoning content → ThinkingBlock (o1/o3/o4-mini models)
-  const reasoning = (msg as unknown as Record<string, unknown>)
-    .reasoning_content;
-  if (typeof reasoning === "string" && reasoning.length > 0) {
-    content.push({ type: "thinking", thinking: reasoning });
-  }
-
-  // Text content → TextBlock
-  if (msg.content) {
-    content.push({ type: "text", text: msg.content });
-  }
-
-  // Tool calls → ToolUseBlock[]
-  if (msg.tool_calls) {
-    for (const tc of msg.tool_calls) {
-      if (tc.type === "function") {
-        let input: Record<string, unknown> = {};
-        try {
-          input = JSON.parse(tc.function.arguments);
-        } catch {
-          // malformed JSON — keep empty object
-        }
-        content.push({
-          type: "tool_use",
-          id: tc.id,
-          name: tc.function.name,
-          input,
-        });
-      }
-    }
-  }
-
-  return {
-    content,
-    stop_reason: mapStopReason(choice.finish_reason),
-    usage: {
-      input: {
-        total: usage?.prompt_tokens ?? 0,
-        cache_miss: 0,
-        cache_hit: 0,
-      },
-      output: usage?.completion_tokens ?? 0,
-    },
-  };
 }
 
 // OpenAIChatClient
