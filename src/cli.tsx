@@ -155,7 +155,6 @@ const initialModel = new Model(
   config.model!.model,
   config.model!.provider,
   config.model!.contextLength ?? 200000,
-  config.thinking.enabled,
   config.thinking.effort,
   config.model!.displayName,
 );

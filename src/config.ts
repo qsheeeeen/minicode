@@ -94,7 +94,7 @@ export interface ResolvedConfig {
     displayName?: string;
   } | null;
   compressionThreshold: number;
-  thinking: { enabled: boolean; effort?: EffortLevel };
+  thinking: { effort?: EffortLevel };
   permissionMode?: "manual" | "yolo" | "auto";
 }
 
@@ -130,7 +130,6 @@ export async function loadAllConfig(
     model,
     compressionThreshold: config.compressionThreshold ?? 0.8,
     thinking: {
-      enabled: typeof config.thinking === "object",
       effort,
     },
     permissionMode: config.permissionMode,

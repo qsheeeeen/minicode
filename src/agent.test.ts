@@ -264,7 +264,6 @@ describe("Agent", () => {
         "test-model",
         "test-provider",
         200000,
-        true, // thinkingEnabled
       );
       const agent = makeAgent({ model: thinkingModel });
       const runPromise = agent.run("Solve this");

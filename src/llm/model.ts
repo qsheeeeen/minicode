@@ -21,7 +21,6 @@ export class Model {
     private readonly _name: string,
     private readonly _provider: string,
     private readonly _contextLength: number,
-    private readonly _thinkingEnabled: boolean = false,
     effort?: EffortLevel,
     private readonly _displayName?: string,
   ) {
@@ -51,11 +50,6 @@ export class Model {
   /** Human-readable name for display (e.g. "Claude Sonnet"). */
   getDisplayName(): string {
     return this._displayName || this._name;
-  }
-
-  /** Whether thinking/reasoning is enabled for this model. */
-  getThinkingEnabled(): boolean {
-    return this._thinkingEnabled;
   }
 
   /** Reasoning effort level (e.g. "low", "high"). */
@@ -96,7 +90,6 @@ export class ModelFactory {
       parsed.modelName,
       parsed.providerName,
       modelConfig?.contextLength ?? 200000,
-      false,  // thinkingEnabled — resolved per-session, not per-model
       undefined, // effort — resolved per-session, not per-model
       modelConfig?.name,
     );
