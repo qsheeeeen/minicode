@@ -7,9 +7,11 @@ import { Panel } from "../Panel.js";
 function mkAgent(model: string, provider: string, ctx: number) {
   return {
     current: {
-      getModelProvider: () => provider,
-      getModelName: () => model,
-      getContextLength: () => ctx,
+      getModel: () => ({
+        getProvider: () => provider,
+        getDisplayName: () => model,
+        getContextLength: () => ctx,
+      }),
     } as any,
   };
 }

@@ -1,5 +1,4 @@
-import type { LLMClient } from "./llm/client.js";
-import { createClient } from "./llm/client.js";
+import type { Model } from "./llm/model.js";
 import type { MessageParam, TextBlock, ThinkingBlock } from "./messages.js";
 import type { LLMToolDef, EffortLevel, LLMResponse } from "./llm/client.js";
 import {
@@ -30,13 +29,7 @@ import { buildSystemPrompt, getEnvironmentContext } from "./utils/prompts.js";
 import type pino from "pino";
 
 export interface AgentConfig {
-  apiKey?: string;
-  baseURL?: string;
-  model?: string;
-  provider?: string;
-  protocol?: string;
-  displayName?: string;
-  contextLength?: number;
+  model: Model;
   compressionThresholdRatio?: number;
   thinkingEnabled?: boolean;
   effort?: EffortLevel;
@@ -46,8 +39,6 @@ export interface AgentConfig {
   agentRegistry?: AgentRegistry;
   currentAgentId?: string;
   sessionStats?: SessionStats;
-  /** LLM client. Defaults to creating one from model/provider config. */
-  client?: LLMClient;
   /** Available tools. Defaults to the built-in tool set. */
   tools?: Map<string, ToolDef>;
   /** Permission mode for tool execution. */
@@ -58,14 +49,9 @@ export interface AgentConfig {
 
 
 export class Agent {
-  private client: LLMClient;
+  private model: Model;
   private tools: Map<string, ToolDef>;
   private store = new MessageStore();
-  private model?: string;
-  private displayName?: string;
-  private modelProvider?: string;
-  private protocol: string;
-  private contextLength: number;
   private compressionThresholdRatio: number;
   private tokenTracker: TokenTracker;
   private compressionService: CompressionService;
@@ -84,8 +70,6 @@ export class Agent {
   private projectPromptFile: string;
   private agentRegistry?: AgentRegistry;
   private currentAgentId: string;
-  private apiKey?: string;
-  private baseURL?: string;
   private sessionStats?: SessionStats;
   private permissionService: PermissionService;
   private abortController: AbortController | null = null;
@@ -93,7 +77,6 @@ export class Agent {
 
   private isCompressing: boolean = false;
   private isRunning: boolean = false;
-  private clientInjected: boolean = false;
   private environmentContext = "";
   private systemPrompt = "";
   public setSession(sessionName: string): void {
@@ -114,49 +97,16 @@ export class Agent {
     this.permissionService.setMode(mode);
   }
 
-  public setModel(
-    model: string,
-    apiKey?: string,
-    baseURL?: string,
-    provider?: string,
-    contextLength?: number,
-    displayName?: string,
-    protocol?: string,
-  ): void {
+  public setModel(model: Model): void {
     this.model = model;
-    this.displayName = displayName;
-    if (provider !== undefined) this.modelProvider = provider;
-    if (apiKey !== undefined) this.apiKey = apiKey;
-    if (baseURL !== undefined) this.baseURL = baseURL;
-    if (contextLength !== undefined) this.contextLength = contextLength;
-    if (protocol !== undefined) this.protocol = protocol;
-    if (!this.clientInjected) {
-      this.client = createClient(
-        this.protocol,
-        this.apiKey,
-        this.baseURL,
-      );
-    }
   }
 
-  getModelName(): string | undefined {
-    return this.displayName || this.model;
-  }
-  getModelProvider(): string | undefined {
-    return this.modelProvider;
-  }
-  getContextLength(): number {
-    return this.contextLength;
+  getModel(): Model {
+    return this.model;
   }
 
-  constructor(config: AgentConfig = {}) {
-    this.apiKey = config.apiKey;
-    this.baseURL = config.baseURL;
+  constructor(config: AgentConfig) {
     this.model = config.model;
-    this.displayName = config.displayName;
-    this.modelProvider = config.provider;
-    this.protocol = config.protocol || "anthropic";
-    this.contextLength = config.contextLength || 200000;
     this.compressionThresholdRatio = config.compressionThresholdRatio || 0.8;
     this.thinkingEnabled = config.thinkingEnabled || false;
     this.effort = config.effort;
@@ -169,17 +119,6 @@ export class Agent {
     this.agentRegistry = config.agentRegistry;
     this.currentAgentId = config.currentAgentId || "1";
     this.sessionStats = config.sessionStats;
-
-    if (config.client) {
-      this.client = config.client;
-      this.clientInjected = true;
-    } else {
-      this.client = createClient(
-        this.protocol,
-        this.apiKey,
-        this.baseURL,
-      );
-    }
 
     this.permissionService = new PermissionService({
       initialMode: config.permissionMode ?? "manual",
@@ -199,7 +138,7 @@ export class Agent {
       store: this.store,
     });
     this.tokenTracker = new TokenTracker(
-      this.contextLength,
+      this.model.getContextLength(),
       this.compressionThresholdRatio,
       this.tokenCount$,
       this.store,
@@ -222,7 +161,7 @@ export class Agent {
 
   private async saveStore(): Promise<void> {
     this.store.setMeta({
-      model: this.model || "unknown",
+      model: this.model.getName(),
       totalTokens: this.tokenTracker.getTotal(),
     });
     await this.store.save().catch((e) => {
@@ -272,8 +211,8 @@ export class Agent {
 
       const compressed = await this.compressionService.compress(
         this.store.toLLMMessages(),
-        this.client,
-        this.model,
+        this.model.getClient(),
+        this.model.getName(),
       );
 
       // Count kept user prompts (excluding the summary added by compression)
@@ -336,7 +275,7 @@ export class Agent {
     if (!response.usage) return;
 
     const { shouldCompress } = this.tokenTracker.processUsage(
-      this.model || "unknown",
+      this.model.getName(),
       response.usage,
     );
 
@@ -348,12 +287,12 @@ export class Agent {
   // Stream LLM response, updating MessageStore in real-time.
   // Returns the final response and any tool calls the LLM requested.
   private async streamLLM(toolDefs: LLMToolDef[]) {
-    const stream = this.client.chatStream(
+    const stream = this.model.getClient().chatStream(
       this.store.toLLMMessages(),
       toolDefs,
       {
         system: this.systemPrompt,
-        model: this.model,
+        model: this.model.getName(),
         signal: this.abortController?.signal,
         effort: this.effort,
       },
@@ -472,11 +411,7 @@ export class Agent {
           registry: this.agentRegistry,
           signal: this.abortController?.signal,
           config: {
-            apiKey: this.apiKey,
-            baseURL: this.baseURL,
             model: this.model,
-            provider: this.modelProvider,
-            contextLength: this.contextLength,
             compressionThresholdRatio: this.compressionThresholdRatio,
             thinkingEnabled: this.thinkingEnabled,
             effort: this.effort,

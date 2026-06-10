@@ -1,5 +1,24 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { EventEmitter } from "events";
+import { Model } from "./llm/model.js";
+
+function makeTestModel() {
+  // Use the mocked chatStream from the llm/client.js mock
+  return new Model(
+    { chatStream: mockChatStream } as any,
+    "test-model",
+    "test-provider",
+    200000,
+  );
+}
+
+function makeAgent(overrides?: Record<string, any>) {
+  return new Agent({
+    model: makeTestModel(),
+    skipEnvironmentRefresh: true,
+    ...overrides,
+  });
+}
 
 class MockStream implements AsyncIterable<any> {
   private _promise: Promise<any>;
@@ -166,14 +185,14 @@ describe("Agent", () => {
 
   describe("constructor", () => {
     it("initializes with default values", () => {
-      const agent = new Agent();
+      const agent = makeAgent();
       expect(agent.currentSession).toMatch(/^session-\d+$/);
       expect(agent.getTokenCount()).toBe(100);
       expect(agent.getStore()).toBeInstanceOf(MessageStore);
     });
 
     it("initializes with config values", () => {
-      const agent = new Agent({ userPrompt: "custom" });
+      const agent = makeAgent({ userPrompt: "custom" });
       agent.setSession("test-session");
       expect(agent.currentSession).toBe("test-session");
     });
@@ -181,7 +200,7 @@ describe("Agent", () => {
 
   describe("getMessages and setMessages", () => {
     it("setMessages stores turns directly", () => {
-      const agent = new Agent();
+      const agent = makeAgent();
       const messages: any[] = [{ role: "user", content: "hello" }];
       agent.setMessages(messages);
       expect(agent.getMessages()).toEqual(messages);
@@ -189,7 +208,7 @@ describe("Agent", () => {
     });
 
     it("getMessages returns store turns", () => {
-      const agent = new Agent();
+      const agent = makeAgent();
       agent.getStore().addUserMessage("hello");
       expect(agent.getMessages()).toEqual([{ role: "user", content: "hello" }]);
     });
@@ -197,7 +216,7 @@ describe("Agent", () => {
 
   describe("compress", () => {
     it("does not compress if not enough turns", async () => {
-      const agent = new Agent();
+      const agent = makeAgent();
       for (let i = 0; i < 5; i++) {
         agent.getStore().addUserMessage(`msg ${i}`);
       }
@@ -209,7 +228,7 @@ describe("Agent", () => {
 
   describe("clearSession", () => {
     it("clears the store", () => {
-      const agent = new Agent();
+      const agent = makeAgent();
       agent.getStore().addUserMessage("hi");
       agent.clearSession();
       expect(agent.getStore().getTurns()).toHaveLength(0);
@@ -220,7 +239,7 @@ describe("Agent", () => {
     it("handles a basic text interaction", async () => {
       const stream = new MockStream();
       mockChatStream.mockReturnValueOnce(stream);
-      const agent = new Agent();
+      const agent = makeAgent();
       const runPromise = agent.run("Hello agent");
       await new Promise((r) => setTimeout(r, 10));
 
@@ -240,7 +259,7 @@ describe("Agent", () => {
     it("handles thinking blocks", async () => {
       const stream = new MockStream();
       mockChatStream.mockReturnValueOnce(stream);
-      const agent = new Agent({ thinkingEnabled: true });
+      const agent = makeAgent({ thinkingEnabled: true });
       const runPromise = agent.run("Solve this");
       await new Promise((r) => setTimeout(r, 10));
 
@@ -261,7 +280,7 @@ describe("Agent", () => {
       const stream2 = new MockStream();
       mockChatStream.mockReturnValueOnce(stream1).mockReturnValueOnce(stream2);
 
-      const agent = new Agent();
+      const agent = makeAgent();
       const runPromise = agent.run("Use tool");
       await new Promise((r) => setTimeout(r, 10));
 
@@ -298,7 +317,7 @@ describe("Agent", () => {
     it("rejects concurrent run() calls, returns false", async () => {
       const stream = new MockStream();
       mockChatStream.mockReturnValueOnce(stream);
-      const agent = new Agent();
+      const agent = makeAgent();
       const run1 = agent.run("First message");
       const run2 = agent.run("Second message");
       await expect(run2).resolves.toBe(false);
@@ -329,7 +348,7 @@ describe("Agent", () => {
           return stream;
         },
       );
-      const agent = new Agent();
+      const agent = makeAgent();
       const runPromise = agent.run("Hello");
       await new Promise((r) => setTimeout(r, 10));
       agent.abort();
@@ -339,7 +358,7 @@ describe("Agent", () => {
 
   describe("rejection", () => {
     it("in manual mode, rejection stops the conversation", async () => {
-      const agent = new Agent();
+      const agent = makeAgent();
       agent.setPermissionMode("manual");
 
       vi.mocked(agent.getPermissionService().check).mockResolvedValue({
@@ -381,7 +400,7 @@ describe("Agent", () => {
     });
 
     it("in auto mode, rejection continues the conversation", async () => {
-      const agent = new Agent();
+      const agent = makeAgent();
       agent.setPermissionMode("auto");
 
       vi.mocked(agent.getPermissionService().check).mockResolvedValue({

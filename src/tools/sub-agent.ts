@@ -54,18 +54,15 @@ export const agentTool: ToolDef = {
 
     // Override model from tier mapping
     if (tier) {
-      const { loadConfig, parseModelSpecifier } = await import("../config.js");
+      const { loadConfig } = await import("../config.js");
+      const { ModelFactory } = await import("../llm/model.js");
       const appConfig = await loadConfig();
       const modelSpec = appConfig.tiers?.[tier];
       if (modelSpec) {
-        const parsed = parseModelSpecifier(
-          modelSpec,
-          appConfig.providers ?? {},
-        );
-        if (parsed) {
-          subConfig.model = parsed.modelName;
-          subConfig.apiKey = parsed.providerConfig.apiKey;
-          subConfig.baseURL = parsed.providerConfig.baseURL;
+        const factory = new ModelFactory(appConfig.providers ?? {});
+        const tierModel = factory.fromSpec(modelSpec);
+        if (tierModel) {
+          subConfig.model = tierModel;
         }
       }
     }

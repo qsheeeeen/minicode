@@ -1,4 +1,5 @@
 import type { ToolDef, ToolResult, ToolExecutionContext } from "./registry.js";
+import { ModelFactory } from "../llm/model.js";
 import { register } from "./registry.js";
 
 export const setModelTool: ToolDef = {
@@ -21,7 +22,7 @@ export const setModelTool: ToolDef = {
     context?: ToolExecutionContext,
   ): Promise<ToolResult> => {
     const tier = String(args.tier);
-    const { loadConfig, parseModelSpecifier, setModel } =
+    const { loadConfig, setModel } =
       await import("../config.js");
     const config = await loadConfig();
     const modelSpec = config.tiers?.[tier];
@@ -29,25 +30,17 @@ export const setModelTool: ToolDef = {
       return { output: `Error: No model mapped to tier ${tier}.` };
     }
 
-    const parsed = parseModelSpecifier(modelSpec, config.providers ?? {});
-    if (!parsed) {
+    const factory = new ModelFactory(config.providers ?? {});
+    const newModel = factory.fromSpec(modelSpec);
+    if (!newModel) {
       return {
         output: `Error: Could not resolve "${modelSpec}" for tier ${tier}.`,
       };
     }
 
     const agent = context?.registry?.get(context.currentAgentId || "1")?.agent;
-    const modelConfig = parsed.providerConfig.models?.[parsed.modelName];
     if (agent) {
-      agent.setModel(
-        parsed.modelName,
-        parsed.providerConfig.apiKey,
-        parsed.providerConfig.baseURL,
-        parsed.providerName,
-        modelConfig?.contextLength,
-        modelConfig?.name,
-        parsed.providerConfig.protocol,
-      );
+      agent.setModel(newModel);
     }
     await setModel(modelSpec);
     return { output: `Switched to ${tier}: ${modelSpec}` };

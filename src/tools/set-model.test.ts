@@ -1,13 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockLoadConfig = vi.fn();
-const mockParseModelSpecifier = vi.fn();
 const mockSetModel = vi.fn();
+const mockFromSpec = vi.fn();
 
 vi.mock("../config.js", () => ({
   loadConfig: mockLoadConfig,
-  parseModelSpecifier: mockParseModelSpecifier,
   setModel: mockSetModel,
+}));
+
+vi.mock("../llm/model.js", () => ({
+  ModelFactory: vi.fn().mockImplementation(function () {
+    return { fromSpec: mockFromSpec };
+  }),
 }));
 
 import { setModelTool } from "./set-model.js";
@@ -34,28 +39,18 @@ beforeEach(() => {
 
 describe("setModelTool", () => {
   it("switches model for a valid tier", async () => {
+    const mockModel = { getName: () => "claude-sonnet-4-5" };
     mockLoadConfig.mockResolvedValue({
       tiers: { pro: "claude-sonnet-4-5@anthropic" },
       providers: { anthropic: { apiKey: "sk-test" } },
     });
-    mockParseModelSpecifier.mockReturnValue({
-      modelName: "claude-sonnet-4-5",
-      providerName: "anthropic",
-      providerConfig: { apiKey: "sk-test" },
-    });
+    mockFromSpec.mockReturnValue(mockModel);
 
     const result = await setModelTool.execute({ tier: "pro" }, makeContext());
 
     expect(result.output).toBe("Switched to pro: claude-sonnet-4-5@anthropic");
-    expect(mockSetModelOnAgent).toHaveBeenCalledWith(
-      "claude-sonnet-4-5",
-      "sk-test",
-      undefined,
-      "anthropic",
-      undefined,
-      undefined,
-      undefined,
-    );
+    expect(mockFromSpec).toHaveBeenCalledWith("claude-sonnet-4-5@anthropic");
+    expect(mockSetModelOnAgent).toHaveBeenCalledWith(mockModel);
     expect(mockSetModel).toHaveBeenCalledWith("claude-sonnet-4-5@anthropic");
   });
 
@@ -80,7 +75,7 @@ describe("setModelTool", () => {
       tiers: { pro: "deepseek-chat@deepseek" },
       providers: { deepseek: {} },
     });
-    mockParseModelSpecifier.mockReturnValue(null);
+    mockFromSpec.mockReturnValue(null);
 
     const result = await setModelTool.execute({ tier: "pro" }, makeContext());
 
@@ -96,11 +91,7 @@ describe("setModelTool", () => {
       tiers: { flash: "gpt-4o-mini@openai" },
       providers: { openai: { apiKey: "oai-key" } },
     });
-    mockParseModelSpecifier.mockReturnValue({
-      modelName: "gpt-4o-mini",
-      providerName: "openai",
-      providerConfig: { apiKey: "oai-key", baseURL: "https://api.openai.com" },
-    });
+    mockFromSpec.mockReturnValue({ getName: () => "gpt-4o-mini" });
 
     const result = await setModelTool.execute(
       { tier: "flash" },
@@ -113,32 +104,21 @@ describe("setModelTool", () => {
   });
 
   it("passes contextLength and displayName from provider config", async () => {
+    const mockModel = {
+      getName: () => "claude-opus",
+      getContextLength: () => 200000,
+      getDisplayName: () => "Claude Opus",
+    };
     mockLoadConfig.mockResolvedValue({
       tiers: { pro: "claude-opus@anthropic" },
       providers: {},
     });
-    mockParseModelSpecifier.mockReturnValue({
-      modelName: "claude-opus",
-      providerName: "anthropic",
-      providerConfig: {
-        apiKey: "sk-test",
-        models: {
-          "claude-opus": { contextLength: 200000, name: "Claude Opus" },
-        },
-      },
-    });
+    mockFromSpec.mockReturnValue(mockModel);
 
     const result = await setModelTool.execute({ tier: "pro" }, makeContext());
 
     expect(result.output).toBe("Switched to pro: claude-opus@anthropic");
-    expect(mockSetModelOnAgent).toHaveBeenCalledWith(
-      "claude-opus",
-      "sk-test",
-      undefined,
-      "anthropic",
-      200000,
-      "Claude Opus",
-      undefined,
-    );
+    expect(mockFromSpec).toHaveBeenCalledWith("claude-opus@anthropic");
+    expect(mockSetModelOnAgent).toHaveBeenCalledWith(mockModel);
   });
 });

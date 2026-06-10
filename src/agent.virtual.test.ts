@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Agent } from "./agent.js";
+import { Model } from "./llm/model.js";
 import {
   VirtualLLMClient,
   defaultTextResponse,
@@ -27,8 +28,9 @@ function createTestAgent(options?: {
         ),
       ],
     ]);
+  const model = new Model(client, "test-model", "test-provider", 200000);
   const agent = new Agent({
-    client,
+    model,
     tools,
     permissionMode: options?.permissionMode ?? "yolo",
     skipEnvironmentRefresh: true,
@@ -208,9 +210,14 @@ describe("Agent virtual integration", () => {
     const prompter = new CallbackPrompter(async () => "no");
 
     const agent = new Agent({
-      client: new VirtualLLMClient([
-        toolUseResponse("call_1", "Dangerous", { action: "delete" }),
-      ]),
+      model: new Model(
+        new VirtualLLMClient([
+          toolUseResponse("call_1", "Dangerous", { action: "delete" }),
+        ]),
+        "test-model",
+        "test-provider",
+        200000,
+      ),
       tools,
       permissionMode: "manual",
       skipEnvironmentRefresh: true,

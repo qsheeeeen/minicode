@@ -110,16 +110,12 @@ export function InputArea({
               config.providers ?? {},
             );
             if (parsed) {
-              const modelConfig =
-                parsed.providerConfig.models?.[parsed.modelName];
-              agentRef.current.setModel(
-                parsed.modelName,
-                parsed.providerConfig.apiKey,
-                parsed.providerConfig.baseURL,
-                parsed.providerName,
-                modelConfig?.contextLength,
-                modelConfig?.name,
-              );
+              const { ModelFactory } = await import("../../llm/model.js");
+              const factory = new ModelFactory(config.providers ?? {});
+              const newModel = factory.fromSpec(modelSpec);
+              if (newModel) {
+                agentRef.current.setModel(newModel);
+              }
               import("../../config.js").then((m) => m.setModel(modelSpec));
               if (tierMatch[2]) {
                 setTier(tier, modelSpec);

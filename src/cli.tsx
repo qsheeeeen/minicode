@@ -17,6 +17,8 @@ import {
   getSkillBody,
 } from "./skills/index.js";
 import { App } from "./ui/tui.js";
+import { Model } from "./llm/model.js";
+import { createClient } from "./llm/client.js";
 import {
   getCommandNames,
   registerCommand,
@@ -148,14 +150,15 @@ const sharedAgentRegistry = new AgentRegistry();
 const sharedSessionStats = new SessionStats();
 
 // Create Agent (composition root — single creation point)
+const initialModel = new Model(
+  createClient(config.model!.protocol, config.model!.apiKey, config.model!.baseURL),
+  config.model!.model,
+  config.model!.provider,
+  config.model!.contextLength ?? 200000,
+  config.model!.displayName,
+);
 const agent = new Agent({
-  apiKey: config.model!.apiKey,
-  baseURL: config.model!.baseURL,
-  model: config.model!.model,
-  provider: config.model!.provider,
-  protocol: config.model!.protocol,
-  displayName: config.model!.displayName,
-  contextLength: config.model!.contextLength,
+  model: initialModel,
   compressionThresholdRatio: config.compressionThreshold,
   thinkingEnabled: config.thinking.enabled,
   effort: config.thinking.effort,

@@ -15,7 +15,8 @@ export function Panel({ agentRef, promptFiles = [] }: PanelProps) {
   const currentSession = useTuiStore((s) => s.currentSession);
   const status = useTuiStore((s) => s.status);
 
-  const contextLength = agentRef.current.getContextLength() || 200000;
+  const currentModel = agentRef.current.getModel();
+  const contextLength = currentModel.getContextLength();
   const percentage = Math.min(100, (tokenCount / contextLength) * 100);
 
   const modeColor =
@@ -29,12 +30,12 @@ export function Panel({ agentRef, promptFiles = [] }: PanelProps) {
     <Box flexDirection="column" overflow="hidden">
       <Box paddingX={1} overflow="hidden">
         <Text wrap="truncate" color="green">
-          {agentRef.current.getModelProvider()}
+          {currentModel.getProvider()}
         </Text>
         <Text wrap="truncate" dimColor>
           :
         </Text>
-        <Text wrap="truncate">{agentRef.current.getModelName()}</Text>
+        <Text wrap="truncate">{currentModel.getDisplayName()}</Text>
         <Text wrap="truncate" dimColor>
           {" "}
           | {currentSession}

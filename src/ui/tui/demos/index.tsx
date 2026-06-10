@@ -85,9 +85,11 @@ const agentSessions = [
 
 const agentRef = {
   current: {
-    getModelProvider: () => "anthropic",
-    getModelName: () => "claude-sonnet-4-5",
-    getContextLength: () => 200000,
+    getModel: () => ({
+      getProvider: () => "anthropic",
+      getDisplayName: () => "claude-sonnet-4-5",
+      getContextLength: () => 200000,
+    }),
     setEffort: () => {},
     setModel: () => {},
     getStore: () => ({ addStatus: () => {} }),
