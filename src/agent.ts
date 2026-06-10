@@ -16,17 +16,16 @@ import {
 import { Signal } from "./utils/signal.js";
 import type { SessionStats } from "./services/session-stats.js";
 import {
-  CompressionService,
   AgentRegistry,
   PermissionService,
   type PermissionMode,
 } from "./services/index.js";
 import type { ContentBlock } from "./messages.js";
-import { TokenTracker } from "./services/token-tracker.js";
 import { ChangeJournal } from "./services/change-journal.js";
 import { MessageStore } from "./messages.js";
 import { PromptManager } from "./services/prompt-manager.js";
 import { SessionManager } from "./services/session-manager.js";
+import { ContextManager } from "./services/context-manager.js";
 import type pino from "pino";
 
 export interface AgentConfig {
@@ -49,22 +48,17 @@ export interface AgentConfig {
 
 export class Agent {
   private model: Model;
-  private tools: Map<string, ToolDef>;
   private sessionManager: SessionManager;
-  private compressionThresholdRatio: number;
-  private tokenTracker: TokenTracker;
-  private compressionService: CompressionService;
+  private contextManager: ContextManager;
   private toolExecutor: ToolExecutor;
   public readonly tokenCount$ = new Signal(0);
   private prompter: UserPrompter;
   private promptManager: PromptManager;
   private agentRegistry?: AgentRegistry;
   private currentAgentId: string;
-  private permissionService: PermissionService;
   private abortController: AbortController | null = null;
   private logger?: pino.Logger;
 
-  private isCompressing: boolean = false;
   private isRunning: boolean = false;
   get currentSession(): string {
     return this.sessionManager.getSessionName();
@@ -82,7 +76,7 @@ export class Agent {
   }
 
   public setPermissionMode(mode: PermissionMode): void {
-    this.permissionService.setMode(mode);
+    this.toolExecutor.setPermissionMode(mode);
   }
 
   public setModel(model: Model): void {
@@ -95,12 +89,17 @@ export class Agent {
 
   constructor(config: AgentConfig) {
     this.model = config.model;
-    this.compressionThresholdRatio = config.compressionThresholdRatio || 0.8;
-    this.compressionService = new CompressionService();
     this.sessionManager = new SessionManager({
       sessionStats: config.sessionStats,
     });
-    this.tools = config.tools
+    this.contextManager = new ContextManager({
+      contextLength: this.model.getContextLength(),
+      compressionThresholdRatio: config.compressionThresholdRatio || 0.8,
+      tokenCount$: this.tokenCount$,
+      store: this.sessionManager.getStore(),
+      sessionStats: this.sessionManager.getSessionStats(),
+    });
+    const tools = config.tools
       ? new Map(config.tools)
       : config.subAgentMode
         ? getSubAgentTools()
@@ -108,30 +107,24 @@ export class Agent {
     this.agentRegistry = config.agentRegistry;
     this.currentAgentId = config.currentAgentId || "1";
 
-    this.permissionService = new PermissionService({
+    const permissionService = new PermissionService({
       initialMode: config.permissionMode ?? "manual",
     });
 
     const availability = { agentRegistry: this.agentRegistry };
-    for (const [name, tool] of this.tools) {
+    for (const [name, tool] of tools) {
       if (tool.requires?.some((r) => !availability[r])) {
-        this.tools.delete(name);
+        tools.delete(name);
       }
     }
 
     this.prompter = new ConsolePrompter();
     this.toolExecutor = new ToolExecutor({
-      permissionService: this.permissionService,
+      tools,
+      permissionService,
       changeJournal: this.sessionManager.getChangeJournal(),
       store: this.sessionManager.getStore(),
     });
-    this.tokenTracker = new TokenTracker(
-      this.model.getContextLength(),
-      this.compressionThresholdRatio,
-      this.tokenCount$,
-      this.sessionManager.getStore(),
-      this.sessionManager.getSessionStats(),
-    );
     this.promptManager = new PromptManager({
       userPrompt: config.userPrompt,
       projectPromptFile: config.projectPromptFile,
@@ -144,13 +137,13 @@ export class Agent {
 
   setPrompter(prompter: UserPrompter): void {
     this.prompter = prompter;
-    this.permissionService.setPrompter(prompter);
+    this.toolExecutor.setPrompter(prompter);
   }
 
   private async saveStore(): Promise<void> {
     await this.sessionManager.saveStore({
       model: this.model.getName(),
-      totalTokens: this.tokenTracker.getTotal(),
+      totalTokens: this.contextManager.getTokenCount(),
     }).catch((e: unknown) => {
       this.logger?.error({ error: String(e) }, "Failed to save session");
     });
@@ -167,87 +160,20 @@ export class Agent {
   }
 
   async compress(): Promise<void> {
-    if (this.isCompressing) return;
-
-    const recentCount = 10;
-    const turns = this.sessionManager.getStore().getTurns();
-    if (turns.length <= recentCount + 2) {
-      this.sessionManager.getStore().addStatus({
-        role: "status",
-        content: "(Not enough messages to compress)",
-        timestamp: new Date(),
-      });
-      return;
-    }
-
-    this.isCompressing = true;
-    const totalTokens = this.tokenTracker.getTotal();
-    this.sessionManager.getStore().addStatus({
-      role: "status",
-      content: `(Compressing ${turns.length - recentCount} messages, ${totalTokens.toLocaleString()} tokens...)`,
-      timestamp: new Date(),
+    const newTurnIdx = await this.contextManager.compress({
+      store: this.sessionManager.getStore(),
+      model: this.model,
+      changeJournal: this.sessionManager.getChangeJournal(),
+      activeTurnIdx: this.sessionManager.getActiveTurnIdx(),
     });
-
-    try {
-      // Count original user prompts before compression
-      let originalUserPrompts = 0;
-      for (const t of turns) {
-        if (t.role === "user" && typeof t.content === "string")
-          originalUserPrompts++;
-      }
-
-      const compressed = await this.compressionService.compress(
-        this.sessionManager.getStore().toLLMMessages(),
-        this.model.getClient(),
-        this.model.getName(),
-      );
-
-      // Count kept user prompts (excluding the summary added by compression)
-      let keptUserPrompts = 0;
-      for (let i = 0; i < compressed.length; i++) {
-        const t = compressed[i];
-        if (t.role === "user" && typeof t.content === "string")
-          keptUserPrompts++;
-      }
-      // Summary adds 1 user prompt, so original kept = keptUserPrompts - 1
-      const originalKept = keptUserPrompts - 1;
-      const prunedCount = originalUserPrompts - originalKept;
-
-      if (prunedCount > 0) {
-        // Remove entries for compressed-away turns, renumber kept entries
-        await this.sessionManager.getChangeJournal().pruneAndRenumber(prunedCount, 1);
-      }
-
-      this.sessionManager.getStore().setTurns(compressed);
-      this.tokenTracker.reset();
-
-      // Recalculate activeTurnIdx for the compressed conversation
-      let newActiveIdx = 0;
-      for (const t of compressed) {
-        if (t.role === "user" && typeof t.content === "string") newActiveIdx++;
-      }
-      this.sessionManager.setActiveTurnIdx(newActiveIdx);
-      this.sessionManager.getStore().addStatus({
-        role: "status",
-        content: `(Compressed to ${compressed.length} turns)`,
-        timestamp: new Date(),
-      });
-    } catch (e) {
-      this.sessionManager.getStore().addStatus({
-        role: "error",
-        content: `(Compression failed: ${(e as Error).message})`,
-        timestamp: new Date(),
-      });
-    } finally {
-      this.isCompressing = false;
-    }
+    this.sessionManager.setActiveTurnIdx(newTurnIdx);
   }
 
   // Track token usage and trigger auto-compression
   private async processTokenUsage(response: LLMResponse): Promise<void> {
     if (!response.usage) return;
 
-    const { shouldCompress } = this.tokenTracker.processUsage(
+    const shouldCompress = this.contextManager.processTokenUsage(
       this.model.getName(),
       response.usage,
     );
@@ -312,7 +238,7 @@ export class Agent {
           handleDelta(chunk.type, chunk[chunk.type]);
         } else if (chunk.type === "tool_use") {
           blockStreaming = false;
-          const tool = this.tools.get(chunk.block.name);
+          const tool = this.toolExecutor.getTools().get(chunk.block.name);
           toolCalls.push({ block: chunk.block, tool });
           this.sessionManager.getStore().appendToLastAssistantTurn(chunk.block as ContentBlock);
           this.saveStore();
@@ -359,7 +285,7 @@ export class Agent {
       while (true) {
         this.throwIfAborted();
 
-        const toolDefs = [...this.tools.values()].map((t) => ({
+        const toolDefs = [...this.toolExecutor.getTools().values()].map((t) => ({
           name: t.name,
           description: t.description,
           input_schema: t.input_schema,
@@ -385,11 +311,10 @@ export class Agent {
           signal: this.abortController?.signal,
           config: {
             model: this.model,
-            compressionThresholdRatio: this.compressionThresholdRatio,
             userPrompt: this.promptManager.getUserPrompt(),
           },
           currentAgentId: this.currentAgentId,
-          permissionService: this.permissionService,
+          permissionService: this.toolExecutor.getPermissionService(),
           prompter: this.prompter,
         };
 
@@ -428,7 +353,7 @@ export class Agent {
       this.logger?.info(
         {
           session: this.currentSession,
-          totalTokens: this.tokenTracker.getTotal(),
+          totalTokens: this.contextManager.getTokenCount(),
         },
         "Session ended",
       );
@@ -459,23 +384,23 @@ export class Agent {
   }
 
   getTokenCount(): number {
-    return this.tokenTracker.getTotal();
+    return this.contextManager.getTokenCount();
   }
 
   setTokenCount(count: number): void {
-    this.tokenTracker.setCount(count);
+    this.contextManager.setTokenCount(count);
   }
 
   clearSession(): void {
     this.sessionManager.clearSession();
-    this.tokenTracker.reset();
+    this.contextManager.reset();
   }
 
   getTools(): Map<string, ToolDef> {
-    return this.tools;
+    return this.toolExecutor.getTools();
   }
 
   getPermissionService(): PermissionService {
-    return this.permissionService;
+    return this.toolExecutor.getPermissionService();
   }
 }

@@ -3,7 +3,11 @@ import { ToolDeniedError } from "./registry.js";
 import type { ToolUseBlock } from "../messages.js";
 import type { MessageStore } from "../messages.js";
 import type { ChangeJournal } from "../services/change-journal.js";
-import type { PermissionService } from "../services/permission.js";
+import {
+  PermissionService,
+  type PermissionMode,
+} from "../services/permission.js";
+import type { UserPrompter } from "../utils/display.js";
 import { callContent } from "../utils/tool-format.js";
 import type pino from "pino";
 
@@ -13,6 +17,7 @@ export interface ToolCall {
 }
 
 export interface ToolExecutorDeps {
+  tools: Map<string, ToolDef>;
   permissionService: PermissionService;
   changeJournal: ChangeJournal;
   store: MessageStore;
@@ -141,5 +146,23 @@ export class ToolExecutor {
 
     // Push all tool results as a single user turn
     this.deps.store.addToolResults(results);
+  }
+
+  // -- Accessors for Agent to use in the LLM loop --
+
+  getTools(): Map<string, ToolDef> {
+    return this.deps.tools;
+  }
+
+  getPermissionService(): PermissionService {
+    return this.deps.permissionService;
+  }
+
+  setPermissionMode(mode: PermissionMode): void {
+    this.deps.permissionService.setMode(mode);
+  }
+
+  setPrompter(prompter: UserPrompter): void {
+    this.deps.permissionService.setPrompter(prompter);
   }
 }
