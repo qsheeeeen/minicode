@@ -1,20 +1,9 @@
-// Test utilities for creating virtual LLM clients and tools.
+// Shared test utilities.
+//
+// Re-usable helpers for creating test doubles (virtual tools, etc).
+// Test files import directly from here instead of polluting production modules.
 
-import { VirtualLLMClient } from "../llm/virtual.js";
-import type { ScriptedResponse } from "../llm/virtual.js";
-import type { ToolDef, ToolResult } from "./registry.js";
-
-export type { ScriptedResponse } from "../llm/virtual.js";
-export { defaultTextResponse, toolUseResponse } from "../llm/virtual.js";
-
-/**
- * Creates a virtual LLMClient that plays back scripted responses in order.
- */
-export function createVirtualLLM(
-  responses: ScriptedResponse[],
-): VirtualLLMClient {
-  return new VirtualLLMClient(responses);
-}
+import type { ToolDef, ToolResult } from "./tools/registry.js";
 
 /**
  * Creates a virtual tool with a custom handler function.

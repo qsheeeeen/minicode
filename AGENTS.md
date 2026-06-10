@@ -34,6 +34,7 @@ src/
 ├── messages.ts           # MessageStore: two-layer messages (LLM + Display), session persistence
 ├── config.ts             # Multi-provider config loader (~/.minicode/config.json)
 ├── args.ts               # CLI argument parser
+├── testing.ts            # Shared test helpers (createVirtualTool)
 ├── llm/
 │   ├── client.ts         # LLMClient interface, LLMStream (AsyncGenerator), protocol registry
 │   ├── anthropic.ts      # Anthropic SDK adapter
@@ -54,7 +55,6 @@ src/
 ├── tools/
 │   ├── registry.ts       # ToolDef interface, self-registering pattern via register()
 │   ├── index.ts          # Barrel: imports all tool modules to trigger registration
-│   ├── testing.ts        # createVirtualLLM() and createVirtualTool() test helpers
 │   ├── shell.ts           # child_process.spawn with streaming
 │   ├── read.ts / write.ts / edit.ts / grep.ts
 │   ├── sub-agent.ts      # Spawns child Agent with restricted tool set
@@ -97,7 +97,7 @@ src/
 
 **Multi-provider LLM:** `LLMClient` interface with protocol registry in `client.ts`. Registered protocols: `anthropic`, `openai` (Chat Completions), `openai-responses` (Responses API). Unknown protocols fall back to Anthropic-compatible. `createClient(protocol, apiKey, baseURL)` factory. `LLMStream` is `AsyncGenerator<StreamEvent, LLMResponse, unknown>` — providers return real async generators, not wrapper objects.
 
-**Agent dependency injection:** Agent constructor accepts optional `client?: LLMClient` and `tools?: Map<string, ToolDef>`. Combined with `VirtualLLMClient` and `createVirtualTool()` in `tools/testing.ts`, this enables full agent loop testing without real LLM calls.
+**Agent dependency injection:** Agent constructor accepts optional `client?: LLMClient` and `tools?: Map<string, ToolDef>`. Combined with `VirtualLLMClient` (from `llm/virtual.ts`) and `createVirtualTool()` (from `testing.ts`), this enables full agent loop testing without real LLM calls.
 
 **Two-layer messages:** `MessageParam[]` (raw API format, with `_display` metadata stripped by `toLLMMessages()`) and `DisplayMessage[]` (flat discriminated union for UI, including UI-only `StatusMessage[]`). Session persisted as JSONL at `~/.minicode/sessions/<md5-hash>/<name>.context.jsonl`.
 
@@ -132,7 +132,7 @@ Headless mode exposes bugs that TUI doesn't. Always verify output is correct.
 - Mock patterns: `vi.spyOn()`, `vi.fn()`, module mocking with `vi.mock()`
 - TUI component tests: render with `render()`, query with `lastFrame()`, simulate input with `stdin.write()`
 - Demo components in `src/ui/tui/demos/` for visual testing during development
-- **Virtual LLM testing:** `createVirtualLLM(responses)` + `createVirtualTool(name, handler)` from `tools/testing.ts` enable testing Agent's tool loop without real API calls. See `agent.virtual.test.ts` for examples.
+- **Virtual LLM testing:** `new VirtualLLMClient(responses)` (from `llm/virtual.ts`) + `createVirtualTool(name, handler)` (from `testing.ts`) enable testing Agent's tool loop without real API calls. See `agent.virtual.test.ts` for examples.
 
 ## Skills Directory
 

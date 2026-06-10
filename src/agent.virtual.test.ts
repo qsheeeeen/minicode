@@ -1,13 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { Agent } from "./agent.js";
 import {
-  createVirtualLLM,
-  createVirtualTool,
+  VirtualLLMClient,
   defaultTextResponse,
   toolUseResponse,
-} from "./tools/testing.js";
+} from "./llm/virtual.js";
+import type { ScriptedResponse } from "./llm/virtual.js";
+import { createVirtualTool } from "./testing.js";
 import { ConsolePrompter, CallbackPrompter } from "./utils/display.js";
-import type { ScriptedResponse } from "./tools/testing.js";
 import type { ToolDef } from "./tools/registry.js";
 
 function createTestAgent(options?: {
@@ -16,7 +16,7 @@ function createTestAgent(options?: {
   permissionMode?: "manual" | "yolo" | "auto";
 }) {
   const responses = options?.responses ?? [defaultTextResponse("OK")];
-  const client = createVirtualLLM(responses);
+  const client = new VirtualLLMClient(responses);
   const tools =
     options?.tools ??
     new Map<string, ToolDef>([
@@ -208,7 +208,7 @@ describe("Agent virtual integration", () => {
     const prompter = new CallbackPrompter(async () => "no");
 
     const agent = new Agent({
-      client: createVirtualLLM([
+      client: new VirtualLLMClient([
         toolUseResponse("call_1", "Dangerous", { action: "delete" }),
       ]),
       tools,
