@@ -316,7 +316,6 @@ export class Agent {
             userPrompt: this.promptManager.getUserPrompt(),
           },
           currentAgentId: this.currentAgentId,
-          permissionService: this.toolExecutor.getPermissionService(),
           prompter: this.prompter,
         };
 

@@ -1,6 +1,5 @@
 import type { AgentRegistry } from "../services/agent-registry.js";
 import type { AgentConfig } from "../agent.js";
-import type { PermissionService } from "../services/permission.js";
 import type { UserPrompter } from "../utils/display.js";
 
 export type ToolRequirement = "agentRegistry";
@@ -10,7 +9,6 @@ export interface ToolExecutionContext {
   config: AgentConfig;
   currentAgentId: string;
   signal: AbortSignal | undefined;
-  permissionService?: PermissionService;
   prompter?: UserPrompter;
 }
 

@@ -46,7 +46,8 @@ export const agentTool: ToolDef = {
     const subId = registry.allocateSubId();
 
     const subConfig: AgentConfig = {
-      ...config,
+      model: config.model,
+      userPrompt: config.userPrompt,
       subAgentMode: true,
       agentRegistry: registry,
       currentAgentId: subId,
