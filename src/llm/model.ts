@@ -3,7 +3,7 @@
 // A Model is an immutable atom — switching models means replacing the entire
 // object. This guarantees client and metadata are always in sync.
 
-import type { LLMClient } from "./client.js";
+import type { LLMClient, EffortLevel } from "./client.js";
 import { createClient } from "./client.js";
 import {
   loadConfig,
@@ -14,13 +14,19 @@ import {
 } from "../config.js";
 
 export class Model {
+  private _effort?: EffortLevel;
+
   constructor(
     private readonly _client: LLMClient,
     private readonly _name: string,
     private readonly _provider: string,
     private readonly _contextLength: number,
+    private readonly _thinkingEnabled: boolean = false,
+    effort?: EffortLevel,
     private readonly _displayName?: string,
-  ) {}
+  ) {
+    this._effort = effort;
+  }
 
   /** The LLM client for making chat requests. */
   getClient(): LLMClient {
@@ -45,6 +51,21 @@ export class Model {
   /** Human-readable name for display (e.g. "Claude Sonnet"). */
   getDisplayName(): string {
     return this._displayName || this._name;
+  }
+
+  /** Whether thinking/reasoning is enabled for this model. */
+  getThinkingEnabled(): boolean {
+    return this._thinkingEnabled;
+  }
+
+  /** Reasoning effort level (e.g. "low", "high"). */
+  getEffort(): EffortLevel | undefined {
+    return this._effort;
+  }
+
+  /** Update effort level at runtime. */
+  setEffort(effort: EffortLevel): void {
+    this._effort = effort;
   }
 }
 
@@ -75,6 +96,8 @@ export class ModelFactory {
       parsed.modelName,
       parsed.providerName,
       modelConfig?.contextLength ?? 200000,
+      false,  // thinkingEnabled — resolved per-session, not per-model
+      undefined, // effort — resolved per-session, not per-model
       modelConfig?.name,
     );
   }

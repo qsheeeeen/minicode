@@ -155,13 +155,13 @@ const initialModel = new Model(
   config.model!.model,
   config.model!.provider,
   config.model!.contextLength ?? 200000,
+  config.thinking.enabled,
+  config.thinking.effort,
   config.model!.displayName,
 );
 const agent = new Agent({
   model: initialModel,
   compressionThresholdRatio: config.compressionThreshold,
-  thinkingEnabled: config.thinking.enabled,
-  effort: config.thinking.effort,
   userPrompt,
   projectPromptFile,
   agentRegistry: sharedAgentRegistry,

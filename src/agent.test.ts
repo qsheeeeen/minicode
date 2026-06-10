@@ -259,7 +259,14 @@ describe("Agent", () => {
     it("handles thinking blocks", async () => {
       const stream = new MockStream();
       mockChatStream.mockReturnValueOnce(stream);
-      const agent = makeAgent({ thinkingEnabled: true });
+      const thinkingModel = new Model(
+        { chatStream: mockChatStream } as any,
+        "test-model",
+        "test-provider",
+        200000,
+        true, // thinkingEnabled
+      );
+      const agent = makeAgent({ model: thinkingModel });
       const runPromise = agent.run("Solve this");
       await new Promise((r) => setTimeout(r, 10));
 

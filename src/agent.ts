@@ -31,8 +31,6 @@ import type pino from "pino";
 export interface AgentConfig {
   model: Model;
   compressionThresholdRatio?: number;
-  thinkingEnabled?: boolean;
-  effort?: EffortLevel;
   userPrompt?: string;
   projectPromptFile?: string;
   subAgentMode?: boolean;
@@ -62,8 +60,6 @@ export class Agent {
   get currentSession(): string {
     return this._currentSession;
   }
-  private thinkingEnabled: boolean;
-  private effort?: EffortLevel;
   public readonly tokenCount$ = new Signal(0);
   private prompter: UserPrompter;
   private userPrompt: string;
@@ -90,7 +86,7 @@ export class Agent {
   }
 
   public setEffort(effort: EffortLevel): void {
-    this.effort = effort;
+    this.model.setEffort(effort);
   }
 
   public setPermissionMode(mode: PermissionMode): void {
@@ -108,8 +104,6 @@ export class Agent {
   constructor(config: AgentConfig) {
     this.model = config.model;
     this.compressionThresholdRatio = config.compressionThresholdRatio || 0.8;
-    this.thinkingEnabled = config.thinkingEnabled || false;
-    this.effort = config.effort;
     this.compressionService = new CompressionService();
     this.tools = config.tools
       ? new Map(config.tools)
@@ -294,7 +288,7 @@ export class Agent {
         system: this.systemPrompt,
         model: this.model.getName(),
         signal: this.abortController?.signal,
-        effort: this.effort,
+        effort: this.model.getEffort(),
       },
     );
 
@@ -413,8 +407,6 @@ export class Agent {
           config: {
             model: this.model,
             compressionThresholdRatio: this.compressionThresholdRatio,
-            thinkingEnabled: this.thinkingEnabled,
-            effort: this.effort,
             userPrompt: this.userPrompt,
           },
           currentAgentId: this.currentAgentId,
