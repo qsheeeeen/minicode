@@ -73,22 +73,22 @@ export class Agent {
 
   constructor(
     model: Model,
-    userPrompt?: string,
-    projectPromptFile?: string,
-    compressionThresholdRatio?: number,
+    userPrompt: string = "",
+    projectPromptFile: string = "",
+    compressionThresholdRatio: number = 0.8,
     agentRegistry?: AgentRegistry,
-    currentAgentId?: string,
-    subAgentMode?: boolean,
+    currentAgentId: string = "1",
+    subAgentMode: boolean = false,
     sessionStats?: SessionStats,
     tools?: Map<string, ToolDef>,
-    permissionMode?: PermissionMode,
-    skipEnvironmentRefresh?: boolean,
+    permissionMode: PermissionMode = "manual",
+    skipEnvironmentRefresh: boolean = false,
   ) {
     this.model = model;
     this.sessionManager = new SessionManager({ sessionStats });
     this.contextManager = new ContextManager({
       contextLength: this.model.getContextLength(),
-      compressionThresholdRatio: compressionThresholdRatio || 0.8,
+      compressionThresholdRatio,
       tokenCount$: this.tokenCount$,
       store: this.store,
       sessionStats: this.sessionManager.getSessionStats(),
@@ -99,10 +99,10 @@ export class Agent {
         ? getSubAgentTools()
         : getAll();
     this.agentRegistry = agentRegistry;
-    this.currentAgentId = currentAgentId || "1";
+    this.currentAgentId = currentAgentId;
 
     const permissionService = new PermissionService({
-      initialMode: permissionMode ?? "manual",
+      initialMode: permissionMode,
     });
 
     const availability = { agentRegistry: this.agentRegistry };

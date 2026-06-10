@@ -31,16 +31,16 @@ function createTestAgent(options?: {
   const model = new Model(client, "test-model", "test-provider", 200000);
   const agent = new Agent(
     model,
-    undefined, // userPrompt
-    undefined, // projectPromptFile
-    undefined, // compressionThresholdRatio
-    undefined, // agentRegistry
-    undefined, // currentAgentId
-    undefined, // subAgentMode
-    undefined, // sessionStats
+    "",
+    "",
+    0.8,
+    undefined,
+    "1",
+    false,
+    undefined,
     tools,
     options?.permissionMode ?? "yolo",
-    true, // skipEnvironmentRefresh
+    true,
   );
 
   return { agent };
@@ -225,16 +225,16 @@ describe("Agent virtual integration", () => {
         "test-provider",
         200000,
       ),
-      undefined, // userPrompt
-      undefined, // projectPromptFile
-      undefined, // compressionThresholdRatio
-      undefined, // agentRegistry
-      undefined, // currentAgentId
-      undefined, // subAgentMode
-      undefined, // sessionStats
+      "",
+      "",
+      0.8,
+      undefined,
+      "1",
+      false,
+      undefined,
       tools,
       "manual",
-      true, // skipEnvironmentRefresh
+      true,
     );
 
     agent.setPrompter(prompter);

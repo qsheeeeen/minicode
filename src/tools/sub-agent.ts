@@ -63,11 +63,11 @@ export const agentTool: ToolDef = {
     const subAgent = new Agent(
       subModel,
       config.userPrompt,
-      undefined, // projectPromptFile
-      undefined, // compressionThresholdRatio
+      "",     // projectPromptFile
+      0.8,    // compressionThresholdRatio
       registry,
       subId,
-      true, // subAgentMode
+      true,   // subAgentMode
     );
 
     context?.signal?.addEventListener("abort", () => {

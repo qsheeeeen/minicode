@@ -21,16 +21,16 @@ function makeAgent(overrides?: {
   const o = overrides ?? {};
   return new Agent(
     o.model ?? makeTestModel(),
-    o.userPrompt,
-    undefined, // projectPromptFile
-    o.compressionThresholdRatio,
-    undefined, // agentRegistry
-    undefined, // currentAgentId
-    undefined, // subAgentMode
-    undefined, // sessionStats
-    undefined, // tools
-    o.permissionMode,
-    true, // skipEnvironmentRefresh
+    o.userPrompt ?? "",
+    "",
+    o.compressionThresholdRatio ?? 0.8,
+    undefined,
+    "1",
+    false,
+    undefined,
+    undefined,
+    o.permissionMode ?? "manual",
+    true,
   );
 }
 
