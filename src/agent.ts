@@ -25,7 +25,7 @@ import type { ContentBlock } from "./messages.js";
 import { TokenTracker } from "./services/token-tracker.js";
 import { ChangeJournal } from "./services/change-journal.js";
 import { MessageStore } from "./messages.js";
-import { buildSystemPrompt, getEnvironmentContext } from "./utils/prompts.js";
+import { PromptManager } from "./services/prompt-manager.js";
 import type pino from "pino";
 
 export interface AgentConfig {
@@ -62,8 +62,7 @@ export class Agent {
   }
   public readonly tokenCount$ = new Signal(0);
   private prompter: UserPrompter;
-  private userPrompt: string;
-  private projectPromptFile: string;
+  private promptManager: PromptManager;
   private agentRegistry?: AgentRegistry;
   private currentAgentId: string;
   private sessionStats?: SessionStats;
@@ -73,8 +72,6 @@ export class Agent {
 
   private isCompressing: boolean = false;
   private isRunning: boolean = false;
-  private environmentContext = "";
-  private systemPrompt = "";
   public setSession(sessionName: string): void {
     this._currentSession = sessionName;
     this.store.setSessionName(sessionName);
@@ -138,12 +135,12 @@ export class Agent {
       this.store,
       this.sessionStats,
     );
-    this.userPrompt = config.userPrompt || "";
-    this.projectPromptFile = config.projectPromptFile || "";
-
-    this.refreshSystemPrompt();
+    this.promptManager = new PromptManager({
+      userPrompt: config.userPrompt,
+      projectPromptFile: config.projectPromptFile,
+    });
     if (!config.skipEnvironmentRefresh) {
-      this.refreshEnvironment(); // async, non-blocking
+      this.promptManager.refreshEnvironment(); // async, non-blocking
     }
   }
 
@@ -250,20 +247,6 @@ export class Agent {
     }
   }
 
-  private async refreshEnvironment(): Promise<void> {
-    this.environmentContext = await getEnvironmentContext();
-    this.refreshSystemPrompt();
-  }
-
-  // Rebuild system prompt from current state
-  refreshSystemPrompt(): void {
-    this.systemPrompt = buildSystemPrompt({
-      environmentContext: this.environmentContext,
-      userPrompt: this.userPrompt,
-      projectPromptFile: this.projectPromptFile,
-    });
-  }
-
   // Track token usage and trigger auto-compression
   private async processTokenUsage(response: LLMResponse): Promise<void> {
     if (!response.usage) return;
@@ -285,7 +268,7 @@ export class Agent {
       this.store.toLLMMessages(),
       toolDefs,
       {
-        system: this.systemPrompt,
+        system: this.promptManager.getSystemPrompt(),
         model: this.model.getName(),
         signal: this.abortController?.signal,
         effort: this.model.getEffort(),
@@ -407,7 +390,7 @@ export class Agent {
           config: {
             model: this.model,
             compressionThresholdRatio: this.compressionThresholdRatio,
-            userPrompt: this.userPrompt,
+            userPrompt: this.promptManager.getUserPrompt(),
           },
           currentAgentId: this.currentAgentId,
           permissionService: this.permissionService,
