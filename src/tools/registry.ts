@@ -1,12 +1,18 @@
 import type { AgentRegistry } from "../services/agent-registry.js";
-import type { AgentConfig } from "../agent.js";
+import type { Model } from "../llm/model.js";
 import type { UserPrompter } from "../utils/display.js";
 
 export type ToolRequirement = "agentRegistry";
 
+/** Narrow config passed to tools — only what tools actually need. */
+export interface ToolConfig {
+  model: Model;
+  userPrompt: string;
+}
+
 export interface ToolExecutionContext {
   registry: AgentRegistry | undefined;
-  config: AgentConfig;
+  config: ToolConfig;
   currentAgentId: string;
   signal: AbortSignal | undefined;
   prompter?: UserPrompter;
