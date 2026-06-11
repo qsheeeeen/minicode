@@ -8,7 +8,7 @@ import {
 } from "./llm/virtual.js";
 import type { ScriptedResponse } from "./llm/virtual.js";
 import { createVirtualTool } from "./testing.js";
-import { ConsolePrompter, CallbackPrompter } from "./utils/display.js";
+import { CallbackPrompter } from "./utils/display.js";
 import type { ToolDef } from "./tools/registry.js";
 import { SessionManager } from "./services/session-manager.js";
 import { ContextManager } from "./services/context-manager.js";
@@ -264,9 +264,7 @@ describe("Agent virtual integration", () => {
       tokenCount$,
     });
 
-    agent.setPrompter(prompter);
-
-    const completed = await agent.run("Do something dangerous");
+    const completed = await agent.run("Do something dangerous", { prompter });
     expect(completed).toBe(true);
 
     const turns = agent.getStore().getTurns();

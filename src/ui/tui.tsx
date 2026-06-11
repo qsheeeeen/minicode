@@ -3,6 +3,7 @@ import { Box, useInput, useApp } from "ink";
 import { Agent } from "../agent.js";
 import type { ResolvedConfig } from "../config.js";
 import type { DisplayMessage } from "../messages.js";
+import type { UserPrompter } from "../utils/display.js";
 import { routeInput } from "./routing.js";
 import { processRoute } from "./route-handler.js";
 import {
@@ -113,7 +114,8 @@ function AppContent({
   agentRegistry,
   programStartTime,
   sessionStats,
-}: Omit<AppProps, "config">) {
+  prompterRef,
+}: Omit<AppProps, "config"> & { prompterRef: React.RefObject<UserPrompter | null> }) {
   const { exit } = useApp();
   const dispatch = useTuiStore((s) => s.dispatch);
   const input = useTuiStore((s) => s.input);
@@ -182,6 +184,7 @@ function AppContent({
       try {
         const sent = await agent.run(processed.promptText, {
           displayContent: processed.displayContent,
+          prompter: prompterRef.current ?? undefined,
         });
         if (!sent) {
           dispatch({ type: "SET_IS_LOADING", payload: false });
@@ -302,16 +305,18 @@ export function App(props: AppProps) {
   }, []);
 
   // Bridge Agent domain observables to Zustand (replaces useDisplay hook)
+  const prompterRef = useRef<UserPrompter | null>(null);
   useEffect(() => {
-    const cleanup = connectAgent({
+    const { cleanup, prompter } = connectAgent({
       agent: props.agent,
       initialSession: props.initialSession,
       sessionName: props.sessionName,
       resumeRecent: props.resumeRecent,
       registry: props.agentRegistry,
     });
+    prompterRef.current = prompter;
     return cleanup;
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return <AppContent {...props} />;
+  return <AppContent {...props} prompterRef={prompterRef} />;
 }

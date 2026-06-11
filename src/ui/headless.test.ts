@@ -1,14 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const mockRun = vi.fn();
-const mockSetPrompter = vi.fn();
 const mockOnChange = vi.fn().mockReturnValue(() => {});
 const mockGetTurns = vi.fn().mockReturnValue([]);
 const mockGetStatuses = vi.fn().mockReturnValue([]);
 
 const mockAgent = {
   run: mockRun,
-  setPrompter: mockSetPrompter,
   getStore: vi.fn().mockReturnValue({
     onChange: mockOnChange,
     getTurns: mockGetTurns,
@@ -31,23 +29,17 @@ describe("runHeadless", () => {
     vi.restoreAllMocks();
   });
 
-  it("sets headless events and prompter on agent", async () => {
+  it("calls agent.run with prompter that returns empty string", async () => {
     mockRun.mockResolvedValueOnce(undefined);
     await runHeadless(mockAgent as any, "test prompt");
 
-    expect(mockSetPrompter).toHaveBeenCalled();
-    const prompterArg = mockSetPrompter.mock.calls[0][0];
-    expect(typeof prompterArg.prompt).toBe("function");
-  });
-
-  it("headless prompter always returns empty string", async () => {
-    mockRun.mockResolvedValueOnce(undefined);
-    let capturedPrompt: Function = () => "yes";
-    mockSetPrompter.mockImplementationOnce((p: any) => {
-      capturedPrompt = p.prompt;
+    expect(mockRun).toHaveBeenCalledWith("test prompt", {
+      prompter: expect.objectContaining({ prompt: expect.any(Function) }),
     });
-    await runHeadless(mockAgent as any, "test prompt");
-    const result = await capturedPrompt({
+
+    // Verify the headless prompter always returns empty string
+    const runOpts = mockRun.mock.calls[0][1];
+    const result = await runOpts.prompter.prompt({
       message: "msg",
       options: [{ label: "Yes", value: "yes" }],
     });
@@ -57,7 +49,7 @@ describe("runHeadless", () => {
   it("calls agent.run with initial prompt", async () => {
     mockRun.mockResolvedValueOnce(undefined);
     await runHeadless(mockAgent as any, "test prompt");
-    expect(mockRun).toHaveBeenCalledWith("test prompt");
+    expect(mockRun).toHaveBeenCalledWith("test prompt", expect.any(Object));
   });
 
   it("handles Aborted error", async () => {

@@ -7,10 +7,7 @@ import {
   ToolDeniedError,
 } from "./tools/index.js";
 import type { ToolExecutor, ToolCall } from "./tools/executor.js";
-import {
-  ConsolePrompter,
-  type UserPrompter,
-} from "./utils/display.js";
+import type { UserPrompter } from "./utils/display.js";
 import type { Signal } from "./utils/signal.js";
 import { type PermissionMode, type PermissionService } from "./services/permission.js";
 import type { AgentRegistry } from "./services/agent-registry.js";
@@ -38,7 +35,6 @@ export class Agent {
   private contextManager: ContextManager;
   private toolExecutor: ToolExecutor;
   public readonly tokenCount$: Signal<number>;
-  private prompter: UserPrompter;
   private promptManager: PromptManager;
   private agentRegistry?: AgentRegistry;
   private currentAgentId: string;
@@ -88,12 +84,6 @@ export class Agent {
     this.tokenCount$ = opts.tokenCount$;
     this.agentRegistry = opts.agentRegistry;
     this.currentAgentId = opts.currentAgentId ?? "1";
-    this.prompter = new ConsolePrompter();
-  }
-
-
-  setPrompter(prompter: UserPrompter): void {
-    this.prompter = prompter;
   }
 
   private async saveStore(): Promise<void> {
@@ -216,7 +206,7 @@ export class Agent {
 
   async run(
     userMessage: string,
-    opts?: { displayContent?: string },
+    opts?: { displayContent?: string; prompter?: UserPrompter },
   ): Promise<boolean> {
     if (this.isRunning) return false;
 
@@ -270,7 +260,7 @@ export class Agent {
             userPrompt: this.promptManager.getUserPrompt(),
           },
           currentAgentId: this.currentAgentId,
-          prompter: this.prompter,
+          prompter: opts?.prompter,
         };
 
         try {

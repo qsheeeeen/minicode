@@ -1,5 +1,6 @@
 import type { Agent } from "../agent.js";
 import type { ContentBlock } from "../messages.js";
+import type { Prompt } from "../utils/display.js";
 import type { CommandContext } from "./commands/index.js";
 import { routeInput } from "./routing.js";
 import { processRoute } from "./route-handler.js";
@@ -33,14 +34,14 @@ export async function runHeadless(
   }
 
 
-  agent.setPrompter({
-    prompt: async (req) => {
+  const headlessPrompter = {
+    prompt: async (req: Prompt) => {
       console.log(
         `[Denied: ${req.message}] -- use --permission yolo or auto in headless mode`,
       );
       return "";
     },
-  });
+  };
 
   let printedTurns = 0;
   const printedBlocks = new Map<number, number>(); // turnIndex → blocks printed so far
@@ -198,7 +199,7 @@ export async function runHeadless(
   // Input routing
   if (!cmdContext) {
     try {
-      await agent.run(initialPrompt);
+      await agent.run(initialPrompt, { prompter: headlessPrompter });
       render(true);
     } catch (e) {
       if (e instanceof Error && e.message === "Aborted") {
@@ -227,7 +228,7 @@ export async function runHeadless(
   }
 
   try {
-    await agent.run(processed.promptText);
+    await agent.run(processed.promptText, { prompter: headlessPrompter });
     render(true);
   } catch (e) {
     if (e instanceof Error && e.message === "Aborted") {

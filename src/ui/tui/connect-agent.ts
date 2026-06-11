@@ -11,6 +11,7 @@
 import type { Agent } from "../../agent.js";
 import type { AgentRegistry } from "../../services/index.js";
 import { CallbackPrompter } from "../../utils/display.js";
+import type { UserPrompter } from "../../utils/display.js";
 import type { MessageParam } from "../../messages.js";
 import { MessageStore } from "../../messages.js";
 import { useTuiStore } from "./store.js";
@@ -23,7 +24,7 @@ export interface ConnectAgentOptions {
   registry: AgentRegistry;
 }
 
-export function connectAgent(options: ConnectAgentOptions): () => void {
+export function connectAgent(options: ConnectAgentOptions): { cleanup: () => void; prompter: UserPrompter } {
   const { agent, initialSession, sessionName, resumeRecent, registry } = options;
   const { dispatch } = useTuiStore.getState();
 
@@ -32,17 +33,15 @@ export function connectAgent(options: ConnectAgentOptions): () => void {
     dispatch({ type: "SET_TOKEN_COUNT", payload: count }),
   );
 
-  // 2. Wire up CallbackPrompter — resolves/rejects via store state
-  agent.setPrompter(
-    new CallbackPrompter(
-      (req) =>
-        new Promise<string>((resolve) => {
-          dispatch({
-            type: "SET_PENDING_PROMPT",
-            payload: { ...req, resolve },
-          });
-        }),
-    ),
+  // 2. Create CallbackPrompter — resolves/rejects via store state
+  const prompter = new CallbackPrompter(
+    (req) =>
+      new Promise<string>((resolve) => {
+        dispatch({
+          type: "SET_PENDING_PROMPT",
+          payload: { ...req, resolve },
+        });
+      }),
   );
 
   // 3. Subscribe to MessageStore changes
@@ -84,9 +83,12 @@ export function connectAgent(options: ConnectAgentOptions): () => void {
   };
   loadInitial();
 
-  // Return cleanup function
-  return () => {
-    unsubToken();
-    unsubStore();
+  // Return cleanup function and prompter for run() calls
+  return {
+    cleanup: () => {
+      unsubToken();
+      unsubStore();
+    },
+    prompter,
   };
 }

@@ -180,7 +180,6 @@ vi.mock("./services/permission.js", () => ({
       }),
       getMode: vi.fn().mockImplementation(() => mode),
       cycleMode: vi.fn(),
-      setPrompter: vi.fn(),
     };
   }),
 }));
