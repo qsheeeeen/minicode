@@ -10,7 +10,6 @@ export class PermissionService {
   private mode: PermissionMode;
   private client?: LLMClient;
   private model?: string;
-  private prompter?: UserPrompter;
 
   constructor(
     initialMode: PermissionMode,
@@ -30,10 +29,6 @@ export class PermissionService {
     this.mode = mode;
   }
 
-  setPrompter(prompter: UserPrompter): void {
-    this.prompter = prompter;
-  }
-
   cycleMode(): PermissionMode {
     const idx = MODES.indexOf(this.mode);
     this.mode = MODES[(idx + 1) % MODES.length];
@@ -44,12 +39,13 @@ export class PermissionService {
     toolName: string,
     toolInput: Record<string, unknown>,
     displayText: string,
+    prompter?: UserPrompter,
   ): Promise<{ allowed: boolean; reason?: string }> {
     switch (this.mode) {
       case "yolo":
         return { allowed: true };
       case "manual": {
-        const answer = await this.prompter?.prompt({
+        const answer = await prompter?.prompt({
           message: `Allow tool execution?\n${displayText}`,
           options: [
             { label: "Yes", value: "yes" },

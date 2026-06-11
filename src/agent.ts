@@ -94,7 +94,6 @@ export class Agent {
 
   setPrompter(prompter: UserPrompter): void {
     this.prompter = prompter;
-    this.toolExecutor.setPrompter(prompter);
   }
 
   private async saveStore(): Promise<void> {

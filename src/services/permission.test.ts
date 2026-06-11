@@ -56,11 +56,11 @@ describe("PermissionService", () => {
     it("manual uses prompter.prompt when available", async () => {
       const service = new PermissionService("manual");
       const promptMock = vi.fn().mockResolvedValue("yes");
-      service.setPrompter({ prompt: promptMock });
       const result = await service.check(
         "Shell",
         { command: "ls" },
         "List files",
+        { prompt: promptMock },
       );
       expect(result).toEqual({ allowed: true });
       expect(promptMock).toHaveBeenCalledWith({
@@ -82,11 +82,11 @@ describe("PermissionService", () => {
     it('manual returns allowed: false and "User rejected" when prompter returns no', async () => {
       const service = new PermissionService("manual");
       const promptMock = vi.fn().mockResolvedValue("no");
-      service.setPrompter({ prompt: promptMock });
       const result = await service.check(
         "Shell",
         { command: "ls" },
         "List files",
+        { prompt: promptMock },
       );
       expect(result).toEqual({ allowed: false, reason: "User rejected" });
     });
@@ -94,11 +94,11 @@ describe("PermissionService", () => {
     it('manual returns allowed: false and "User cancelled" when prompter returns empty', async () => {
       const service = new PermissionService("manual");
       const promptMock = vi.fn().mockResolvedValue("");
-      service.setPrompter({ prompt: promptMock });
       const result = await service.check(
         "Shell",
         { command: "ls" },
         "List files",
+        { prompt: promptMock },
       );
       expect(result).toEqual({ allowed: false, reason: "User cancelled" });
     });

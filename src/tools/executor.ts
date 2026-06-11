@@ -7,7 +7,6 @@ import {
   PermissionService,
   type PermissionMode,
 } from "../services/permission.js";
-import type { UserPrompter } from "../utils/display.js";
 import { callContent } from "../utils/tool-format.js";
 import type pino from "pino";
 
@@ -58,6 +57,7 @@ export class ToolExecutor {
         tool.name,
         args,
         displayText,
+        context?.prompter,
       );
       if (!allowed) {
         if (this.permissionService.getMode() === "auto") {
@@ -172,9 +172,5 @@ export class ToolExecutor {
 
   setPermissionMode(mode: PermissionMode): void {
     this.permissionService.setMode(mode);
-  }
-
-  setPrompter(prompter: UserPrompter): void {
-    this.permissionService.setPrompter(prompter);
   }
 }
