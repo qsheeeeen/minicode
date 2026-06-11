@@ -69,19 +69,19 @@ export const agentTool: ToolDef = {
 
     const tokenCount$ = new Signal(0);
     const sessionManager = new SessionManager();
-    const contextManager = new ContextManager({
-      contextLength: subModel.getContextLength(),
-      compressionThresholdRatio: 0.8,
+    const contextManager = new ContextManager(
+      subModel.getContextLength(),
+      0.8,
       tokenCount$,
-      store: sessionManager.getStore(),
-    });
-    const promptManager = new PromptManager({ userPrompt: config.userPrompt });
-    const toolExecutor = new ToolExecutor({
-      tools: getSubAgentTools(),
-      permissionService: new PermissionService({ initialMode: "manual" }),
-      changeJournal: sessionManager.getChangeJournal(),
-      store: sessionManager.getStore(),
-    });
+      sessionManager.getStore(),
+    );
+    const promptManager = new PromptManager(config.userPrompt);
+    const toolExecutor = new ToolExecutor(
+      getSubAgentTools(),
+      new PermissionService("manual"),
+      sessionManager.getChangeJournal(),
+      sessionManager.getStore(),
+    );
     const subAgent = new Agent(
       subModel,
       sessionManager,

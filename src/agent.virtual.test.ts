@@ -37,18 +37,19 @@ function createTestAgent(options?: {
   const model = new Model(client, "test-model", "test-provider", 200000);
   const tokenCount$ = new Signal(0);
   const sessionManager = new SessionManager();
-  const contextManager = new ContextManager({
-    contextLength: model.getContextLength(),
+  const contextManager = new ContextManager(
+    model.getContextLength(),
+    0.8,
     tokenCount$,
-    store: sessionManager.getStore(),
-  });
+    sessionManager.getStore(),
+  );
   const promptManager = new PromptManager();
-  const toolExecutor = new ToolExecutor({
+  const toolExecutor = new ToolExecutor(
     tools,
-    permissionService: new PermissionService({ initialMode: options?.permissionMode ?? "yolo" }),
-    changeJournal: sessionManager.getChangeJournal(),
-    store: sessionManager.getStore(),
-  });
+    new PermissionService(options?.permissionMode ?? "yolo"),
+    sessionManager.getChangeJournal(),
+    sessionManager.getStore(),
+  );
   const agent = new Agent(
     model,
     sessionManager,
@@ -241,18 +242,19 @@ describe("Agent virtual integration", () => {
     );
     const tokenCount$ = new Signal(0);
     const sessionManager = new SessionManager();
-    const contextManager = new ContextManager({
-      contextLength: model.getContextLength(),
+    const contextManager = new ContextManager(
+      model.getContextLength(),
+      0.8,
       tokenCount$,
-      store: sessionManager.getStore(),
-    });
+      sessionManager.getStore(),
+    );
     const promptManager = new PromptManager();
-    const toolExecutor = new ToolExecutor({
+    const toolExecutor = new ToolExecutor(
       tools,
-      permissionService: new PermissionService({ initialMode: "manual" }),
-      changeJournal: sessionManager.getChangeJournal(),
-      store: sessionManager.getStore(),
-    });
+      new PermissionService("manual"),
+      sessionManager.getChangeJournal(),
+      sessionManager.getStore(),
+    );
     const agent = new Agent(
       model,
       sessionManager,

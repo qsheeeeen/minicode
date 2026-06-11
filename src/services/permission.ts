@@ -12,14 +12,14 @@ export class PermissionService {
   private model?: string;
   private prompter?: UserPrompter;
 
-  constructor(options: {
-    initialMode: PermissionMode;
-    client?: LLMClient;
-    model?: string;
-  }) {
-    this.mode = options.initialMode;
-    this.client = options.client;
-    this.model = options.model;
+  constructor(
+    initialMode: PermissionMode,
+    client?: LLMClient,
+    model?: string,
+  ) {
+    this.mode = initialMode;
+    this.client = client;
+    this.model = model;
   }
 
   getMode(): PermissionMode {

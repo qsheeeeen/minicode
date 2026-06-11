@@ -16,20 +16,30 @@ export interface ToolCall {
   tool?: ToolDef;
 }
 
-export interface ToolExecutorDeps {
-  tools: Map<string, ToolDef>;
-  permissionService: PermissionService;
-  changeJournal: ChangeJournal;
-  store: MessageStore;
-  logger?: pino.Logger;
-}
-
 /**
  * Executes tool calls with permission checks, change journaling,
  * and error handling. Decoupled from the Agent's core LLM loop.
  */
 export class ToolExecutor {
-  constructor(private deps: ToolExecutorDeps) {}
+  private tools: Map<string, ToolDef>;
+  private permissionService: PermissionService;
+  private changeJournal: ChangeJournal;
+  private store: MessageStore;
+  private logger?: pino.Logger;
+
+  constructor(
+    tools: Map<string, ToolDef>,
+    permissionService: PermissionService,
+    changeJournal: ChangeJournal,
+    store: MessageStore,
+    logger?: pino.Logger,
+  ) {
+    this.tools = tools;
+    this.permissionService = permissionService;
+    this.changeJournal = changeJournal;
+    this.store = store;
+    this.logger = logger;
+  }
 
   /**
    * Run a single tool with permission check and change tracking.
@@ -42,13 +52,13 @@ export class ToolExecutor {
   ): Promise<{ output: string }> {
     if (!(tool.readOnly ?? !tool.requiresPermission)) {
       const displayText = callContent(tool.name, args);
-      const { allowed, reason } = await this.deps.permissionService.check(
+      const { allowed, reason } = await this.permissionService.check(
         tool.name,
         args,
         displayText,
       );
       if (!allowed) {
-        if (this.deps.permissionService.getMode() === "auto") {
+        if (this.permissionService.getMode() === "auto") {
           return {
             output: `Tool execution denied by auto-gate: ${reason || "unknown reason"}`,
           };
@@ -66,7 +76,7 @@ export class ToolExecutor {
       } catch {
         // File doesn't exist yet — before stays ""
       }
-      this.deps.changeJournal.recordBefore(
+      this.changeJournal.recordBefore(
         activeTurnIdx,
         filePath,
         tool.changeOp ?? "write",
@@ -87,7 +97,7 @@ export class ToolExecutor {
   ): Promise<void> {
     if (toolCalls.length === 0) return;
 
-    this.deps.logger?.info(
+    this.logger?.info(
       {
         session: context.config.model.getName(),
         toolCount: toolCalls.length,
@@ -105,7 +115,7 @@ export class ToolExecutor {
           toolUseId: block.id,
           content: `Error: Tool '${block.name}' not found or not available.`,
         });
-        this.deps.logger?.warn(
+        this.logger?.warn(
           { toolName: block.name },
           "LLM attempted to use an unavailable tool",
         );
@@ -119,7 +129,7 @@ export class ToolExecutor {
           activeTurnIdx,
         );
         results.push({ toolUseId: block.id, content: result.output });
-        this.deps.logger?.info(
+        this.logger?.info(
           { toolName: tool.name, toolInput: block.input },
           "Tool result",
         );
@@ -132,12 +142,12 @@ export class ToolExecutor {
               content: reason.reason,
             });
           }
-          this.deps.store.addToolResults(results);
+          this.store.addToolResults(results);
           throw reason;
         }
         const error = `Error: ${reason instanceof Error ? reason.message : String(reason)}`;
         results.push({ toolUseId: block.id, content: error });
-        this.deps.logger?.error(
+        this.logger?.error(
           { toolName: tool.name, error: String(reason) },
           "Tool error",
         );
@@ -145,24 +155,24 @@ export class ToolExecutor {
     }
 
     // Push all tool results as a single user turn
-    this.deps.store.addToolResults(results);
+    this.store.addToolResults(results);
   }
 
   // -- Accessors for Agent to use in the LLM loop --
 
   getTools(): Map<string, ToolDef> {
-    return this.deps.tools;
+    return this.tools;
   }
 
   getPermissionService(): PermissionService {
-    return this.deps.permissionService;
+    return this.permissionService;
   }
 
   setPermissionMode(mode: PermissionMode): void {
-    this.deps.permissionService.setMode(mode);
+    this.permissionService.setMode(mode);
   }
 
   setPrompter(prompter: UserPrompter): void {
-    this.deps.permissionService.setPrompter(prompter);
+    this.permissionService.setPrompter(prompter);
   }
 }

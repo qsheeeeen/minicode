@@ -15,9 +15,9 @@ export class PromptManager {
   private environmentContext = "";
   private systemPrompt = "";
 
-  constructor(opts?: { userPrompt?: string; projectPromptFile?: string }) {
-    this.userPrompt = opts?.userPrompt ?? "";
-    this.projectPromptFile = opts?.projectPromptFile ?? "";
+  constructor(userPrompt: string = "", projectPromptFile: string = "") {
+    this.userPrompt = userPrompt;
+    this.projectPromptFile = projectPromptFile;
     this.refreshSystemPrompt();
   }
 
