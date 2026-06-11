@@ -16,6 +16,14 @@ export interface ToolCall {
   tool?: ToolDef;
 }
 
+export interface ToolExecutorOpts {
+  readonly tools: Map<string, ToolDef>;
+  readonly permissionService: PermissionService;
+  readonly changeJournal: ChangeJournal;
+  readonly store: MessageStore;
+  readonly logger?: pino.Logger;
+}
+
 /**
  * Executes tool calls with permission checks, change journaling,
  * and error handling. Decoupled from the Agent's core LLM loop.
@@ -27,18 +35,12 @@ export class ToolExecutor {
   private store: MessageStore;
   private logger?: pino.Logger;
 
-  constructor(
-    tools: Map<string, ToolDef>,
-    permissionService: PermissionService,
-    changeJournal: ChangeJournal,
-    store: MessageStore,
-    logger?: pino.Logger,
-  ) {
-    this.tools = tools;
-    this.permissionService = permissionService;
-    this.changeJournal = changeJournal;
-    this.store = store;
-    this.logger = logger;
+  constructor(opts: ToolExecutorOpts) {
+    this.tools = opts.tools;
+    this.permissionService = opts.permissionService;
+    this.changeJournal = opts.changeJournal;
+    this.store = opts.store;
+    this.logger = opts.logger;
   }
 
   /**

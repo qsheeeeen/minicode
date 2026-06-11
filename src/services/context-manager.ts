@@ -15,6 +15,14 @@ import { CompressionService } from "./compression-service.js";
 import { ChangeJournal } from "./change-journal.js";
 import { MessageStore } from "../messages.js";
 
+export interface ContextManagerOpts {
+  readonly contextLength: number;
+  readonly compressionThresholdRatio: number;
+  readonly tokenCount$: Signal<number>;
+  readonly store: MessageStore;
+  readonly sessionStats?: SessionStats;
+}
+
 export interface CompressDeps {
   store: MessageStore;
   model: Model;
@@ -28,20 +36,14 @@ export class ContextManager {
   private isCompressing = false;
   readonly tokenCount$: Signal<number>;
 
-  constructor(
-    contextLength: number,
-    compressionThresholdRatio: number,
-    tokenCount$: Signal<number>,
-    store: MessageStore,
-    sessionStats?: SessionStats,
-  ) {
-    this.tokenCount$ = tokenCount$;
+  constructor(opts: ContextManagerOpts) {
+    this.tokenCount$ = opts.tokenCount$;
     this.tokenTracker = new TokenTracker(
-      contextLength,
-      compressionThresholdRatio,
-      tokenCount$,
-      store,
-      sessionStats,
+      opts.contextLength,
+      opts.compressionThresholdRatio,
+      opts.tokenCount$,
+      opts.store,
+      opts.sessionStats,
     );
   }
 

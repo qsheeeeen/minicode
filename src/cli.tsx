@@ -168,13 +168,13 @@ const initialModel = new Model(
 
 const tokenCount$ = new Signal(0);
 const sessionManager = new SessionManager(undefined, sharedSessionStats);
-const contextManager = new ContextManager(
-  initialModel.getContextLength(),
-  config.compressionThreshold,
+const contextManager = new ContextManager({
+  contextLength: initialModel.getContextLength(),
+  compressionThresholdRatio: config.compressionThreshold,
   tokenCount$,
-  sessionManager.getStore(),
-  sessionManager.getSessionStats(),
-);
+  store: sessionManager.getStore(),
+  sessionStats: sessionManager.getSessionStats(),
+});
 const promptManager = new PromptManager(userPrompt, projectPromptFile);
 promptManager.refreshEnvironment(); // async, non-blocking
 
@@ -186,22 +186,22 @@ for (const [name, tool] of tools) {
     tools.delete(name);
   }
 }
-const toolExecutor = new ToolExecutor(
+const toolExecutor = new ToolExecutor({
   tools,
   permissionService,
-  sessionManager.getChangeJournal(),
-  sessionManager.getStore(),
-);
+  changeJournal: sessionManager.getChangeJournal(),
+  store: sessionManager.getStore(),
+});
 
-const agent = new Agent(
-  initialModel,
+const agent = new Agent({
+  model: initialModel,
   sessionManager,
   contextManager,
   toolExecutor,
   promptManager,
   tokenCount$,
-  sharedAgentRegistry,
-);
+  agentRegistry: sharedAgentRegistry,
+});
 agent.setSession(initialSession);
 agent.setLogger(logger);
 

@@ -29,27 +29,27 @@ function makeAgent(overrides?: {
   const model = o.model ?? makeTestModel();
   const tokenCount$ = new Signal(0);
   const sessionManager = new SessionManager();
-  const contextManager = new ContextManager(
-    model.getContextLength(),
-    o.compressionThresholdRatio ?? 0.8,
+  const contextManager = new ContextManager({
+    contextLength: model.getContextLength(),
+    compressionThresholdRatio: o.compressionThresholdRatio ?? 0.8,
     tokenCount$,
-    sessionManager.getStore(),
-  );
+    store: sessionManager.getStore(),
+  });
   const promptManager = new PromptManager(o.userPrompt);
-  const toolExecutor = new ToolExecutor(
-    getAll(),
-    new PermissionService(o.permissionMode ?? "manual"),
-    sessionManager.getChangeJournal(),
-    sessionManager.getStore(),
-  );
-  return new Agent(
+  const toolExecutor = new ToolExecutor({
+    tools: getAll(),
+    permissionService: new PermissionService(o.permissionMode ?? "manual"),
+    changeJournal: sessionManager.getChangeJournal(),
+    store: sessionManager.getStore(),
+  });
+  return new Agent({
     model,
     sessionManager,
     contextManager,
     toolExecutor,
     promptManager,
     tokenCount$,
-  );
+  });
 }
 
 class MockStream implements AsyncIterable<any> {

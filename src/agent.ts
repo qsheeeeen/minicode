@@ -21,6 +21,17 @@ import type { SessionManager } from "./services/session-manager.js";
 import type { ContextManager } from "./services/context-manager.js";
 import type pino from "pino";
 
+export interface AgentOpts {
+  readonly model: Model;
+  readonly sessionManager: SessionManager;
+  readonly contextManager: ContextManager;
+  readonly toolExecutor: ToolExecutor;
+  readonly promptManager: PromptManager;
+  readonly tokenCount$: Signal<number>;
+  readonly agentRegistry?: AgentRegistry;
+  readonly currentAgentId?: string;
+}
+
 export class Agent {
   private model: Model;
   private sessionManager: SessionManager;
@@ -68,24 +79,15 @@ export class Agent {
     return this.model;
   }
 
-  constructor(
-    model: Model,
-    sessionManager: SessionManager,
-    contextManager: ContextManager,
-    toolExecutor: ToolExecutor,
-    promptManager: PromptManager,
-    tokenCount$: Signal<number>,
-    agentRegistry?: AgentRegistry,
-    currentAgentId: string = "1",
-  ) {
-    this.model = model;
-    this.sessionManager = sessionManager;
-    this.contextManager = contextManager;
-    this.toolExecutor = toolExecutor;
-    this.promptManager = promptManager;
-    this.tokenCount$ = tokenCount$;
-    this.agentRegistry = agentRegistry;
-    this.currentAgentId = currentAgentId;
+  constructor(opts: AgentOpts) {
+    this.model = opts.model;
+    this.sessionManager = opts.sessionManager;
+    this.contextManager = opts.contextManager;
+    this.toolExecutor = opts.toolExecutor;
+    this.promptManager = opts.promptManager;
+    this.tokenCount$ = opts.tokenCount$;
+    this.agentRegistry = opts.agentRegistry;
+    this.currentAgentId = opts.currentAgentId ?? "1";
     this.prompter = new ConsolePrompter();
   }
 
