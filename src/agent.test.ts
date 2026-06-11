@@ -1,6 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { EventEmitter } from "events";
 import { Model } from "./llm/model.js";
+import { SessionManager } from "./services/session-manager.js";
+import { ContextManager } from "./services/context-manager.js";
+import { PromptManager } from "./services/prompt-manager.js";
+import { ToolExecutor } from "./tools/executor.js";
+import { PermissionService } from "./services/permission.js";
+import { Signal } from "./utils/signal.js";
+import { getAll } from "./tools/index.js";
 
 function makeTestModel() {
   // Use the mocked chatStream from the llm/client.js mock
@@ -19,18 +26,29 @@ function makeAgent(overrides?: {
   permissionMode?: any;
 }) {
   const o = overrides ?? {};
+  const model = o.model ?? makeTestModel();
+  const tokenCount$ = new Signal(0);
+  const sessionManager = new SessionManager();
+  const contextManager = new ContextManager({
+    contextLength: model.getContextLength(),
+    compressionThresholdRatio: o.compressionThresholdRatio ?? 0.8,
+    tokenCount$,
+    store: sessionManager.getStore(),
+  });
+  const promptManager = new PromptManager({ userPrompt: o.userPrompt });
+  const toolExecutor = new ToolExecutor({
+    tools: getAll(),
+    permissionService: new PermissionService({ initialMode: o.permissionMode ?? "manual" }),
+    changeJournal: sessionManager.getChangeJournal(),
+    store: sessionManager.getStore(),
+  });
   return new Agent(
-    o.model ?? makeTestModel(),
-    o.userPrompt ?? "",
-    "",
-    o.compressionThresholdRatio ?? 0.8,
-    undefined,
-    "1",
-    false,
-    undefined,
-    undefined,
-    o.permissionMode ?? "manual",
-    true,
+    model,
+    sessionManager,
+    contextManager,
+    toolExecutor,
+    promptManager,
+    tokenCount$,
   );
 }
 

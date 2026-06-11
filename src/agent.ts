@@ -2,26 +2,23 @@ import type { Model } from "./llm/model.js";
 import type { MessageParam, TextBlock, ThinkingBlock, MessageStore } from "./messages.js";
 import type { LLMToolDef, EffortLevel, LLMResponse } from "./llm/client.js";
 import {
-  getAll,
-  getSubAgentTools,
   type ToolDef,
   type ToolExecutionContext,
   ToolDeniedError,
 } from "./tools/index.js";
-import { ToolExecutor, type ToolCall } from "./tools/executor.js";
+import type { ToolExecutor, ToolCall } from "./tools/executor.js";
 import {
   ConsolePrompter,
   type UserPrompter,
 } from "./utils/display.js";
-import { Signal } from "./utils/signal.js";
-import type { SessionStats } from "./services/session-stats.js";
-import { PermissionService, type PermissionMode } from "./services/permission.js";
+import type { Signal } from "./utils/signal.js";
+import { type PermissionMode, type PermissionService } from "./services/permission.js";
 import type { AgentRegistry } from "./services/agent-registry.js";
 import type { ChangeJournal } from "./services/change-journal.js";
 import type { ContentBlock } from "./messages.js";
-import { PromptManager } from "./services/prompt-manager.js";
-import { SessionManager } from "./services/session-manager.js";
-import { ContextManager } from "./services/context-manager.js";
+import type { PromptManager } from "./services/prompt-manager.js";
+import type { SessionManager } from "./services/session-manager.js";
+import type { ContextManager } from "./services/context-manager.js";
 import type pino from "pino";
 
 export class Agent {
@@ -29,7 +26,7 @@ export class Agent {
   private sessionManager: SessionManager;
   private contextManager: ContextManager;
   private toolExecutor: ToolExecutor;
-  public readonly tokenCount$ = new Signal(0);
+  public readonly tokenCount$: Signal<number>;
   private prompter: UserPrompter;
   private promptManager: PromptManager;
   private agentRegistry?: AgentRegistry;
@@ -73,59 +70,23 @@ export class Agent {
 
   constructor(
     model: Model,
-    userPrompt: string = "",
-    projectPromptFile: string = "",
-    compressionThresholdRatio: number = 0.8,
+    sessionManager: SessionManager,
+    contextManager: ContextManager,
+    toolExecutor: ToolExecutor,
+    promptManager: PromptManager,
+    tokenCount$: Signal<number>,
     agentRegistry?: AgentRegistry,
     currentAgentId: string = "1",
-    subAgentMode: boolean = false,
-    sessionStats?: SessionStats,
-    tools?: Map<string, ToolDef>,
-    permissionMode: PermissionMode = "manual",
-    skipEnvironmentRefresh: boolean = false,
   ) {
     this.model = model;
-    this.sessionManager = new SessionManager({ sessionStats });
-    this.contextManager = new ContextManager({
-      contextLength: this.model.getContextLength(),
-      compressionThresholdRatio,
-      tokenCount$: this.tokenCount$,
-      store: this.store,
-      sessionStats: this.sessionManager.getSessionStats(),
-    });
-    const resolvedTools = tools
-      ? new Map(tools)
-      : subAgentMode
-        ? getSubAgentTools()
-        : getAll();
+    this.sessionManager = sessionManager;
+    this.contextManager = contextManager;
+    this.toolExecutor = toolExecutor;
+    this.promptManager = promptManager;
+    this.tokenCount$ = tokenCount$;
     this.agentRegistry = agentRegistry;
     this.currentAgentId = currentAgentId;
-
-    const permissionService = new PermissionService({
-      initialMode: permissionMode,
-    });
-
-    const availability = { agentRegistry: this.agentRegistry };
-    for (const [name, tool] of resolvedTools) {
-      if (tool.requires?.some((r) => !availability[r])) {
-        resolvedTools.delete(name);
-      }
-    }
-
     this.prompter = new ConsolePrompter();
-    this.toolExecutor = new ToolExecutor({
-      tools: resolvedTools,
-      permissionService,
-      changeJournal: this.sessionManager.getChangeJournal(),
-      store: this.store,
-    });
-    this.promptManager = new PromptManager({
-      userPrompt,
-      projectPromptFile,
-    });
-    if (!skipEnvironmentRefresh) {
-      this.promptManager.refreshEnvironment(); // async, non-blocking
-    }
   }
 
 

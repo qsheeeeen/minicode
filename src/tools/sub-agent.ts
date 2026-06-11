@@ -1,6 +1,13 @@
 import type { ToolDef, ToolResult, ToolExecutionContext } from "./registry.js";
 import type { MessageParam, ContentBlock } from "../messages.js";
 import { Agent } from "../agent.js";
+import { SessionManager } from "../services/session-manager.js";
+import { ContextManager } from "../services/context-manager.js";
+import { PromptManager } from "../services/prompt-manager.js";
+import { ToolExecutor } from "./executor.js";
+import { PermissionService } from "../services/permission.js";
+import { getSubAgentTools } from "./registry.js";
+import { Signal } from "../utils/signal.js";
 import { register } from "./registry.js";
 
 export const agentTool: ToolDef = {
@@ -60,14 +67,30 @@ export const agentTool: ToolDef = {
       }
     }
 
+    const tokenCount$ = new Signal(0);
+    const sessionManager = new SessionManager();
+    const contextManager = new ContextManager({
+      contextLength: subModel.getContextLength(),
+      compressionThresholdRatio: 0.8,
+      tokenCount$,
+      store: sessionManager.getStore(),
+    });
+    const promptManager = new PromptManager({ userPrompt: config.userPrompt });
+    const toolExecutor = new ToolExecutor({
+      tools: getSubAgentTools(),
+      permissionService: new PermissionService({ initialMode: "manual" }),
+      changeJournal: sessionManager.getChangeJournal(),
+      store: sessionManager.getStore(),
+    });
     const subAgent = new Agent(
       subModel,
-      config.userPrompt,
-      "",     // projectPromptFile
-      0.8,    // compressionThresholdRatio
+      sessionManager,
+      contextManager,
+      toolExecutor,
+      promptManager,
+      tokenCount$,
       registry,
       subId,
-      true,   // subAgentMode
     );
 
     context?.signal?.addEventListener("abort", () => {

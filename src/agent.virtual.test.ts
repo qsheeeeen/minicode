@@ -10,6 +10,12 @@ import type { ScriptedResponse } from "./llm/virtual.js";
 import { createVirtualTool } from "./testing.js";
 import { ConsolePrompter, CallbackPrompter } from "./utils/display.js";
 import type { ToolDef } from "./tools/registry.js";
+import { SessionManager } from "./services/session-manager.js";
+import { ContextManager } from "./services/context-manager.js";
+import { PromptManager } from "./services/prompt-manager.js";
+import { ToolExecutor } from "./tools/executor.js";
+import { PermissionService } from "./services/permission.js";
+import { Signal } from "./utils/signal.js";
 
 function createTestAgent(options?: {
   responses?: ScriptedResponse[];
@@ -29,18 +35,27 @@ function createTestAgent(options?: {
       ],
     ]);
   const model = new Model(client, "test-model", "test-provider", 200000);
+  const tokenCount$ = new Signal(0);
+  const sessionManager = new SessionManager();
+  const contextManager = new ContextManager({
+    contextLength: model.getContextLength(),
+    tokenCount$,
+    store: sessionManager.getStore(),
+  });
+  const promptManager = new PromptManager();
+  const toolExecutor = new ToolExecutor({
+    tools,
+    permissionService: new PermissionService({ initialMode: options?.permissionMode ?? "yolo" }),
+    changeJournal: sessionManager.getChangeJournal(),
+    store: sessionManager.getStore(),
+  });
   const agent = new Agent(
     model,
-    "",
-    "",
-    0.8,
-    undefined,
-    "1",
-    false,
-    undefined,
-    tools,
-    options?.permissionMode ?? "yolo",
-    true,
+    sessionManager,
+    contextManager,
+    toolExecutor,
+    promptManager,
+    tokenCount$,
   );
 
   return { agent };
@@ -216,25 +231,35 @@ describe("Agent virtual integration", () => {
 
     const prompter = new CallbackPrompter(async () => "no");
 
-    const agent = new Agent(
-      new Model(
-        new VirtualLLMClient([
-          toolUseResponse("call_1", "Dangerous", { action: "delete" }),
-        ]),
-        "test-model",
-        "test-provider",
-        200000,
-      ),
-      "",
-      "",
-      0.8,
-      undefined,
-      "1",
-      false,
-      undefined,
+    const model = new Model(
+      new VirtualLLMClient([
+        toolUseResponse("call_1", "Dangerous", { action: "delete" }),
+      ]),
+      "test-model",
+      "test-provider",
+      200000,
+    );
+    const tokenCount$ = new Signal(0);
+    const sessionManager = new SessionManager();
+    const contextManager = new ContextManager({
+      contextLength: model.getContextLength(),
+      tokenCount$,
+      store: sessionManager.getStore(),
+    });
+    const promptManager = new PromptManager();
+    const toolExecutor = new ToolExecutor({
       tools,
-      "manual",
-      true,
+      permissionService: new PermissionService({ initialMode: "manual" }),
+      changeJournal: sessionManager.getChangeJournal(),
+      store: sessionManager.getStore(),
+    });
+    const agent = new Agent(
+      model,
+      sessionManager,
+      contextManager,
+      toolExecutor,
+      promptManager,
+      tokenCount$,
     );
 
     agent.setPrompter(prompter);

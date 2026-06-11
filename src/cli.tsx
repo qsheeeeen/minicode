@@ -7,6 +7,13 @@ import { render } from "ink";
 import { loadAllConfig } from "./config.js";
 import { Agent } from "./agent.js";
 import { AgentRegistry, SessionStats } from "./services/index.js";
+import { SessionManager } from "./services/session-manager.js";
+import { ContextManager } from "./services/context-manager.js";
+import { PromptManager } from "./services/prompt-manager.js";
+import { ToolExecutor } from "./tools/executor.js";
+import { PermissionService } from "./services/permission.js";
+import { getAll } from "./tools/index.js";
+import { Signal } from "./utils/signal.js";
 import { MessageStore } from "./messages.js";
 import { createLogger } from "./utils/logger.js";
 import { parseArgs, type PermissionMode } from "./args.js";
@@ -149,7 +156,7 @@ for (const skill of getSkills()) {
 const sharedAgentRegistry = new AgentRegistry();
 const sharedSessionStats = new SessionStats();
 
-// Create Agent (composition root — single creation point)
+// Create Agent (composition root — build managers, then inject)
 const initialModel = new Model(
   createClient(config.model!.protocol, config.model!.apiKey, config.model!.baseURL),
   config.model!.model,
@@ -158,19 +165,45 @@ const initialModel = new Model(
   config.thinking.effort,
   config.model!.displayName,
 );
+
+const tokenCount$ = new Signal(0);
+const sessionManager = new SessionManager({ sessionStats: sharedSessionStats });
+const contextManager = new ContextManager({
+  contextLength: initialModel.getContextLength(),
+  compressionThresholdRatio: config.compressionThreshold,
+  tokenCount$,
+  store: sessionManager.getStore(),
+  sessionStats: sessionManager.getSessionStats(),
+});
+const promptManager = new PromptManager({ userPrompt, projectPromptFile });
+promptManager.refreshEnvironment(); // async, non-blocking
+
+const permissionService = new PermissionService({ initialMode: permissionMode });
+const tools = getAll();
+const availability = { agentRegistry: sharedAgentRegistry };
+for (const [name, tool] of tools) {
+  if (tool.requires?.some((r) => !availability[r])) {
+    tools.delete(name);
+  }
+}
+const toolExecutor = new ToolExecutor({
+  tools,
+  permissionService,
+  changeJournal: sessionManager.getChangeJournal(),
+  store: sessionManager.getStore(),
+});
+
 const agent = new Agent(
   initialModel,
-  userPrompt,
-  projectPromptFile,
-  config.compressionThreshold,
+  sessionManager,
+  contextManager,
+  toolExecutor,
+  promptManager,
+  tokenCount$,
   sharedAgentRegistry,
-  undefined, // currentAgentId
-  undefined, // subAgentMode
-  sharedSessionStats,
 );
 agent.setSession(initialSession);
 agent.setLogger(logger);
-agent.setPermissionMode(permissionMode);
 
 // Shared command context for headless mode
 const cmdContext = {
