@@ -1,18 +1,24 @@
 import type { Agent } from "../agent.js";
-import type { ContentBlock } from "../messages.js";
+import type { ContentBlock, MessageStore as MessageStoreType } from "../messages.js";
 import type { Prompt } from "../utils/display.js";
 import type { CommandContext } from "./commands/index.js";
 import { routeInput } from "./routing.js";
 import { processRoute } from "./route-handler.js";
 import { MessageStore } from "../messages.js";
+import type { SessionManager } from "../services/session-manager.js";
+import type { Signal } from "../utils/signal.js";
 
 export async function runHeadless(
   agent: Agent,
   initialPrompt: string,
+  sessionManager: SessionManager,
+  tokenCount$: Signal<number>,
   sessionName?: string,
   resumeRecent?: boolean,
   cmdContext?: CommandContext,
 ): Promise<void> {
+  const store = sessionManager.getStore();
+
   // Load session if requested
   if (sessionName || resumeRecent) {
     const name =
@@ -21,15 +27,15 @@ export async function runHeadless(
       `session-${Date.now()}`;
     const data = await MessageStore.load(name);
     if (data) {
-      agent.setMessages(data.messages);
+      store.setTurns(data.messages);
       const totalTokens = data.totalTokens || 0;
       if (totalTokens > 0) {
-        agent.setTokenCount(totalTokens);
+        tokenCount$.set(totalTokens);
       }
       const { createLogger } = await import("../utils/logger.js");
       const newLogger = await createLogger(MessageStore.getProjectHash(), name);
-      agent.setSession(name);
-      agent.setLogger(newLogger);
+      sessionManager.setSession(name);
+      agent.logger = newLogger;
     }
   }
 
@@ -51,8 +57,8 @@ export async function runHeadless(
   const printedResults = new Set<string>(); // tool_use IDs whose results have been printed
 
   function render(isFinal = false) {
-    const turns = agent.getStore().getTurns();
-    const statuses = agent.getStore().getStatuses();
+    const turns = store.getTurns();
+    const statuses = store.getStatuses();
 
     for (let ti = printedTurns; ti < turns.length; ti++) {
       const turn = turns[ti];
@@ -194,7 +200,7 @@ export async function runHeadless(
     }
   }
 
-  const unsubscribe = agent.getStore().onChange(() => render(false));
+  const unsubscribe = store.onChange(() => render(false));
 
   // Input routing
   if (!cmdContext) {
@@ -216,7 +222,7 @@ export async function runHeadless(
   }
 
   const route = await routeInput(initialPrompt, cmdContext);
-  const processed = processRoute(route, initialPrompt, agent);
+  const processed = processRoute(route, initialPrompt, store);
 
   if (processed.type === "done") {
     if (processed.shellOutput) {

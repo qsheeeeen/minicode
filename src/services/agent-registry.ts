@@ -1,4 +1,5 @@
 import type { Agent } from "../agent.js";
+import type { MessageStore } from "../messages.js";
 
 export type AgentStatus = "idle" | "running" | "completed" | "error";
 
@@ -6,6 +7,7 @@ export interface AgentSession {
   id: string;
   type: "main" | "sub";
   agent: Agent;
+  store: MessageStore;
   status: AgentStatus;
   task?: string;
   parentId?: string;

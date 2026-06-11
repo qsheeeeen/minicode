@@ -5,18 +5,30 @@ const mockOnChange = vi.fn().mockReturnValue(() => {});
 const mockGetTurns = vi.fn().mockReturnValue([]);
 const mockGetStatuses = vi.fn().mockReturnValue([]);
 
+const mockStore = {
+  onChange: mockOnChange,
+  getTurns: mockGetTurns,
+  getStatuses: mockGetStatuses,
+  toLLMMessages: vi.fn().mockReturnValue([]),
+  setTurns: vi.fn(),
+};
+
+const mockSetSession = vi.fn();
+const mockSessionManager = {
+  getStore: vi.fn().mockReturnValue(mockStore),
+  setSession: mockSetSession,
+};
+
+const mockTokenCount$ = {
+  get: vi.fn().mockReturnValue(0),
+  set: vi.fn(),
+  subscribe: vi.fn().mockReturnValue(() => {}),
+};
+
 const mockAgent = {
   run: mockRun,
-  getStore: vi.fn().mockReturnValue({
-    onChange: mockOnChange,
-    getTurns: mockGetTurns,
-    getStatuses: mockGetStatuses,
-    toLLMMessages: vi.fn().mockReturnValue([]),
-  }),
-  getTools: vi.fn().mockReturnValue(new Map()),
-  setTokenCount: vi.fn(),
-  setSession: vi.fn(),
-  setMessages: vi.fn(),
+  model: undefined as any,
+  logger: undefined as any,
 };
 
 import { runHeadless } from "./headless.js";
@@ -31,7 +43,12 @@ describe("runHeadless", () => {
 
   it("calls agent.run with prompter that returns empty string", async () => {
     mockRun.mockResolvedValueOnce(undefined);
-    await runHeadless(mockAgent as any, "test prompt");
+    await runHeadless(
+      mockAgent as any,
+      "test prompt",
+      mockSessionManager as any,
+      mockTokenCount$ as any,
+    );
 
     expect(mockRun).toHaveBeenCalledWith("test prompt", {
       prompter: expect.objectContaining({ prompt: expect.any(Function) }),
@@ -48,14 +65,24 @@ describe("runHeadless", () => {
 
   it("calls agent.run with initial prompt", async () => {
     mockRun.mockResolvedValueOnce(undefined);
-    await runHeadless(mockAgent as any, "test prompt");
+    await runHeadless(
+      mockAgent as any,
+      "test prompt",
+      mockSessionManager as any,
+      mockTokenCount$ as any,
+    );
     expect(mockRun).toHaveBeenCalledWith("test prompt", expect.any(Object));
   });
 
   it("handles Aborted error", async () => {
     mockRun.mockRejectedValueOnce(new Error("Aborted"));
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-    await runHeadless(mockAgent as any, "test prompt");
+    await runHeadless(
+      mockAgent as any,
+      "test prompt",
+      mockSessionManager as any,
+      mockTokenCount$ as any,
+    );
     expect(logSpy).toHaveBeenCalledWith("(Aborted)");
     logSpy.mockRestore();
   });
@@ -63,15 +90,25 @@ describe("runHeadless", () => {
   it("handles generic error", async () => {
     mockRun.mockRejectedValueOnce(new Error("test error"));
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    await runHeadless(mockAgent as any, "test prompt");
+    await runHeadless(
+      mockAgent as any,
+      "test prompt",
+      mockSessionManager as any,
+      mockTokenCount$ as any,
+    );
     expect(errSpy).toHaveBeenCalledWith("(Error: test error)");
     errSpy.mockRestore();
   });
 
   it("throws non-Error objects", async () => {
     mockRun.mockRejectedValueOnce("string error");
-    await expect(runHeadless(mockAgent as any, "test prompt")).rejects.toBe(
-      "string error",
-    );
+    await expect(
+      runHeadless(
+        mockAgent as any,
+        "test prompt",
+        mockSessionManager as any,
+        mockTokenCount$ as any,
+      ),
+    ).rejects.toBe("string error");
   });
 });

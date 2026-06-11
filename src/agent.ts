@@ -1,6 +1,6 @@
 import type { Model } from "./llm/model.js";
 import type { MessageParam, TextBlock, ThinkingBlock, MessageStore } from "./messages.js";
-import type { LLMToolDef, EffortLevel, LLMResponse } from "./llm/client.js";
+import type { LLMToolDef, LLMResponse } from "./llm/client.js";
 import {
   type ToolDef,
   type ToolExecutionContext,
@@ -9,9 +9,7 @@ import {
 import type { ToolExecutor, ToolCall } from "./tools/executor.js";
 import type { UserPrompter } from "./utils/display.js";
 import type { Signal } from "./utils/signal.js";
-import { type PermissionMode, type PermissionService } from "./services/permission.js";
 import type { AgentRegistry } from "./services/agent-registry.js";
-import type { ChangeJournal } from "./services/change-journal.js";
 import type { ContentBlock } from "./messages.js";
 import type { PromptManager } from "./services/prompt-manager.js";
 import type { SessionManager } from "./services/session-manager.js";
@@ -30,7 +28,7 @@ export interface AgentOpts {
 }
 
 export class Agent {
-  private model: Model;
+  public model: Model;
   private sessionManager: SessionManager;
   private contextManager: ContextManager;
   private toolExecutor: ToolExecutor;
@@ -39,9 +37,9 @@ export class Agent {
   private agentRegistry?: AgentRegistry;
   private currentAgentId: string;
   private abortController: AbortController | null = null;
-  private logger?: pino.Logger;
+  public logger?: pino.Logger;
 
-  private isRunning: boolean = false;
+  private _isRunning: boolean = false;
 
   /** Cached access to the message store. */
   private get store(): MessageStore {
@@ -51,28 +49,9 @@ export class Agent {
   get currentSession(): string {
     return this.sessionManager.getSessionName();
   }
-  public setSession(sessionName: string): void {
-    this.sessionManager.setSession(sessionName);
-  }
 
-  public setLogger(logger: pino.Logger): void {
-    this.logger = logger;
-  }
-
-  public setEffort(effort: EffortLevel): void {
-    this.model.setEffort(effort);
-  }
-
-  public setPermissionMode(mode: PermissionMode): void {
-    this.toolExecutor.setPermissionMode(mode);
-  }
-
-  public setModel(model: Model): void {
-    this.model = model;
-  }
-
-  getModel(): Model {
-    return this.model;
+  get isRunning(): boolean {
+    return this._isRunning;
   }
 
   constructor(opts: AgentOpts) {
@@ -208,9 +187,9 @@ export class Agent {
     userMessage: string,
     opts?: { displayContent?: string; prompter?: UserPrompter },
   ): Promise<boolean> {
-    if (this.isRunning) return false;
+    if (this._isRunning) return false;
 
-    this.isRunning = true;
+    this._isRunning = true;
     this.store.addUserMessage(userMessage, opts?.displayContent);
 
     // Count user prompts to determine current turn index
@@ -284,7 +263,7 @@ export class Agent {
         if (toolCalls.length === 0) break;
       }
     } finally {
-      this.isRunning = false;
+      this._isRunning = false;
       if (this.abortController?.signal.aborted) {
         // Remove the last user message that triggered this aborted run
         this.store.removeLastTurn(
@@ -307,45 +286,8 @@ export class Agent {
     return true;
   }
 
-  getIsRunning(): boolean {
-    return this.isRunning;
-  }
-
-  getMessages(): MessageParam[] {
-    return this.store.toLLMMessages();
-  }
-
-  // Restore messages from session. Stores turns directly — no conversion needed.
-  setMessages(messages: MessageParam[]): void {
-    this.store.setTurns(messages);
-  }
-
-  getStore(): MessageStore {
-    return this.store;
-  }
-
-  getChangeJournal(): ChangeJournal {
-    return this.sessionManager.getChangeJournal();
-  }
-
-  getTokenCount(): number {
-    return this.contextManager.getTokenCount();
-  }
-
-  setTokenCount(count: number): void {
-    this.contextManager.setTokenCount(count);
-  }
-
   clearSession(): void {
     this.sessionManager.clearSession();
     this.contextManager.reset();
-  }
-
-  getTools(): Map<string, ToolDef> {
-    return this.toolExecutor.getTools();
-  }
-
-  getPermissionService(): PermissionService {
-    return this.toolExecutor.getPermissionService();
   }
 }

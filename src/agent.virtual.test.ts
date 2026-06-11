@@ -59,19 +59,19 @@ function createTestAgent(options?: {
     tokenCount$,
   });
 
-  return { agent };
+  return { agent, store: sessionManager.getStore() };
 }
 
 describe("Agent virtual integration", () => {
   it("scenario 1: pure text — LLM returns text, run ends, store has correct messages", async () => {
-    const { agent } = createTestAgent({
+    const { agent, store } = createTestAgent({
       responses: [defaultTextResponse("Hello, I am the agent.")],
     });
 
     const completed = await agent.run("Hi there");
     expect(completed).toBe(true);
 
-    const turns = agent.getStore().getTurns();
+    const turns = store.getTurns();
     expect(turns).toHaveLength(2);
 
     // Turn 0: user message
@@ -90,7 +90,7 @@ describe("Agent virtual integration", () => {
     const virtualTool = createVirtualTool("Echo", (args) => `echoed: ${args.input}`);
     const tools = new Map([["Echo", virtualTool]]);
 
-    const { agent } = createTestAgent({
+    const { agent, store } = createTestAgent({
       responses: [
         toolUseResponse("call_1", "Echo", { input: "hello" }),
         defaultTextResponse("The tool said: echoed: hello"),
@@ -101,7 +101,7 @@ describe("Agent virtual integration", () => {
     const completed = await agent.run("Use the Echo tool");
     expect(completed).toBe(true);
 
-    const turns = agent.getStore().getTurns();
+    const turns = store.getTurns();
     // Turn 0: user message
     // Turn 1: assistant [tool_use block]
     // Turn 2: user [tool_result block]
@@ -149,7 +149,7 @@ describe("Agent virtual integration", () => {
       ["ToolB", toolB],
     ]);
 
-    const { agent } = createTestAgent({
+    const { agent, store } = createTestAgent({
       responses: [
         // LLM requests both tools in one response
         {
@@ -206,7 +206,7 @@ describe("Agent virtual integration", () => {
     // Verify tool execution order
     expect(callOrder).toEqual(["A", "B"]);
 
-    const turns = agent.getStore().getTurns();
+    const turns = store.getTurns();
     // Turn 0: user
     // Turn 1: assistant [tool_use A, tool_use B]
     // Turn 2: user [tool_result A, tool_result B]
@@ -263,11 +263,12 @@ describe("Agent virtual integration", () => {
       promptManager,
       tokenCount$,
     });
+    const store = sessionManager.getStore();
 
     const completed = await agent.run("Do something dangerous", { prompter });
     expect(completed).toBe(true);
 
-    const turns = agent.getStore().getTurns();
+    const turns = store.getTurns();
     // Turn 0: user message
     // Turn 1: assistant [tool_use]
     // Turn 2: user [tool_result with rejection reason]
@@ -280,7 +281,7 @@ describe("Agent virtual integration", () => {
     expect(toolResult[0].content).toContain("User rejected");
 
     // Status message should indicate denial
-    const statuses = agent.getStore().getStatuses();
+    const statuses = store.getStatuses();
     expect(
       statuses.some(
         (s) => s.role === "error" && s.content.includes("denied by user"),

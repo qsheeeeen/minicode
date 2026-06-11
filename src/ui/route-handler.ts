@@ -1,5 +1,5 @@
 import type { RouteResult } from "./routing.js";
-import type { Agent } from "../agent.js";
+import type { MessageStore } from "../messages.js";
 import { runShell } from "../services/index.js";
 
 export interface ShellOutput {
@@ -21,7 +21,7 @@ export type ProcessedRoute =
 export function processRoute(
   route: RouteResult,
   rawInput: string,
-  agent: Agent,
+  store: MessageStore,
 ): ProcessedRoute {
   if (route.action === "none") {
     return { type: "done" };
@@ -32,11 +32,11 @@ export function processRoute(
     const output = runShell(command);
 
     // Inject into LLM history so the agent sees the command + result
-    agent.getStore().addUserMessage(
+    store.addUserMessage(
       `Ran: ${command}\n\n\`\`\`\n${output}\n\`\`\``,
       rawInput.trim(),
     );
-    agent.getStore().addStatus({
+    store.addStatus({
       role: "status",
       content: `$ ${command}\n${output}`,
       toolDisplay: {
@@ -46,7 +46,7 @@ export function processRoute(
       },
       timestamp: new Date(),
     });
-    agent.getStore().startAssistantTurn();
+    store.startAssistantTurn();
 
     return { type: "done", shellOutput: { command, output } };
   }

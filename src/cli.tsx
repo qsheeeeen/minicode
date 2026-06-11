@@ -202,17 +202,22 @@ const agent = new Agent({
   tokenCount$,
   agentRegistry: sharedAgentRegistry,
 });
-agent.setSession(initialSession);
-agent.setLogger(logger);
+sessionManager.setSession(initialSession);
+agent.logger = logger;
 
 // Shared command context for headless mode
 const cmdContext = {
   agent,
+  model: initialModel,
+  store: sessionManager.getStore(),
+  sessionManager,
+  changeJournal: sessionManager.getChangeJournal(),
+  tokenCount$,
   sessionStats: sharedSessionStats,
   setMessages: () => {},
   setCurrentSession: (name: string) => {
     initialSession = name;
-    agent.setSession(name);
+    sessionManager.setSession(name);
   },
   setMode: () => {},
   setInputMode: () => {},
@@ -232,6 +237,8 @@ if (headless) {
   await runHeadless(
     agent,
     initialPrompt,
+    sessionManager,
+    tokenCount$,
     sessionName,
     resumeRecent,
     cmdContext,
@@ -253,6 +260,10 @@ render(
     agentRegistry={sharedAgentRegistry}
     programStartTime={programStartTime}
     sessionStats={sharedSessionStats}
+    sessionManager={sessionManager}
+    store={sessionManager.getStore()}
+    tokenCount$={tokenCount$}
+    permissionService={permissionService}
   />,
   { exitOnCtrlC: false },
 );

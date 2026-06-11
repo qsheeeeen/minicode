@@ -1,8 +1,12 @@
 import type { Agent } from "../../agent.js";
 import type { DisplayMessage } from "../../utils/display.js";
 import type { EffortLevel } from "../../llm/client.js";
+import type { Model } from "../../llm/model.js";
 import type { SessionStats } from "../../services/session-stats.js";
-import { MessageStore } from "../../messages.js";
+import type { SessionManager } from "../../services/session-manager.js";
+import type { ChangeJournal } from "../../services/change-journal.js";
+import type { Signal } from "../../utils/signal.js";
+import { MessageStore, type MessageParam, type StatusMessage } from "../../messages.js";
 import { getSkillBody, getAvailableSkills } from "../../skills/index.js";
 import { createLogger } from "../../utils/logger.js";
 import { switchSession } from "../../services/session-lifecycle.js";
@@ -18,6 +22,11 @@ export interface CommandHandler {
 
 export interface CommandContext {
   agent: Agent;
+  model: Model;
+  store: MessageStore;
+  sessionManager: SessionManager;
+  changeJournal: ChangeJournal;
+  tokenCount$: Signal<number>;
   sessionStats: SessionStats;
   setMessages: (msg: DisplayMessage[]) => void;
   setCurrentSession: (name: string) => void;
@@ -116,10 +125,11 @@ registerCommand({
   description: "Clear all history and start a new session",
   handler: async (_args, ctx): Promise<void> => {
     ctx.agent.clearSession();
-    ctx.agent.setTokenCount(0);
+    ctx.tokenCount$.set(0);
     const newSession = `session-${Date.now()}`;
     await switchSession({
       agent: ctx.agent,
+      sessionManager: ctx.sessionManager,
       sessionName: newSession,
       setCurrentSession: ctx.setCurrentSession,
       sessionStats: ctx.sessionStats,
@@ -133,7 +143,7 @@ registerCommand({
   description: "Compress conversation history",
   handler: async (_args, ctx): Promise<void> => {
     await ctx.agent.compress();
-    ctx.agent.getStore().addStatus({
+    ctx.store.addStatus({
       role: "status",
       content: "(Compression complete)",
       timestamp: new Date(),
@@ -152,10 +162,10 @@ registerCommand({
       ctx.setInputMode("effort-select");
       return;
     }
-    ctx.agent.setEffort(value as EffortLevel);
+    ctx.model.setEffort(value as EffortLevel);
     const { setEffort } = await import("../../config.js");
     await setEffort(value);
-    ctx.agent.getStore().addStatus({
+    ctx.store.addStatus({
       role: "status",
       content: `(Effort set to: ${value})`,
       timestamp: new Date(),
@@ -172,6 +182,7 @@ registerCommand({
       ctx.agent.clearSession();
       await switchSession({
         agent: ctx.agent,
+        sessionManager: ctx.sessionManager,
         sessionName: name,
         setCurrentSession: ctx.setCurrentSession,
         sessionStats: ctx.sessionStats,
@@ -193,10 +204,10 @@ registerCommand({
         MessageStore.getProjectHash(),
         newName,
       );
-      ctx.agent.setSession(newName);
-      ctx.agent.setLogger(newLogger);
+      ctx.sessionManager.setSession(newName);
+      ctx.agent.logger = newLogger;
       ctx.setCurrentSession(newName);
-      ctx.agent.getStore().addStatus({
+      ctx.store.addStatus({
         role: "status",
         content: `Renamed: ${oldName} -> ${newName}`,
         timestamp: new Date(),
@@ -216,20 +227,21 @@ registerCommand({
       const name = args[0];
       const data = await MessageStore.load(name);
       if (data) {
-        ctx.agent.setMessages(data.messages);
+        ctx.store.setTurns(data.messages);
         const totalTokens = data.totalTokens || 0;
         if (totalTokens > 0) {
-          ctx.agent.setTokenCount(totalTokens);
+          ctx.tokenCount$.set(totalTokens);
         }
         await switchSession({
           agent: ctx.agent,
+          sessionManager: ctx.sessionManager,
           sessionName: name,
           setCurrentSession: ctx.setCurrentSession,
           sessionStats: ctx.sessionStats,
           statusMessage: `Loaded session: ${name}`,
         });
       } else {
-        ctx.agent.getStore().addStatus({
+        ctx.store.addStatus({
           role: "error",
           content: `Session not found: ${name}`,
           timestamp: new Date(),
@@ -261,7 +273,7 @@ registerCommand({
   handler: async (_args, ctx): Promise<void> => {
     const skills = getAvailableSkills();
     if (skills.length === 0) {
-      ctx.agent.getStore().addStatus({
+      ctx.store.addStatus({
         role: "status",
         content: "(No skills available)",
         timestamp: new Date(),
@@ -301,7 +313,7 @@ registerCommand({
       lines.push(`  /${skill.name} - ${skill.description}`);
     }
 
-    ctx.agent.getStore().addStatus({
+    ctx.store.addStatus({
       role: "status",
       content: lines.join("\n"),
       element,
@@ -326,8 +338,8 @@ registerCommand({
   name: "undo",
   description: "Rollback to a previous conversation turn",
   handler: async (_args, ctx): Promise<void> => {
-    if (ctx.agent.getIsRunning()) {
-      ctx.agent.getStore().addStatus({
+    if (ctx.agent.isRunning) {
+      ctx.store.addStatus({
         role: "status",
         content: "(Agent is running, please wait)",
         timestamp: new Date(),
@@ -335,7 +347,7 @@ registerCommand({
       return;
     }
 
-    const turns = ctx.agent.getStore().getTurns();
+    const turns = ctx.store.getTurns();
     const userMessages: string[] = [];
     for (const t of turns) {
       if (t.role === "user" && typeof t.content === "string") {
@@ -344,7 +356,7 @@ registerCommand({
     }
 
     if (userMessages.length === 0) {
-      ctx.agent.getStore().addStatus({
+      ctx.store.addStatus({
         role: "status",
         content: "(Nothing to rollback)",
         timestamp: new Date(),
@@ -352,8 +364,7 @@ registerCommand({
       return;
     }
 
-    const journal = ctx.agent.getChangeJournal();
-    const entriesByTurnMap = await journal.getEntriesByTurn();
+    const entriesByTurnMap = await ctx.changeJournal.getEntriesByTurn();
     const entriesByTurn = Array.from(entriesByTurnMap.entries()).map(
       ([turnIdx, entries]) => ({ turnIdx, entries }),
     );
@@ -362,7 +373,8 @@ registerCommand({
       totalTurns: userMessages.length,
       entriesByTurn,
       userMessages,
-      agent: ctx.agent,
+      changeJournal: ctx.changeJournal,
+      store: ctx.store,
     });
   },
 });

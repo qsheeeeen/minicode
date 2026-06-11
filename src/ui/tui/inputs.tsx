@@ -3,7 +3,8 @@ import { Box, Text, useInput } from "ink";
 import { Select, TextInput } from "@inkjs/ui";
 import type { ProviderConfig } from "../../config.js";
 import type { ChangeEntry } from "../../services/change-journal.js";
-import type { Agent } from "../../agent.js";
+import type { ChangeJournal } from "../../services/change-journal.js";
+import type { MessageStore } from "../../messages.js";
 
 export interface InputComponentProps {
   onSubmit?: (value: string) => void;
@@ -233,12 +234,14 @@ export function UndoInput({
   entriesByTurn = [],
   userMessages = [],
   totalTurns = 0,
-  agent,
+  changeJournal,
+  store,
 }: InputComponentProps & {
   entriesByTurn?: Array<{ turnIdx: number; entries: ChangeEntry[] }>;
   userMessages?: string[];
   totalTurns?: number;
-  agent?: Agent;
+  changeJournal?: ChangeJournal;
+  store?: MessageStore;
 }) {
   const [step, setStep] = useState<"list" | "confirm">("list");
   const [selectedTurnIdx, setSelectedTurnIdx] = useState(0);
@@ -338,7 +341,7 @@ export function UndoInput({
             onCancel?.();
             return;
           }
-          if (!agent) {
+          if (!changeJournal || !store) {
             onCancel?.();
             return;
           }
@@ -347,20 +350,19 @@ export function UndoInput({
           const { RollbackExecutor } =
             await import("../../services/rollback-executor.js");
           const executor = new RollbackExecutor();
-          const journal = agent.getChangeJournal();
 
           try {
             let result;
             if (v === "both") {
               result = await executor.rollbackFilesAndConversation(
-                journal,
-                agent.getStore(),
+                changeJournal,
+                store,
                 selectedTurnIdx,
               );
             } else {
               result = await executor.rollbackConversation(
-                journal,
-                agent.getStore(),
+                changeJournal,
+                store,
                 selectedTurnIdx,
               );
             }
@@ -375,13 +377,13 @@ export function UndoInput({
               }
             }
             parts.push("conversation rolled back");
-            agent.getStore().addStatus({
+            store.addStatus({
               role: "status",
               content: `(Rollback: ${parts.join(", ")})`,
               timestamp: new Date(),
             });
           } catch (e) {
-            agent.getStore().addStatus({
+            store.addStatus({
               role: "error",
               content: `(Rollback failed: ${(e as Error).message})`,
               timestamp: new Date(),

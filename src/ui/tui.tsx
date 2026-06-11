@@ -11,6 +11,10 @@ import {
   type AgentSession,
 } from "../services/index.js";
 import type { SessionStats } from "../services/session-stats.js";
+import type { SessionManager } from "../services/session-manager.js";
+import type { PermissionService } from "../services/permission.js";
+import type { MessageStore } from "../messages.js";
+import type { Signal } from "../utils/signal.js";
 import { Receipt } from "./tui/Receipt.js";
 
 import { useTuiStore } from "./tui/store.js";
@@ -36,6 +40,10 @@ export interface AppProps {
   agentRegistry: AgentRegistry;
   programStartTime: number;
   sessionStats: SessionStats;
+  sessionManager: SessionManager;
+  store: MessageStore;
+  tokenCount$: Signal<number>;
+  permissionService: PermissionService;
 }
 
 // Hook: multi-agent coordination and switching using Global Store
@@ -66,7 +74,7 @@ function useMultiAgent(
       dispatch({ type: "SET_ACTIVE_AGENT_ID", payload: session.id });
       dispatch({
         type: "SET_MESSAGES",
-        payload: session.agent.getStore().toDisplayMessages(),
+        payload: session.store.toDisplayMessages(),
       });
       agentRef.current = session.agent;
     },
@@ -114,6 +122,10 @@ function AppContent({
   agentRegistry,
   programStartTime,
   sessionStats,
+  sessionManager,
+  store,
+  tokenCount$,
+  permissionService,
   prompterRef,
 }: Omit<AppProps, "config"> & { prompterRef: React.RefObject<UserPrompter | null> }) {
   const { exit } = useApp();
@@ -141,6 +153,11 @@ function AppContent({
   const cmdContext = useCallback(
     () => ({
       agent: agentRef.current,
+      model: agentRef.current.model,
+      store,
+      sessionManager,
+      changeJournal: sessionManager.getChangeJournal(),
+      tokenCount$,
       sessionStats,
       setMessages: (msgs: DisplayMessage[]) => {
         dispatch({ type: "SET_MESSAGES", payload: msgs });
@@ -156,7 +173,7 @@ function AppContent({
         dispatch({ type: "SET_SELECTED_SESSION_INDEX", payload: index }),
       exit: () => dispatch({ type: "SET_SHOW_RECEIPT", payload: true }),
     }),
-    [dispatch],
+    [dispatch, sessionManager, tokenCount$],
   );
 
   const handleSubmit = useCallback(
@@ -166,13 +183,13 @@ function AppContent({
 
       const agent = agentRef.current;
       const route = await routeInput(value, cmdContext());
-      const processed = processRoute(route, value, agent);
+      const processed = processRoute(route, value, store);
 
       if (processed.type === "done") {
         if (processed.shellOutput) {
           dispatch({
             type: "SET_MESSAGES",
-            payload: agent.getStore().toDisplayMessages(),
+            payload: store.toDisplayMessages(),
           });
         }
         return false;
@@ -193,17 +210,13 @@ function AppContent({
         return true;
       } catch (e) {
         if (e instanceof Error && e.message === "Aborted") {
-          agent
-            .getStore()
-            .addStatus({
+          store.addStatus({
               role: "status",
               content: "(Aborted)",
               timestamp: new Date(),
             });
         } else if (e instanceof Error) {
-          agent
-            .getStore()
-            .addStatus({
+          store.addStatus({
               role: "error",
               content: `(Error: ${e.message})`,
               timestamp: new Date(),
@@ -214,6 +227,8 @@ function AppContent({
         return false;
       } finally {
         loadingRef.current = false;
+        // Ensure final messages are always synced to Zustand after run
+        dispatch({ type: "SET_MESSAGES", payload: store.toDisplayMessages() });
         dispatch({ type: "SET_IS_LOADING", payload: false });
         dispatch({ type: "SET_STATUS", payload: "" });
       }
@@ -246,7 +261,7 @@ function AppContent({
       }
       if (key.shift && key.tab) {
         const next =
-          agentRef.current.getPermissionService()?.cycleMode() ?? "manual";
+          permissionService.cycleMode();
         dispatch({ type: "SET_PERMISSION_MODE", payload: next });
         return;
       }
@@ -296,19 +311,20 @@ function AppContent({
 }
 
 export function App(props: AppProps) {
-  // Set initial permission mode on Zustand store (replaces TuiProvider initialState)
+  // Set initial permission mode on Zustand store
   useEffect(() => {
     useTuiStore.setState({
-      permissionMode:
-        props.agent.getPermissionService()?.getMode() ?? "manual",
+      permissionMode: props.permissionService.getMode(),
     });
   }, []);
 
-  // Bridge Agent domain observables to Zustand (replaces useDisplay hook)
+  // Bridge Agent domain observables to Zustand
   const prompterRef = useRef<UserPrompter | null>(null);
   useEffect(() => {
     const { cleanup, prompter } = connectAgent({
       agent: props.agent,
+      sessionManager: props.sessionManager,
+      tokenCount$: props.tokenCount$,
       initialSession: props.initialSession,
       sessionName: props.sessionName,
       resumeRecent: props.resumeRecent,

@@ -68,6 +68,7 @@ const agentSessions = [
     id: "1",
     type: "main" as const,
     agent: {} as any,
+    store: {} as any,
     status: "running" as const,
     tokenCount: 12000,
     toolCalls: 5,
@@ -76,6 +77,7 @@ const agentSessions = [
     id: "2",
     type: "sub" as const,
     agent: {} as any,
+    store: {} as any,
     status: "completed" as const,
     task: "Install dependencies",
     tokenCount: 3200,
@@ -85,14 +87,12 @@ const agentSessions = [
 
 const agentRef = {
   current: {
-    getModel: () => ({
+    model: {
       getProvider: () => "anthropic",
       getDisplayName: () => "claude-sonnet-4-5",
       getContextLength: () => 200000,
-    }),
-    setEffort: () => {},
-    setModel: () => {},
-    getStore: () => ({ addStatus: () => {} }),
+      setEffort: () => {},
+    },
   } as any,
 };
 

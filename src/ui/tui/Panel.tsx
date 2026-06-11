@@ -15,7 +15,7 @@ export function Panel({ agentRef, promptFiles = [] }: PanelProps) {
   const currentSession = useTuiStore((s) => s.currentSession);
   const status = useTuiStore((s) => s.status);
 
-  const currentModel = agentRef.current.getModel();
+  const currentModel = agentRef.current.model;
   const contextLength = currentModel.getContextLength();
   const percentage = Math.min(100, (tokenCount / contextLength) * 100);
 

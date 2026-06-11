@@ -97,10 +97,13 @@ export const agentTool: ToolDef = {
       subAgent.abort();
     });
 
+    const subStore = sessionManager.getStore();
+
     registry.register({
       id: subId,
       type: "sub",
       agent: subAgent,
+      store: subStore,
       status: "running",
       task,
       parentId,
@@ -110,7 +113,7 @@ export const agentTool: ToolDef = {
     const parentSession = registry.get(parentId);
     if (parentSession) {
       const taskPreview = task.length > 40 ? task.slice(0, 40) + "..." : task;
-      parentSession.agent.getStore().addStatus({
+      parentSession.store.addStatus({
         role: "status",
         content: `[Agent #${subId} started: ${taskPreview}]`,
         timestamp: new Date(),
@@ -122,8 +125,8 @@ export const agentTool: ToolDef = {
     subAgent.tokenCount$.subscribe((count: number) => {
       registry.updateProgress(subId, { tokenCount: count });
     });
-    subAgent.getStore().onChange(() => {
-      const turns = subAgent.getStore().getTurns();
+    subStore.onChange(() => {
+      const turns = subStore.getTurns();
       let tc = 0;
       for (const turn of turns) {
         if (turn.role === "assistant" && Array.isArray(turn.content)) {
@@ -140,11 +143,11 @@ export const agentTool: ToolDef = {
 
     try {
       await subAgent.run(task);
-      const turns = subAgent.getStore().getTurns();
+      const turns = subStore.getTurns();
       const finalResponse = extractFinalResponse(turns);
       const summary = generateSummary(turns);
       registry.updateProgress(subId, {
-        tokenCount: subAgent.getTokenCount(),
+        tokenCount: subAgent.tokenCount$.get(),
         toolCalls: toolCallCount,
       });
       registry.updateStatus(subId, "completed");

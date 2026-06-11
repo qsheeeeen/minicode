@@ -17,8 +17,7 @@ vi.mock("../llm/model.js", () => ({
 
 import { setModelTool } from "./set-model.js";
 
-const mockSetModelOnAgent = vi.fn();
-const mockAgent = { setModel: mockSetModelOnAgent };
+const mockAgent = { model: undefined as any };
 
 function makeContext(overrides?: Record<string, unknown>) {
   return {
@@ -35,6 +34,7 @@ function makeContext(overrides?: Record<string, unknown>) {
 beforeEach(() => {
   vi.clearAllMocks();
   mockSetModel.mockResolvedValue(undefined);
+  mockAgent.model = undefined;
 });
 
 describe("setModelTool", () => {
@@ -50,7 +50,7 @@ describe("setModelTool", () => {
 
     expect(result.output).toBe("Switched to pro: claude-sonnet-4-5@anthropic");
     expect(mockFromSpec).toHaveBeenCalledWith("claude-sonnet-4-5@anthropic");
-    expect(mockSetModelOnAgent).toHaveBeenCalledWith(mockModel);
+    expect(mockAgent.model).toBe(mockModel);
     expect(mockSetModel).toHaveBeenCalledWith("claude-sonnet-4-5@anthropic");
   });
 
@@ -66,7 +66,7 @@ describe("setModelTool", () => {
     );
 
     expect(result.output).toBe("Error: No model mapped to tier pro.");
-    expect(mockSetModelOnAgent).not.toHaveBeenCalled();
+    expect(mockAgent.model).toBeUndefined();
     expect(mockSetModel).not.toHaveBeenCalled();
   });
 
@@ -82,7 +82,7 @@ describe("setModelTool", () => {
     expect(result.output).toBe(
       'Error: Could not resolve "deepseek-chat@deepseek" for tier pro.',
     );
-    expect(mockSetModelOnAgent).not.toHaveBeenCalled();
+    expect(mockAgent.model).toBeUndefined();
     expect(mockSetModel).not.toHaveBeenCalled();
   });
 
@@ -99,7 +99,7 @@ describe("setModelTool", () => {
     );
 
     expect(result.output).toBe("Switched to flash: gpt-4o-mini@openai");
-    expect(mockSetModelOnAgent).not.toHaveBeenCalled();
+    expect(mockAgent.model).toBeUndefined();
     expect(mockSetModel).toHaveBeenCalledWith("gpt-4o-mini@openai");
   });
 
@@ -119,6 +119,6 @@ describe("setModelTool", () => {
 
     expect(result.output).toBe("Switched to pro: claude-opus@anthropic");
     expect(mockFromSpec).toHaveBeenCalledWith("claude-opus@anthropic");
-    expect(mockSetModelOnAgent).toHaveBeenCalledWith(mockModel);
+    expect(mockAgent.model).toBe(mockModel);
   });
 });

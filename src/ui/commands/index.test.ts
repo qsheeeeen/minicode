@@ -87,32 +87,96 @@ describe("Builtin commands", () => {
     expect(names).toContain("model");
   });
 
+  /** Create a mock MessageStore (ctx.store) */
   function makeStoreMock() {
-    return { addStatus: vi.fn() };
+    return {
+      addStatus: vi.fn(),
+      setTurns: vi.fn(),
+      getTurns: vi.fn().mockReturnValue([]),
+    };
   }
 
-  function makeAgentMock(overrides: Record<string, any> = {}) {
-    const store = makeStoreMock();
+  /** Create a mock Model (ctx.model) */
+  function makeModelMock() {
     return {
-      getStore: vi.fn().mockReturnValue(store),
-      ...overrides,
-      __store: store,
+      setEffort: vi.fn(),
     };
+  }
+
+  /** Create a mock SessionManager (ctx.sessionManager) */
+  function makeSessionManagerMock(storeMock: ReturnType<typeof makeStoreMock>) {
+    return {
+      setSession: vi.fn(),
+      getStore: vi.fn().mockReturnValue(storeMock),
+      getChangeJournal: vi.fn(),
+    };
+  }
+
+  /** Create a mock ChangeJournal (ctx.changeJournal) */
+  function makeChangeJournalMock() {
+    return {
+      getEntriesByTurn: vi.fn().mockResolvedValue(new Map()),
+    };
+  }
+
+  /** Create a mock Signal<number> (ctx.tokenCount$) */
+  function makeTokenCountMock() {
+    return {
+      get: vi.fn().mockReturnValue(0),
+      set: vi.fn(),
+      subscribe: vi.fn().mockReturnValue(() => {}),
+    };
+  }
+
+  /** Build a full mock CommandContext with sensible defaults */
+  function makeCtx(overrides: Record<string, any> = {}) {
+    const store = makeStoreMock();
+    const model = makeModelMock();
+    const sessionManager = makeSessionManagerMock(store);
+    const changeJournal = makeChangeJournalMock();
+    const tokenCount$ = makeTokenCountMock();
+
+    const agent = {
+      clearSession: vi.fn(),
+      compress: vi.fn().mockResolvedValue(undefined),
+      setSession: vi.fn(),
+      setLogger: vi.fn(),
+      currentSession: "test-session",
+      logger: { info: vi.fn(), error: vi.fn() },
+      isRunning: false,
+      ...overrides.agent,
+    };
+
+    const ctx: Partial<CommandContext> = {
+      agent: agent as any,
+      model: model as any,
+      store: store as any,
+      sessionManager: sessionManager as any,
+      changeJournal: changeJournal as any,
+      tokenCount$: tokenCount$ as any,
+      sessionStats: {
+        incrementSessionCount: vi.fn(),
+      } as any,
+      setCurrentSession: vi.fn(),
+      setMessages: vi.fn(),
+      setInputMode: vi.fn(),
+      exit: vi.fn(),
+      ...overrides,
+    };
+
+    return { ctx, store, model, sessionManager, changeJournal, tokenCount$, agent };
   }
 
   describe("handlers", () => {
     it("/exit calls ctx.exit()", async () => {
-      const ctx: Partial<CommandContext> = { exit: vi.fn() };
+      const { ctx } = makeCtx();
       const result = await executeCommand("exit", [], ctx as CommandContext);
       expect(result.handled).toBe(true);
       expect(ctx.exit).toHaveBeenCalled();
     });
 
     it("/compress calls ctx.agent.compress() and adds status via store", async () => {
-      const agentMock = makeAgentMock({
-        compress: vi.fn().mockResolvedValue(undefined),
-      });
-      const ctx: Partial<CommandContext> = { agent: agentMock as any };
+      const { ctx, store } = makeCtx();
 
       const result = await executeCommand(
         "compress",
@@ -120,49 +184,30 @@ describe("Builtin commands", () => {
         ctx as CommandContext,
       );
       expect(result.handled).toBe(true);
-      expect(agentMock.compress).toHaveBeenCalled();
-      expect(agentMock.__store.addStatus).toHaveBeenCalledWith(
+      expect(ctx.agent.compress).toHaveBeenCalled();
+      expect(store.addStatus).toHaveBeenCalledWith(
         expect.objectContaining({ role: "status" }),
       );
     });
 
     it("/clear clears session and adds status via store", async () => {
-      const agentMock = makeAgentMock({
-        clearSession: vi.fn(),
-        setTokenCount: vi.fn(),
-        setSession: vi.fn(),
-        setLogger: vi.fn(),
-      });
-      const ctx: Partial<CommandContext> = {
-        agent: agentMock as any,
-        sessionStats: { incrementSessionCount: vi.fn() } as any,
-        setCurrentSession: vi.fn(),
-        setMessages: vi.fn(),
-      };
+      const { ctx, store, tokenCount$ } = makeCtx();
 
       const result = await executeCommand("clear", [], ctx as CommandContext);
       expect(result.handled).toBe(true);
-      expect(agentMock.clearSession).toHaveBeenCalled();
-      expect(agentMock.setTokenCount).toHaveBeenCalledWith(0);
+      expect(ctx.agent.clearSession).toHaveBeenCalled();
+      expect(tokenCount$.set).toHaveBeenCalledWith(0);
       expect(ctx.setCurrentSession).toHaveBeenCalledWith(
         expect.stringMatching(/^session-/),
       );
-      expect(agentMock.__store.addStatus).toHaveBeenCalledWith(
+      // switchSession calls sessionManager.getStore().addStatus()
+      expect(store.addStatus).toHaveBeenCalledWith(
         expect.objectContaining({ role: "status" }),
       );
     });
 
     it("/new creates new session and adds status via store", async () => {
-      const agentMock = makeAgentMock({
-        clearSession: vi.fn(),
-        setSession: vi.fn(),
-        setLogger: vi.fn(),
-      });
-      const ctx: Partial<CommandContext> = {
-        agent: agentMock as any,
-        sessionStats: { incrementSessionCount: vi.fn() } as any,
-        setCurrentSession: vi.fn(),
-      };
+      const { ctx, store } = makeCtx();
 
       const result = await executeCommand(
         "new",
@@ -170,27 +215,16 @@ describe("Builtin commands", () => {
         ctx as CommandContext,
       );
       expect(result.handled).toBe(true);
-      expect(agentMock.clearSession).toHaveBeenCalled();
-      expect(agentMock.setSession).toHaveBeenCalledWith("my new session");
+      expect(ctx.agent.clearSession).toHaveBeenCalled();
       expect(ctx.setCurrentSession).toHaveBeenCalledWith("my new session");
-      expect(agentMock.__store.addStatus).toHaveBeenCalledWith(
+      // switchSession calls sessionManager.getStore().addStatus()
+      expect(store.addStatus).toHaveBeenCalledWith(
         expect.objectContaining({ role: "status" }),
       );
     });
 
     it("/rename renames session and adds status via store", async () => {
-      const storeMock = makeStoreMock();
-      const agentMock = {
-        currentSession: "old-session",
-        setSession: vi.fn(),
-        setLogger: vi.fn(),
-        getStore: vi.fn().mockReturnValue(storeMock),
-      };
-      const ctx: Partial<CommandContext> = {
-        agent: agentMock as any,
-        sessionStats: { incrementSessionCount: vi.fn() } as any,
-        setCurrentSession: vi.fn(),
-      };
+      const { ctx, store } = makeCtx();
 
       const result = await executeCommand(
         "rename",
@@ -199,11 +233,11 @@ describe("Builtin commands", () => {
       );
       expect(result.handled).toBe(true);
       expect(messageStoreMock.rename).toHaveBeenCalledWith(
-        "old-session",
+        "test-session",
         "new-session",
       );
       expect(ctx.setCurrentSession).toHaveBeenCalledWith("new-session");
-      expect(storeMock.addStatus).toHaveBeenCalledWith(
+      expect(store.addStatus).toHaveBeenCalledWith(
         expect.objectContaining({ role: "status" }),
       );
     });
@@ -213,9 +247,7 @@ describe("Builtin commands", () => {
         { name: "session-1" },
         { name: "session-2" },
       ]);
-      const ctx: Partial<CommandContext> = {
-        setInputMode: vi.fn(),
-      };
+      const { ctx } = makeCtx();
 
       const result = await executeCommand("resume", [], ctx as CommandContext);
       expect(result.handled).toBe(true);
@@ -230,21 +262,7 @@ describe("Builtin commands", () => {
         messages: [],
         totalTokens: 100,
       });
-      const storeMock = { addStatus: vi.fn() };
-      const agentMock = {
-        setMessages: vi.fn(),
-        setTokenCount: vi.fn(),
-        setSession: vi.fn(),
-        setLogger: vi.fn(),
-        getTools: vi.fn(),
-        getStore: vi.fn().mockReturnValue(storeMock),
-      };
-      const ctx: Partial<CommandContext> = {
-        agent: agentMock as any,
-        sessionStats: { incrementSessionCount: vi.fn() } as any,
-        setCurrentSession: vi.fn(),
-        setMessages: vi.fn(),
-      };
+      const { ctx, store, tokenCount$ } = makeCtx();
 
       const result = await executeCommand(
         "resume",
@@ -253,21 +271,18 @@ describe("Builtin commands", () => {
       );
       expect(result.handled).toBe(true);
       expect(messageStoreMock.load).toHaveBeenCalledWith("session-1");
-      expect(agentMock.setMessages).toHaveBeenCalled();
-      expect(agentMock.setTokenCount).toHaveBeenCalledWith(100);
+      expect(store.setTurns).toHaveBeenCalled();
+      expect(tokenCount$.set).toHaveBeenCalledWith(100);
       expect(ctx.setCurrentSession).toHaveBeenCalledWith("session-1");
-      expect(storeMock.addStatus).toHaveBeenCalledWith(
+      // switchSession adds a status message
+      expect(store.addStatus).toHaveBeenCalledWith(
         expect.objectContaining({ role: "status" }),
       );
     });
 
     it("/resume with unknown session shows error", async () => {
       messageStoreMock.load.mockResolvedValue(null);
-      const storeMock = { addStatus: vi.fn() };
-      const ctx: Partial<CommandContext> = {
-        agent: { getStore: vi.fn().mockReturnValue(storeMock) } as any,
-        setMessages: vi.fn(),
-      };
+      const { ctx, store } = makeCtx();
 
       const result = await executeCommand(
         "resume",
@@ -275,36 +290,34 @@ describe("Builtin commands", () => {
         ctx as CommandContext,
       );
       expect(result.handled).toBe(true);
-      expect(storeMock.addStatus).toHaveBeenCalledWith(
+      expect(store.addStatus).toHaveBeenCalledWith(
         expect.objectContaining({ role: "error" }),
       );
     });
 
     it("/plan returns prompt text", async () => {
-      const result = await executeCommand("plan", [], {} as CommandContext);
+      const { ctx } = makeCtx();
+      const result = await executeCommand("plan", [], ctx as CommandContext);
       expect(result.handled).toBe(true);
       expect(result.promptText).toContain("executable plan");
     });
 
     it("/test returns prompt text", async () => {
-      const result = await executeCommand("test", [], {} as CommandContext);
+      const { ctx } = makeCtx();
+      const result = await executeCommand("test", [], ctx as CommandContext);
       expect(result.handled).toBe(true);
       expect(result.promptText).toContain("smoke test of your available tools");
     });
 
     it("/effort with no args shows effort select UI", async () => {
-      const ctx: Partial<CommandContext> = {
-        setInputMode: vi.fn(),
-      };
+      const { ctx } = makeCtx();
       const result = await executeCommand("effort", [], ctx as CommandContext);
       expect(result.handled).toBe(true);
       expect(ctx.setInputMode).toHaveBeenCalledWith("effort-select");
     });
 
     it("/effort with invalid value shows effort select UI", async () => {
-      const ctx: Partial<CommandContext> = {
-        setInputMode: vi.fn(),
-      };
+      const { ctx } = makeCtx();
       const result = await executeCommand(
         "effort",
         ["invalid"],
@@ -315,23 +328,16 @@ describe("Builtin commands", () => {
     });
 
     it("/effort with valid value sets effort and adds status", async () => {
-      const storeMock = { addStatus: vi.fn() };
-      const agentMock = {
-        setEffort: vi.fn(),
-        getStore: vi.fn().mockReturnValue(storeMock),
-      };
-      const ctx: Partial<CommandContext> = {
-        agent: agentMock as any,
-      };
+      const { ctx, store, model } = makeCtx();
       const result = await executeCommand(
         "effort",
         ["high"],
         ctx as CommandContext,
       );
       expect(result.handled).toBe(true);
-      expect(agentMock.setEffort).toHaveBeenCalledWith("high");
+      expect(model.setEffort).toHaveBeenCalledWith("high");
       expect(configMock.setEffort).toHaveBeenCalledWith("high");
-      expect(storeMock.addStatus).toHaveBeenCalledWith(
+      expect(store.addStatus).toHaveBeenCalledWith(
         expect.objectContaining({
           role: "status",
           content: "(Effort set to: high)",
@@ -341,13 +347,11 @@ describe("Builtin commands", () => {
 
     it("/skills with no skills shows no-skills status", async () => {
       skillsMock.getAvailableSkills.mockReturnValue([]);
-      const storeMock = { addStatus: vi.fn() };
-      const agentMock = { getStore: vi.fn().mockReturnValue(storeMock) };
-      const ctx: Partial<CommandContext> = { agent: agentMock as any };
+      const { ctx, store } = makeCtx();
 
       const result = await executeCommand("skills", [], ctx as CommandContext);
       expect(result.handled).toBe(true);
-      expect(storeMock.addStatus).toHaveBeenCalledWith(
+      expect(store.addStatus).toHaveBeenCalledWith(
         expect.objectContaining({
           role: "status",
           content: "(No skills available)",
@@ -360,13 +364,11 @@ describe("Builtin commands", () => {
         { name: "my-skill", description: "A custom skill" },
         { name: "other", description: "Another one" },
       ]);
-      const storeMock = { addStatus: vi.fn() };
-      const agentMock = { getStore: vi.fn().mockReturnValue(storeMock) };
-      const ctx: Partial<CommandContext> = { agent: agentMock as any };
+      const { ctx, store } = makeCtx();
 
       const result = await executeCommand("skills", [], ctx as CommandContext);
       expect(result.handled).toBe(true);
-      expect(storeMock.addStatus).toHaveBeenCalledWith(
+      expect(store.addStatus).toHaveBeenCalledWith(
         expect.objectContaining({
           role: "status",
           content:
@@ -379,9 +381,7 @@ describe("Builtin commands", () => {
       configMock.loadConfig.mockResolvedValue({
         providers: { anthropic: {}, openai: {} },
       });
-      const ctx: Partial<CommandContext> = {
-        setInputMode: vi.fn(),
-      };
+      const { ctx } = makeCtx();
       const result = await executeCommand("model", [], ctx as CommandContext);
       expect(result.handled).toBe(true);
       expect(ctx.setInputMode).toHaveBeenCalledWith("model-select", {

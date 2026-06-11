@@ -40,7 +40,7 @@ export const setModelTool: ToolDef = {
 
     const agent = context?.registry?.get(context.currentAgentId || "1")?.agent;
     if (agent) {
-      agent.setModel(newModel);
+      agent.model = newModel;
     }
     await setModel(modelSpec);
     return { output: `Switched to ${tier}: ${modelSpec}` };

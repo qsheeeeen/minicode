@@ -70,7 +70,7 @@ export function InputArea({
   const handleSubmitValue = useCallback(
     async (value: string) => {
       if (input.mode === "effort-select") {
-        agentRef.current.setEffort(value as EffortLevel);
+        agentRef.current.model.setEffort(value as EffortLevel);
         import("../../config.js").then((m) => m.setEffort(value));
         dispatch({
           type: "ADD_MESSAGE",
@@ -114,7 +114,7 @@ export function InputArea({
               const factory = new ModelFactory(config.providers ?? {});
               const newModel = factory.fromSpec(modelSpec);
               if (newModel) {
-                agentRef.current.setModel(newModel);
+                agentRef.current.model = newModel;
               }
               import("../../config.js").then((m) => m.setModel(modelSpec));
               if (tierMatch[2]) {
