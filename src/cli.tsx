@@ -3,7 +3,7 @@ import path from "path";
 import os from "os";
 import { fileURLToPath } from "url";
 import { render } from "ink";
-import { loadAllConfig } from "./config.js";
+import { loadAllConfig, resolveModel } from "./config.js";
 import { Agent } from "./agent.js";
 import { AgentRegistry, SessionStats } from "./services/index.js";
 import { SessionManager } from "./services/session-manager.js";
@@ -33,7 +33,10 @@ const packageJson = JSON.parse(
 );
 const VERSION = packageJson.version;
 
-// Parse CLI arguments (yargs handles --help/--version before config loading)
+// 1. Config init — load from file with file-level defaults (no args)
+const config = await loadAllConfig();
+
+// 2. Args init — yargs handles --help/--version fast exit
 let {
   modelOverride,
   initialPrompt,
@@ -50,10 +53,13 @@ if (headless === undefined) {
 }
 headless = !!headless;
 
-// Get configuration
-const config = await loadAllConfig(modelOverride, cliPermissionMode);
+// 3. Args override config (one-time layer; args are never persisted)
+const model = modelOverride
+  ? resolveModel(modelOverride, config.providers)
+  : config.model;
+const permissionMode = cliPermissionMode ?? config.permissionMode;
 
-if (!config.model) {
+if (!model) {
   console.error(
     "Error: No valid model configuration found. Please set model in config.json",
   );
@@ -106,12 +112,12 @@ const sharedSessionStats = new SessionStats();
 
 // Create Agent (composition root — build managers, then inject)
 const initialModel = new Model(
-  createClient(config.model!.protocol, config.model!.apiKey, config.model!.baseURL),
-  config.model!.model,
-  config.model!.provider,
-  config.model!.contextLength ?? 200000,
+  createClient(model.protocol, model.apiKey, model.baseURL),
+  model.model,
+  model.provider,
+  model.contextLength ?? 200000,
   config.thinking.effort,
-  config.model!.displayName,
+  model.displayName,
 );
 
 const tokenCount$ = new Signal(0);
@@ -127,7 +133,7 @@ const contextManager = new ContextManager({
 const promptManager = new PromptManager(userPrompt, projectPromptFile);
 promptManager.refreshEnvironment(); // async, non-blocking
 
-const permissionService = new PermissionService(config.permissionMode);
+const permissionService = new PermissionService(permissionMode);
 const tools = getAll();
 const availability = { agentRegistry: sharedAgentRegistry };
 for (const [name, tool] of tools) {

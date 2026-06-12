@@ -93,34 +93,35 @@ export interface ResolvedConfig {
     contextLength?: number;
     displayName?: string;
   } | null;
+  providers: Providers;
   compressionThreshold: number;
   thinking: { effort?: EffortLevel };
   permissionMode: "manual" | "yolo" | "auto";
 }
 
-export async function loadAllConfig(
-  modelSpecifier?: string,
-  permissionMode?: "manual" | "yolo" | "auto",
-): Promise<ResolvedConfig> {
-  const config = await loadConfig();
-  const spec = modelSpecifier || config.model;
+/** Resolve a model@provider specifier against providers. Exposed so the
+ *  CLI override layer can re-resolve without re-reading config internals. */
+export function resolveModel(
+  spec: string,
+  providers: Providers,
+): ResolvedConfig["model"] {
+  const parsed = parseModelSpecifier(spec, providers);
+  if (!parsed) return null;
+  const modelConfig = parsed.providerConfig.models?.[parsed.modelName];
+  return {
+    provider: parsed.providerName,
+    protocol: parsed.providerConfig.protocol || "anthropic",
+    model: parsed.modelName,
+    apiKey: parsed.providerConfig.apiKey!,
+    baseURL: parsed.providerConfig.baseURL,
+    contextLength: modelConfig?.contextLength,
+    displayName: modelConfig?.name,
+  };
+}
 
-  let model: ResolvedConfig["model"] = null;
-  if (spec) {
-    const parsed = parseModelSpecifier(spec, config.providers ?? {});
-    if (parsed) {
-      const modelConfig = parsed.providerConfig.models?.[parsed.modelName];
-      model = {
-        provider: parsed.providerName,
-        protocol: parsed.providerConfig.protocol || "anthropic",
-        model: parsed.modelName,
-        apiKey: parsed.providerConfig.apiKey!,
-        baseURL: parsed.providerConfig.baseURL,
-        contextLength: modelConfig?.contextLength,
-        displayName: modelConfig?.name,
-      };
-    }
-  }
+export async function loadAllConfig(): Promise<ResolvedConfig> {
+  const config = await loadConfig();
+  const providers = config.providers ?? {};
 
   const effort =
     typeof config.thinking === "object" && config.thinking?.effort
@@ -128,12 +129,13 @@ export async function loadAllConfig(
       : config.effort;
 
   return {
-    model,
+    model: config.model ? resolveModel(config.model, providers) : null,
+    providers,
     compressionThreshold: config.compressionThreshold ?? 0.8,
     thinking: {
       effort,
     },
-    permissionMode: permissionMode || config.permissionMode || "manual",
+    permissionMode: config.permissionMode ?? "manual",
   };
 }
 
