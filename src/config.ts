@@ -95,11 +95,12 @@ export interface ResolvedConfig {
   } | null;
   compressionThreshold: number;
   thinking: { effort?: EffortLevel };
-  permissionMode?: "manual" | "yolo" | "auto";
+  permissionMode: "manual" | "yolo" | "auto";
 }
 
 export async function loadAllConfig(
   modelSpecifier?: string,
+  permissionMode?: "manual" | "yolo" | "auto",
 ): Promise<ResolvedConfig> {
   const config = await loadConfig();
   const spec = modelSpecifier || config.model;
@@ -132,7 +133,7 @@ export async function loadAllConfig(
     thinking: {
       effort,
     },
-    permissionMode: config.permissionMode,
+    permissionMode: permissionMode || config.permissionMode || "manual",
   };
 }
 

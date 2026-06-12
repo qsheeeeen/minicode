@@ -15,7 +15,7 @@ import { getAll } from "./tools/index.js";
 import { Signal } from "./utils/signal.js";
 import { SessionPersistence } from "./services/session-persistence.js";
 import { createLogger } from "./utils/logger.js";
-import { parseArgs, type PermissionMode } from "./args.js";
+import { parseArgs } from "./args.js";
 import { loadGlobalPrompt } from "./utils/prompts.js";
 import { SkillManager } from "./skills/skill-manager.js";
 import { App } from "./ui/tui.js";
@@ -51,7 +51,7 @@ if (headless === undefined) {
 headless = !!headless;
 
 // Get configuration
-const config = await loadAllConfig(modelOverride);
+const config = await loadAllConfig(modelOverride, cliPermissionMode);
 
 if (!config.model) {
   console.error(
@@ -59,10 +59,6 @@ if (!config.model) {
   );
   process.exit(1);
 }
-
-// Resolve permission mode: CLI flag > config > default
-const permissionMode: PermissionMode =
-  cliPermissionMode || config.permissionMode || "manual";
 
 // Load global prompt only (project prompt is loaded on-demand by the LLM)
 const globalPrompt = await loadGlobalPrompt();
@@ -131,7 +127,7 @@ const contextManager = new ContextManager({
 const promptManager = new PromptManager(userPrompt, projectPromptFile);
 promptManager.refreshEnvironment(); // async, non-blocking
 
-const permissionService = new PermissionService(permissionMode);
+const permissionService = new PermissionService(config.permissionMode);
 const tools = getAll();
 const availability = { agentRegistry: sharedAgentRegistry };
 for (const [name, tool] of tools) {
