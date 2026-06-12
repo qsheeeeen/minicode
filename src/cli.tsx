@@ -18,18 +18,10 @@ import { SessionPersistence } from "./services/session-persistence.js";
 import { createLogger } from "./utils/logger.js";
 import { parseArgs, type PermissionMode } from "./args.js";
 import { loadGlobalPrompt } from "./utils/prompts.js";
-import {
-  loadSkills,
-  getAvailableSkills as getSkills,
-  getSkillBody,
-} from "./skills/index.js";
+import { SkillManager } from "./skills/skill-manager.js";
 import { App } from "./ui/tui.js";
 import { Model } from "./llm/model.js";
 import { createClient } from "./llm/client.js";
-import {
-  getCommandNames,
-  registerCommand,
-} from "./ui/commands/index.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -125,32 +117,12 @@ const logger = await createLogger(
   initialSession,
 );
 
-// Load global skills from ~/.minicode/skills/
-await loadSkills(path.join(os.homedir(), ".minicode", "skills"));
-
-// Load project skills from .agent/ directory
-await loadSkills(path.resolve(process.cwd(), ".agent"));
-
-// Register skills as slash commands (e.g. /skill-creator)
-for (const skill of getSkills()) {
-  if (getCommandNames().includes(skill.name)) {
-    console.warn(
-      `Skill "${skill.name}" skipped: a builtin command with the same name already exists.`,
-    );
-    continue;
-  }
-  const body = getSkillBody(skill.name);
-  if (!body) continue;
-
-  registerCommand({
-    name: skill.name,
-    description: skill.description,
-    prompt: (args: string[]) => {
-      const userInput = args.length > 0 ? `\n\n${args.join(" ")}` : "";
-      return `<activated_skill name="${skill.name}">\n<instructions>\n${body}\n</instructions>\n</activated_skill>${userInput}`;
-    },
-  });
-}
+// Load + wire skills (directories → global registry → slash commands)
+const skillManager = new SkillManager()
+  .addDirectory(path.join(os.homedir(), ".minicode", "skills"))
+  .addDirectory(path.resolve(process.cwd(), ".agent"));
+await skillManager.loadAll();
+skillManager.registerAsCommands();
 
 // Create shared AgentRegistry (used by both Agent tools and TUI state display)
 const sharedAgentRegistry = new AgentRegistry();
