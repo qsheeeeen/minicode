@@ -10,23 +10,23 @@ export interface RollbackResult {
 export class RollbackExecutor {
   async rollbackConversation(
     changeJournal: ChangeJournal,
-    messageStore: LLMContextManager,
+    context: LLMContextManager,
     fromTurnIdx: number,
   ): Promise<RollbackResult> {
-    this.truncateConversation(messageStore, fromTurnIdx);
+    this.truncateConversation(context, fromTurnIdx);
     await changeJournal.pruneFrom(fromTurnIdx);
     return { filesRestored: [], filesDeleted: [] };
   }
 
   async rollbackFilesAndConversation(
     changeJournal: ChangeJournal,
-    messageStore: LLMContextManager,
+    context: LLMContextManager,
     fromTurnIdx: number,
   ): Promise<RollbackResult> {
     // Step 1: Restore files
     const result = await this.restoreFiles(changeJournal, fromTurnIdx);
     // Step 2: Truncate conversation
-    this.truncateConversation(messageStore, fromTurnIdx);
+    this.truncateConversation(context, fromTurnIdx);
     // Step 3: Prune journal (last — only after everything else succeeds)
     await changeJournal.pruneFrom(fromTurnIdx);
     return result;
@@ -74,10 +74,10 @@ export class RollbackExecutor {
   }
 
   private truncateConversation(
-    messageStore: LLMContextManager,
+    context: LLMContextManager,
     fromTurnIdx: number,
   ): void {
-    const turns = messageStore.getTurns();
+    const turns = context.getTurns();
     let userPromptCount = 0;
     let cutAt = turns.length;
     for (let i = 0; i < turns.length; i++) {
@@ -89,6 +89,6 @@ export class RollbackExecutor {
         }
       }
     }
-    messageStore.setTurns(turns.slice(0, cutAt));
+    context.setTurns(turns.slice(0, cutAt));
   }
 }

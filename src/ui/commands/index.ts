@@ -25,7 +25,7 @@ export interface CommandHandler {
 export interface CommandContext {
   agent: Agent;
   model: Model;
-  store: LLMContextManager;
+  context: LLMContextManager;
   sessionManager: SessionManager;
   changeJournal: ChangeJournal;
   tokenCount$: Signal<number>;
@@ -229,7 +229,7 @@ registerCommand({
       const name = args[0];
       const data = await SessionPersistence.load(name);
       if (data) {
-        ctx.store.setTurns(data.messages);
+        ctx.context.setTurns(data.messages);
         const totalTokens = data.totalTokens || 0;
         if (totalTokens > 0) {
           ctx.tokenCount$.set(totalTokens);
@@ -349,7 +349,7 @@ registerCommand({
       return;
     }
 
-    const turns = ctx.store.getTurns();
+    const turns = ctx.context.getTurns();
     const userMessages: string[] = [];
     for (const t of turns) {
       if (t.role === "user" && typeof t.content === "string") {
@@ -376,7 +376,7 @@ registerCommand({
       entriesByTurn,
       userMessages,
       changeJournal: ctx.changeJournal,
-      store: ctx.store,
+      context: ctx.context,
       reportStatus: ctx.sessionManager.reportStatus.bind(ctx.sessionManager),
     });
   },

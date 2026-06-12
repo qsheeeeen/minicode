@@ -77,7 +77,7 @@ export class SessionManager {
 
   // -- Context accessors --
 
-  getStore(): LLMContextManager {
+  getContext(): LLMContextManager {
     return this.context;
   }
 

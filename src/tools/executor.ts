@@ -19,7 +19,7 @@ export interface ToolExecutorOpts {
   readonly tools: Map<string, ToolDef>;
   readonly permissionService: PermissionService;
   readonly changeJournal: ChangeJournal;
-  readonly store: LLMContextManager;
+  readonly context: LLMContextManager;
   readonly logger?: pino.Logger;
 }
 
@@ -31,14 +31,14 @@ export class ToolExecutor {
   private tools: Map<string, ToolDef>;
   private permissionService: PermissionService;
   private changeJournal: ChangeJournal;
-  private store: LLMContextManager;
+  private context: LLMContextManager;
   private logger?: pino.Logger;
 
   constructor(opts: ToolExecutorOpts) {
     this.tools = opts.tools;
     this.permissionService = opts.permissionService;
     this.changeJournal = opts.changeJournal;
-    this.store = opts.store;
+    this.context = opts.context;
     this.logger = opts.logger;
   }
 
@@ -144,7 +144,7 @@ export class ToolExecutor {
               content: reason.reason,
             });
           }
-          this.store.addToolResults(results);
+          this.context.addToolResults(results);
           throw reason;
         }
         const error = `Error: ${reason instanceof Error ? reason.message : String(reason)}`;
@@ -157,7 +157,7 @@ export class ToolExecutor {
     }
 
     // Push all tool results as a single user turn
-    this.store.addToolResults(results);
+    this.context.addToolResults(results);
   }
 
   // -- Accessors for Agent to use in the LLM loop --

@@ -172,7 +172,7 @@ const contextManager = new ContextManager({
   contextLength: initialModel.getContextLength(),
   compressionThresholdRatio: config.compressionThreshold,
   tokenCount$,
-  contextManager: sessionManager.getStore(),
+  contextManager: sessionManager.getContext(),
   statusReporter: sessionManager.getStatusReporter(),
   sessionStats: sessionManager.getSessionStats(),
 });
@@ -191,7 +191,7 @@ const toolExecutor = new ToolExecutor({
   tools,
   permissionService,
   changeJournal: sessionManager.getChangeJournal(),
-  store: sessionManager.getStore(),
+  context: sessionManager.getContext(),
 });
 
 const agent = new Agent({
@@ -210,7 +210,7 @@ agent.logger = logger;
 const cmdContext = {
   agent,
   model: initialModel,
-  store: sessionManager.getStore(),
+  context: sessionManager.getContext(),
   sessionManager,
   changeJournal: sessionManager.getChangeJournal(),
   tokenCount$,
@@ -262,7 +262,7 @@ render(
     programStartTime={programStartTime}
     sessionStats={sharedSessionStats}
     sessionManager={sessionManager}
-    store={sessionManager.getStore()}
+    context={sessionManager.getContext()}
     tokenCount$={tokenCount$}
     permissionService={permissionService}
   />,

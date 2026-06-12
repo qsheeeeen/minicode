@@ -32,14 +32,14 @@ function createTestAgent(responses = [defaultTextResponse("OK")]) {
     contextLength: model.getContextLength(),
     compressionThresholdRatio: 0.8,
     tokenCount$,
-    store: sessionManager.getStore(),
+    context: sessionManager.getContext(),
   });
   const promptManager = new PromptManager();
   const toolExecutor = new ToolExecutor({
     tools,
     permissionService: new PermissionService("yolo"),
     changeJournal: sessionManager.getChangeJournal(),
-    store: sessionManager.getStore(),
+    context: sessionManager.getContext(),
   });
   const agent = new Agent({
     model,
@@ -181,7 +181,7 @@ describe("connectAgent", () => {
     expect(sessions[0].id).toBe("1");
     expect(sessions[0].type).toBe("main");
     expect(sessions[0].agent).toBe(agent);
-    expect(sessions[0].store).toBe(sessionManager.getStore());
+    expect(sessions[0].context).toBe(sessionManager.getContext());
   });
 
   it("should unsubscribe on cleanup", async () => {

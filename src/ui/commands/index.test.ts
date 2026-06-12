@@ -89,8 +89,8 @@ describe("Builtin commands", () => {
     expect(names).toContain("model");
   });
 
-  /** Create a mock store (ctx.store) */
-  function makeStoreMock() {
+  /** Create a mock context (ctx.context) */
+  function makeContextMock() {
     return {
       setTurns: vi.fn(),
       getTurns: vi.fn().mockReturnValue([]),
@@ -105,10 +105,10 @@ describe("Builtin commands", () => {
   }
 
   /** Create a mock SessionManager (ctx.sessionManager) */
-  function makeSessionManagerMock(storeMock: ReturnType<typeof makeStoreMock>) {
+  function makeSessionManagerMock(contextMock: ReturnType<typeof makeContextMock>) {
     return {
       setSession: vi.fn(),
-      getStore: vi.fn().mockReturnValue(storeMock),
+      getStore: vi.fn().mockReturnValue(contextMock),
       getChangeJournal: vi.fn(),
       reportStatus: vi.fn(),
     };
@@ -132,9 +132,9 @@ describe("Builtin commands", () => {
 
   /** Build a full mock CommandContext with sensible defaults */
   function makeCtx(overrides: Record<string, any> = {}) {
-    const store = makeStoreMock();
+    const context = makeContextMock();
     const model = makeModelMock();
-    const sessionManager = makeSessionManagerMock(store);
+    const sessionManager = makeSessionManagerMock(context);
     const changeJournal = makeChangeJournalMock();
     const tokenCount$ = makeTokenCountMock();
 
@@ -152,7 +152,7 @@ describe("Builtin commands", () => {
     const ctx: Partial<CommandContext> = {
       agent: agent as any,
       model: model as any,
-      store: store as any,
+      context: context as any,
       sessionManager: sessionManager as any,
       changeJournal: changeJournal as any,
       tokenCount$: tokenCount$ as any,
@@ -166,7 +166,7 @@ describe("Builtin commands", () => {
       ...overrides,
     };
 
-    return { ctx, store, model, sessionManager, changeJournal, tokenCount$, agent };
+    return { ctx, context, model, sessionManager, changeJournal, tokenCount$, agent };
   }
 
   describe("handlers", () => {
@@ -264,7 +264,7 @@ describe("Builtin commands", () => {
         messages: [],
         totalTokens: 100,
       });
-      const { ctx, store, tokenCount$, sessionManager } = makeCtx();
+      const { ctx, context, tokenCount$, sessionManager } = makeCtx();
 
       const result = await executeCommand(
         "resume",
@@ -273,7 +273,7 @@ describe("Builtin commands", () => {
       );
       expect(result.handled).toBe(true);
       expect(sessionPersistenceMock.load).toHaveBeenCalledWith("session-1");
-      expect(store.setTurns).toHaveBeenCalled();
+      expect(context.setTurns).toHaveBeenCalled();
       expect(tokenCount$.set).toHaveBeenCalledWith(100);
       expect(ctx.setCurrentSession).toHaveBeenCalledWith("session-1");
       // switchSession reports a status message

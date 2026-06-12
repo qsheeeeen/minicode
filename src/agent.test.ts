@@ -29,12 +29,12 @@ function makeAgent(overrides?: {
   const model = o.model ?? makeTestModel();
   const tokenCount$ = new Signal(0);
   const sessionManager = new SessionManager();
-  const store = sessionManager.getStore();
+  const context = sessionManager.getContext();
   const contextManager = new ContextManager({
     contextLength: model.getContextLength(),
     compressionThresholdRatio: o.compressionThresholdRatio ?? 0.8,
     tokenCount$,
-    contextManager: store,
+    contextManager: context,
     statusReporter: sessionManager.reportStatus.bind(sessionManager),
   });
   const promptManager = new PromptManager(o.userPrompt);
@@ -43,7 +43,7 @@ function makeAgent(overrides?: {
     tools: getAll(),
     permissionService,
     changeJournal: sessionManager.getChangeJournal(),
-    store,
+    context,
   });
   const agent = new Agent({
     model,
@@ -53,7 +53,7 @@ function makeAgent(overrides?: {
     promptManager,
     tokenCount$,
   });
-  return { agent, store, sessionManager, tokenCount$, permissionService };
+  return { agent, context, sessionManager, tokenCount$, permissionService };
 }
 
 class MockStream implements AsyncIterable<any> {
@@ -234,26 +234,26 @@ describe("Agent", () => {
 
   describe("getMessages and setMessages", () => {
     it("setMessages stores turns directly", () => {
-      const { store, sessionManager } = makeAgent();
+      const { context, sessionManager } = makeAgent();
       const messages: any[] = [{ role: "user", content: "hello" }];
       sessionManager.setMessages(messages);
-      expect(store.getTurns()).toEqual(messages);
+      expect(context.getTurns()).toEqual(messages);
     });
 
-    it("getMessages returns store turns", () => {
-      const { store } = makeAgent();
-      store.addUserMessage("hello");
-      expect(store.getTurns()).toEqual([{ role: "user", content: "hello" }]);
+    it("getMessages returns context turns", () => {
+      const { context } = makeAgent();
+      context.addUserMessage("hello");
+      expect(context.getTurns()).toEqual([{ role: "user", content: "hello" }]);
     });
   });
 
   describe("compress", () => {
     it("does not compress if not enough turns", async () => {
-      const { agent, store, sessionManager } = makeAgent();
+      const { agent, context, sessionManager } = makeAgent();
       const reportStatusSpy = vi.fn();
       sessionManager.setStatusReporter(reportStatusSpy);
       for (let i = 0; i < 5; i++) {
-        store.addUserMessage(`msg ${i}`);
+        context.addUserMessage(`msg ${i}`);
       }
       await agent.compress();
       expect(reportStatusSpy).toHaveBeenCalledWith(
@@ -263,11 +263,11 @@ describe("Agent", () => {
   });
 
   describe("clearSession", () => {
-    it("clears the store", () => {
-      const { agent, store } = makeAgent();
-      store.addUserMessage("hi");
+    it("clears the context", () => {
+      const { agent, context } = makeAgent();
+      context.addUserMessage("hi");
       agent.clearSession();
-      expect(store.getTurns()).toHaveLength(0);
+      expect(context.getTurns()).toHaveLength(0);
     });
   });
 
@@ -275,7 +275,7 @@ describe("Agent", () => {
     it("handles a basic text interaction", async () => {
       const stream = new MockStream();
       mockChatStream.mockReturnValueOnce(stream);
-      const { agent, store } = makeAgent();
+      const { agent, context } = makeAgent();
       const runPromise = agent.run("Hello agent");
       await new Promise((r) => setTimeout(r, 10));
 
@@ -287,7 +287,7 @@ describe("Agent", () => {
       });
 
       await runPromise;
-      const turns = store.getTurns();
+      const turns = context.getTurns();
       expect(turns[0]).toEqual({ role: "user", content: "Hello agent" });
       expect(turns[1].role).toBe("assistant");
     });
@@ -301,7 +301,7 @@ describe("Agent", () => {
         "test-provider",
         200000,
       );
-      const { agent, store } = makeAgent({ model: thinkingModel });
+      const { agent, context } = makeAgent({ model: thinkingModel });
       const runPromise = agent.run("Solve this");
       await new Promise((r) => setTimeout(r, 10));
 
@@ -312,7 +312,7 @@ describe("Agent", () => {
       });
 
       await runPromise;
-      const turns = store.getTurns();
+      const turns = context.getTurns();
       const content = turns[1].content as any[];
       expect(content.some((b: any) => b.type === "thinking")).toBe(true);
     });
@@ -322,7 +322,7 @@ describe("Agent", () => {
       const stream2 = new MockStream();
       mockChatStream.mockReturnValueOnce(stream1).mockReturnValueOnce(stream2);
 
-      const { agent, store } = makeAgent();
+      const { agent, context } = makeAgent();
       const runPromise = agent.run("Use tool");
       await new Promise((r) => setTimeout(r, 10));
 
@@ -345,7 +345,7 @@ describe("Agent", () => {
       });
 
       await runPromise;
-      const turns = store.getTurns();
+      const turns = context.getTurns();
       const assistantContent = turns[1].content as any[];
       expect(assistantContent.some((b: any) => b.type === "tool_use")).toBe(
         true,
@@ -400,7 +400,7 @@ describe("Agent", () => {
 
   describe("rejection", () => {
     it("in manual mode, rejection stops the conversation", async () => {
-      const { agent, store, sessionManager, permissionService } = makeAgent();
+      const { agent, context, sessionManager, permissionService } = makeAgent();
       const reportStatusSpy = vi.spyOn(sessionManager, "reportStatus");
       permissionService.setMode("manual");
 
@@ -428,7 +428,7 @@ describe("Agent", () => {
 
       await runPromise;
 
-      const turns = store.getTurns();
+      const turns = context.getTurns();
       expect(turns).toHaveLength(3);
       const lastTurn = turns[2];
       expect(lastTurn.role).toBe("user");
@@ -440,7 +440,7 @@ describe("Agent", () => {
     });
 
     it("in auto mode, rejection continues the conversation", async () => {
-      const { agent, store, permissionService } = makeAgent();
+      const { agent, context, permissionService } = makeAgent();
       permissionService.setMode("auto");
 
       vi.mocked(permissionService.check).mockResolvedValue({
@@ -484,7 +484,7 @@ describe("Agent", () => {
 
       await runPromise;
 
-      const turns = store.getTurns();
+      const turns = context.getTurns();
       expect(turns).toHaveLength(4);
       const toolResultTurn = turns[2];
       expect((toolResultTurn.content as any)[0].content).toContain(

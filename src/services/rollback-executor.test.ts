@@ -29,7 +29,7 @@ describe("RollbackExecutor", () => {
   describe("rollbackConversation", () => {
     it("truncates conversation and prunes journal", async () => {
       const journal = makeMockJournal([]);
-      const store = makeMockMessageStore([
+      const context = makeMockMessageStore([
         { role: "user", content: "first" },
         { role: "assistant", content: "reply" },
         { role: "user", content: "second" },
@@ -38,9 +38,9 @@ describe("RollbackExecutor", () => {
 
       const { RollbackExecutor } = await import("./rollback-executor.js");
       const executor = new RollbackExecutor();
-      const result = await executor.rollbackConversation(journal, store, 2);
+      const result = await executor.rollbackConversation(journal, context, 2);
 
-      expect(store.setTurns).toHaveBeenCalledWith([
+      expect(context.setTurns).toHaveBeenCalledWith([
         { role: "user", content: "first" },
         { role: "assistant", content: "reply" },
       ]);
@@ -63,7 +63,7 @@ describe("RollbackExecutor", () => {
         { turnIdx: 3, path: "b.ts", op: "write", before: "", ts: 200 },
       ];
       const journal = makeMockJournal(entries);
-      const store = makeMockMessageStore([
+      const context = makeMockMessageStore([
         { role: "user", content: "first" },
         { role: "user", content: "second" },
         { role: "user", content: "third" },
@@ -73,7 +73,7 @@ describe("RollbackExecutor", () => {
       const executor = new RollbackExecutor();
       const result = await executor.rollbackFilesAndConversation(
         journal,
-        store,
+        context,
         2,
       );
 
@@ -87,7 +87,7 @@ describe("RollbackExecutor", () => {
       expect(fs.unlink).toHaveBeenCalledWith("b.ts");
 
       // Conversation truncated before turn 2
-      expect(store.setTurns).toHaveBeenCalledWith([
+      expect(context.setTurns).toHaveBeenCalledWith([
         { role: "user", content: "first" },
       ]);
       // Journal pruned last
@@ -98,13 +98,13 @@ describe("RollbackExecutor", () => {
       const journal = makeMockJournal([
         { turnIdx: 1, path: "a.ts", op: "edit", before: "old", ts: 100 },
       ]);
-      const store = makeMockMessageStore([{ role: "user", content: "first" }]);
+      const context = makeMockMessageStore([{ role: "user", content: "first" }]);
 
       const { RollbackExecutor } = await import("./rollback-executor.js");
       const executor = new RollbackExecutor();
       const result = await executor.rollbackFilesAndConversation(
         journal,
-        store,
+        context,
         5,
       );
 
@@ -130,14 +130,18 @@ describe("RollbackExecutor", () => {
         },
       ];
       const journal = makeMockJournal(entries);
-      const store = makeMockMessageStore([
+      const context = makeMockMessageStore([
         { role: "user", content: "first" },
         { role: "user", content: "second" },
       ]);
 
       const { RollbackExecutor } = await import("./rollback-executor.js");
       const executor = new RollbackExecutor();
-      await executor.rollbackFilesAndConversation(journal, store, 2);
+      await executor.rollbackFilesAndConversation(
+        journal,
+        context,
+        2,
+      );
 
       const fs = (await import("fs/promises")).default;
       // Should use the earliest entry (first-version), not second

@@ -30,13 +30,13 @@ export interface ConnectAgentOptions {
 
 export function connectAgent(options: ConnectAgentOptions): { cleanup: () => void; prompter: UserPrompter } {
   const { agent, sessionManager, tokenCount$, initialSession, sessionName, resumeRecent, registry } = options;
-  const store = sessionManager.getStore();
+  const context = sessionManager.getContext();
   const { dispatch } = useTuiStore.getState();
 
   // Helper: sync display messages from LLMContextManager + Zustand statuses
   const syncMessages = () => {
     const { statuses } = useTuiStore.getState();
-    dispatch({ type: "SET_MESSAGES", payload: store.toDisplayMessages(statuses) });
+    dispatch({ type: "SET_MESSAGES", payload: context.toDisplayMessages(statuses) });
   };
 
   // 1. Subscribe to token count signal
@@ -57,19 +57,19 @@ export function connectAgent(options: ConnectAgentOptions): { cleanup: () => voi
 
   // 3. Wire StatusReporter: statuses → Zustand + re-sync display messages
   sessionManager.setStatusReporter((msg) => {
-    const turnIndex = store.getTurnCount();
+    const turnIndex = context.getTurnCount();
     dispatch({ type: "ADD_STATUS", payload: { ...msg, turnIndex } });
     syncMessages();
   });
 
   // 4. Subscribe to LLMContextManager changes → re-sync display messages
-  const unsubStore = store.onChange(syncMessages);
+  const unsubStore = context.onChange(syncMessages);
 
   // 5. Register main agent in the registry
-  registry.register({ id: "1", type: "main", agent, store, status: "idle" });
+  registry.register({ id: "1", type: "main", agent, context, status: "idle" });
   dispatch({
     type: "SET_AGENT_SESSIONS",
-    payload: [{ id: "1", type: "main", agent, store, status: "idle" }],
+    payload: [{ id: "1", type: "main", agent, context, status: "idle" }],
   });
 
   // 6. Load initial session (async — onChange subscription will push updates)
@@ -79,7 +79,7 @@ export function connectAgent(options: ConnectAgentOptions): { cleanup: () => voi
     if (sessionName || resumeRecent) {
       const data = await SessionPersistence.load(initialSession);
       if (data) {
-        store.setTurns(data.messages as MessageParam[]);
+        context.setTurns(data.messages as MessageParam[]);
         const totalTokens = data.totalTokens || 0;
         if (totalTokens > 0) {
           tokenCount$.set(totalTokens);

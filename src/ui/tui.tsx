@@ -41,7 +41,7 @@ export interface AppProps {
   programStartTime: number;
   sessionStats: SessionStats;
   sessionManager: SessionManager;
-  store: LLMContextManager;
+  context: LLMContextManager;
   tokenCount$: Signal<number>;
   permissionService: PermissionService;
 }
@@ -75,7 +75,7 @@ function useMultiAgent(
       dispatch({ type: "CLEAR_STATUSES" });
       dispatch({
         type: "SET_MESSAGES",
-        payload: session.store.toDisplayMessages([]),
+        payload: session.context.toDisplayMessages([]),
       });
       agentRef.current = session.agent;
     },
@@ -124,7 +124,7 @@ function AppContent({
   programStartTime,
   sessionStats,
   sessionManager,
-  store,
+  context,
   tokenCount$,
   permissionService,
   prompterRef,
@@ -155,7 +155,7 @@ function AppContent({
     () => ({
       agent: agentRef.current,
       model: agentRef.current.model,
-      store,
+      context,
       sessionManager,
       changeJournal: sessionManager.getChangeJournal(),
       tokenCount$,
@@ -184,14 +184,14 @@ function AppContent({
 
       const agent = agentRef.current;
       const route = await routeInput(value, cmdContext());
-      const processed = processRoute(route, value, store, sessionManager.reportStatus.bind(sessionManager));
+      const processed = processRoute(route, value, context, sessionManager.reportStatus.bind(sessionManager));
 
       if (processed.type === "done") {
         if (processed.shellOutput) {
           const { statuses } = useTuiStore.getState();
           dispatch({
             type: "SET_MESSAGES",
-            payload: store.toDisplayMessages(statuses),
+            payload: context.toDisplayMessages(statuses),
           });
         }
         return false;
@@ -231,7 +231,7 @@ function AppContent({
         loadingRef.current = false;
         // Ensure final messages are always synced to Zustand after run
         const { statuses } = useTuiStore.getState();
-        dispatch({ type: "SET_MESSAGES", payload: store.toDisplayMessages(statuses) });
+        dispatch({ type: "SET_MESSAGES", payload: context.toDisplayMessages(statuses) });
         dispatch({ type: "SET_IS_LOADING", payload: false });
         dispatch({ type: "SET_STATUS", payload: "" });
       }

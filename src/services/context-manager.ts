@@ -1,7 +1,7 @@
 // ContextManager owns compression logic, token tracking, and the reactive
 // token count signal.
 //
-// The compress() method receives cross-manager deps as params (store, model,
+// The compress() method receives cross-manager deps as params (context, model,
 // changeJournal, activeTurnIdx, statusReporter) to avoid coupling to other managers.
 // It returns the new activeTurnIdx so the caller (Agent) can update
 // SessionManager.
@@ -26,7 +26,7 @@ export interface ContextManagerOpts {
 }
 
 export interface CompressDeps {
-  store: LLMContextManager;
+  context: LLMContextManager;
   model: Model;
   changeJournal: ChangeJournal;
   activeTurnIdx: number;
@@ -69,7 +69,7 @@ export class ContextManager {
 
     try {
       const recentCount = 10;
-      const turns = deps.store.getTurns();
+      const turns = deps.context.getTurns();
       if (turns.length <= recentCount + 2) {
         deps.statusReporter({
           role: "status",
@@ -95,7 +95,7 @@ export class ContextManager {
       }
 
       const compressed = await this.compressionService.compress(
-        deps.store.toLLMMessages(),
+        deps.context.toLLMMessages(),
         deps.model.getClient() as LLMClient,
         deps.model.getName(),
       );
@@ -114,7 +114,7 @@ export class ContextManager {
         deps.changeJournal.pruneAndRenumber(prunedCount, 1);
       }
 
-      deps.store.setTurns(compressed);
+      deps.context.setTurns(compressed);
       this.tokenTracker.reset();
 
       // Recalculate activeTurnIdx

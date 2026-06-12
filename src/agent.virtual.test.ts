@@ -41,7 +41,7 @@ function createTestAgent(options?: {
     contextLength: model.getContextLength(),
     compressionThresholdRatio: 0.8,
     tokenCount$,
-    contextManager: sessionManager.getStore(),
+    contextManager: sessionManager.getContext(),
     statusReporter: sessionManager.reportStatus.bind(sessionManager),
   });
   const promptManager = new PromptManager();
@@ -49,7 +49,7 @@ function createTestAgent(options?: {
     tools,
     permissionService: new PermissionService(options?.permissionMode ?? "yolo"),
     changeJournal: sessionManager.getChangeJournal(),
-    store: sessionManager.getStore(),
+    context: sessionManager.getContext(),
   });
   const agent = new Agent({
     model,
@@ -60,19 +60,19 @@ function createTestAgent(options?: {
     tokenCount$,
   });
 
-  return { agent, store: sessionManager.getStore() };
+  return { agent, context: sessionManager.getContext() };
 }
 
 describe("Agent virtual integration", () => {
-  it("scenario 1: pure text — LLM returns text, run ends, store has correct messages", async () => {
-    const { agent, store } = createTestAgent({
+  it("scenario 1: pure text — LLM returns text, run ends, context has correct messages", async () => {
+    const { agent, context } = createTestAgent({
       responses: [defaultTextResponse("Hello, I am the agent.")],
     });
 
     const completed = await agent.run("Hi there");
     expect(completed).toBe(true);
 
-    const turns = store.getTurns();
+    const turns = context.getTurns();
     expect(turns).toHaveLength(2);
 
     // Turn 0: user message
@@ -91,7 +91,7 @@ describe("Agent virtual integration", () => {
     const virtualTool = createVirtualTool("Echo", (args) => `echoed: ${args.input}`);
     const tools = new Map([["Echo", virtualTool]]);
 
-    const { agent, store } = createTestAgent({
+    const { agent, context } = createTestAgent({
       responses: [
         toolUseResponse("call_1", "Echo", { input: "hello" }),
         defaultTextResponse("The tool said: echoed: hello"),
@@ -102,7 +102,7 @@ describe("Agent virtual integration", () => {
     const completed = await agent.run("Use the Echo tool");
     expect(completed).toBe(true);
 
-    const turns = store.getTurns();
+    const turns = context.getTurns();
     // Turn 0: user message
     // Turn 1: assistant [tool_use block]
     // Turn 2: user [tool_result block]
@@ -150,7 +150,7 @@ describe("Agent virtual integration", () => {
       ["ToolB", toolB],
     ]);
 
-    const { agent, store } = createTestAgent({
+    const { agent, context } = createTestAgent({
       responses: [
         // LLM requests both tools in one response
         {
@@ -207,7 +207,7 @@ describe("Agent virtual integration", () => {
     // Verify tool execution order
     expect(callOrder).toEqual(["A", "B"]);
 
-    const turns = store.getTurns();
+    const turns = context.getTurns();
     // Turn 0: user
     // Turn 1: assistant [tool_use A, tool_use B]
     // Turn 2: user [tool_result A, tool_result B]
@@ -247,7 +247,7 @@ describe("Agent virtual integration", () => {
       contextLength: model.getContextLength(),
       compressionThresholdRatio: 0.8,
       tokenCount$,
-      contextManager: sessionManager.getStore(),
+      contextManager: sessionManager.getContext(),
       statusReporter: sessionManager.reportStatus.bind(sessionManager),
     });
     const promptManager = new PromptManager();
@@ -255,7 +255,7 @@ describe("Agent virtual integration", () => {
       tools,
       permissionService: new PermissionService("manual"),
       changeJournal: sessionManager.getChangeJournal(),
-      store: sessionManager.getStore(),
+      context: sessionManager.getContext(),
     });
     const agent = new Agent({
       model,
@@ -265,13 +265,13 @@ describe("Agent virtual integration", () => {
       promptManager,
       tokenCount$,
     });
-    const store = sessionManager.getStore();
+    const context = sessionManager.getContext();
     const reportStatusSpy = vi.spyOn(sessionManager, "reportStatus");
 
     const completed = await agent.run("Do something dangerous", { prompter });
     expect(completed).toBe(true);
 
-    const turns = store.getTurns();
+    const turns = context.getTurns();
     // Turn 0: user message
     // Turn 1: assistant [tool_use]
     // Turn 2: user [tool_result with rejection reason]

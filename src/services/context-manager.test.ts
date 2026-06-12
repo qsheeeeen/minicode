@@ -7,18 +7,18 @@ function createContextManager(overrides?: {
   compressionThresholdRatio?: number;
 }) {
   const tokenCount$ = new Signal(0);
-  const store = new LLMContextManager();
+  const context = new LLMContextManager();
   const statusReporter = vi.fn();
   const sessionStats = { recordUsage: vi.fn(), incrementSessionCount: vi.fn() } as any;
   const cm = new ContextManager({
     contextLength: 200000,
     compressionThresholdRatio: overrides?.compressionThresholdRatio ?? 0.8,
     tokenCount$,
-    contextManager: store,
+    contextManager: context,
     statusReporter,
     sessionStats,
   });
-  return { cm, tokenCount$, store, statusReporter };
+  return { cm, tokenCount$, context, statusReporter };
 }
 
 describe("ContextManager", () => {
@@ -89,9 +89,9 @@ describe("ContextManager", () => {
 
   describe("compress", () => {
     it("returns activeTurnIdx unchanged when not enough turns", async () => {
-      const { cm, store, statusReporter } = createContextManager();
+      const { cm, context, statusReporter } = createContextManager();
       const newIdx = await cm.compress({
-        store,
+        context,
         model: {} as any,
         changeJournal: {} as any,
         activeTurnIdx: 3,

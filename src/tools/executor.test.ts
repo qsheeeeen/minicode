@@ -25,15 +25,15 @@ function makeExecutor(overrides?: {
   const permissionService = new PermissionService(
     overrides?.permissionMode ?? "yolo",
   );
-  const store = new LLMContextManager();
+  const context = new LLMContextManager();
   const changeJournal = new ChangeJournal();
   const executor = new ToolExecutor({
     tools,
     permissionService,
     changeJournal,
-    store,
+    context,
   });
-  return { executor, tools, permissionService, store, changeJournal };
+  return { executor, tools, permissionService, context, changeJournal };
 }
 
 function makeContext(): ToolExecutionContext {
@@ -88,18 +88,18 @@ describe("ToolExecutor", () => {
 
   describe("execute", () => {
     it("does nothing with empty tool calls", async () => {
-      const { executor, store } = makeExecutor();
-      const spy = vi.spyOn(store, "addToolResults");
+      const { executor, context } = makeExecutor();
+      const spy = vi.spyOn(context, "addToolResults");
       await executor.execute([], makeContext(), 1);
       expect(spy).not.toHaveBeenCalled();
     });
 
     it("executes a tool and pushes result", async () => {
       const tool = makeTool();
-      const { executor, store } = makeExecutor({
+      const { executor, context } = makeExecutor({
         tools: new Map([["testTool", tool]]),
       });
-      const spy = vi.spyOn(store, "addToolResults");
+      const spy = vi.spyOn(context, "addToolResults");
 
       await executor.execute(
         [makeToolCall(tool)],
@@ -114,8 +114,8 @@ describe("ToolExecutor", () => {
     });
 
     it("handles tool not found", async () => {
-      const { executor, store } = makeExecutor({ tools: new Map() });
-      const spy = vi.spyOn(store, "addToolResults");
+      const { executor, context } = makeExecutor({ tools: new Map() });
+      const spy = vi.spyOn(context, "addToolResults");
 
       await executor.execute(
         [makeToolCall(undefined)],
@@ -154,11 +154,11 @@ describe("ToolExecutor", () => {
         readOnly: false,
         requiresPermission: true,
       });
-      const { executor, store } = makeExecutor({
+      const { executor, context } = makeExecutor({
         tools: new Map([["testTool", tool]]),
         permissionMode: "auto",
       });
-      const spy = vi.spyOn(store, "addToolResults");
+      const spy = vi.spyOn(context, "addToolResults");
 
       vi.spyOn(executor.getPermissionService(), "check").mockResolvedValue({
         allowed: false,
@@ -177,10 +177,10 @@ describe("ToolExecutor", () => {
       (tool.execute as ReturnType<typeof vi.fn>).mockRejectedValue(
         new Error("boom"),
       );
-      const { executor, store } = makeExecutor({
+      const { executor, context } = makeExecutor({
         tools: new Map([["testTool", tool]]),
       });
-      const spy = vi.spyOn(store, "addToolResults");
+      const spy = vi.spyOn(context, "addToolResults");
 
       await executor.execute([makeToolCall(tool)], makeContext(), 1);
 
@@ -192,13 +192,13 @@ describe("ToolExecutor", () => {
     it("executes multiple tools sequentially", async () => {
       const tool1 = makeTool({ name: "tool1" });
       const tool2 = makeTool({ name: "tool2" });
-      const { executor, store } = makeExecutor({
+      const { executor, context } = makeExecutor({
         tools: new Map([
           ["tool1", tool1],
           ["tool2", tool2],
         ]),
       });
-      const spy = vi.spyOn(store, "addToolResults");
+      const spy = vi.spyOn(context, "addToolResults");
 
       await executor.execute(
         [makeToolCall(tool1), makeToolCall(tool2)],

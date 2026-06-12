@@ -16,13 +16,13 @@ export type ProcessedRoute =
  * Process a routed input: execute shell commands, handle system commands,
  * or pass through to the LLM. Returns what the caller should do next.
  *
- * Shell results are always injected into the agent's message store so
+ * Shell results are always injected into the agent's context so
  * the LLM can see them in future turns, regardless of display mode.
  */
 export function processRoute(
   route: RouteResult,
   rawInput: string,
-  store: LLMContextManager,
+  context: LLMContextManager,
   reportStatus?: StatusReporter,
 ): ProcessedRoute {
   if (route.action === "none") {
@@ -34,7 +34,7 @@ export function processRoute(
     const output = runShell(command);
 
     // Inject into LLM history so the agent sees the command + result
-    store.addUserMessage(
+    context.addUserMessage(
       `Ran: ${command}\n\n\`\`\`\n${output}\n\`\`\``,
       rawInput.trim(),
     );
@@ -48,7 +48,7 @@ export function processRoute(
       },
       timestamp: new Date(),
     });
-    store.startAssistantTurn();
+    context.startAssistantTurn();
 
     return { type: "done", shellOutput: { command, output } };
   }

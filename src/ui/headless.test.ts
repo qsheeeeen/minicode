@@ -4,7 +4,7 @@ const mockRun = vi.fn();
 const mockOnChange = vi.fn().mockReturnValue(() => {});
 const mockGetTurns = vi.fn().mockReturnValue([]);
 
-const mockStore = {
+const mockContext = {
   onChange: mockOnChange,
   getTurns: mockGetTurns,
   getTurnCount: vi.fn().mockReturnValue(0),
@@ -15,7 +15,7 @@ const mockStore = {
 const mockSetSession = vi.fn();
 const mockSetStatusReporter = vi.fn();
 const mockSessionManager = {
-  getStore: vi.fn().mockReturnValue(mockStore),
+  getContext: vi.fn().mockReturnValue(mockContext),
   setSession: mockSetSession,
   setStatusReporter: mockSetStatusReporter,
   reportStatus: vi.fn(),

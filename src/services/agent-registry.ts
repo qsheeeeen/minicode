@@ -7,7 +7,7 @@ export interface AgentSession {
   id: string;
   type: "main" | "sub";
   agent: Agent;
-  store: LLMContextManager;
+  context: LLMContextManager;
   status: AgentStatus;
   task?: string;
   parentId?: string;

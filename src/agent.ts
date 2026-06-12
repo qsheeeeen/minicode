@@ -43,8 +43,8 @@ export class Agent {
   private _isRunning: boolean = false;
 
   /** Cached access to the context manager. */
-  private get store(): LLMContextManager {
-    return this.sessionManager.getStore();
+  private get context(): LLMContextManager {
+    return this.sessionManager.getContext();
   }
 
   get currentSession(): string {
@@ -92,7 +92,7 @@ export class Agent {
 
   async compress(): Promise<void> {
     const newTurnIdx = await this.contextManager.compress({
-      store: this.store,
+      context: this.context,
       model: this.model,
       changeJournal: this.sessionManager.getChangeJournal(),
       activeTurnIdx: this.sessionManager.getActiveTurnIdx(),
@@ -119,7 +119,7 @@ export class Agent {
   // Returns the final response and any tool calls the LLM requested.
   private async streamLLM(toolDefs: LLMToolDef[]) {
     const stream = this.model.getClient().chatStream(
-      this.store.toLLMMessages(),
+      this.context.toLLMMessages(),
       toolDefs,
       {
         system: this.promptManager.getSystemPrompt(),
@@ -139,16 +139,16 @@ export class Agent {
           : { type: "text" as const, text: delta.trimStart() };
       if (!blockStreaming) {
         blockStreaming = true;
-        this.store.setStreaming(true);
-        this.store.appendToLastAssistantTurn(block as ContentBlock);
+        this.context.setStreaming(true);
+        this.context.appendToLastAssistantTurn(block as ContentBlock);
       } else {
-        const last = this.store.getLastBlock();
+        const last = this.context.getLastBlock();
         if (last?.type === field && field in last) {
           const currentText = (field === "text" ? (last as TextBlock).text : (last as ThinkingBlock).thinking);
           const newText = currentText === "" ? delta.trimStart() : delta;
-          this.store.updateLastBlock({ [field]: currentText + newText });
+          this.context.updateLastBlock({ [field]: currentText + newText });
         } else {
-          this.store.appendToLastAssistantTurn(block as ContentBlock);
+          this.context.appendToLastAssistantTurn(block as ContentBlock);
         }
       }
     };
@@ -172,7 +172,7 @@ export class Agent {
           blockStreaming = false;
           const tool = this.toolExecutor.getTools().get(chunk.block.name);
           toolCalls.push({ block: chunk.block, tool });
-          this.store.appendToLastAssistantTurn(chunk.block as ContentBlock);
+          this.context.appendToLastAssistantTurn(chunk.block as ContentBlock);
           this.saveStore();
         }
       }
@@ -184,7 +184,7 @@ export class Agent {
       throw e;
     } finally {
       this.saveStore();
-      this.store.setStreaming(false);
+      this.context.setStreaming(false);
     }
 
     return { response, toolCalls };
@@ -197,10 +197,10 @@ export class Agent {
     if (this._isRunning) return false;
 
     this._isRunning = true;
-    this.store.addUserMessage(userMessage, opts?.displayContent);
+    this.context.addUserMessage(userMessage, opts?.displayContent);
 
     // Count user prompts to determine current turn index
-    const turns = this.store.getTurns();
+    const turns = this.context.getTurns();
     let promptCount = 0;
     for (const t of turns) {
       if (t.role === "user" && typeof t.content === "string") promptCount++;
@@ -273,7 +273,7 @@ export class Agent {
       this._isRunning = false;
       if (this.abortController?.signal.aborted) {
         // Remove the last user message that triggered this aborted run
-        this.store.removeLastTurn(
+        this.context.removeLastTurn(
           (last) =>
             last.role === "user" &&
             typeof last.content === "string" &&

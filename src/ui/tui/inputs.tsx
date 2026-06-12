@@ -236,14 +236,14 @@ export function UndoInput({
   userMessages = [],
   totalTurns = 0,
   changeJournal,
-  store,
+  context,
   reportStatus,
 }: InputComponentProps & {
   entriesByTurn?: Array<{ turnIdx: number; entries: ChangeEntry[] }>;
   userMessages?: string[];
   totalTurns?: number;
   changeJournal?: ChangeJournal;
-  store?: LLMContextManager;
+  context?: LLMContextManager;
   reportStatus?: StatusReporter;
 }) {
   const [step, setStep] = useState<"list" | "confirm">("list");
@@ -344,7 +344,7 @@ export function UndoInput({
             onCancel?.();
             return;
           }
-          if (!changeJournal || !store) {
+          if (!changeJournal || !context) {
             onCancel?.();
             return;
           }
@@ -359,13 +359,13 @@ export function UndoInput({
             if (v === "both") {
               result = await executor.rollbackFilesAndConversation(
                 changeJournal,
-                store,
+                context,
                 selectedTurnIdx,
               );
             } else {
               result = await executor.rollbackConversation(
                 changeJournal,
-                store,
+                context,
                 selectedTurnIdx,
               );
             }

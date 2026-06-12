@@ -18,12 +18,12 @@ export async function runHeadless(
   resumeRecent?: boolean,
   cmdContext?: CommandContext,
 ): Promise<void> {
-  const store = sessionManager.getStore();
+  const context = sessionManager.getContext();
 
   // Local status collection for headless rendering
   const statuses: StatusMessage[] = [];
   sessionManager.setStatusReporter((msg) => {
-    const turnIndex = store.getTurnCount();
+    const turnIndex = context.getTurnCount();
     statuses.push({ ...msg, turnIndex });
   });
 
@@ -35,7 +35,7 @@ export async function runHeadless(
       `session-${Date.now()}`;
     const data = await SessionPersistence.load(name);
     if (data) {
-      store.setTurns(data.messages);
+      context.setTurns(data.messages);
       const totalTokens = data.totalTokens || 0;
       if (totalTokens > 0) {
         tokenCount$.set(totalTokens);
@@ -66,7 +66,7 @@ export async function runHeadless(
   let lastStatusIdx = 0; // track which statuses have been printed
 
   function render(isFinal = false) {
-    const turns = store.getTurns();
+    const turns = context.getTurns();
 
     for (let ti = printedTurns; ti < turns.length; ti++) {
       const turn = turns[ti];
@@ -210,7 +210,7 @@ export async function runHeadless(
     lastStatusIdx = statuses.length;
   }
 
-  const unsubscribe = store.onChange(() => render(false));
+  const unsubscribe = context.onChange(() => render(false));
 
   // Input routing
   if (!cmdContext) {
@@ -232,7 +232,7 @@ export async function runHeadless(
   }
 
   const route = await routeInput(initialPrompt, cmdContext);
-  const processed = processRoute(route, initialPrompt, store, sessionManager.reportStatus.bind(sessionManager));
+  const processed = processRoute(route, initialPrompt, context, sessionManager.reportStatus.bind(sessionManager));
 
   if (processed.type === "done") {
     if (processed.shellOutput) {

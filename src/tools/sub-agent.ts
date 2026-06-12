@@ -73,7 +73,7 @@ export const agentTool: ToolDef = {
       contextLength: subModel.getContextLength(),
       compressionThresholdRatio: 0.8,
       tokenCount$,
-      contextManager: sessionManager.getStore(),
+      contextManager: sessionManager.getContext(),
       statusReporter: () => {}, // sub-agents don't report statuses
     });
     const promptManager = new PromptManager(config.userPrompt);
@@ -81,7 +81,7 @@ export const agentTool: ToolDef = {
       tools: getSubAgentTools(),
       permissionService: new PermissionService("manual"),
       changeJournal: sessionManager.getChangeJournal(),
-      store: sessionManager.getStore(),
+      context: sessionManager.getContext(),
     });
     const subAgent = new Agent({
       model: subModel,
@@ -98,13 +98,13 @@ export const agentTool: ToolDef = {
       subAgent.abort();
     });
 
-    const subStore = sessionManager.getStore();
+    const subContext = sessionManager.getContext();
 
     registry.register({
       id: subId,
       type: "sub",
       agent: subAgent,
-      store: subStore,
+      context: subContext,
       status: "running",
       task,
       parentId,
@@ -120,8 +120,8 @@ export const agentTool: ToolDef = {
     subAgent.tokenCount$.subscribe((count: number) => {
       registry.updateProgress(subId, { tokenCount: count });
     });
-    subStore.onChange(() => {
-      const turns = subStore.getTurns();
+    subContext.onChange(() => {
+      const turns = subContext.getTurns();
       let tc = 0;
       for (const turn of turns) {
         if (turn.role === "assistant" && Array.isArray(turn.content)) {
@@ -138,7 +138,7 @@ export const agentTool: ToolDef = {
 
     try {
       await subAgent.run(task);
-      const turns = subStore.getTurns();
+      const turns = subContext.getTurns();
       const finalResponse = extractFinalResponse(turns);
       const summary = generateSummary(turns);
       registry.updateProgress(subId, {
