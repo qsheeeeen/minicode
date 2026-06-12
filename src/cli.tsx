@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 import path from "path";
 import os from "os";
-import fs from "fs";
 import { fileURLToPath } from "url";
 import { render } from "ink";
 import { loadAllConfig } from "./config.js";
@@ -44,25 +43,11 @@ let {
   permissionMode: cliPermissionMode,
 } = parseArgs(process.argv, VERSION);
 
-// Support for piped input
-if (!process.stdin.isTTY) {
-  try {
-    const pipedInput = fs.readFileSync(0, "utf-8").trim();
-    if (pipedInput) {
-      initialPrompt = initialPrompt
-        ? `${initialPrompt}\n\n${pipedInput}`
-        : pipedInput;
-      // Default to headless mode when piped, as TUI requires a TTY
-      if (headless === undefined) {
-        headless = true;
-      }
-    }
-  } catch (err) {
-    // Handle or ignore potential read errors from empty pipes
-  }
+// Auto-headless when stdin is not a TTY (piped input or no terminal).
+// Piped content is read inside runHeadless; here we only decide the branch.
+if (headless === undefined) {
+  headless = !process.stdin.isTTY;
 }
-
-// Ensure headless is boolean for downstream
 headless = !!headless;
 
 // Get configuration
@@ -196,11 +181,6 @@ const cmdContext = {
 
 // Branch: display layer only
 if (headless) {
-  if (!initialPrompt) {
-    console.error("Error: --headless requires a prompt argument");
-    process.exit(1);
-  }
-
   const { runHeadless } = await import("./ui/headless.js");
   await runHeadless(
     agent,

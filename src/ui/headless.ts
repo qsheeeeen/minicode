@@ -1,3 +1,4 @@
+import fs from "fs";
 import type { Agent } from "../agent.js";
 import type { ContentBlock } from "../messages.js";
 import type { UserPrompter, Prompt } from "../tools/registry.js";
@@ -11,13 +12,32 @@ import type { StatusMessage } from "../messages.js";
 
 export async function runHeadless(
   agent: Agent,
-  initialPrompt: string,
+  initialPrompt: string | undefined,
   sessionManager: SessionManager,
   tokenCount$: Signal<number>,
   sessionName?: string,
   resumeRecent?: boolean,
   cmdContext?: CommandContext,
 ): Promise<void> {
+  // Read piped stdin (non-TTY) and append to the prompt
+  if (!process.stdin.isTTY) {
+    try {
+      const pipedInput = fs.readFileSync(0, "utf-8").trim();
+      if (pipedInput) {
+        initialPrompt = initialPrompt
+          ? `${initialPrompt}\n\n${pipedInput}`
+          : pipedInput;
+      }
+    } catch {
+      // Ignore read errors from empty/closed pipes
+    }
+  }
+
+  if (!initialPrompt) {
+    console.error("Error: --headless requires a prompt argument");
+    process.exit(1);
+  }
+
   const context = sessionManager.getContext();
 
   // Local status collection for headless rendering
