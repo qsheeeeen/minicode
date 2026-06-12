@@ -4,7 +4,7 @@ This file provides guidance to the CLI agent when working with code in this repo
 
 ## Overview
 
-minicode is an LLM-powered CLI coding agent with React/Ink TUI. TypeScript implementation in `src/` is the sole codebase.
+minicode is an LLM-powered CLI coding agent with a React/Ink TUI. The TypeScript implementation in `src/` is the sole codebase. The project goal is self-bootstrapping: use minicode to develop minicode itself.
 
 ## Build & Run
 
@@ -25,60 +25,95 @@ bun run src/cli.tsx -H "<prompt>"           # Basic headless
 bun run src/cli.tsx -H --perm yolo "<prompt>" # Headless with permission mode
 ```
 
+## Slash Commands
+
+Commands entered at the TUI prompt:
+
+| Command           | Description                                         |
+| ----------------- | --------------------------------------------------- |
+| `/new [name]`     | Create new session                                  |
+| `/resume`         | List sessions (arrow keys + Enter)                  |
+| `/resume <name>`  | Load specific session                               |
+| `/rename <name>`  | Rename current session                              |
+| `/compress`       | Compress conversation history                       |
+| `/clear`          | Clear history and start fresh                       |
+| `/effort [level]` | Set thinking effort (low\|medium\|high\|xhigh\|max) |
+| `/plan`           | Generate executable plan from discussion            |
+| `/test`           | Run a simple test across all tools                  |
+| `/skills`         | List available skills                               |
+| `/model`          | Switch model/provider via UI                        |
+| `/exit`           | Quit (or Ctrl+C)                                    |
+
+**Permission mode:** Shift+Tab cycles between manual/yolo/auto.
+
 ## Architecture
 
 ```
 src/
-├── cli.tsx               # Entry point: arg parsing, config loading, TUI/headless branching
-├── agent.ts              # Core Agent class with LLM loop (stream → tools → repeat)
-├── messages.ts           # MessageStore: two-layer messages (LLM + Display), session persistence
-├── config.ts             # Multi-provider config loader (~/.minicode/config.json)
-├── args.ts               # CLI argument parser
-├── testing.ts            # Shared test helpers (createVirtualTool)
+├── cli.tsx                 # Entry point: arg parsing, config loading, TUI/headless branching
+├── agent.ts                # Core Agent class with LLM loop (stream → tools → repeat)
+├── agent.virtual.test.ts   # Full agent-loop tests using VirtualLLMClient
+├── args.ts                 # CLI argument parser
+├── config.ts               # Multi-provider config loader (~/.minicode/config.json)
+├── messages.ts             # MessageStore: two-layer messages (LLM + Display), session persistence
+├── llm-context.ts          # LLM context message types and helpers
+├── llm-context-manager.ts  # Context window / truncation manager
+├── testing.ts              # Shared test helpers (createVirtualTool)
 ├── llm/
-│   ├── client.ts         # LLMClient interface, LLMStream (AsyncGenerator), protocol registry
-│   ├── anthropic.ts      # Anthropic SDK adapter
-│   ├── openai-chat.ts    # OpenAI Chat Completions adapter
+│   ├── client.ts           # LLMClient interface, LLMStream (AsyncGenerator), protocol registry
+│   ├── anthropic.ts        # Anthropic SDK adapter
+│   ├── openai-chat.ts      # OpenAI Chat Completions adapter
 │   ├── openai-responses.ts # OpenAI Responses API adapter
-│   ├── virtual.ts        # Virtual LLM client for testing (scripted responses)
-│   └── index.ts          # Barrel exports
+│   ├── virtual.ts          # Virtual LLM client for testing (scripted responses)
+│   └── index.ts            # Barrel exports
 ├── services/
-│   ├── agent-registry.ts # Multi-agent session tracking (main + sub-agents 2-9)
-│   ├── token-tracker.ts  # Token counting via Signal<number>, compression threshold tracking
-│   ├── compression-service.ts  # LLM-based context compression (keeps last 10 turns)
-│   ├── session-lifecycle.ts # Session switching helper (switchSession)
-│   ├── permission.ts     # manual/yolo/auto permission modes
-│   ├── shell.ts           # Synchronous execSync wrapper for slash commands
-│   ├── change-journal.ts # JSONL change tracking (before-state per file edit/write)
-│   ├── rollback-executor.ts # Conversation + file rollback using change journal
-│   └── session-stats.ts  # Per-model token usage tracking, receipt data
+│   ├── agent-registry.ts   # Multi-agent session tracking (main + sub-agents 2-9)
+│   ├── token-tracker.ts    # Token counting via Signal<number>, compression threshold tracking
+│   ├── compression-service.ts   # LLM-based context compression (keeps last 10 turns)
+│   ├── context-manager.ts  # Context assembly and routing
+│   ├── session-manager.ts  # Session metadata and listing
+│   ├── session-persistence.ts   # JSONL read/write for session files
+│   ├── session-lifecycle.ts     # Session switching helper (switchSession)
+│   ├── session-stats.ts    # Per-model token usage tracking, receipt data
+│   ├── prompt-manager.ts   # System prompt assembly
+│   ├── permission.ts       # manual/yolo/auto permission modes
+│   ├── shell.ts            # Synchronous execSync wrapper for slash commands
+│   ├── change-journal.ts   # JSONL change tracking (before-state per file edit/write)
+│   ├── rollback-executor.ts     # Conversation + file rollback using change journal
+│   └── index.ts            # Service barrel exports
 ├── tools/
-│   ├── registry.ts       # ToolDef interface, self-registering pattern via register()
-│   ├── index.ts          # Barrel: imports all tool modules to trigger registration
-│   ├── shell.ts           # child_process.spawn with streaming
-│   ├── read.ts / write.ts / edit.ts / grep.ts
-│   ├── sub-agent.ts      # Spawns child Agent with restricted tool set
-│   ├── load-skill.ts / ask-user.ts / set-model.ts
-├── skills/index.ts       # Loads SKILL.md from skills directories (built-in + external)
+│   ├── registry.ts         # ToolDef interface, self-registering pattern via register()
+│   ├── index.ts            # Barrel: imports all builtin tools to trigger registration
+│   ├── executor.ts         # Tool execution orchestration
+│   └── builtin/            # Individual tool implementations
+│       ├── read.ts / write.ts / edit.ts / grep.ts
+│       ├── shell.ts        # child_process.spawn with streaming
+│       ├── sub-agent.ts    # Spawns child Agent with restricted tool set
+│       ├── ask-user.ts / load-skill.ts / set-model.ts
+│       └── index.ts        # Builtin tool barrel
+├── skills/
+│   ├── index.ts            # Loads SKILL.md from skills directories (built-in + external)
+│   └── skill-manager.ts    # Skill runtime management
 ├── ui/
-│   ├── tui.tsx           # Root <App> component, Ink render
-│   ├── headless.ts       # Non-interactive stdout renderer
-│   ├── routing.ts        # Input router: slash commands / shell escapes / agent
-│   ├── commands/index.ts # Slash command registry (handler vs prompt types)
+│   ├── tui.tsx             # Root <App> component, Ink render
+│   ├── headless.ts         # Non-interactive stdout renderer
+│   ├── routing.ts          # Input router: slash commands / shell escapes / agent
+│   ├── route-handler.ts    # Per-route dispatch implementation
+│   ├── commands/index.ts   # Slash command registry (handler vs prompt types)
 │   └── tui/
-│       ├── store.tsx          # Zustand store wrapping tuiReducer
-│       ├── connect-agent.ts   # Agent→Zustand bridge (replaces old useDisplay hook)
+│       ├── store.tsx            # Zustand store wrapping tuiReducer
+│       ├── connect-agent.ts     # Agent→Zustand bridge
 │       ├── Header.tsx / InputArea.tsx / Message.tsx / MessageList.tsx
 │       ├── Help.tsx / Panel.tsx / Receipt.tsx / Status.tsx / SubAgentBar.tsx
 │       ├── ModalPrompter.tsx / inputs.tsx / tool-display.tsx
-│       └── demos/             # Visual testing components
+│       └── demos/               # Visual testing components
 └── utils/
-    ├── logger.ts         # Pino session-scoped logging
-    ├── signal.ts         # Signal<T> — minimal reactive value container (get/set/subscribe)
-    ├── prompts.ts        # Global + project AGENTS.md loading
-    ├── display.ts        # UserPrompter interface + Prompt types
-    ├── diff.ts           # Unified diff generation for Edit tool
-    └── tool-format.ts    # callContent() for tool call display formatting
+    ├── logger.ts           # Pino session-scoped logging
+    ├── signal.ts           # Signal<T> — minimal reactive value container (get/set/subscribe)
+    ├── prompts.ts          # Global + project AGENTS.md loading
+    ├── display.ts          # UserPrompter interface + Prompt types
+    ├── diff.ts             # Unified diff generation for Edit tool
+    └── tool-format.ts      # callContent() for tool call display formatting
 ```
 
 ### Core Flow
@@ -101,7 +136,7 @@ src/
 
 **Two-layer messages:** `MessageParam[]` (raw API format, with `_display` metadata stripped by `toLLMMessages()`) and `DisplayMessage[]` (flat discriminated union for UI, including UI-only `StatusMessage[]`). Session persisted as JSONL at `~/.minicode/sessions/<md5-hash>/<name>.context.jsonl`.
 
-**Self-registering tools:** Each tool file calls `register(toolDef)` at module scope. `tools/index.ts` imports all to trigger registration. `ToolDef` has `execute()`, `requiresPermission`, `readOnly`, `interactive`, `trackChanges`, `changeOp` fields. Sub-agents get filtered set: only read-only + non-interactive tools.
+**Self-registering tools:** Each tool file calls `register(toolDef)` at module scope. `tools/index.ts` imports all builtin tools to trigger registration. `ToolDef` has `execute()`, `requiresPermission`, `readOnly`, `interactive`, `trackChanges`, `changeOp` fields. Sub-agents get filtered set: only read-only + non-interactive tools.
 
 **Permission modes:** `manual` (prompt per call), `yolo` (allow all), `auto` (LLM decides safety). Shift+Tab cycles in TUI.
 
@@ -109,11 +144,43 @@ src/
 
 **Undo/rollback:** `/undo` command with two scopes — conversation-only or conversation+files. `ChangeJournal` records before-state of each file edit/write as JSONL. `RollbackExecutor` restores files and truncates conversation to a chosen turn.
 
+### Adding a Tool
+
+Create a file in `src/tools/builtin/` implementing `ToolDef` from `tools/registry.ts`:
+
+```typescript
+import { register } from '../registry.js';
+import type { ToolDef } from '../registry.js';
+
+const myTool: ToolDef = {
+  name: 'my_tool',
+  description: 'What it does',
+  input_schema: { /* JSON Schema */ },
+  requiresPermission: true,    // optional: gate behind PermissionService
+  readOnly: false,
+  execute: async (args, context) => {
+    // context.registry — AgentRegistry for sub-agent access
+    // context.config   — parent AgentConfig
+    return { output: 'result for LLM' };
+  }
+};
+
+register(myTool);
+```
+
+`tools/index.ts` already imports `tools/builtin/index.ts`, which re-exports all builtin modules to trigger registration.
+
+### Multi-Agent
+
+- Main agent delegates tasks via the `agent` tool; sub-agents run in parallel.
+- Switch between main and sub-agent views with **Ctrl+O**.
+- Sub-agents receive only read-only, non-interactive tools.
+
 ## Config
 
 `~/.minicode/config.json` — model specifier format: `model@provider` (e.g., `claude-sonnet-4-5@anthropic`, `deepseek-chat@deepseek`). Resolution order: CLI `-m` > `MODEL` env > config `model` field. Supports tiers: `"pro"` and `"flash"`, each mapping to a `model@provider`.
 
-Providers config supports arbitrary keys — any `model@provider` resolves via `createClient()` protocol registry or falls back to Anthropic-compatible (e.g., `deepseek-chat@deepseek` with a custom `baseURL`).
+Providers config supports arbitrary keys — any `model@provider` resolves via `createClient()` protocol registry or falls back to Anthropic-compatible (e.g., `deepseek-chat@deepseek` with a custom `baseURL`). See `config.example.json` for a concrete provider/tier setup.
 
 ## Verification Protocol
 
