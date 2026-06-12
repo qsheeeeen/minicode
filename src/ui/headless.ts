@@ -1,6 +1,6 @@
 import type { Agent } from "../agent.js";
 import type { ContentBlock } from "../messages.js";
-import type { Prompt } from "../tools/registry.js";
+import type { UserPrompter, Prompt } from "../tools/registry.js";
 import type { CommandContext } from "./commands/index.js";
 import { routeInput } from "./routing.js";
 import { processRoute } from "./route-handler.js";
@@ -48,7 +48,7 @@ export async function runHeadless(
   }
 
 
-  const headlessPrompter = {
+  const headlessPrompter: UserPrompter = {
     prompt: async (req: Prompt) => {
       console.log(
         `[Denied: ${req.message}] -- use --permission yolo or auto in headless mode`,
