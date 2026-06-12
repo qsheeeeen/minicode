@@ -11,16 +11,16 @@ function createTracker(
   overrides: { contextLength?: number; ratio?: number } = {},
 ) {
   const tokenCount = new Signal(0);
-  const store = { addStatus: vi.fn() };
+  const statusReporter = vi.fn();
   const sessionStats = { recordUsage: vi.fn(), incrementSessionCount: vi.fn() };
   const tracker = new TokenTracker(
     overrides.contextLength ?? 100000,
     overrides.ratio ?? 0.8,
     tokenCount,
-    store as any,
+    statusReporter,
     sessionStats as any,
   );
-  return { tracker, tokenCount, store, sessionStats };
+  return { tracker, tokenCount, statusReporter, sessionStats };
 }
 
 describe("TokenTracker", () => {
@@ -50,18 +50,18 @@ describe("TokenTracker", () => {
     expect(tokenCount.get()).toBe(50000);
   });
 
-  it("adds status when crossing threshold boundary", () => {
-    const { tracker, store } = createTracker();
+  it("calls statusReporter when crossing threshold boundary", () => {
+    const { tracker, statusReporter } = createTracker();
     tracker.processUsage("model", usage(26000, 0));
-    expect(store.addStatus).toHaveBeenCalledWith(
+    expect(statusReporter).toHaveBeenCalledWith(
       expect.objectContaining({ role: "status", content: "[26% context]" }),
     );
   });
 
-  it("does not add status below 25%", () => {
-    const { tracker, store } = createTracker();
+  it("does not call statusReporter below 25%", () => {
+    const { tracker, statusReporter } = createTracker();
     tracker.processUsage("model", usage(24000, 0));
-    expect(store.addStatus).not.toHaveBeenCalled();
+    expect(statusReporter).not.toHaveBeenCalled();
   });
 
   it("getTotal returns current count", () => {

@@ -1,5 +1,5 @@
 import type { Model } from "./llm/model.js";
-import type { MessageParam, TextBlock, ThinkingBlock, MessageStore } from "./messages.js";
+import type { MessageParam, TextBlock, ThinkingBlock } from "./messages.js";
 import type { LLMToolDef, LLMResponse } from "./llm/client.js";
 import {
   type ToolDef,
@@ -14,6 +14,7 @@ import type { ContentBlock } from "./messages.js";
 import type { PromptManager } from "./services/prompt-manager.js";
 import type { SessionManager } from "./services/session-manager.js";
 import type { ContextManager } from "./services/context-manager.js";
+import type { LLMContextManager } from "./llm-context-manager.js";
 import type pino from "pino";
 
 export interface AgentOpts {
@@ -41,8 +42,8 @@ export class Agent {
 
   private _isRunning: boolean = false;
 
-  /** Cached access to the message store. */
-  private get store(): MessageStore {
+  /** Cached access to the context manager. */
+  private get store(): LLMContextManager {
     return this.sessionManager.getStore();
   }
 
@@ -74,6 +75,11 @@ export class Agent {
     });
   }
 
+  /** Report a status message via the session's StatusReporter. */
+  private reportStatus(msg: { role: "status" | "error"; content: string; timestamp: Date; element?: unknown; toolDisplay?: { name: string; input: Record<string, unknown>; output?: string } }): void {
+    this.sessionManager.reportStatus(msg);
+  }
+
   abort(): void {
     this.abortController?.abort();
   }
@@ -90,6 +96,7 @@ export class Agent {
       model: this.model,
       changeJournal: this.sessionManager.getChangeJournal(),
       activeTurnIdx: this.sessionManager.getActiveTurnIdx(),
+      statusReporter: this.sessionManager.getStatusReporter(),
     });
     this.sessionManager.setActiveTurnIdx(newTurnIdx);
   }
@@ -108,7 +115,7 @@ export class Agent {
     }
   }
 
-  // Stream LLM response, updating MessageStore in real-time.
+  // Stream LLM response, updating context in real-time.
   // Returns the final response and any tool calls the LLM requested.
   private async streamLLM(toolDefs: LLMToolDef[]) {
     const stream = this.model.getClient().chatStream(
@@ -246,7 +253,7 @@ export class Agent {
           await this.toolExecutor.execute(toolCalls, toolContext, this.sessionManager.getActiveTurnIdx());
         } catch (e) {
           if (e instanceof ToolDeniedError) {
-            this.store.addStatus({
+            this.reportStatus({
               role: "error",
               content: `Tool "${e.toolName}" was denied by user`,
               timestamp: new Date(),

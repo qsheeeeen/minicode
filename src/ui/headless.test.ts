@@ -3,20 +3,22 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 const mockRun = vi.fn();
 const mockOnChange = vi.fn().mockReturnValue(() => {});
 const mockGetTurns = vi.fn().mockReturnValue([]);
-const mockGetStatuses = vi.fn().mockReturnValue([]);
 
 const mockStore = {
   onChange: mockOnChange,
   getTurns: mockGetTurns,
-  getStatuses: mockGetStatuses,
+  getTurnCount: vi.fn().mockReturnValue(0),
   toLLMMessages: vi.fn().mockReturnValue([]),
   setTurns: vi.fn(),
 };
 
 const mockSetSession = vi.fn();
+const mockSetStatusReporter = vi.fn();
 const mockSessionManager = {
   getStore: vi.fn().mockReturnValue(mockStore),
   setSession: mockSetSession,
+  setStatusReporter: mockSetStatusReporter,
+  reportStatus: vi.fn(),
 };
 
 const mockTokenCount$ = {

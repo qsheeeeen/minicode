@@ -1,12 +1,13 @@
 import type { Agent } from "../agent.js";
-import type { ContentBlock, MessageStore as MessageStoreType } from "../messages.js";
+import type { ContentBlock } from "../messages.js";
 import type { Prompt } from "../utils/display.js";
 import type { CommandContext } from "./commands/index.js";
 import { routeInput } from "./routing.js";
 import { processRoute } from "./route-handler.js";
-import { MessageStore } from "../messages.js";
+import { SessionPersistence } from "../services/session-persistence.js";
 import type { SessionManager } from "../services/session-manager.js";
 import type { Signal } from "../utils/signal.js";
+import type { StatusMessage } from "../messages.js";
 
 export async function runHeadless(
   agent: Agent,
@@ -19,13 +20,20 @@ export async function runHeadless(
 ): Promise<void> {
   const store = sessionManager.getStore();
 
+  // Local status collection for headless rendering
+  const statuses: StatusMessage[] = [];
+  sessionManager.setStatusReporter((msg) => {
+    const turnIndex = store.getTurnCount();
+    statuses.push({ ...msg, turnIndex });
+  });
+
   // Load session if requested
   if (sessionName || resumeRecent) {
     const name =
       sessionName ??
-      (await MessageStore.getMostRecent()) ??
+      (await SessionPersistence.getMostRecent()) ??
       `session-${Date.now()}`;
-    const data = await MessageStore.load(name);
+    const data = await SessionPersistence.load(name);
     if (data) {
       store.setTurns(data.messages);
       const totalTokens = data.totalTokens || 0;
@@ -33,7 +41,7 @@ export async function runHeadless(
         tokenCount$.set(totalTokens);
       }
       const { createLogger } = await import("../utils/logger.js");
-      const newLogger = await createLogger(MessageStore.getProjectHash(), name);
+      const newLogger = await createLogger(SessionPersistence.getProjectHash(), name);
       sessionManager.setSession(name);
       agent.logger = newLogger;
     }
@@ -55,10 +63,10 @@ export async function runHeadless(
   const finalizedBlocks = new Set<string>(); // "turnIdx:blockIdx" → finalized (printed newline)
   const printedToolUses = new Set<string>(); // tool_use block IDs already printed
   const printedResults = new Set<string>(); // tool_use IDs whose results have been printed
+  let lastStatusIdx = 0; // track which statuses have been printed
 
   function render(isFinal = false) {
     const turns = store.getTurns();
-    const statuses = store.getStatuses();
 
     for (let ti = printedTurns; ti < turns.length; ti++) {
       const turn = turns[ti];
@@ -187,7 +195,8 @@ export async function runHeadless(
     }
 
     // Print any new status messages
-    for (const s of statuses) {
+    for (let i = lastStatusIdx; i < statuses.length; i++) {
+      const s = statuses[i];
       if (s.role === "error") console.error(`[error] ${s.content}`);
       else if (s.toolDisplay) {
         const td = s.toolDisplay;
@@ -198,6 +207,7 @@ export async function runHeadless(
         console.log(s.content);
       }
     }
+    lastStatusIdx = statuses.length;
   }
 
   const unsubscribe = store.onChange(() => render(false));
@@ -222,7 +232,7 @@ export async function runHeadless(
   }
 
   const route = await routeInput(initialPrompt, cmdContext);
-  const processed = processRoute(route, initialPrompt, store);
+  const processed = processRoute(route, initialPrompt, store, sessionManager.reportStatus.bind(sessionManager));
 
   if (processed.type === "done") {
     if (processed.shellOutput) {

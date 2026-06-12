@@ -1,39 +1,58 @@
-// SessionManager owns all session-level state: message store, change journal,
+// SessionManager owns all session-level state: context manager, change journal,
 // session name, turn index, and session stats.
 //
-// Coordinates store.setSessionName + changeJournal.startSession on session
-// switch. Agent delegates session operations here.
+// Coordinates contextManager + changeJournal on session switch.
+// Provides StatusReporter callback for services to emit UI notifications.
+// Agent delegates session operations here.
 
-import { MessageStore } from "../messages.js";
+import { LLMContextManager } from "../llm-context-manager.js";
 import { ChangeJournal } from "./change-journal.js";
+import { SessionPersistence } from "./session-persistence.js";
 import type { SessionStats } from "./session-stats.js";
-import type { MessageParam } from "../messages.js";
+import type { MessageParam, StatusMessage } from "../messages.js";
+import type { StatusReporter } from "../utils/display.js";
 
 export class SessionManager {
   private _currentSession: string;
-  private store = new MessageStore();
+  private context = new LLMContextManager();
   private changeJournal = new ChangeJournal();
   private activeTurnIdx = 0;
   private sessionStats?: SessionStats;
+  private _meta = { model: "unknown", totalTokens: 0 };
+  private _statusReporter: StatusReporter = () => {};
 
   constructor(sessionName?: string, sessionStats?: SessionStats) {
     this._currentSession = sessionName ?? `session-${Date.now()}`;
     this.sessionStats = sessionStats;
   }
 
-  /** Switch to a new session. Coordinates store + journal. */
+  /** Set the status reporter callback (called by UI layer during wiring). */
+  setStatusReporter(reporter: StatusReporter): void {
+    this._statusReporter = reporter;
+  }
+
+  /** Get the status reporter for services to emit UI notifications. */
+  getStatusReporter(): StatusReporter {
+    return this._statusReporter;
+  }
+
+  /** Convenience: report a status via the configured reporter. */
+  reportStatus(msg: Omit<StatusMessage, "turnIndex">): void {
+    this._statusReporter(msg);
+  }
+
+  /** Switch to a new session. Coordinates context + journal. */
   setSession(sessionName: string): void {
     this._currentSession = sessionName;
-    this.store.setSessionName(sessionName);
     this.changeJournal.startSession(
-      MessageStore.getSessionDir(),
+      SessionPersistence.getSessionDir(),
       sessionName,
     );
   }
 
-  /** Clear all session state (messages, journal, turn index). */
+  /** Clear all session state (context, journal, turn index). */
   clearSession(): void {
-    this.store.clear();
+    this.context.clear();
     this.changeJournal.close();
     this.changeJournal = new ChangeJournal();
     this.activeTurnIdx = 0;
@@ -44,17 +63,22 @@ export class SessionManager {
     model: string;
     totalTokens: number;
   }): Promise<void> {
-    this.store.setMeta(meta);
-    await this.store.save().catch((e) => {
-      // Caller should handle logging if needed
+    if (meta.model !== undefined) this._meta.model = meta.model;
+    if (meta.totalTokens !== undefined)
+      this._meta.totalTokens = meta.totalTokens;
+    await SessionPersistence.save(
+      this._currentSession,
+      this.context.getTurns(),
+      { model: this._meta.model, totalTokens: this._meta.totalTokens },
+    ).catch((e) => {
       throw e;
     });
   }
 
-  // -- Store accessors --
+  // -- Context accessors --
 
-  getStore(): MessageStore {
-    return this.store;
+  getStore(): LLMContextManager {
+    return this.context;
   }
 
   getChangeJournal(): ChangeJournal {
@@ -75,14 +99,14 @@ export class SessionManager {
     this.activeTurnIdx = idx;
   }
 
-  // -- Convenience shortcuts for common store operations --
+  // -- Convenience shortcuts for common context operations --
 
   getMessages(): MessageParam[] {
-    return this.store.getTurns();
+    return this.context.getTurns();
   }
 
   setMessages(messages: MessageParam[]): void {
-    this.store.setTurns(messages);
+    this.context.setTurns(messages);
   }
 
   getSessionStats(): SessionStats | undefined {

@@ -1,5 +1,5 @@
 import type { SessionStats } from "./session-stats.js";
-import type { MessageStore } from "../messages.js";
+import type { StatusReporter } from "../utils/display.js";
 import type { TokenUsage } from "../llm/client.js";
 import type { Signal } from "../utils/signal.js";
 
@@ -10,7 +10,7 @@ export class TokenTracker {
     private contextLength: number,
     private compressionThresholdRatio: number,
     private tokenCount: Signal<number>,
-    private store: MessageStore,
+    private statusReporter: StatusReporter,
     private sessionStats?: SessionStats,
   ) {}
 
@@ -28,7 +28,7 @@ export class TokenTracker {
     const thresholds = [25, 50, 75, 90];
     for (const t of thresholds) {
       if (percentage >= t && this.lastShownThreshold < t) {
-        this.store.addStatus({
+        this.statusReporter({
           role: "status",
           content: `[${percentage}% context]`,
           timestamp: new Date(),

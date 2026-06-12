@@ -2,7 +2,7 @@ import type { Agent } from "../agent.js";
 import type { SessionStats } from "./session-stats.js";
 import type { SessionManager } from "./session-manager.js";
 import { createLogger } from "../utils/logger.js";
-import { MessageStore } from "../messages.js";
+import { SessionPersistence } from "./session-persistence.js";
 
 export interface SessionSwitchOptions {
   agent: Agent;
@@ -15,7 +15,7 @@ export interface SessionSwitchOptions {
 
 export async function switchSession(opts: SessionSwitchOptions): Promise<void> {
   const logger = await createLogger(
-    MessageStore.getProjectHash(),
+    SessionPersistence.getProjectHash(),
     opts.sessionName,
   );
   opts.sessionManager.setSession(opts.sessionName);
@@ -23,7 +23,7 @@ export async function switchSession(opts: SessionSwitchOptions): Promise<void> {
   opts.setCurrentSession(opts.sessionName);
   opts.sessionStats.incrementSessionCount(opts.sessionName);
   if (opts.statusMessage) {
-    opts.sessionManager.getStore().addStatus({
+    opts.sessionManager.reportStatus({
       role: "status",
       content: opts.statusMessage,
       timestamp: new Date(),

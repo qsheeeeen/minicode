@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { DisplayMessage, Prompt } from "../../utils/display.js";
 import type { AgentSession, PermissionMode } from "../../services/index.js";
+import type { StatusMessage } from "../../messages.js";
 
 export interface InputState {
   mode: string;
@@ -16,6 +17,7 @@ export interface SessionListState {
 
 export interface TuiState {
   messages: DisplayMessage[];
+  statuses: StatusMessage[];
   input: InputState;
   sessionList: SessionListState;
   agentSessions: AgentSession[];
@@ -32,6 +34,8 @@ export interface TuiState {
 export type TuiAction =
   | { type: "SET_MESSAGES"; payload: DisplayMessage[] }
   | { type: "ADD_MESSAGE"; payload: DisplayMessage }
+  | { type: "ADD_STATUS"; payload: StatusMessage }
+  | { type: "CLEAR_STATUSES" }
   | {
       type: "SET_INPUT_MODE";
       payload: { mode: string; props?: Record<string, unknown> };
@@ -58,6 +62,7 @@ export type TuiAction =
 
 export const initialState: TuiState = {
   messages: [],
+  statuses: [],
   input: {
     mode: "chat",
     value: "",
@@ -85,6 +90,11 @@ export function tuiReducer(state: TuiState, action: TuiAction): TuiState {
       return { ...state, messages: action.payload };
     case "ADD_MESSAGE":
       return { ...state, messages: [...state.messages, action.payload] };
+    case "ADD_STATUS":
+      return { ...state, statuses: [...state.statuses, action.payload] };
+    case "CLEAR_STATUSES":
+      if (state.statuses.length === 0) return state;
+      return { ...state, statuses: [] };
     case "SET_INPUT_MODE":
       return {
         ...state,

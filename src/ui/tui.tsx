@@ -13,7 +13,7 @@ import {
 import type { SessionStats } from "../services/session-stats.js";
 import type { SessionManager } from "../services/session-manager.js";
 import type { PermissionService } from "../services/permission.js";
-import type { MessageStore } from "../messages.js";
+import type { LLMContextManager } from "../llm-context-manager.js";
 import type { Signal } from "../utils/signal.js";
 import { Receipt } from "./tui/Receipt.js";
 
@@ -41,7 +41,7 @@ export interface AppProps {
   programStartTime: number;
   sessionStats: SessionStats;
   sessionManager: SessionManager;
-  store: MessageStore;
+  store: LLMContextManager;
   tokenCount$: Signal<number>;
   permissionService: PermissionService;
 }
@@ -72,9 +72,10 @@ function useMultiAgent(
     (session: AgentSession) => {
       activeAgentIdRef.current = session.id;
       dispatch({ type: "SET_ACTIVE_AGENT_ID", payload: session.id });
+      dispatch({ type: "CLEAR_STATUSES" });
       dispatch({
         type: "SET_MESSAGES",
-        payload: session.store.toDisplayMessages(),
+        payload: session.store.toDisplayMessages([]),
       });
       agentRef.current = session.agent;
     },
@@ -183,13 +184,14 @@ function AppContent({
 
       const agent = agentRef.current;
       const route = await routeInput(value, cmdContext());
-      const processed = processRoute(route, value, store);
+      const processed = processRoute(route, value, store, sessionManager.reportStatus.bind(sessionManager));
 
       if (processed.type === "done") {
         if (processed.shellOutput) {
+          const { statuses } = useTuiStore.getState();
           dispatch({
             type: "SET_MESSAGES",
-            payload: store.toDisplayMessages(),
+            payload: store.toDisplayMessages(statuses),
           });
         }
         return false;
@@ -210,17 +212,17 @@ function AppContent({
         return true;
       } catch (e) {
         if (e instanceof Error && e.message === "Aborted") {
-          store.addStatus({
-              role: "status",
-              content: "(Aborted)",
-              timestamp: new Date(),
-            });
+          sessionManager.reportStatus({
+            role: "status",
+            content: "(Aborted)",
+            timestamp: new Date(),
+          });
         } else if (e instanceof Error) {
-          store.addStatus({
-              role: "error",
-              content: `(Error: ${e.message})`,
-              timestamp: new Date(),
-            });
+          sessionManager.reportStatus({
+            role: "error",
+            content: `(Error: ${e.message})`,
+            timestamp: new Date(),
+          });
         } else {
           throw e;
         }
@@ -228,7 +230,8 @@ function AppContent({
       } finally {
         loadingRef.current = false;
         // Ensure final messages are always synced to Zustand after run
-        dispatch({ type: "SET_MESSAGES", payload: store.toDisplayMessages() });
+        const { statuses } = useTuiStore.getState();
+        dispatch({ type: "SET_MESSAGES", payload: store.toDisplayMessages(statuses) });
         dispatch({ type: "SET_IS_LOADING", payload: false });
         dispatch({ type: "SET_STATUS", payload: "" });
       }

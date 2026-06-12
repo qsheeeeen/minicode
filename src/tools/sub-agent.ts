@@ -73,7 +73,8 @@ export const agentTool: ToolDef = {
       contextLength: subModel.getContextLength(),
       compressionThresholdRatio: 0.8,
       tokenCount$,
-      store: sessionManager.getStore(),
+      contextManager: sessionManager.getStore(),
+      statusReporter: () => {}, // sub-agents don't report statuses
     });
     const promptManager = new PromptManager(config.userPrompt);
     const toolExecutor = new ToolExecutor({
@@ -109,16 +110,10 @@ export const agentTool: ToolDef = {
       parentId,
     });
 
-    // Notify via parent agent's store
+    // Notify via parent agent's status reporter (if available through registry)
     const parentSession = registry.get(parentId);
-    if (parentSession) {
-      const taskPreview = task.length > 40 ? task.slice(0, 40) + "..." : task;
-      parentSession.store.addStatus({
-        role: "status",
-        content: `[Agent #${subId} started: ${taskPreview}]`,
-        timestamp: new Date(),
-      });
-    }
+    // Note: parent status notification is now handled by the registry update above
+    // Sub-agent start/stop is tracked via registry.updateStatus()
 
     // Track progress during execution
     let toolCallCount = 0;

@@ -2,7 +2,7 @@
 // token count signal.
 //
 // The compress() method receives cross-manager deps as params (store, model,
-// changeJournal, activeTurnIdx) to avoid coupling to other managers.
+// changeJournal, activeTurnIdx, statusReporter) to avoid coupling to other managers.
 // It returns the new activeTurnIdx so the caller (Agent) can update
 // SessionManager.
 
@@ -13,21 +13,24 @@ import { Signal } from "../utils/signal.js";
 import { TokenTracker } from "./token-tracker.js";
 import { CompressionService } from "./compression-service.js";
 import { ChangeJournal } from "./change-journal.js";
-import { MessageStore } from "../messages.js";
+import type { LLMContextManager } from "../llm-context-manager.js";
+import type { StatusReporter } from "../utils/display.js";
 
 export interface ContextManagerOpts {
   readonly contextLength: number;
   readonly compressionThresholdRatio: number;
   readonly tokenCount$: Signal<number>;
-  readonly store: MessageStore;
+  readonly contextManager: LLMContextManager;
+  readonly statusReporter: StatusReporter;
   readonly sessionStats?: SessionStats;
 }
 
 export interface CompressDeps {
-  store: MessageStore;
+  store: LLMContextManager;
   model: Model;
   changeJournal: ChangeJournal;
   activeTurnIdx: number;
+  statusReporter: StatusReporter;
 }
 
 export class ContextManager {
@@ -35,14 +38,16 @@ export class ContextManager {
   private compressionService = new CompressionService();
   private isCompressing = false;
   readonly tokenCount$: Signal<number>;
+  private statusReporter: StatusReporter;
 
   constructor(opts: ContextManagerOpts) {
     this.tokenCount$ = opts.tokenCount$;
+    this.statusReporter = opts.statusReporter;
     this.tokenTracker = new TokenTracker(
       opts.contextLength,
       opts.compressionThresholdRatio,
       opts.tokenCount$,
-      opts.store,
+      opts.statusReporter,
       opts.sessionStats,
     );
   }
@@ -66,7 +71,7 @@ export class ContextManager {
       const recentCount = 10;
       const turns = deps.store.getTurns();
       if (turns.length <= recentCount + 2) {
-        deps.store.addStatus({
+        deps.statusReporter({
           role: "status",
           content: "Not enough conversation to compress.",
           timestamp: new Date(),
@@ -75,7 +80,7 @@ export class ContextManager {
       }
 
       const totalTokens = this.tokenTracker.getTotal();
-      deps.store.addStatus({
+      deps.statusReporter({
         role: "status",
         content: `Compressing ${turns.length - recentCount} turns (${totalTokens} tokens)...`,
         timestamp: new Date(),
@@ -120,7 +125,7 @@ export class ContextManager {
         }
       }
 
-      deps.store.addStatus({
+      deps.statusReporter({
         role: "status",
         content: `Compressed: ${prunedCount} turns removed, ${compressed.length} remaining.`,
         timestamp: new Date(),
@@ -128,7 +133,7 @@ export class ContextManager {
 
       return newActiveIdx;
     } catch (error) {
-      deps.store.addStatus({
+      deps.statusReporter({
         role: "error",
         content: `Compression failed: ${error instanceof Error ? error.message : String(error)}`,
         timestamp: new Date(),

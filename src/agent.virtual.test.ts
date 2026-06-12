@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { Agent } from "./agent.js";
 import { Model } from "./llm/model.js";
 import {
@@ -41,7 +41,8 @@ function createTestAgent(options?: {
     contextLength: model.getContextLength(),
     compressionThresholdRatio: 0.8,
     tokenCount$,
-    store: sessionManager.getStore(),
+    contextManager: sessionManager.getStore(),
+    statusReporter: sessionManager.reportStatus.bind(sessionManager),
   });
   const promptManager = new PromptManager();
   const toolExecutor = new ToolExecutor({
@@ -246,7 +247,8 @@ describe("Agent virtual integration", () => {
       contextLength: model.getContextLength(),
       compressionThresholdRatio: 0.8,
       tokenCount$,
-      store: sessionManager.getStore(),
+      contextManager: sessionManager.getStore(),
+      statusReporter: sessionManager.reportStatus.bind(sessionManager),
     });
     const promptManager = new PromptManager();
     const toolExecutor = new ToolExecutor({
@@ -264,6 +266,7 @@ describe("Agent virtual integration", () => {
       tokenCount$,
     });
     const store = sessionManager.getStore();
+    const reportStatusSpy = vi.spyOn(sessionManager, "reportStatus");
 
     const completed = await agent.run("Do something dangerous", { prompter });
     expect(completed).toBe(true);
@@ -281,11 +284,8 @@ describe("Agent virtual integration", () => {
     expect(toolResult[0].content).toContain("User rejected");
 
     // Status message should indicate denial
-    const statuses = store.getStatuses();
-    expect(
-      statuses.some(
-        (s) => s.role === "error" && s.content.includes("denied by user"),
-      ),
-    ).toBe(true);
+    expect(reportStatusSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ role: "error", content: expect.stringContaining("denied by user") }),
+    );
   });
 });

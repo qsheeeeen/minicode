@@ -4,7 +4,8 @@ import { Select, TextInput } from "@inkjs/ui";
 import type { ProviderConfig } from "../../config.js";
 import type { ChangeEntry } from "../../services/change-journal.js";
 import type { ChangeJournal } from "../../services/change-journal.js";
-import type { MessageStore } from "../../messages.js";
+import type { LLMContextManager } from "../../llm-context-manager.js";
+import type { StatusReporter } from "../../utils/display.js";
 
 export interface InputComponentProps {
   onSubmit?: (value: string) => void;
@@ -236,12 +237,14 @@ export function UndoInput({
   totalTurns = 0,
   changeJournal,
   store,
+  reportStatus,
 }: InputComponentProps & {
   entriesByTurn?: Array<{ turnIdx: number; entries: ChangeEntry[] }>;
   userMessages?: string[];
   totalTurns?: number;
   changeJournal?: ChangeJournal;
-  store?: MessageStore;
+  store?: LLMContextManager;
+  reportStatus?: StatusReporter;
 }) {
   const [step, setStep] = useState<"list" | "confirm">("list");
   const [selectedTurnIdx, setSelectedTurnIdx] = useState(0);
@@ -377,13 +380,13 @@ export function UndoInput({
               }
             }
             parts.push("conversation rolled back");
-            store.addStatus({
+            reportStatus?.({
               role: "status",
               content: `(Rollback: ${parts.join(", ")})`,
               timestamp: new Date(),
             });
           } catch (e) {
-            store.addStatus({
+            reportStatus?.({
               role: "error",
               content: `(Rollback failed: ${(e as Error).message})`,
               timestamp: new Date(),

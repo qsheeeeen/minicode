@@ -6,7 +6,9 @@ import type { SessionStats } from "../../services/session-stats.js";
 import type { SessionManager } from "../../services/session-manager.js";
 import type { ChangeJournal } from "../../services/change-journal.js";
 import type { Signal } from "../../utils/signal.js";
-import { MessageStore, type MessageParam, type StatusMessage } from "../../messages.js";
+import type { MessageParam, StatusMessage } from "../../messages.js";
+import type { LLMContextManager } from "../../llm-context-manager.js";
+import { SessionPersistence } from "../../services/session-persistence.js";
 import { getSkillBody, getAvailableSkills } from "../../skills/index.js";
 import { createLogger } from "../../utils/logger.js";
 import { switchSession } from "../../services/session-lifecycle.js";
@@ -23,7 +25,7 @@ export interface CommandHandler {
 export interface CommandContext {
   agent: Agent;
   model: Model;
-  store: MessageStore;
+  store: LLMContextManager;
   sessionManager: SessionManager;
   changeJournal: ChangeJournal;
   tokenCount$: Signal<number>;
@@ -143,7 +145,7 @@ registerCommand({
   description: "Compress conversation history",
   handler: async (_args, ctx): Promise<void> => {
     await ctx.agent.compress();
-    ctx.store.addStatus({
+    ctx.sessionManager.reportStatus({
       role: "status",
       content: "(Compression complete)",
       timestamp: new Date(),
@@ -165,7 +167,7 @@ registerCommand({
     ctx.model.setEffort(value as EffortLevel);
     const { setEffort } = await import("../../config.js");
     await setEffort(value);
-    ctx.store.addStatus({
+    ctx.sessionManager.reportStatus({
       role: "status",
       content: `(Effort set to: ${value})`,
       timestamp: new Date(),
@@ -199,15 +201,15 @@ registerCommand({
     const newName = args.join(" ");
     if (newName) {
       const oldName = ctx.agent.currentSession;
-      await MessageStore.rename(oldName, newName);
+      await SessionPersistence.rename(oldName, newName);
       const newLogger = await createLogger(
-        MessageStore.getProjectHash(),
+        SessionPersistence.getProjectHash(),
         newName,
       );
       ctx.sessionManager.setSession(newName);
       ctx.agent.logger = newLogger;
       ctx.setCurrentSession(newName);
-      ctx.store.addStatus({
+      ctx.sessionManager.reportStatus({
         role: "status",
         content: `Renamed: ${oldName} -> ${newName}`,
         timestamp: new Date(),
@@ -221,11 +223,11 @@ registerCommand({
   description: "Load a session (without args: list sessions)",
   handler: async (args, ctx): Promise<void> => {
     if (args.length === 0) {
-      const sessions = await MessageStore.list();
+      const sessions = await SessionPersistence.list();
       ctx.setInputMode("session-list", { sessions });
     } else {
       const name = args[0];
-      const data = await MessageStore.load(name);
+      const data = await SessionPersistence.load(name);
       if (data) {
         ctx.store.setTurns(data.messages);
         const totalTokens = data.totalTokens || 0;
@@ -241,7 +243,7 @@ registerCommand({
           statusMessage: `Loaded session: ${name}`,
         });
       } else {
-        ctx.store.addStatus({
+        ctx.sessionManager.reportStatus({
           role: "error",
           content: `Session not found: ${name}`,
           timestamp: new Date(),
@@ -273,7 +275,7 @@ registerCommand({
   handler: async (_args, ctx): Promise<void> => {
     const skills = getAvailableSkills();
     if (skills.length === 0) {
-      ctx.store.addStatus({
+      ctx.sessionManager.reportStatus({
         role: "status",
         content: "(No skills available)",
         timestamp: new Date(),
@@ -313,7 +315,7 @@ registerCommand({
       lines.push(`  /${skill.name} - ${skill.description}`);
     }
 
-    ctx.store.addStatus({
+    ctx.sessionManager.reportStatus({
       role: "status",
       content: lines.join("\n"),
       element,
@@ -339,7 +341,7 @@ registerCommand({
   description: "Rollback to a previous conversation turn",
   handler: async (_args, ctx): Promise<void> => {
     if (ctx.agent.isRunning) {
-      ctx.store.addStatus({
+      ctx.sessionManager.reportStatus({
         role: "status",
         content: "(Agent is running, please wait)",
         timestamp: new Date(),
@@ -356,7 +358,7 @@ registerCommand({
     }
 
     if (userMessages.length === 0) {
-      ctx.store.addStatus({
+      ctx.sessionManager.reportStatus({
         role: "status",
         content: "(Nothing to rollback)",
         timestamp: new Date(),
@@ -375,6 +377,7 @@ registerCommand({
       userMessages,
       changeJournal: ctx.changeJournal,
       store: ctx.store,
+      reportStatus: ctx.sessionManager.reportStatus.bind(ctx.sessionManager),
     });
   },
 });

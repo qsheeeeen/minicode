@@ -1,20 +1,24 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { ContextManager } from "./context-manager.js";
 import { Signal } from "../utils/signal.js";
-import { MessageStore } from "../messages.js";
+import { LLMContextManager } from "../llm-context-manager.js";
 
 function createContextManager(overrides?: {
   compressionThresholdRatio?: number;
 }) {
   const tokenCount$ = new Signal(0);
-  const store = new MessageStore();
+  const store = new LLMContextManager();
+  const statusReporter = vi.fn();
+  const sessionStats = { recordUsage: vi.fn(), incrementSessionCount: vi.fn() } as any;
   const cm = new ContextManager({
     contextLength: 200000,
     compressionThresholdRatio: overrides?.compressionThresholdRatio ?? 0.8,
     tokenCount$,
-    store,
+    contextManager: store,
+    statusReporter,
+    sessionStats,
   });
-  return { cm, tokenCount$, store };
+  return { cm, tokenCount$, store, statusReporter };
 }
 
 describe("ContextManager", () => {
@@ -85,12 +89,13 @@ describe("ContextManager", () => {
 
   describe("compress", () => {
     it("returns activeTurnIdx unchanged when not enough turns", async () => {
-      const { cm, store } = createContextManager();
+      const { cm, store, statusReporter } = createContextManager();
       const newIdx = await cm.compress({
         store,
         model: {} as any,
         changeJournal: {} as any,
         activeTurnIdx: 3,
+        statusReporter,
       });
       expect(newIdx).toBe(3);
     });

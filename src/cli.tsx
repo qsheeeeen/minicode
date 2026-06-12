@@ -14,7 +14,7 @@ import { ToolExecutor } from "./tools/executor.js";
 import { PermissionService } from "./services/permission.js";
 import { getAll } from "./tools/index.js";
 import { Signal } from "./utils/signal.js";
-import { MessageStore } from "./messages.js";
+import { SessionPersistence } from "./services/session-persistence.js";
 import { createLogger } from "./utils/logger.js";
 import { parseArgs, type PermissionMode } from "./args.js";
 import { loadGlobalPrompt } from "./utils/prompts.js";
@@ -114,14 +114,14 @@ let initialSession: string;
 if (sessionName) {
   initialSession = sessionName;
 } else if (resumeRecent) {
-  const recent = await MessageStore.getMostRecent();
+  const recent = await SessionPersistence.getMostRecent();
   initialSession = recent || `session-${Date.now()}`;
 } else {
   initialSession = `session-${Date.now()}`;
 }
 
 const logger = await createLogger(
-  MessageStore.getProjectHash(),
+  SessionPersistence.getProjectHash(),
   initialSession,
 );
 
@@ -172,7 +172,8 @@ const contextManager = new ContextManager({
   contextLength: initialModel.getContextLength(),
   compressionThresholdRatio: config.compressionThreshold,
   tokenCount$,
-  store: sessionManager.getStore(),
+  contextManager: sessionManager.getStore(),
+  statusReporter: sessionManager.getStatusReporter(),
   sessionStats: sessionManager.getSessionStats(),
 });
 const promptManager = new PromptManager(userPrompt, projectPromptFile);

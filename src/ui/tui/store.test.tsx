@@ -5,6 +5,7 @@ import {
   type TuiState,
   type TuiAction,
 } from "./store.js";
+import type { StatusMessage } from "../../messages.js";
 
 describe("tuiReducer", () => {
   it("should update input value correctly and return new state", () => {
@@ -90,6 +91,50 @@ describe("tuiReducer", () => {
       });
       expect(state2.messages).toBe(msgs2);
       expect(state2.messages).not.toBe(msgs1);
+    });
+  });
+
+  describe("ADD_STATUS", () => {
+    it("should append a status to the statuses array", () => {
+      const status: StatusMessage = {
+        role: "status",
+        content: "test status",
+        turnIndex: 1,
+        timestamp: new Date(),
+      };
+      const action: TuiAction = { type: "ADD_STATUS", payload: status };
+      const nextState = tuiReducer(initialState, action);
+
+      expect(nextState.statuses).toHaveLength(1);
+      expect(nextState.statuses[0]).toBe(status);
+    });
+
+    it("should accumulate multiple statuses", () => {
+      const s1: StatusMessage = { role: "status", content: "first", turnIndex: 1, timestamp: new Date() };
+      const s2: StatusMessage = { role: "error", content: "second", turnIndex: 2, timestamp: new Date() };
+
+      const state1 = tuiReducer(initialState, { type: "ADD_STATUS", payload: s1 });
+      const state2 = tuiReducer(state1, { type: "ADD_STATUS", payload: s2 });
+
+      expect(state2.statuses).toHaveLength(2);
+      expect(state2.statuses[0].role).toBe("status");
+      expect(state2.statuses[1].role).toBe("error");
+    });
+  });
+
+  describe("CLEAR_STATUSES", () => {
+    it("should clear all statuses", () => {
+      const status: StatusMessage = { role: "status", content: "temp", turnIndex: 0, timestamp: new Date() };
+      const state1 = tuiReducer(initialState, { type: "ADD_STATUS", payload: status });
+      expect(state1.statuses).toHaveLength(1);
+
+      const state2 = tuiReducer(state1, { type: "CLEAR_STATUSES" });
+      expect(state2.statuses).toHaveLength(0);
+    });
+
+    it("should bail out if statuses already empty", () => {
+      const state = tuiReducer(initialState, { type: "CLEAR_STATUSES" });
+      expect(state).toBe(initialState); // same reference — bailout
     });
   });
 });

@@ -6,10 +6,10 @@ describe("switchSession", () => {
     const agent = {
       set logger(_val: any) {},
     };
-    const addStatus = vi.fn();
+    const reportStatus = vi.fn();
     const sessionManager = {
       setSession: vi.fn(),
-      getStore: vi.fn().mockReturnValue({ addStatus }),
+      reportStatus,
     };
     const setCurrentSession = vi.fn();
     const sessionStats = { incrementSessionCount: vi.fn() };
@@ -28,19 +28,19 @@ describe("switchSession", () => {
     expect(sessionStats.incrementSessionCount).toHaveBeenCalledWith(
       "test-session",
     );
-    expect(addStatus).toHaveBeenCalledWith(
+    expect(reportStatus).toHaveBeenCalledWith(
       expect.objectContaining({ role: "status", content: "Created session" }),
     );
   });
 
   it("skips status message when not provided", async () => {
-    const addStatus = vi.fn();
+    const reportStatus = vi.fn();
     const agent = {
       set logger(_val: any) {},
     };
     const sessionManager = {
       setSession: vi.fn(),
-      getStore: vi.fn().mockReturnValue({ addStatus }),
+      reportStatus,
     };
 
     await switchSession({
@@ -51,6 +51,6 @@ describe("switchSession", () => {
       sessionStats: { incrementSessionCount: vi.fn() } as any,
     });
 
-    expect(addStatus).not.toHaveBeenCalled();
+    expect(reportStatus).not.toHaveBeenCalled();
   });
 });

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { ToolExecutor, type ToolCall } from "./executor.js";
 import { PermissionService } from "../services/permission.js";
-import { MessageStore } from "../messages.js";
+import { LLMContextManager } from "../llm-context-manager.js";
 import { ChangeJournal } from "../services/change-journal.js";
 import type { ToolDef, ToolExecutionContext } from "./registry.js";
 import { ToolDeniedError } from "./registry.js";
@@ -25,7 +25,7 @@ function makeExecutor(overrides?: {
   const permissionService = new PermissionService(
     overrides?.permissionMode ?? "yolo",
   );
-  const store = new MessageStore();
+  const store = new LLMContextManager();
   const changeJournal = new ChangeJournal();
   const executor = new ToolExecutor({
     tools,

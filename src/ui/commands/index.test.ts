@@ -17,12 +17,14 @@ import {
   type CommandContext,
 } from "./index.js";
 
-const { messageStoreMock, configMock, skillsMock } = vi.hoisted(() => ({
-  messageStoreMock: {
+const { sessionPersistenceMock, configMock, skillsMock } = vi.hoisted(() => ({
+  sessionPersistenceMock: {
     getProjectHash: vi.fn().mockReturnValue("testhash"),
     load: vi.fn().mockResolvedValue(null),
     list: vi.fn().mockResolvedValue([]),
     rename: vi.fn().mockResolvedValue(undefined),
+    getMostRecent: vi.fn().mockResolvedValue(null),
+    getSessionDir: vi.fn().mockReturnValue("/tmp/.minicode/sessions/testhash"),
   },
   configMock: {
     setEffort: vi.fn().mockResolvedValue(undefined),
@@ -34,8 +36,8 @@ const { messageStoreMock, configMock, skillsMock } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("../../messages.js", () => ({
-  MessageStore: messageStoreMock,
+vi.mock("../../services/session-persistence.js", () => ({
+  SessionPersistence: sessionPersistenceMock,
 }));
 
 vi.mock("../../utils/logger.js", () => ({
@@ -87,10 +89,9 @@ describe("Builtin commands", () => {
     expect(names).toContain("model");
   });
 
-  /** Create a mock MessageStore (ctx.store) */
+  /** Create a mock store (ctx.store) */
   function makeStoreMock() {
     return {
-      addStatus: vi.fn(),
       setTurns: vi.fn(),
       getTurns: vi.fn().mockReturnValue([]),
     };
@@ -109,6 +110,7 @@ describe("Builtin commands", () => {
       setSession: vi.fn(),
       getStore: vi.fn().mockReturnValue(storeMock),
       getChangeJournal: vi.fn(),
+      reportStatus: vi.fn(),
     };
   }
 
@@ -175,8 +177,8 @@ describe("Builtin commands", () => {
       expect(ctx.exit).toHaveBeenCalled();
     });
 
-    it("/compress calls ctx.agent.compress() and adds status via store", async () => {
-      const { ctx, store } = makeCtx();
+    it("/compress calls ctx.agent.compress() and reports status", async () => {
+      const { ctx, sessionManager } = makeCtx();
 
       const result = await executeCommand(
         "compress",
@@ -185,13 +187,13 @@ describe("Builtin commands", () => {
       );
       expect(result.handled).toBe(true);
       expect(ctx.agent.compress).toHaveBeenCalled();
-      expect(store.addStatus).toHaveBeenCalledWith(
+      expect(sessionManager.reportStatus).toHaveBeenCalledWith(
         expect.objectContaining({ role: "status" }),
       );
     });
 
-    it("/clear clears session and adds status via store", async () => {
-      const { ctx, store, tokenCount$ } = makeCtx();
+    it("/clear clears session and reports status", async () => {
+      const { ctx, sessionManager, tokenCount$ } = makeCtx();
 
       const result = await executeCommand("clear", [], ctx as CommandContext);
       expect(result.handled).toBe(true);
@@ -200,14 +202,14 @@ describe("Builtin commands", () => {
       expect(ctx.setCurrentSession).toHaveBeenCalledWith(
         expect.stringMatching(/^session-/),
       );
-      // switchSession calls sessionManager.getStore().addStatus()
-      expect(store.addStatus).toHaveBeenCalledWith(
+      // switchSession calls sessionManager.reportStatus()
+      expect(sessionManager.reportStatus).toHaveBeenCalledWith(
         expect.objectContaining({ role: "status" }),
       );
     });
 
-    it("/new creates new session and adds status via store", async () => {
-      const { ctx, store } = makeCtx();
+    it("/new creates new session and reports status", async () => {
+      const { ctx, sessionManager } = makeCtx();
 
       const result = await executeCommand(
         "new",
@@ -217,14 +219,14 @@ describe("Builtin commands", () => {
       expect(result.handled).toBe(true);
       expect(ctx.agent.clearSession).toHaveBeenCalled();
       expect(ctx.setCurrentSession).toHaveBeenCalledWith("my new session");
-      // switchSession calls sessionManager.getStore().addStatus()
-      expect(store.addStatus).toHaveBeenCalledWith(
+      // switchSession calls sessionManager.reportStatus()
+      expect(sessionManager.reportStatus).toHaveBeenCalledWith(
         expect.objectContaining({ role: "status" }),
       );
     });
 
-    it("/rename renames session and adds status via store", async () => {
-      const { ctx, store } = makeCtx();
+    it("/rename renames session and reports status", async () => {
+      const { ctx, sessionManager } = makeCtx();
 
       const result = await executeCommand(
         "rename",
@@ -232,18 +234,18 @@ describe("Builtin commands", () => {
         ctx as CommandContext,
       );
       expect(result.handled).toBe(true);
-      expect(messageStoreMock.rename).toHaveBeenCalledWith(
+      expect(sessionPersistenceMock.rename).toHaveBeenCalledWith(
         "test-session",
         "new-session",
       );
       expect(ctx.setCurrentSession).toHaveBeenCalledWith("new-session");
-      expect(store.addStatus).toHaveBeenCalledWith(
+      expect(sessionManager.reportStatus).toHaveBeenCalledWith(
         expect.objectContaining({ role: "status" }),
       );
     });
 
     it("/resume with no args lists sessions", async () => {
-      messageStoreMock.list.mockResolvedValue([
+      sessionPersistenceMock.list.mockResolvedValue([
         { name: "session-1" },
         { name: "session-2" },
       ]);
@@ -251,18 +253,18 @@ describe("Builtin commands", () => {
 
       const result = await executeCommand("resume", [], ctx as CommandContext);
       expect(result.handled).toBe(true);
-      expect(messageStoreMock.list).toHaveBeenCalled();
+      expect(sessionPersistenceMock.list).toHaveBeenCalled();
       expect(ctx.setInputMode).toHaveBeenCalledWith("session-list", {
         sessions: [{ name: "session-1" }, { name: "session-2" }],
       });
     });
 
     it("/resume with args loads session", async () => {
-      messageStoreMock.load.mockResolvedValue({
+      sessionPersistenceMock.load.mockResolvedValue({
         messages: [],
         totalTokens: 100,
       });
-      const { ctx, store, tokenCount$ } = makeCtx();
+      const { ctx, store, tokenCount$, sessionManager } = makeCtx();
 
       const result = await executeCommand(
         "resume",
@@ -270,19 +272,19 @@ describe("Builtin commands", () => {
         ctx as CommandContext,
       );
       expect(result.handled).toBe(true);
-      expect(messageStoreMock.load).toHaveBeenCalledWith("session-1");
+      expect(sessionPersistenceMock.load).toHaveBeenCalledWith("session-1");
       expect(store.setTurns).toHaveBeenCalled();
       expect(tokenCount$.set).toHaveBeenCalledWith(100);
       expect(ctx.setCurrentSession).toHaveBeenCalledWith("session-1");
-      // switchSession adds a status message
-      expect(store.addStatus).toHaveBeenCalledWith(
+      // switchSession reports a status message
+      expect(sessionManager.reportStatus).toHaveBeenCalledWith(
         expect.objectContaining({ role: "status" }),
       );
     });
 
     it("/resume with unknown session shows error", async () => {
-      messageStoreMock.load.mockResolvedValue(null);
-      const { ctx, store } = makeCtx();
+      sessionPersistenceMock.load.mockResolvedValue(null);
+      const { ctx, sessionManager } = makeCtx();
 
       const result = await executeCommand(
         "resume",
@@ -290,7 +292,7 @@ describe("Builtin commands", () => {
         ctx as CommandContext,
       );
       expect(result.handled).toBe(true);
-      expect(store.addStatus).toHaveBeenCalledWith(
+      expect(sessionManager.reportStatus).toHaveBeenCalledWith(
         expect.objectContaining({ role: "error" }),
       );
     });
@@ -327,8 +329,8 @@ describe("Builtin commands", () => {
       expect(ctx.setInputMode).toHaveBeenCalledWith("effort-select");
     });
 
-    it("/effort with valid value sets effort and adds status", async () => {
-      const { ctx, store, model } = makeCtx();
+    it("/effort with valid value sets effort and reports status", async () => {
+      const { ctx, sessionManager, model } = makeCtx();
       const result = await executeCommand(
         "effort",
         ["high"],
@@ -337,7 +339,7 @@ describe("Builtin commands", () => {
       expect(result.handled).toBe(true);
       expect(model.setEffort).toHaveBeenCalledWith("high");
       expect(configMock.setEffort).toHaveBeenCalledWith("high");
-      expect(store.addStatus).toHaveBeenCalledWith(
+      expect(sessionManager.reportStatus).toHaveBeenCalledWith(
         expect.objectContaining({
           role: "status",
           content: "(Effort set to: high)",
@@ -347,11 +349,11 @@ describe("Builtin commands", () => {
 
     it("/skills with no skills shows no-skills status", async () => {
       skillsMock.getAvailableSkills.mockReturnValue([]);
-      const { ctx, store } = makeCtx();
+      const { ctx, sessionManager } = makeCtx();
 
       const result = await executeCommand("skills", [], ctx as CommandContext);
       expect(result.handled).toBe(true);
-      expect(store.addStatus).toHaveBeenCalledWith(
+      expect(sessionManager.reportStatus).toHaveBeenCalledWith(
         expect.objectContaining({
           role: "status",
           content: "(No skills available)",
@@ -364,11 +366,11 @@ describe("Builtin commands", () => {
         { name: "my-skill", description: "A custom skill" },
         { name: "other", description: "Another one" },
       ]);
-      const { ctx, store } = makeCtx();
+      const { ctx, sessionManager } = makeCtx();
 
       const result = await executeCommand("skills", [], ctx as CommandContext);
       expect(result.handled).toBe(true);
-      expect(store.addStatus).toHaveBeenCalledWith(
+      expect(sessionManager.reportStatus).toHaveBeenCalledWith(
         expect.objectContaining({
           role: "status",
           content:

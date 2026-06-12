@@ -1,5 +1,6 @@
 import type { RouteResult } from "./routing.js";
-import type { MessageStore } from "../messages.js";
+import type { LLMContextManager } from "../llm-context-manager.js";
+import type { StatusReporter } from "../utils/display.js";
 import { runShell } from "../services/index.js";
 
 export interface ShellOutput {
@@ -21,7 +22,8 @@ export type ProcessedRoute =
 export function processRoute(
   route: RouteResult,
   rawInput: string,
-  store: MessageStore,
+  store: LLMContextManager,
+  reportStatus?: StatusReporter,
 ): ProcessedRoute {
   if (route.action === "none") {
     return { type: "done" };
@@ -36,7 +38,7 @@ export function processRoute(
       `Ran: ${command}\n\n\`\`\`\n${output}\n\`\`\``,
       rawInput.trim(),
     );
-    store.addStatus({
+    reportStatus?.({
       role: "status",
       content: `$ ${command}\n${output}`,
       toolDisplay: {

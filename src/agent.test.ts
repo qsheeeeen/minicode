@@ -34,7 +34,8 @@ function makeAgent(overrides?: {
     contextLength: model.getContextLength(),
     compressionThresholdRatio: o.compressionThresholdRatio ?? 0.8,
     tokenCount$,
-    store,
+    contextManager: store,
+    statusReporter: sessionManager.reportStatus.bind(sessionManager),
   });
   const promptManager = new PromptManager(o.userPrompt);
   const permissionService = new PermissionService(o.permissionMode ?? "manual");
@@ -248,13 +249,16 @@ describe("Agent", () => {
 
   describe("compress", () => {
     it("does not compress if not enough turns", async () => {
-      const { agent, store } = makeAgent();
+      const { agent, store, sessionManager } = makeAgent();
+      const reportStatusSpy = vi.fn();
+      sessionManager.setStatusReporter(reportStatusSpy);
       for (let i = 0; i < 5; i++) {
         store.addUserMessage(`msg ${i}`);
       }
       await agent.compress();
-      const statuses = store.getStatuses();
-      expect(statuses.some((s) => s.content.includes("Not enough"))).toBe(true);
+      expect(reportStatusSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ content: expect.stringContaining("Not enough") }),
+      );
     });
   });
 
@@ -396,7 +400,8 @@ describe("Agent", () => {
 
   describe("rejection", () => {
     it("in manual mode, rejection stops the conversation", async () => {
-      const { agent, store, permissionService } = makeAgent();
+      const { agent, store, sessionManager, permissionService } = makeAgent();
+      const reportStatusSpy = vi.spyOn(sessionManager, "reportStatus");
       permissionService.setMode("manual");
 
       vi.mocked(permissionService.check).mockResolvedValue({
@@ -429,12 +434,9 @@ describe("Agent", () => {
       expect(lastTurn.role).toBe("user");
       expect((lastTurn.content as any)[0].content).toBe("User rejected");
 
-      const statuses = store.getStatuses();
-      expect(
-        statuses.some(
-          (s) => s.role === "error" && s.content.includes("denied by user"),
-        ),
-      ).toBe(true);
+      expect(reportStatusSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ role: "error", content: expect.stringContaining("denied by user") }),
+      );
     });
 
     it("in auto mode, rejection continues the conversation", async () => {

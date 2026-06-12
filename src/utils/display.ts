@@ -1,6 +1,14 @@
-import type { DisplayMessage } from "../messages.js";
+import type { DisplayMessage, StatusMessage } from "../messages.js";
 
 export type { DisplayMessage };
+
+/**
+ * Callback interface for reporting UI status messages.
+ * Services (Agent, ContextManager, TokenTracker) use this
+ * to emit status/error notifications without knowing about
+ * the UI layer (Zustand, console, etc.).
+ */
+export type StatusReporter = (msg: Omit<StatusMessage, "turnIndex">) => void;
 
 export interface PromptOption {
   label: string;

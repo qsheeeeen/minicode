@@ -14,7 +14,7 @@ import type { SessionManager } from "../../services/session-manager.js";
 import { CallbackPrompter } from "../../utils/display.js";
 import type { UserPrompter } from "../../utils/display.js";
 import type { MessageParam } from "../../messages.js";
-import { MessageStore } from "../../messages.js";
+import { SessionPersistence } from "../../services/session-persistence.js";
 import type { Signal } from "../../utils/signal.js";
 import { useTuiStore } from "./store.js";
 
@@ -33,6 +33,12 @@ export function connectAgent(options: ConnectAgentOptions): { cleanup: () => voi
   const store = sessionManager.getStore();
   const { dispatch } = useTuiStore.getState();
 
+  // Helper: sync display messages from LLMContextManager + Zustand statuses
+  const syncMessages = () => {
+    const { statuses } = useTuiStore.getState();
+    dispatch({ type: "SET_MESSAGES", payload: store.toDisplayMessages(statuses) });
+  };
+
   // 1. Subscribe to token count signal
   const unsubToken = tokenCount$.subscribe((count) =>
     dispatch({ type: "SET_TOKEN_COUNT", payload: count }),
@@ -49,27 +55,29 @@ export function connectAgent(options: ConnectAgentOptions): { cleanup: () => voi
       }),
   );
 
-  // 3. Subscribe to MessageStore changes
-  const unsubStore = store.onChange(() => {
-    dispatch({
-      type: "SET_MESSAGES",
-      payload: store.toDisplayMessages(),
-    });
+  // 3. Wire StatusReporter: statuses → Zustand + re-sync display messages
+  sessionManager.setStatusReporter((msg) => {
+    const turnIndex = store.getTurnCount();
+    dispatch({ type: "ADD_STATUS", payload: { ...msg, turnIndex } });
+    syncMessages();
   });
 
-  // 4. Register main agent in the registry
+  // 4. Subscribe to LLMContextManager changes → re-sync display messages
+  const unsubStore = store.onChange(syncMessages);
+
+  // 5. Register main agent in the registry
   registry.register({ id: "1", type: "main", agent, store, status: "idle" });
   dispatch({
     type: "SET_AGENT_SESSIONS",
     payload: [{ id: "1", type: "main", agent, store, status: "idle" }],
   });
 
-  // 5. Load initial session (async — onChange subscription will push updates)
+  // 6. Load initial session (async — onChange subscription will push updates)
   const loadInitial = async () => {
     sessionManager.setSession(initialSession);
     dispatch({ type: "SET_CURRENT_SESSION", payload: initialSession });
     if (sessionName || resumeRecent) {
-      const data = await MessageStore.load(initialSession);
+      const data = await SessionPersistence.load(initialSession);
       if (data) {
         store.setTurns(data.messages as MessageParam[]);
         const totalTokens = data.totalTokens || 0;
@@ -78,7 +86,7 @@ export function connectAgent(options: ConnectAgentOptions): { cleanup: () => voi
           dispatch({ type: "SET_TOKEN_COUNT", payload: totalTokens });
         }
       } else if (sessionName) {
-        store.addStatus({
+        sessionManager.reportStatus({
           role: "status",
           content: `Created new session: ${sessionName}`,
           timestamp: new Date(),
