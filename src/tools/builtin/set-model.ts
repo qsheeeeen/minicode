@@ -1,6 +1,6 @@
-import type { ToolDef, ToolResult, ToolExecutionContext } from "./registry.js";
-import { ModelFactory } from "../llm/model.js";
-import { register } from "./registry.js";
+import type { ToolDef, ToolResult, ToolExecutionContext } from "../registry.js";
+import { ModelFactory } from "../../llm/model.js";
+import { register } from "../registry.js";
 
 export const setModelTool: ToolDef = {
   name: "SetModel",
@@ -23,7 +23,7 @@ export const setModelTool: ToolDef = {
   ): Promise<ToolResult> => {
     const tier = String(args.tier);
     const { loadConfig, setModel } =
-      await import("../config.js");
+      await import("../../config.js");
     const config = await loadConfig();
     const modelSpec = config.tiers?.[tier];
     if (!modelSpec) {

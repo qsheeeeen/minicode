@@ -1,6 +1,6 @@
 import { spawn } from "child_process";
-import type { ToolDef, ToolResult, ToolExecutionContext } from "./registry.js";
-import { register } from "./registry.js";
+import type { ToolDef, ToolResult, ToolExecutionContext } from "../registry.js";
+import { register } from "../registry.js";
 
 function stripAnsiCodes(text: string): string {
   return text.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");

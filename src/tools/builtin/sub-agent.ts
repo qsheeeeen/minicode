@@ -1,14 +1,14 @@
-import type { ToolDef, ToolResult, ToolExecutionContext } from "./registry.js";
-import type { MessageParam, ContentBlock } from "../messages.js";
-import { Agent } from "../agent.js";
-import { SessionManager } from "../services/session-manager.js";
-import { ContextManager } from "../services/context-manager.js";
-import { PromptManager } from "../services/prompt-manager.js";
-import { ToolExecutor } from "./executor.js";
-import { PermissionService } from "../services/permission.js";
-import { getSubAgentTools } from "./registry.js";
-import { Signal } from "../utils/signal.js";
-import { register } from "./registry.js";
+import type { ToolDef, ToolResult, ToolExecutionContext } from "../registry.js";
+import type { MessageParam, ContentBlock } from "../../messages.js";
+import { Agent } from "../../agent.js";
+import { SessionManager } from "../../services/session-manager.js";
+import { ContextManager } from "../../services/context-manager.js";
+import { PromptManager } from "../../services/prompt-manager.js";
+import { ToolExecutor } from "../executor.js";
+import { PermissionService } from "../../services/permission.js";
+import { getSubAgentTools } from "../registry.js";
+import { Signal } from "../../utils/signal.js";
+import { register } from "../registry.js";
 
 export const agentTool: ToolDef = {
   name: "SubAgent",
@@ -54,8 +54,8 @@ export const agentTool: ToolDef = {
     // Resolve model (optionally override via tier)
     let subModel = config.model;
     if (tier) {
-      const { loadConfig } = await import("../config.js");
-      const { ModelFactory } = await import("../llm/model.js");
+      const { loadConfig } = await import("../../config.js");
+      const { ModelFactory } = await import("../../llm/model.js");
       const appConfig = await loadConfig();
       const modelSpec = appConfig.tiers?.[tier];
       if (modelSpec) {

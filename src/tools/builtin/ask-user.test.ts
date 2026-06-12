@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { askUserTool } from "./ask-user.js";
-import { ToolDeniedError } from "./registry.js";
+import { ToolDeniedError } from "../registry.js";
 
 describe("askUserTool", () => {
   describe("execute", () => {

@@ -1,11 +1,11 @@
 import { describe, it, expect, vi } from "vitest";
 
-vi.mock("../skills/index.js", () => ({
+vi.mock("../../skills/index.js", () => ({
   getSkillBody: vi.fn(),
 }));
 
 import { loadSkillTool } from "./load-skill.js";
-import { getSkillBody } from "../skills/index.js";
+import { getSkillBody } from "../../skills/index.js";
 
 const mockGetSkillBody = vi.mocked(getSkillBody);
 

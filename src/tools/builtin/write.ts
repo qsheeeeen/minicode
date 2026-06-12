@@ -1,7 +1,7 @@
 import fs from "fs/promises";
 import path from "path";
-import type { ToolDef, ToolResult } from "./registry.js";
-import { register } from "./registry.js";
+import type { ToolDef, ToolResult } from "../registry.js";
+import { register } from "../registry.js";
 
 export const writeTool: ToolDef = {
   name: "Write",

@@ -1,7 +1,7 @@
 import fs from "fs/promises";
-import { generateDiffSummary } from "../utils/diff.js";
-import type { ToolDef, ToolResult } from "./registry.js";
-import { register } from "./registry.js";
+import { generateDiffSummary } from "../../utils/diff.js";
+import type { ToolDef, ToolResult } from "../registry.js";
+import { register } from "../registry.js";
 
 export const editTool: ToolDef = {
   name: "Edit",

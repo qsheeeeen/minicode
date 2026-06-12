@@ -1,6 +1,6 @@
-import type { ToolDef, ToolResult, ToolExecutionContext } from "./registry.js";
-import { register } from "./registry.js";
-import { getSkillBody } from "../skills/index.js";
+import type { ToolDef, ToolResult, ToolExecutionContext } from "../registry.js";
+import { register } from "../registry.js";
+import { getSkillBody } from "../../skills/index.js";
 
 export const loadSkillTool: ToolDef = {
   name: "LoadSkill",

@@ -1,6 +1,6 @@
-import type { ToolDef, ToolResult, ToolExecutionContext } from "./registry.js";
-import { ToolDeniedError } from "./registry.js";
-import { register } from "./registry.js";
+import type { ToolDef, ToolResult, ToolExecutionContext } from "../registry.js";
+import { ToolDeniedError } from "../registry.js";
+import { register } from "../registry.js";
 
 interface AskUserArgs {
   question: string;

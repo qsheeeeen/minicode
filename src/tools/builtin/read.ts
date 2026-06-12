@@ -1,6 +1,6 @@
 import fs from "fs/promises";
-import type { ToolDef, ToolResult } from "./registry.js";
-import { register } from "./registry.js";
+import type { ToolDef, ToolResult } from "../registry.js";
+import { register } from "../registry.js";
 
 export const readTool: ToolDef = {
   name: "Read",

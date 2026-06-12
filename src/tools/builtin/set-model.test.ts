@@ -4,12 +4,12 @@ const mockLoadConfig = vi.fn();
 const mockSetModel = vi.fn();
 const mockFromSpec = vi.fn();
 
-vi.mock("../config.js", () => ({
+vi.mock("../../config.js", () => ({
   loadConfig: mockLoadConfig,
   setModel: mockSetModel,
 }));
 
-vi.mock("../llm/model.js", () => ({
+vi.mock("../../llm/model.js", () => ({
   ModelFactory: vi.fn().mockImplementation(function () {
     return { fromSpec: mockFromSpec };
   }),
