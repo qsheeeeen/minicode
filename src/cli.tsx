@@ -34,12 +34,7 @@ const packageJson = JSON.parse(
 );
 const VERSION = packageJson.version;
 
-// Parse CLI arguments (handle early-exit flags before config loading)
-const argv = process.argv.slice(2);
-if (argv.includes("--version") || argv.includes("-v")) {
-  console.log(`Mini Code v${VERSION}`);
-  process.exit(0);
-}
+// Parse CLI arguments (yargs handles --help/--version before config loading)
 let {
   modelOverride,
   initialPrompt,
@@ -47,7 +42,7 @@ let {
   resumeRecent,
   headless,
   permissionMode: cliPermissionMode,
-} = parseArgs(process.argv);
+} = parseArgs(process.argv, VERSION);
 
 // Support for piped input
 if (!process.stdin.isTTY) {

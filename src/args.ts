@@ -12,8 +12,8 @@ export interface CliArgs {
   permissionMode?: PermissionMode;
 }
 
-export function parseArgs(argv: string[]): CliArgs {
-  const parsed = yargs(hideBin(argv))
+export function parseArgs(argv: string[], version?: string): CliArgs {
+  const parser = yargs(hideBin(argv))
     .usage(
       "Mini Code - A minimal coding agent with TUI\n\nUsage: minicode [options] [prompt]",
     )
@@ -45,15 +45,21 @@ export function parseArgs(argv: string[]): CliArgs {
     })
     .help("h")
     .alias("h", "help")
-    .version(false) // Handle version manually in cli.tsx for fast exit
     .example("minicode", "Start TUI")
     .example('minicode "list files"', "Start TUI and auto-run prompt")
     .example("minicode -s my-session", "Use specific session")
     .example('minicode -H --perm yolo "ls"', "Headless, no permission checks")
     .epilog(
       "In TUI mode:\n  /compress       # Compress conversation history\n  /new <name>     # Create new session\n  /resume         # List and resume sessions\n  /rename <name>  # Rename current session\n  /exit           # Quit (or Ctrl+C)\n  Shift+Tab       # Cycle permission mode (manual/yolo/auto)\n  Ctrl+O          # Switch active agent",
-    )
-    .parseSync();
+    );
+
+  if (version !== undefined) {
+    parser.version(`Mini Code v${version}`).alias("version", "v");
+  } else {
+    parser.version(false);
+  }
+
+  const parsed = parser.parseSync();
 
   const initialPrompt = parsed._.length > 0 ? parsed._.join(" ") : undefined;
 
