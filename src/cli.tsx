@@ -3,7 +3,7 @@ import path from "path";
 import os from "os";
 import { fileURLToPath } from "url";
 import { render } from "ink";
-import { loadAllConfig, resolveModel } from "./config.js";
+import { loadAllConfig } from "./config.js";
 import { Agent } from "./agent.js";
 import { AgentRegistry, SessionStats } from "./services/index.js";
 import { SessionManager } from "./services/session-manager.js";
@@ -36,15 +36,18 @@ const VERSION = packageJson.version;
 // 1. Config init — load from file with file-level defaults (no args)
 const config = await loadAllConfig();
 
-// 2. Args init — yargs handles --help/--version fast exit
+// 2. Parse args overlaid onto config — yargs handles --help/--version,
+//    then args (model/permission) override config in one merged object.
 let {
-  modelOverride,
+  model,
+  permissionMode,
+  compressionThreshold,
+  thinking,
   initialPrompt,
   sessionName,
   resumeRecent,
   headless,
-  permissionMode: cliPermissionMode,
-} = parseArgs(process.argv, VERSION);
+} = parseArgs(process.argv, config, VERSION);
 
 // Auto-headless when stdin is not a TTY (piped input or no terminal).
 // Piped content is read inside runHeadless; here we only decide the branch.
@@ -52,12 +55,6 @@ if (headless === undefined) {
   headless = !process.stdin.isTTY;
 }
 headless = !!headless;
-
-// 3. Args override config (one-time layer; args are never persisted)
-const model = modelOverride
-  ? resolveModel(modelOverride, config.providers)
-  : config.model;
-const permissionMode = cliPermissionMode ?? config.permissionMode;
 
 if (!model) {
   console.error(
@@ -116,7 +113,7 @@ const initialModel = new Model(
   model.model,
   model.provider,
   model.contextLength ?? 200000,
-  config.thinking.effort,
+  thinking.effort,
   model.displayName,
 );
 
@@ -124,7 +121,7 @@ const tokenCount$ = new Signal(0);
 const sessionManager = new SessionManager(undefined, sharedSessionStats);
 const contextManager = new ContextManager({
   contextLength: initialModel.getContextLength(),
-  compressionThresholdRatio: config.compressionThreshold,
+  compressionThresholdRatio: compressionThreshold,
   tokenCount$,
   contextManager: sessionManager.getContext(),
   statusReporter: sessionManager.getStatusReporter(),

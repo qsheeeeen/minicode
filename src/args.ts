@@ -1,18 +1,25 @@
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
+import type { ResolvedConfig } from "./config.js";
+import { resolveModel } from "./config.js";
 
 export type PermissionMode = "manual" | "yolo" | "auto";
 
-export interface CliArgs {
-  modelOverride?: string;
+/** Effective runtime values: config with args overlaid (args win) plus
+ *  the pure-arg fields that have no config counterpart. Produced during
+ *  parsing so callers get one merged object. */
+export interface ResolvedArgs extends ResolvedConfig {
   initialPrompt?: string;
   sessionName?: string;
   resumeRecent: boolean;
   headless?: boolean;
-  permissionMode?: PermissionMode;
 }
 
-export function parseArgs(argv: string[], version?: string): CliArgs {
+export function parseArgs(
+  argv: string[],
+  config: ResolvedConfig,
+  version?: string,
+): ResolvedArgs {
   const parser = yargs(hideBin(argv))
     .usage(
       "Mini Code - A minimal coding agent with TUI\n\nUsage: minicode [options] [prompt]",
@@ -60,15 +67,20 @@ export function parseArgs(argv: string[], version?: string): CliArgs {
   }
 
   const parsed = parser.parseSync();
-
   const initialPrompt = parsed._.length > 0 ? parsed._.join(" ") : undefined;
 
+  // Overlay args onto config (one-time; args are never persisted back to file)
   return {
-    modelOverride: parsed.model,
+    ...config,
+    model: parsed.model
+      ? resolveModel(parsed.model, config.providers)
+      : config.model,
+    permissionMode:
+      (parsed.permission as PermissionMode | undefined) ??
+      config.permissionMode,
     initialPrompt,
     sessionName: parsed.session,
     resumeRecent: parsed.resume,
     headless: parsed.headless,
-    permissionMode: parsed.permission as PermissionMode | undefined,
   };
 }
