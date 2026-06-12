@@ -27,6 +27,8 @@ render(
         return true;
       }}
       loadingRef={loadingRef}
+      config={{} as any}
+      modelFactory={{ fromSpec: () => null } as any}
     />
   </Box>,
 );

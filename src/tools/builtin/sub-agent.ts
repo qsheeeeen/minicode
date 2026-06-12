@@ -4,6 +4,7 @@ import { Agent } from "../../agent.js";
 import { SessionManager } from "../../services/session-manager.js";
 import { ContextManager } from "../../services/context-manager.js";
 import { PromptManager } from "../../services/prompt-manager.js";
+import { ModelFactory } from "../../llm/model.js";
 import { ToolExecutor } from "../executor.js";
 import { PermissionService } from "../../services/permission.js";
 import { getSubAgentTools } from "../registry.js";
@@ -52,14 +53,12 @@ export const agentTool: ToolDef = {
     const subId = registry.allocateSubId();
 
     // Resolve model (optionally override via tier)
+    const appConfig = context?.appConfig;
     let subModel = config.model;
-    if (tier) {
-      const { loadConfig } = await import("../../config.js");
-      const { ModelFactory } = await import("../../llm/model.js");
-      const appConfig = await loadConfig();
+    if (tier && appConfig) {
       const modelSpec = appConfig.tiers?.[tier];
       if (modelSpec) {
-        const factory = new ModelFactory(appConfig.providers ?? {});
+        const factory = new ModelFactory(appConfig);
         const tierModel = factory.fromSpec(modelSpec);
         if (tierModel) {
           subModel = tierModel;
@@ -92,6 +91,7 @@ export const agentTool: ToolDef = {
       tokenCount$,
       agentRegistry: registry,
       currentAgentId: subId,
+      appConfig: appConfig!,
     });
 
     context?.signal?.addEventListener("abort", () => {

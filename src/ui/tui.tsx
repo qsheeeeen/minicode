@@ -1,9 +1,10 @@
-import React, { useCallback, useRef, useEffect } from "react";
+import React, { useCallback, useRef, useEffect, useMemo } from "react";
 import { Box, useInput, useApp } from "ink";
 import { Agent } from "../agent.js";
-import type { ResolvedConfig } from "../config.js";
+import type { AppConfig } from "../config.js";
 import type { DisplayMessage } from "../messages.js";
 import type { UserPrompter } from "../tools/registry.js";
+import { ModelFactory } from "../llm/model.js";
 import { routeInput } from "./routing.js";
 import { processRoute } from "./route-handler.js";
 import {
@@ -30,7 +31,7 @@ import { Help } from "./tui/Help.js";
 
 export interface AppProps {
   agent: Agent;
-  config: ResolvedConfig;
+  config: AppConfig;
   version: string;
   promptFiles: string[];
   initialSession: string;
@@ -116,6 +117,7 @@ function useMultiAgent(
 
 function AppContent({
   agent,
+  config,
   version,
   promptFiles,
   initialSession,
@@ -128,8 +130,9 @@ function AppContent({
   tokenCount$,
   permissionService,
   prompterRef,
-}: Omit<AppProps, "config"> & { prompterRef: React.RefObject<UserPrompter | null> }) {
+}: AppProps & { prompterRef: React.RefObject<UserPrompter | null> }) {
   const { exit } = useApp();
+  const modelFactory = useMemo(() => new ModelFactory(config), [config]);
   const dispatch = useTuiStore((s) => s.dispatch);
   const input = useTuiStore((s) => s.input);
   const pendingPrompt = useTuiStore((s) => s.pendingPrompt);
@@ -155,6 +158,7 @@ function AppContent({
     () => ({
       agent: agentRef.current,
       model: agentRef.current.model,
+      config,
       context,
       sessionManager,
       changeJournal: sessionManager.getChangeJournal(),
@@ -174,7 +178,7 @@ function AppContent({
         dispatch({ type: "SET_SELECTED_SESSION_INDEX", payload: index }),
       exit: () => dispatch({ type: "SET_SHOW_RECEIPT", payload: true }),
     }),
-    [dispatch, sessionManager, tokenCount$],
+    [dispatch, sessionManager, tokenCount$, config],
   );
 
   const handleSubmit = useCallback(
@@ -301,6 +305,8 @@ function AppContent({
           agentRef={agentRef}
           handleSubmit={handleSubmit}
           loadingRef={loadingRef}
+          config={config}
+          modelFactory={modelFactory}
         />
       )}
       <SubAgentBar />

@@ -22,15 +22,16 @@ export const setModelTool: ToolDef = {
     context?: ToolExecutionContext,
   ): Promise<ToolResult> => {
     const tier = String(args.tier);
-    const { loadConfig, setModel } =
-      await import("../../config.js");
-    const config = await loadConfig();
-    const modelSpec = config.tiers?.[tier];
+    const appConfig = context?.appConfig;
+    if (!appConfig) {
+      return { output: "Error: app config not available." };
+    }
+    const modelSpec = appConfig.tiers?.[tier];
     if (!modelSpec) {
       return { output: `Error: No model mapped to tier ${tier}.` };
     }
 
-    const factory = new ModelFactory(config.providers ?? {});
+    const factory = new ModelFactory(appConfig);
     const newModel = factory.fromSpec(modelSpec);
     if (!newModel) {
       return {
@@ -42,7 +43,7 @@ export const setModelTool: ToolDef = {
     if (agent) {
       agent.model = newModel;
     }
-    await setModel(modelSpec);
+    await appConfig.setModel(modelSpec);
     return { output: `Switched to ${tier}: ${modelSpec}` };
   },
 };

@@ -3,7 +3,7 @@ import path from "path";
 import os from "os";
 import { fileURLToPath } from "url";
 import { render } from "ink";
-import { loadAllConfig } from "./config.js";
+import { AppConfig } from "./config.js";
 import { Agent } from "./agent.js";
 import { AgentRegistry, SessionStats } from "./services/index.js";
 import { SessionManager } from "./services/session-manager.js";
@@ -15,11 +15,11 @@ import { getAll } from "./tools/index.js";
 import { Signal } from "./utils/signal.js";
 import { SessionPersistence } from "./services/session-persistence.js";
 import { createLogger } from "./utils/logger.js";
-import { parseArgs } from "./args.js";
+import { Args } from "./args.js";
 import { loadGlobalPrompt } from "./utils/prompts.js";
 import { SkillManager } from "./skills/skill-manager.js";
 import { App } from "./ui/tui.js";
-import { Model } from "./llm/model.js";
+import { Model, ModelFactory } from "./llm/model.js";
 import { createClient } from "./llm/client.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -33,28 +33,17 @@ const packageJson = JSON.parse(
 );
 const VERSION = packageJson.version;
 
-// 1. Config init — load from file with file-level defaults (no args)
-const config = await loadAllConfig();
+// 1. Config init — single instance, threaded everywhere via DI
+const config = await AppConfig.load();
 
 // 2. Parse args overlaid onto config — yargs handles --help/--version,
-//    then args (model/permission) override config in one merged object.
-let {
-  model,
-  permissionMode,
-  compressionThreshold,
-  thinking,
-  initialPrompt,
-  sessionName,
-  resumeRecent,
-  headless,
-} = parseArgs(process.argv, config, VERSION);
+//    then args (model/permission) override config.
+const args = new Args(process.argv, config, VERSION);
+const { model, permissionMode, compressionThreshold, thinking, initialPrompt, sessionName, resumeRecent } = args;
 
 // Auto-headless when stdin is not a TTY (piped input or no terminal).
 // Piped content is read inside runHeadless; here we only decide the branch.
-if (headless === undefined) {
-  headless = !process.stdin.isTTY;
-}
-headless = !!headless;
+const headless = args.headless ?? !process.stdin.isTTY;
 
 if (!model) {
   console.error(
@@ -62,6 +51,8 @@ if (!model) {
   );
   process.exit(1);
 }
+
+const modelFactory = new ModelFactory(config);
 
 // Load global prompt only (project prompt is loaded on-demand by the LLM)
 const globalPrompt = await loadGlobalPrompt();
@@ -153,6 +144,7 @@ const agent = new Agent({
   promptManager,
   tokenCount$,
   agentRegistry: sharedAgentRegistry,
+  appConfig: config,
 });
 sessionManager.setSession(initialSession);
 agent.logger = logger;
@@ -161,6 +153,7 @@ agent.logger = logger;
 const cmdContext = {
   agent,
   model: initialModel,
+  config,
   context: sessionManager.getContext(),
   sessionManager,
   changeJournal: sessionManager.getChangeJournal(),

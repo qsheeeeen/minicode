@@ -28,7 +28,8 @@ const { sessionPersistenceMock, configMock, skillsMock } = vi.hoisted(() => ({
   },
   configMock: {
     setEffort: vi.fn().mockResolvedValue(undefined),
-    loadConfig: vi.fn().mockResolvedValue({ providers: {} }),
+    providers: {} as Record<string, any>,
+    tiers: {} as Record<string, string>,
   },
   skillsMock: {
     getAvailableSkills: vi.fn().mockReturnValue([]),
@@ -45,11 +46,6 @@ vi.mock("../../utils/logger.js", () => ({
 }));
 
 vi.mock("../../skills/index.js", () => skillsMock);
-
-vi.mock("../../config.js", () => ({
-  setEffort: configMock.setEffort,
-  loadConfig: configMock.loadConfig,
-}));
 
 vi.mock("react", () => ({
   createElement: vi.fn((...args: any[]) => args),
@@ -152,6 +148,7 @@ describe("Builtin commands", () => {
     const ctx: Partial<CommandContext> = {
       agent: agent as any,
       model: model as any,
+      config: configMock as any,
       context: context as any,
       sessionManager: sessionManager as any,
       changeJournal: changeJournal as any,
@@ -380,9 +377,8 @@ describe("Builtin commands", () => {
     });
 
     it("/model shows model select UI", async () => {
-      configMock.loadConfig.mockResolvedValue({
-        providers: { anthropic: {}, openai: {} },
-      });
+      configMock.providers = { anthropic: {}, openai: {} };
+      configMock.tiers = {};
       const { ctx } = makeCtx();
       const result = await executeCommand("model", [], ctx as CommandContext);
       expect(result.handled).toBe(true);

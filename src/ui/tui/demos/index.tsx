@@ -150,6 +150,8 @@ function Demo() {
             return true;
           }}
           loadingRef={{ current: false }}
+          config={{} as any}
+          modelFactory={{ fromSpec: () => null } as any}
         />
       ) : mode === "effort" ? (
         <Box

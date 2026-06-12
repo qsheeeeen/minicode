@@ -1,11 +1,9 @@
-import fs from "fs";
 import fsPromises from "fs/promises";
 import path from "path";
 import os from "os";
 import type { EffortLevel } from "./llm/client.js";
 
-const CONFIG_DIR = path.join(os.homedir(), ".minicode");
-const CONFIG_PATH = path.join(CONFIG_DIR, "config.json");
+const DEFAULT_CONFIG_PATH = path.join(os.homedir(), ".minicode", "config.json");
 
 export interface ModelConfig {
   contextLength?: number;
@@ -28,34 +26,26 @@ export interface ThinkingConfig {
   effort?: EffortLevel;
 }
 
+/** Raw on-disk config shape (all fields optional). */
 export interface Config {
   providers?: Providers;
   model?: string; // format: model@provider, e.g. "claude-sonnet-4-5@anthropic"
-  tiers?: Record<string, string>; // tier -> model@provider, e.g. { "pro": "claude-sonnet@anthropic", "flash": "gpt-4o@openai" }
+  tiers?: Record<string, string>; // tier -> model@provider
   compressionThreshold?: number; // 0-1, compress at this ratio of context
-  thinking?: ThinkingConfig; // thinking configuration (Go writes { effort: "high" })
+  thinking?: ThinkingConfig;
   effort?: EffortLevel; // legacy: top-level effort, now nested under thinking
   permissionMode?: "manual" | "yolo" | "auto";
 }
 
-let cachedConfig: Config | null = null;
-
-export async function loadConfig(refresh = false): Promise<Config> {
-  if (cachedConfig && !refresh) return cachedConfig;
-
-  try {
-    await fsPromises.mkdir(CONFIG_DIR, { recursive: true });
-    const content = await fsPromises.readFile(CONFIG_PATH, "utf-8");
-    cachedConfig = JSON.parse(content) as Config;
-    return cachedConfig ?? {};
-  } catch {
-    // 配置文件不存在，返回空配置
-    return {};
-  }
-}
-
-export function invalidateConfig(): void {
-  cachedConfig = null;
+/** Resolved model descriptor (flattened from a model@provider spec). */
+export interface ResolvedModel {
+  provider: string;
+  protocol: string;
+  model: string;
+  apiKey: string;
+  baseURL?: string;
+  contextLength?: number;
+  displayName?: string;
 }
 
 export function parseModelSpecifier(
@@ -74,37 +64,11 @@ export function parseModelSpecifier(
   return { modelName, providerName, providerConfig };
 }
 
-export function loadConfigSync(): Config {
-  try {
-    const content = fs.readFileSync(CONFIG_PATH, "utf-8");
-    return JSON.parse(content) as Config;
-  } catch {
-    return {};
-  }
-}
-
-export interface ResolvedConfig {
-  model: {
-    provider: string;
-    protocol: string;
-    model: string;
-    apiKey: string;
-    baseURL?: string;
-    contextLength?: number;
-    displayName?: string;
-  } | null;
-  providers: Providers;
-  compressionThreshold: number;
-  thinking: { effort?: EffortLevel };
-  permissionMode: "manual" | "yolo" | "auto";
-}
-
-/** Resolve a model@provider specifier against providers. Exposed so the
- *  CLI override layer can re-resolve without re-reading config internals. */
+/** Resolve a model@provider spec into a flattened descriptor (pure). */
 export function resolveModel(
   spec: string,
   providers: Providers,
-): ResolvedConfig["model"] {
+): ResolvedModel | null {
   const parsed = parseModelSpecifier(spec, providers);
   if (!parsed) return null;
   const modelConfig = parsed.providerConfig.models?.[parsed.modelName];
@@ -119,59 +83,101 @@ export function resolveModel(
   };
 }
 
-export async function loadAllConfig(): Promise<ResolvedConfig> {
-  const config = await loadConfig();
-  const providers = config.providers ?? {};
+/**
+ * AppConfig — the single app configuration instance. Created once at startup
+ * via `AppConfig.load()` and threaded through dependency injection. Since the
+ * instance is shared by reference, mutators update it in place (+ persist to
+ * disk) and every consumer sees the change immediately — replacing the old
+ * module-level cache.
+ */
+export class AppConfig {
+  private raw: Config;
+  private readonly configPath: string;
+  private writeChain: Promise<void> = Promise.resolve();
 
-  const effort =
-    typeof config.thinking === "object" && config.thinking?.effort
-      ? config.thinking.effort
-      : config.effort;
-
-  return {
-    model: config.model ? resolveModel(config.model, providers) : null,
-    providers,
-    compressionThreshold: config.compressionThreshold ?? 0.8,
-    thinking: {
-      effort,
-    },
-    permissionMode: config.permissionMode ?? "manual",
-  };
-}
-
-export async function setEffort(effort: string): Promise<void> {
-  const config = await loadConfig();
-  if (typeof config.thinking !== "object" || config.thinking === null) {
-    config.thinking = {};
+  constructor(raw: Config = {}, configPath: string = DEFAULT_CONFIG_PATH) {
+    this.raw = raw;
+    this.configPath = configPath;
   }
-  config.thinking.effort = effort as EffortLevel;
-  cachedConfig = config;
-  await fsPromises.writeFile(
-    CONFIG_PATH,
-    JSON.stringify(config, null, 2),
-    "utf-8",
-  );
-}
 
-export async function setModel(modelSpec: string): Promise<void> {
-  const config = await loadConfig();
-  config.model = modelSpec;
-  cachedConfig = config;
-  await fsPromises.writeFile(
-    CONFIG_PATH,
-    JSON.stringify(config, null, 2),
-    "utf-8",
-  );
-}
+  /** Read the config file once and return a fresh instance (no caching). */
+  static async load(configPath: string = DEFAULT_CONFIG_PATH): Promise<AppConfig> {
+    let raw: Config = {};
+    try {
+      await fsPromises.mkdir(path.dirname(configPath), { recursive: true });
+      raw = JSON.parse(await fsPromises.readFile(configPath, "utf-8")) as Config;
+    } catch {
+      // Missing or unreadable config — start empty
+    }
+    return new AppConfig(raw, configPath);
+  }
 
-export async function setTier(tier: string, modelSpec: string): Promise<void> {
-  const config = await loadConfig();
-  if (!config.tiers) config.tiers = {};
-  config.tiers[tier] = modelSpec;
-  cachedConfig = config;
-  await fsPromises.writeFile(
-    CONFIG_PATH,
-    JSON.stringify(config, null, 2),
-    "utf-8",
-  );
+  // --- resolved/normalized getters ---
+
+  get providers(): Providers {
+    return this.raw.providers ?? {};
+  }
+
+  get modelSpec(): string | undefined {
+    return this.raw.model;
+  }
+
+  get model(): ResolvedModel | null {
+    return this.raw.model ? resolveModel(this.raw.model, this.providers) : null;
+  }
+
+  get compressionThreshold(): number {
+    return this.raw.compressionThreshold ?? 0.8;
+  }
+
+  get thinking(): { effort?: EffortLevel } {
+    const effort =
+      typeof this.raw.thinking === "object" && this.raw.thinking?.effort
+        ? this.raw.thinking.effort
+        : this.raw.effort;
+    return { effort };
+  }
+
+  get permissionMode(): "manual" | "yolo" | "auto" {
+    return this.raw.permissionMode ?? "manual";
+  }
+
+  get tiers(): Record<string, string> {
+    return this.raw.tiers ?? {};
+  }
+
+  /** Resolve an arbitrary model@provider spec against current providers. */
+  resolveModel(spec: string): ResolvedModel | null {
+    return resolveModel(spec, this.providers);
+  }
+
+  // --- mutators: update in-memory synchronously, then persist ---
+
+  async setModel(modelSpec: string): Promise<void> {
+    this.raw.model = modelSpec;
+    await this.persist();
+  }
+
+  async setEffort(effort: EffortLevel): Promise<void> {
+    if (typeof this.raw.thinking !== "object" || this.raw.thinking === null) {
+      this.raw.thinking = {};
+    }
+    this.raw.thinking.effort = effort;
+    await this.persist();
+  }
+
+  async setTier(tier: string, modelSpec: string): Promise<void> {
+    if (!this.raw.tiers) this.raw.tiers = {};
+    this.raw.tiers[tier] = modelSpec;
+    await this.persist();
+  }
+
+  /** Serialize concurrent writes so they apply in order. */
+  private persist(): Promise<void> {
+    const snapshot = JSON.stringify(this.raw, null, 2);
+    this.writeChain = this.writeChain.then(() =>
+      fsPromises.writeFile(this.configPath, snapshot, "utf-8"),
+    );
+    return this.writeChain;
+  }
 }

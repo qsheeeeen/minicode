@@ -5,17 +5,23 @@ import { getInputComponent } from "./inputs.js";
 import { getCommandList } from "../commands/index.js";
 import type { Agent } from "../../agent.js";
 import type { EffortLevel } from "../../llm/client.js";
+import type { AppConfig } from "../../config.js";
+import type { ModelFactory } from "../../llm/model.js";
 
 interface InputAreaProps {
   agentRef: React.MutableRefObject<Agent>;
   handleSubmit: (value: string) => Promise<boolean>;
   loadingRef: React.MutableRefObject<boolean>;
+  config: AppConfig;
+  modelFactory: ModelFactory;
 }
 
 export function InputArea({
   agentRef,
   handleSubmit,
   loadingRef,
+  config,
+  modelFactory,
 }: InputAreaProps) {
   const input = useTuiStore((s) => s.input);
   const pendingPrompt = useTuiStore((s) => s.pendingPrompt);
@@ -71,7 +77,7 @@ export function InputArea({
     async (value: string) => {
       if (input.mode === "effort-select") {
         agentRef.current.model.setEffort(value as EffortLevel);
-        import("../../config.js").then((m) => m.setEffort(value));
+        config.setEffort(value as EffortLevel);
         dispatch({
           type: "ADD_MESSAGE",
           payload: {
@@ -91,34 +97,22 @@ export function InputArea({
         dispatch({ type: "INCREMENT_INPUT_KEY" });
         setSelectedSuggestion(0);
       } else if (input.mode === "model-select") {
-        const { loadConfig, parseModelSpecifier, setTier } =
-          await import("../../config.js");
-        const config = await loadConfig();
-
         const tierMatch = value.match(/^(pro|flash):(.*)$/);
         if (tierMatch) {
           const tier = tierMatch[1];
           let modelSpec = tierMatch[2];
 
           if (!modelSpec) {
-            modelSpec = config.tiers?.[tier] || "";
+            modelSpec = config.tiers[tier] || "";
           }
 
           if (modelSpec) {
-            const parsed = parseModelSpecifier(
-              modelSpec,
-              config.providers ?? {},
-            );
-            if (parsed) {
-              const { ModelFactory } = await import("../../llm/model.js");
-              const factory = new ModelFactory(config.providers ?? {});
-              const newModel = factory.fromSpec(modelSpec);
-              if (newModel) {
-                agentRef.current.model = newModel;
-              }
-              import("../../config.js").then((m) => m.setModel(modelSpec));
+            const newModel = modelFactory.fromSpec(modelSpec);
+            if (newModel) {
+              agentRef.current.model = newModel;
+              await config.setModel(modelSpec);
               if (tierMatch[2]) {
-                setTier(tier, modelSpec);
+                await config.setTier(tier, modelSpec);
               }
               dispatch({
                 type: "ADD_MESSAGE",
@@ -151,7 +145,7 @@ export function InputArea({
     dispatch({ type: "SET_INPUT_MODE", payload: { mode: "chat" } });
     dispatch({ type: "SET_INPUT_VALUE", payload: "" });
     setSelectedSuggestion(0);
-  }, [dispatch]);
+  }, [dispatch, config, modelFactory, handleSubmit]);
 
   const handleChange = useCallback(
     (v: string) => {

@@ -15,6 +15,7 @@ import type { PromptManager } from "./services/prompt-manager.js";
 import type { SessionManager } from "./services/session-manager.js";
 import type { ContextManager } from "./services/context-manager.js";
 import type { LLMContextManager } from "./llm-context-manager.js";
+import type { AppConfig } from "./config.js";
 import type pino from "pino";
 
 export interface AgentOpts {
@@ -26,6 +27,7 @@ export interface AgentOpts {
   readonly tokenCount$: Signal<number>;
   readonly agentRegistry?: AgentRegistry;
   readonly currentAgentId?: string;
+  readonly appConfig: AppConfig;
 }
 
 export class Agent {
@@ -37,6 +39,7 @@ export class Agent {
   private promptManager: PromptManager;
   private agentRegistry?: AgentRegistry;
   private currentAgentId: string;
+  private readonly appConfig: AppConfig;
   private abortController: AbortController | null = null;
   public logger?: pino.Logger;
 
@@ -64,6 +67,7 @@ export class Agent {
     this.tokenCount$ = opts.tokenCount$;
     this.agentRegistry = opts.agentRegistry;
     this.currentAgentId = opts.currentAgentId ?? "1";
+    this.appConfig = opts.appConfig;
   }
 
   private async saveStore(): Promise<void> {
@@ -245,6 +249,7 @@ export class Agent {
             model: this.model,
             userPrompt: this.promptManager.getUserPrompt(),
           },
+          appConfig: this.appConfig,
           currentAgentId: this.currentAgentId,
           prompter: opts?.prompter,
         };

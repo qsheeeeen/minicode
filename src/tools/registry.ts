@@ -1,5 +1,6 @@
 import type { AgentRegistry } from "../services/agent-registry.js";
 import type { Model } from "../llm/model.js";
+import type { AppConfig } from "../config.js";
 
 /**
  * UI interaction interfaces defined by the tool execution layer.
@@ -34,6 +35,7 @@ export interface ToolConfig {
 export interface ToolExecutionContext {
   registry: AgentRegistry | undefined;
   config: ToolConfig;
+  appConfig: AppConfig;
   currentAgentId: string;
   signal: AbortSignal | undefined;
   prompter?: UserPrompter;

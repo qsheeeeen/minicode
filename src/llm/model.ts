@@ -5,13 +5,7 @@
 
 import type { LLMClient, EffortLevel } from "./client.js";
 import { createClient } from "./client.js";
-import {
-  loadConfig,
-  parseModelSpecifier,
-  setModel as persistModel,
-  setTier as persistTier,
-  type Providers,
-} from "../config.js";
+import { parseModelSpecifier, type AppConfig } from "../config.js";
 
 export class Model {
   private _effort?: EffortLevel;
@@ -63,18 +57,14 @@ export class Model {
   }
 }
 
-// ModelFactory creates Model instances from config.
+// ModelFactory creates Model instances from an injected AppConfig.
 
 export class ModelFactory {
-  private readonly providers: Providers;
-
-  constructor(providers: Providers) {
-    this.providers = providers;
-  }
+  constructor(private readonly config: AppConfig) {}
 
   /** Create a Model from a "model@provider" specifier string. */
   fromSpec(spec: string): Model | null {
-    const parsed = parseModelSpecifier(spec, this.providers);
+    const parsed = parseModelSpecifier(spec, this.config.providers);
     if (!parsed) return null;
 
     const protocol = parsed.providerConfig.protocol || "anthropic";
@@ -93,27 +83,5 @@ export class ModelFactory {
       undefined, // effort — resolved per-session, not per-model
       modelConfig?.name,
     );
-  }
-
-  /** Create a Model by resolving a tier name through config. */
-  async fromTier(tier: string): Promise<Model | null> {
-    const config = await loadConfig();
-    const spec = config.tiers?.[tier];
-    if (!spec) return null;
-    return this.fromSpec(spec);
-  }
-
-  /** Persist a tier mapping and return the resolved Model. */
-  async mapTier(tier: string, spec: string): Promise<Model | null> {
-    const model = this.fromSpec(spec);
-    if (model) {
-      await persistTier(tier, spec);
-    }
-    return model;
-  }
-
-  /** Persist the default model specifier. */
-  static async persistDefault(spec: string): Promise<void> {
-    await persistModel(spec);
   }
 }

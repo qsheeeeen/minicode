@@ -8,6 +8,7 @@ import type { ChangeJournal } from "../../services/change-journal.js";
 import type { Signal } from "../../utils/signal.js";
 import type { MessageParam, StatusMessage } from "../../messages.js";
 import type { LLMContextManager } from "../../llm-context-manager.js";
+import type { AppConfig } from "../../config.js";
 import { SessionPersistence } from "../../services/session-persistence.js";
 import { getSkillBody, getAvailableSkills } from "../../skills/index.js";
 import { createLogger } from "../../utils/logger.js";
@@ -25,6 +26,7 @@ export interface CommandHandler {
 export interface CommandContext {
   agent: Agent;
   model: Model;
+  config: AppConfig;
   context: LLMContextManager;
   sessionManager: SessionManager;
   changeJournal: ChangeJournal;
@@ -165,8 +167,7 @@ registerCommand({
       return;
     }
     ctx.model.setEffort(value as EffortLevel);
-    const { setEffort } = await import("../../config.js");
-    await setEffort(value);
+    await ctx.config.setEffort(value as EffortLevel);
     ctx.sessionManager.reportStatus({
       role: "status",
       content: `(Effort set to: ${value})`,
@@ -328,11 +329,10 @@ registerCommand({
   name: "model",
   description: "Switch model/provider",
   handler: async (_args, ctx): Promise<void> => {
-    const { loadConfig } = await import("../../config.js");
-    const config = await loadConfig();
-    const providers = config.providers ?? {};
-    const tiers = config.tiers ?? {};
-    ctx.setInputMode("model-select", { providers, tiers });
+    ctx.setInputMode("model-select", {
+      providers: ctx.config.providers,
+      tiers: ctx.config.tiers,
+    });
   },
 });
 

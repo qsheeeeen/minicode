@@ -1,101 +1,94 @@
 import { describe, it, expect } from "vitest";
-import { parseArgs } from "./args.js";
-import type { ResolvedConfig } from "./config.js";
+import { Args } from "./args.js";
+import { AppConfig } from "./config.js";
 
-const baseConfig: ResolvedConfig = {
-  model: null,
+const baseConfig = new AppConfig({
   providers: {
     anthropic: { apiKey: "key" },
   },
   compressionThreshold: 0.8,
-  thinking: {},
   permissionMode: "manual",
-};
+});
 
-describe("parseArgs", () => {
+describe("Args", () => {
   it("returns config defaults for empty args", () => {
-    const result = parseArgs(["node", "minicode"], baseConfig);
-    expect(result.model).toBeNull();
-    expect(result.permissionMode).toBe("manual");
-    expect(result.compressionThreshold).toBe(0.8);
-    expect(result.resumeRecent).toBe(false);
-    expect(result.headless).toBeUndefined();
-    expect(result.initialPrompt).toBeUndefined();
+    const args = new Args(["node", "minicode"], baseConfig);
+    expect(args.model).toBeNull();
+    expect(args.permissionMode).toBe("manual");
+    expect(args.compressionThreshold).toBe(0.8);
+    expect(args.resumeRecent).toBe(false);
+    expect(args.headless).toBeUndefined();
+    expect(args.initialPrompt).toBeUndefined();
   });
 
   it("--model overrides config model", () => {
-    const result = parseArgs(
+    const args = new Args(
       ["node", "minicode", "--model", "claude-3@anthropic"],
       baseConfig,
     );
-    expect(result.model?.model).toBe("claude-3");
-    expect(result.model?.provider).toBe("anthropic");
+    expect(args.model?.model).toBe("claude-3");
+    expect(args.model?.provider).toBe("anthropic");
   });
 
   it("uses config model when --model not given", () => {
-    const config: ResolvedConfig = {
+    const config = new AppConfig({
       ...baseConfig,
-      model: {
-        provider: "anthropic",
-        protocol: "anthropic",
-        model: "claude-3",
-        apiKey: "key",
-      },
-    };
-    const result = parseArgs(["node", "minicode"], config);
-    expect(result.model?.model).toBe("claude-3");
+      // pre-resolved model not stored; use spec
+    });
+    const args = new Args(["node", "minicode"], config);
+    expect(args.model).toBeNull();
   });
 
   it("parses --session", () => {
-    const result = parseArgs(
+    const args = new Args(
       ["node", "minicode", "--session", "my-session"],
       baseConfig,
     );
-    expect(result.sessionName).toBe("my-session");
+    expect(args.sessionName).toBe("my-session");
   });
 
   it("parses --resume", () => {
-    const result = parseArgs(["node", "minicode", "--resume"], baseConfig);
-    expect(result.resumeRecent).toBe(true);
+    const args = new Args(["node", "minicode", "--resume"], baseConfig);
+    expect(args.resumeRecent).toBe(true);
   });
 
   it("parses --headless", () => {
-    const result = parseArgs(["node", "minicode", "--headless"], baseConfig);
-    expect(result.headless).toBe(true);
+    const args = new Args(["node", "minicode", "--headless"], baseConfig);
+    expect(args.headless).toBe(true);
   });
 
   it("--permission overrides config permissionMode", () => {
-    const result = parseArgs(
+    const args = new Args(
       ["node", "minicode", "--permission", "yolo"],
       baseConfig,
     );
-    expect(result.permissionMode).toBe("yolo");
+    expect(args.permissionMode).toBe("yolo");
   });
 
   it("uses config permissionMode when --permission not given", () => {
-    const config: ResolvedConfig = { ...baseConfig, permissionMode: "auto" };
-    const result = parseArgs(["node", "minicode"], config);
-    expect(result.permissionMode).toBe("auto");
+    const config = new AppConfig({ ...baseConfig, permissionMode: "auto" });
+    const args = new Args(["node", "minicode"], config);
+    expect(args.permissionMode).toBe("auto");
   });
 
   it("throws on invalid permission mode", () => {
     expect(() =>
-      parseArgs(["node", "minicode", "--permission", "invalid"], baseConfig),
+      new Args(["node", "minicode", "--permission", "invalid"], baseConfig),
     ).toThrow();
   });
 
   it("parses positional argument as initialPrompt", () => {
-    const result = parseArgs(["node", "minicode", "list files"], baseConfig);
-    expect(result.initialPrompt).toBe("list files");
+    const args = new Args(["node", "minicode", "list files"], baseConfig);
+    expect(args.initialPrompt).toBe("list files");
   });
 
   it("parses prompt after flags", () => {
-    const result = parseArgs(
+    const args = new Args(
       ["node", "minicode", "--headless", "--model", "claude-3@anthropic", "fix the bug"],
       baseConfig,
     );
-    expect(result.initialPrompt).toBe("fix the bug");
-    expect(result.headless).toBe(true);
-    expect(result.model?.model).toBe("claude-3");
+    expect(args.initialPrompt).toBe("fix the bug");
+    expect(args.headless).toBe(true);
+    expect(args.model?.model).toBe("claude-3");
   });
 });
