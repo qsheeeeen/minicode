@@ -10,7 +10,13 @@ import { ChangeJournal } from "./change-journal.js";
 import { SessionPersistence } from "./session-persistence.js";
 import type { SessionStats } from "./session-stats.js";
 import type { MessageParam, StatusMessage } from "../messages.js";
-import type { StatusReporter } from "../utils/display.js";
+/**
+ * StatusReporter — callback for emitting UI status/error notifications.
+ * Defined here (SessionManager) because this is the primary owner of
+ * status reporting lifecycle. Other services (ContextManager, TokenTracker)
+ * receive it as a dependency.
+ */
+export type StatusReporter = (msg: Omit<StatusMessage, "turnIndex">) => void;
 
 export class SessionManager {
   private _currentSession: string;

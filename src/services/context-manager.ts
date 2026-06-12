@@ -14,7 +14,7 @@ import { TokenTracker } from "./token-tracker.js";
 import { CompressionService } from "./compression-service.js";
 import { ChangeJournal } from "./change-journal.js";
 import type { LLMContextManager } from "../llm-context-manager.js";
-import type { StatusReporter } from "../utils/display.js";
+import type { StatusReporter } from "./session-manager.js";
 
 export interface ContextManagerOpts {
   readonly contextLength: number;

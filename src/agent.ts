@@ -7,7 +7,7 @@ import {
   ToolDeniedError,
 } from "./tools/index.js";
 import type { ToolExecutor, ToolCall } from "./tools/executor.js";
-import type { UserPrompter } from "./utils/display.js";
+import type { UserPrompter } from "./tools/registry.js";
 import type { Signal } from "./utils/signal.js";
 import type { AgentRegistry } from "./services/agent-registry.js";
 import type { ContentBlock } from "./messages.js";

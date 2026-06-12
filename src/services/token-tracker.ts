@@ -1,5 +1,5 @@
 import type { SessionStats } from "./session-stats.js";
-import type { StatusReporter } from "../utils/display.js";
+import type { StatusReporter } from "./session-manager.js";
 import type { TokenUsage } from "../llm/client.js";
 import type { Signal } from "../utils/signal.js";
 

@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import type { DisplayMessage, Prompt } from "../../utils/display.js";
+import type { DisplayMessage } from "../../messages.js";
+import type { Prompt } from "../../tools/registry.js";
 import type { AgentSession, PermissionMode } from "../../services/index.js";
 import type { StatusMessage } from "../../messages.js";
 

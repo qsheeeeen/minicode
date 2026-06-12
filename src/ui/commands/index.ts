@@ -1,5 +1,5 @@
 import type { Agent } from "../../agent.js";
-import type { DisplayMessage } from "../../utils/display.js";
+import type { DisplayMessage } from "../../messages.js";
 import type { EffortLevel } from "../../llm/client.js";
 import type { Model } from "../../llm/model.js";
 import type { SessionStats } from "../../services/session-stats.js";

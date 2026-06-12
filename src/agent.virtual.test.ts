@@ -8,8 +8,8 @@ import {
 } from "./llm/virtual.js";
 import type { ScriptedResponse } from "./llm/virtual.js";
 import { createVirtualTool } from "./testing.js";
-import { CallbackPrompter } from "./utils/display.js";
-import type { ToolDef } from "./tools/registry.js";
+
+import type { ToolDef, UserPrompter } from "./tools/registry.js";
 import { SessionManager } from "./services/session-manager.js";
 import { ContextManager } from "./services/context-manager.js";
 import { PromptManager } from "./services/prompt-manager.js";
@@ -231,7 +231,7 @@ describe("Agent virtual integration", () => {
     );
     const tools = new Map<string, ToolDef>([["Dangerous", dangerousTool]]);
 
-    const prompter = new CallbackPrompter(async () => "no");
+    const prompter: UserPrompter = { prompt: async () => "no" };
 
     const model = new Model(
       new VirtualLLMClient([

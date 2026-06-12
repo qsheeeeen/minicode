@@ -3,7 +3,7 @@ import { Box, useInput, useApp } from "ink";
 import { Agent } from "../agent.js";
 import type { ResolvedConfig } from "../config.js";
 import type { DisplayMessage } from "../messages.js";
-import type { UserPrompter } from "../utils/display.js";
+import type { UserPrompter } from "../tools/registry.js";
 import { routeInput } from "./routing.js";
 import { processRoute } from "./route-handler.js";
 import {

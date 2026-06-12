@@ -9,6 +9,9 @@ export type {
   ToolResult,
   ToolExecutionContext,
   ToolRequirement,
+  UserPrompter,
+  Prompt,
+  PromptOption,
 } from "./registry.js";
 
 // Side-effect imports: each tool file registers itself via register()

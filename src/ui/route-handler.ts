@@ -1,6 +1,6 @@
 import type { RouteResult } from "./routing.js";
 import type { LLMContextManager } from "../llm-context-manager.js";
-import type { StatusReporter } from "../utils/display.js";
+import type { StatusReporter } from "../services/session-manager.js";
 import { runShell } from "../services/index.js";
 
 export interface ShellOutput {

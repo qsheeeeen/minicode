@@ -1,6 +1,6 @@
 import type { Agent } from "../agent.js";
 import type { ContentBlock } from "../messages.js";
-import type { Prompt } from "../utils/display.js";
+import type { Prompt } from "../tools/registry.js";
 import type { CommandContext } from "./commands/index.js";
 import { routeInput } from "./routing.js";
 import { processRoute } from "./route-handler.js";

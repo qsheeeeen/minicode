@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Box, Text, useInput } from "ink";
 import { useTuiStore, type TuiState, type TuiAction } from "./store.js";
-import type { PromptOption } from "../../utils/display.js";
+import type { PromptOption } from "../../tools/registry.js";
 
 function OptionList({
   options,

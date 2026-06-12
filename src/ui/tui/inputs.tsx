@@ -5,7 +5,7 @@ import type { ProviderConfig } from "../../config.js";
 import type { ChangeEntry } from "../../services/change-journal.js";
 import type { ChangeJournal } from "../../services/change-journal.js";
 import type { LLMContextManager } from "../../llm-context-manager.js";
-import type { StatusReporter } from "../../utils/display.js";
+import type { StatusReporter } from "../../services/session-manager.js";
 
 export interface InputComponentProps {
   onSubmit?: (value: string) => void;

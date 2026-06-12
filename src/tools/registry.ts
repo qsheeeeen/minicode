@@ -1,6 +1,27 @@
 import type { AgentRegistry } from "../services/agent-registry.js";
 import type { Model } from "../llm/model.js";
-import type { UserPrompter } from "../utils/display.js";
+
+/**
+ * UI interaction interfaces defined by the tool execution layer.
+ * Tools that need user interaction (e.g., AskUser, PermissionService)
+ * use UserPrompter to request input without knowing about the UI implementation.
+ */
+export interface PromptOption {
+  label: string;
+  value: string;
+  description?: string;
+}
+
+export interface Prompt {
+  message: string;
+  options: PromptOption[];
+  multiSelect?: boolean;
+}
+
+/** Request-response: agent asks, human answers. */
+export interface UserPrompter {
+  prompt(req: Prompt): Promise<string>;
+}
 
 export type ToolRequirement = "agentRegistry";
 

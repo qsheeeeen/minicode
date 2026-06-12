@@ -11,12 +11,19 @@
 import type { Agent } from "../../agent.js";
 import type { AgentRegistry } from "../../services/index.js";
 import type { SessionManager } from "../../services/session-manager.js";
-import { CallbackPrompter } from "../../utils/display.js";
-import type { UserPrompter } from "../../utils/display.js";
+import type { UserPrompter, Prompt } from "../../tools/registry.js";
 import type { MessageParam } from "../../messages.js";
 import { SessionPersistence } from "../../services/session-persistence.js";
 import type { Signal } from "../../utils/signal.js";
 import { useTuiStore } from "./store.js";
+
+/** UserPrompter implementation: resolves/rejects via Zustand store state. */
+class CallbackPrompter implements UserPrompter {
+  constructor(private onPrompt: (req: Prompt) => Promise<string>) {}
+  prompt(req: Prompt): Promise<string> {
+    return this.onPrompt(req);
+  }
+}
 
 export interface ConnectAgentOptions {
   agent: Agent;
