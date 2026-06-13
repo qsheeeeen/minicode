@@ -1,27 +1,22 @@
 import type { Agent } from "../../agent.js";
 import type { DisplayMessage } from "../../messages.js";
-import type { EffortLevel } from "../../llm/client.js";
 import type { Model } from "../../llm/model.js";
 import type { SessionStats } from "../../services/session-stats.js";
 import type { SessionManager } from "../../services/session-manager.js";
 import type { ChangeJournal } from "../../services/change-journal.js";
 import type { Signal } from "../../utils/signal.js";
-import type { MessageParam, StatusMessage } from "../../messages.js";
 import type { LLMContextManager } from "../../llm-context-manager.js";
 import type { AppConfig } from "../../config.js";
-import { SessionPersistence } from "../../services/session-persistence.js";
 import { getSkillBody, getAvailableSkills } from "../../skills/index.js";
-import { createLogger } from "../../utils/logger.js";
-import { switchSession } from "../../services/session-lifecycle.js";
+import {
+  registerCommand,
+  getCommand,
+  getCommandNames,
+  getAllCommands,
+} from "./registry.js";
 
-export interface CommandHandler {
-  name: string;
-  description: string;
-  // System command: directly manipulates app state
-  handler?: (args: string[], context: CommandContext) => Promise<void>;
-  // Prompt command: returns text to inject into agent conversation
-  prompt?: (args: string[]) => string;
-}
+export type { CommandHandler } from "./registry.js";
+export { registerCommand, getCommandNames } from "./registry.js";
 
 export interface CommandContext {
   agent: Agent;
@@ -41,20 +36,6 @@ export interface CommandContext {
   exit: () => void;
 }
 
-const commands = new Map<string, CommandHandler>();
-
-export function registerCommand(cmd: CommandHandler): void {
-  if (!cmd.handler && !cmd.prompt) {
-    throw new Error(`Command "${cmd.name}" must have either handler or prompt`);
-  }
-  if (cmd.handler && cmd.prompt) {
-    throw new Error(
-      `Command "${cmd.name}" cannot have both handler and prompt`,
-    );
-  }
-  commands.set(cmd.name, cmd);
-}
-
 export async function executeCommand(
   name: string,
   args: string[],
@@ -64,7 +45,7 @@ export async function executeCommand(
   promptText?: string;
   displayContent?: string;
 }> {
-  const cmd = commands.get(name);
+  const cmd = getCommand(name);
   if (cmd) {
     if (cmd.handler) {
       await cmd.handler(args, context);
@@ -92,17 +73,13 @@ export async function executeCommand(
   return { handled: false };
 }
 
-export function getCommandNames(): string[] {
-  return Array.from(commands.keys());
-}
-
 export function getCommandList(): Array<{ name: string; description: string }> {
-  const builtin = Array.from(commands.values()).map((cmd) => ({
+  const builtin = getAllCommands().map((cmd) => ({
     name: cmd.name,
     description: cmd.description,
   }));
   const skills = getAvailableSkills()
-    .filter((s) => !commands.has(s.name))
+    .filter((s) => !getCommandNames().includes(s.name))
     .map((s) => ({ name: s.name, description: s.description }));
   return [...builtin, ...skills].sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -116,268 +93,7 @@ export function getHelp(): string {
   return lines.join("\n");
 }
 
-registerCommand({
-  name: "exit",
-  description: "Exit the application",
-  handler: async (_args, ctx): Promise<void> => {
-    ctx.exit();
-  },
-});
-
-registerCommand({
-  name: "clear",
-  description: "Clear all history and start a new session",
-  handler: async (_args, ctx): Promise<void> => {
-    ctx.agent.clearSession();
-    ctx.tokenCount$.set(0);
-    const newSession = `session-${Date.now()}`;
-    await switchSession({
-      agent: ctx.agent,
-      sessionManager: ctx.sessionManager,
-      sessionName: newSession,
-      setCurrentSession: ctx.setCurrentSession,
-      sessionStats: ctx.sessionStats,
-      statusMessage: "(Cleared)",
-    });
-  },
-});
-
-registerCommand({
-  name: "compress",
-  description: "Compress conversation history",
-  handler: async (_args, ctx): Promise<void> => {
-    await ctx.agent.compress();
-    ctx.sessionManager.reportStatus({
-      role: "status",
-      content: "(Compression complete)",
-      timestamp: new Date(),
-    });
-  },
-});
-
-registerCommand({
-  name: "effort",
-  description: "Set thinking effort (low|medium|high|xhigh|max)",
-  handler: async (args, ctx): Promise<void> => {
-    const value = args[0]?.toLowerCase();
-    const valid = ["low", "medium", "high", "xhigh", "max"] as const;
-    if (!value || !(valid as readonly string[]).includes(value)) {
-      // Show effort selection UI
-      ctx.setInputMode("effort-select");
-      return;
-    }
-    ctx.model.setEffort(value as EffortLevel);
-    await ctx.config.setEffort(value as EffortLevel);
-    ctx.sessionManager.reportStatus({
-      role: "status",
-      content: `(Effort set to: ${value})`,
-      timestamp: new Date(),
-    });
-  },
-});
-
-registerCommand({
-  name: "new",
-  description: "Create a new session",
-  handler: async (args, ctx): Promise<void> => {
-    const name = args.join(" ");
-    if (name) {
-      ctx.agent.clearSession();
-      await switchSession({
-        agent: ctx.agent,
-        sessionManager: ctx.sessionManager,
-        sessionName: name,
-        setCurrentSession: ctx.setCurrentSession,
-        sessionStats: ctx.sessionStats,
-        statusMessage: `Created session: ${name}`,
-      });
-    }
-  },
-});
-
-registerCommand({
-  name: "rename",
-  description: "Rename current session",
-  handler: async (args, ctx): Promise<void> => {
-    const newName = args.join(" ");
-    if (newName) {
-      const oldName = ctx.agent.currentSession;
-      await SessionPersistence.rename(oldName, newName);
-      const newLogger = await createLogger(
-        SessionPersistence.getProjectHash(),
-        newName,
-      );
-      ctx.sessionManager.setSession(newName);
-      ctx.agent.logger = newLogger;
-      ctx.setCurrentSession(newName);
-      ctx.sessionManager.reportStatus({
-        role: "status",
-        content: `Renamed: ${oldName} -> ${newName}`,
-        timestamp: new Date(),
-      });
-    }
-  },
-});
-
-registerCommand({
-  name: "resume",
-  description: "Load a session (without args: list sessions)",
-  handler: async (args, ctx): Promise<void> => {
-    if (args.length === 0) {
-      const sessions = await SessionPersistence.list();
-      ctx.setInputMode("session-list", { sessions });
-    } else {
-      const name = args[0];
-      const data = await SessionPersistence.load(name);
-      if (data) {
-        ctx.context.setTurns(data.messages);
-        const totalTokens = data.totalTokens || 0;
-        if (totalTokens > 0) {
-          ctx.tokenCount$.set(totalTokens);
-        }
-        await switchSession({
-          agent: ctx.agent,
-          sessionManager: ctx.sessionManager,
-          sessionName: name,
-          setCurrentSession: ctx.setCurrentSession,
-          sessionStats: ctx.sessionStats,
-          statusMessage: `Loaded session: ${name}`,
-        });
-      } else {
-        ctx.sessionManager.reportStatus({
-          role: "error",
-          content: `Session not found: ${name}`,
-          timestamp: new Date(),
-        });
-      }
-    }
-  },
-});
-
-registerCommand({
-  name: "plan",
-  description: "Turn the current discussion into an executable plan",
-  prompt: () => {
-    return "Based on our discussion so far, produce a concrete, step-by-step executable plan. For each step, specify what to do and how to verify it works. Do NOT start implementing — only output the plan.";
-  },
-});
-
-registerCommand({
-  name: "test",
-  description: "Run a simple test across all available tools",
-  prompt: () => {
-    return "Ignore the project context. Run a simple smoke test of your available tools, use each tool once with minimal inputs, and report pass/fail for each.";
-  },
-});
-
-registerCommand({
-  name: "skills",
-  description: "List available skills",
-  handler: async (_args, ctx): Promise<void> => {
-    const skills = getAvailableSkills();
-    if (skills.length === 0) {
-      ctx.sessionManager.reportStatus({
-        role: "status",
-        content: "(No skills available)",
-        timestamp: new Date(),
-      });
-      return;
-    }
-
-    const { createElement: el } = await import("react");
-    const { Box, Text } = await import("ink");
-
-    const skillElements = skills.map((skill) =>
-      el(
-        Box,
-        { key: skill.name, flexDirection: "row" },
-        el(Box, { width: 25 }, el(Text, { color: "cyan" }, `  /${skill.name}`)),
-        el(
-          Box,
-          { flexGrow: 1, flexShrink: 1 },
-          el(
-            Text,
-            { wrap: "truncate", dimColor: true },
-            `- ${skill.description}`,
-          ),
-        ),
-      ),
-    );
-
-    const element = el(
-      Box,
-      { flexDirection: "column", paddingY: 1 },
-      el(Text, { bold: true }, "Available skills:"),
-      ...skillElements,
-    );
-
-    const lines = ["Available skills:"];
-    for (const skill of skills) {
-      lines.push(`  /${skill.name} - ${skill.description}`);
-    }
-
-    ctx.sessionManager.reportStatus({
-      role: "status",
-      content: lines.join("\n"),
-      element,
-      timestamp: new Date(),
-    });
-  },
-});
-
-registerCommand({
-  name: "model",
-  description: "Switch model/provider",
-  handler: async (_args, ctx): Promise<void> => {
-    ctx.setInputMode("model-select", {
-      providers: ctx.config.providers,
-      tiers: ctx.config.tiers,
-    });
-  },
-});
-
-registerCommand({
-  name: "undo",
-  description: "Rollback to a previous conversation turn",
-  handler: async (_args, ctx): Promise<void> => {
-    if (ctx.agent.isRunning) {
-      ctx.sessionManager.reportStatus({
-        role: "status",
-        content: "(Agent is running, please wait)",
-        timestamp: new Date(),
-      });
-      return;
-    }
-
-    const turns = ctx.context.getTurns();
-    const userMessages: string[] = [];
-    for (const t of turns) {
-      if (t.role === "user" && typeof t.content === "string") {
-        userMessages.push(t.content);
-      }
-    }
-
-    if (userMessages.length === 0) {
-      ctx.sessionManager.reportStatus({
-        role: "status",
-        content: "(Nothing to rollback)",
-        timestamp: new Date(),
-      });
-      return;
-    }
-
-    const entriesByTurnMap = await ctx.changeJournal.getEntriesByTurn();
-    const entriesByTurn = Array.from(entriesByTurnMap.entries()).map(
-      ([turnIdx, entries]) => ({ turnIdx, entries }),
-    );
-
-    ctx.setInputMode("undo", {
-      totalTurns: userMessages.length,
-      entriesByTurn,
-      userMessages,
-      changeJournal: ctx.changeJournal,
-      context: ctx.context,
-      reportStatus: ctx.sessionManager.reportStatus.bind(ctx.sessionManager),
-    });
-  },
-});
+// Side-effect import: registers all builtin commands.
+// registry.ts has no circular dependency on this file, so builtin/*.ts
+// can safely import from registry.ts.
+import "./builtin/index.js";
