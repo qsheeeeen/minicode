@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { PermissionService } from "./permission.js";
+import { PermissionService, AutoPermissionStrategy } from "./permission.js";
 import type { LLMClient } from "../llm/client.js";
 
 describe("PermissionService", () => {
@@ -104,14 +104,14 @@ describe("PermissionService", () => {
     });
   });
 
-  describe("autoDecide", () => {
+  describe("AutoPermissionStrategy", () => {
     beforeEach(() => {
       vi.clearAllMocks();
     });
 
     it("returns allowed: false and reason when client is not set", async () => {
-      const service = new PermissionService("auto");
-      const result = await (service as any).autoDecide("Shell", {
+      const strategy = new AutoPermissionStrategy();
+      const result = await strategy.check("Shell", {
         command: "ls",
       });
       expect(result).toEqual({
@@ -129,13 +129,9 @@ describe("PermissionService", () => {
           }),
         }),
       } as unknown as LLMClient;
-      const service = new PermissionService(
-        "auto",
-        mockClient,
-        "claude-3",
-      );
+      const strategy = new AutoPermissionStrategy(mockClient, "claude-3");
 
-      const result = await (service as any).autoDecide("Read", {
+      const result = await strategy.check("Read", {
         path: "a.txt",
       });
 
@@ -160,9 +156,9 @@ describe("PermissionService", () => {
           }),
         }),
       } as unknown as LLMClient;
-      const service = new PermissionService("auto", mockClient);
+      const strategy = new AutoPermissionStrategy(mockClient);
 
-      const result = await (service as any).autoDecide("Shell", {
+      const result = await strategy.check("Shell", {
         command: "rm -rf /",
       });
 
@@ -183,9 +179,9 @@ describe("PermissionService", () => {
           }),
         }),
       } as unknown as LLMClient;
-      const service = new PermissionService("auto", mockClient);
+      const strategy = new AutoPermissionStrategy(mockClient);
 
-      const result = await (service as any).autoDecide("Shell", {
+      const result = await strategy.check("Shell", {
         command: "echo hello",
       });
 
@@ -201,9 +197,9 @@ describe("PermissionService", () => {
           }),
         }),
       } as unknown as LLMClient;
-      const service = new PermissionService("auto", mockClient);
+      const strategy = new AutoPermissionStrategy(mockClient);
 
-      const result = await (service as any).autoDecide("Shell", {
+      const result = await strategy.check("Shell", {
         command: "ls",
       });
 
@@ -216,9 +212,9 @@ describe("PermissionService", () => {
           next: vi.fn().mockRejectedValue(new Error("API error")),
         }),
       } as unknown as LLMClient;
-      const service = new PermissionService("auto", mockClient);
+      const strategy = new AutoPermissionStrategy(mockClient);
 
-      const result = await (service as any).autoDecide("Shell", {
+      const result = await strategy.check("Shell", {
         command: "ls",
       });
 

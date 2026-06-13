@@ -6,75 +6,79 @@ export type PermissionMode = "manual" | "yolo" | "auto";
 
 const MODES: PermissionMode[] = ["manual", "yolo", "auto"];
 
-export class PermissionService {
-  private mode: PermissionMode;
-  private client?: LLMClient;
-  private model?: string;
+export interface PermissionCheckResult {
+  allowed: boolean;
+  reason?: string;
+}
 
-  constructor(
-    initialMode: PermissionMode,
-    client?: LLMClient,
-    model?: string,
-  ) {
-    this.mode = initialMode;
-    this.client = client;
-    this.model = model;
-  }
-
-  getMode(): PermissionMode {
-    return this.mode;
-  }
-
-  setMode(mode: PermissionMode): void {
-    this.mode = mode;
-  }
-
-  cycleMode(): PermissionMode {
-    const idx = MODES.indexOf(this.mode);
-    this.mode = MODES[(idx + 1) % MODES.length];
-    return this.mode;
-  }
-
-  async check(
+export interface PermissionStrategy {
+  check(
     toolName: string,
     toolInput: Record<string, unknown>,
     displayText: string,
     prompter?: UserPrompter,
-  ): Promise<{ allowed: boolean; reason?: string }> {
-    switch (this.mode) {
-      case "yolo":
-        return { allowed: true };
-      case "manual": {
-        const answer = await prompter?.prompt({
-          message: `Allow tool execution?\n${displayText}`,
-          options: [
-            { label: "Yes", value: "yes" },
-            { label: "No", value: "no" },
-            { label: "Yes to all", value: "yolo" },
-          ],
-        });
-        if (!answer) return { allowed: false, reason: "User cancelled" }; // empty = cancelled via Esc/Ctrl+C
-        if (answer === "yolo") {
-          this.setMode("yolo");
-          return { allowed: true };
-        }
-        if (answer === "yes") return { allowed: true };
-        return { allowed: false, reason: "User rejected" };
-      }
-      case "auto":
-        return this.autoDecide(toolName, toolInput);
-    }
-  }
+  ): Promise<PermissionCheckResult>;
+}
 
-  private async autoDecide(
+const strategies = new Map<PermissionMode, PermissionStrategy>();
+
+export function registerPermissionStrategy(
+  mode: PermissionMode,
+  strategy: PermissionStrategy,
+): void {
+  strategies.set(mode, strategy);
+}
+
+export function getPermissionStrategy(mode: PermissionMode): PermissionStrategy | undefined {
+  return strategies.get(mode);
+}
+
+// ── Built-in strategies ────────────────────────────────────────────────────
+
+export class YoloPermissionStrategy implements PermissionStrategy {
+  async check(): Promise<PermissionCheckResult> {
+    return { allowed: true };
+  }
+}
+
+export class ManualPermissionStrategy implements PermissionStrategy {
+  async check(
+    _toolName: string,
+    _toolInput: Record<string, unknown>,
+    displayText: string,
+    prompter?: UserPrompter,
+  ): Promise<PermissionCheckResult> {
+    const answer = await prompter?.prompt({
+      message: `Allow tool execution?\n${displayText}`,
+      options: [
+        { label: "Yes", value: "yes" },
+        { label: "No", value: "no" },
+        { label: "Yes to all", value: "yolo" },
+      ],
+    });
+    if (!answer) return { allowed: false, reason: "User cancelled" };
+    if (answer === "yolo") return { allowed: true, reason: "yolo" };
+    if (answer === "yes") return { allowed: true };
+    return { allowed: false, reason: "User rejected" };
+  }
+}
+
+export class AutoPermissionStrategy implements PermissionStrategy {
+  constructor(
+    private readonly client?: LLMClient,
+    private readonly model?: string,
+  ) {}
+
+  async check(
     toolName: string,
     toolInput: Record<string, unknown>,
-  ): Promise<{ allowed: boolean; reason?: string }> {
-    if (!this.client)
+  ): Promise<PermissionCheckResult> {
+    if (!this.client) {
       return {
         allowed: false,
         reason: "No LLM client configured for auto-permission",
       };
+    }
 
     try {
       const prompt = `You are a permission gate for a coding agent. Decide if this tool execution should be allowed.
@@ -126,5 +130,52 @@ Reply with exactly one of:
         reason: `Error during auto-permission check: ${e instanceof Error ? e.message : String(e)}`,
       };
     }
+  }
+}
+
+// Register built-in strategies
+registerPermissionStrategy("yolo", new YoloPermissionStrategy());
+registerPermissionStrategy("manual", new ManualPermissionStrategy());
+
+export class PermissionService {
+  private mode: PermissionMode;
+
+  constructor(
+    initialMode: PermissionMode,
+    client?: LLMClient,
+    model?: string,
+  ) {
+    this.mode = initialMode;
+    // Ensure auto strategy is registered with the provided client/model.
+    if (!strategies.has("auto")) {
+      registerPermissionStrategy("auto", new AutoPermissionStrategy(client, model));
+    }
+  }
+
+  getMode(): PermissionMode {
+    return this.mode;
+  }
+
+  setMode(mode: PermissionMode): void {
+    this.mode = mode;
+  }
+
+  cycleMode(): PermissionMode {
+    const idx = MODES.indexOf(this.mode);
+    this.mode = MODES[(idx + 1) % MODES.length];
+    return this.mode;
+  }
+
+  async check(
+    toolName: string,
+    toolInput: Record<string, unknown>,
+    displayText: string,
+    prompter?: UserPrompter,
+  ): Promise<PermissionCheckResult> {
+    const strategy = strategies.get(this.mode);
+    if (!strategy) {
+      return { allowed: false, reason: `Unknown permission mode: ${this.mode}` };
+    }
+    return strategy.check(toolName, toolInput, displayText, prompter);
   }
 }
