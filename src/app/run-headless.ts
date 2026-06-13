@@ -1,0 +1,14 @@
+import type { AppRuntime } from "./types.js";
+import { runHeadless } from "../ui/headless.js";
+
+export async function runHeadlessApp(app: AppRuntime): Promise<void> {
+  await runHeadless(
+    app.agent,
+    app.initialPrompt,
+    app.sessionManager,
+    app.tokenCount$,
+    app.sessionName,
+    app.resumeRecent,
+    app.commandContext,
+  );
+}

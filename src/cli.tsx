@@ -4,8 +4,8 @@ import { fileURLToPath } from "url";
 import { AppConfig } from "./config.js";
 import { Args } from "./args.js";
 import { createApp } from "./app/create-app.js";
-import { HeadlessSurface } from "./surfaces/headless-surface.js";
-import { TuiSurface } from "./surfaces/tui-surface.js";
+import { runHeadlessApp } from "./app/run-headless.js";
+import { runTuiApp } from "./app/run-tui.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -38,8 +38,8 @@ try {
 }
 
 if (runtime.headless) {
-  await new HeadlessSurface().run(runtime);
+  await runHeadlessApp(runtime);
   process.exit(0);
 }
 
-await new TuiSurface().run(runtime);
+await runTuiApp(runtime);

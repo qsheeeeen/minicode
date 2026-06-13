@@ -1,12 +1,12 @@
 import { describe, it, expect, vi } from "vitest";
-import { HeadlessSurface } from "./headless-surface.js";
+import { runHeadlessApp } from "./run-headless.js";
 import { runHeadless } from "../ui/headless.js";
 
 vi.mock("../ui/headless.js", () => ({
   runHeadless: vi.fn().mockResolvedValue(undefined),
 }));
 
-function makeRuntime() {
+function makeApp() {
   return {
     agent: { id: "agent" },
     initialPrompt: "hello",
@@ -18,20 +18,20 @@ function makeRuntime() {
   } as any;
 }
 
-describe("HeadlessSurface", () => {
-  it("runs the headless adapter with runtime dependencies", async () => {
-    const runtime = makeRuntime();
+describe("runHeadlessApp", () => {
+  it("runs the headless adapter with app dependencies", async () => {
+    const app = makeApp();
 
-    await new HeadlessSurface().run(runtime);
+    await runHeadlessApp(app);
 
     expect(runHeadless).toHaveBeenCalledWith(
-      runtime.agent,
-      runtime.initialPrompt,
-      runtime.sessionManager,
-      runtime.tokenCount$,
-      runtime.sessionName,
-      runtime.resumeRecent,
-      runtime.commandContext,
+      app.agent,
+      app.initialPrompt,
+      app.sessionManager,
+      app.tokenCount$,
+      app.sessionName,
+      app.resumeRecent,
+      app.commandContext,
     );
   });
 });

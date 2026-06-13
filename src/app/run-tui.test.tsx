@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { render } from "ink";
-import { TuiSurface } from "./tui-surface.js";
+import { runTuiApp } from "./run-tui.js";
 
 vi.mock("ink", async (importOriginal) => ({
   ...(await importOriginal<typeof import("ink")>()),
@@ -11,7 +11,7 @@ vi.mock("../ui/tui.js", () => ({
   App: () => null,
 }));
 
-function makeRuntime() {
+function makeApp() {
   const sessionManager = {
     getContext: vi.fn().mockReturnValue({ id: "context" }),
   };
@@ -34,15 +34,15 @@ function makeRuntime() {
   } as any;
 }
 
-describe("TuiSurface", () => {
+describe("runTuiApp", () => {
   it("renders the TUI app", async () => {
-    const runtime = makeRuntime();
+    const app = makeApp();
 
-    await new TuiSurface().run(runtime);
+    await runTuiApp(app);
 
     expect(render).toHaveBeenCalledWith(expect.anything(), {
       exitOnCtrlC: false,
     });
-    expect(runtime.sessionManager.getContext).toHaveBeenCalled();
+    expect(app.sessionManager.getContext).toHaveBeenCalled();
   });
 });
