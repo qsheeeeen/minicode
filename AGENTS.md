@@ -130,7 +130,7 @@ src/
 
 **Zustand + connect-agent bridge:** TUI state lives in a Zustand store (`store.tsx`) that wraps a `tuiReducer`. `connectAgent()` wires Agent-domain observables to Zustand dispatches — components are pure views reading via selectors. No React Context.
 
-**Multi-provider LLM:** `LLMClient` interface with protocol registry in `client.ts`. Registered protocols: `anthropic`, `openai` (Chat Completions), `openai-responses` (Responses API). Unknown protocols fall back to Anthropic-compatible. `createClient(protocol, apiKey, baseURL)` factory. `LLMStream` is `AsyncGenerator<StreamEvent, LLMResponse, unknown>` — providers return real async generators, not wrapper objects.
+**Multi-provider LLM:** `LLMClient` interface with protocol registry in `client.ts`. Registered protocols: `anthropic`, `openai` (Chat Completions), `openai-responses` (Responses API). Unknown protocols throw an error; register a new protocol via `registerProtocol()` to extend support. `createClient(protocol, apiKey, baseURL)` factory. `LLMStream` is `AsyncGenerator<StreamEvent, LLMResponse, unknown>` — providers return real async generators, not wrapper objects.
 
 **Agent dependency injection:** Agent constructor accepts optional `client?: LLMClient` and `tools?: Map<string, ToolDef>`. Combined with `VirtualLLMClient` (from `llm/virtual.ts`) and `createVirtualTool()` (from `testing.ts`), this enables full agent loop testing without real LLM calls.
 
