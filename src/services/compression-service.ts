@@ -2,7 +2,15 @@ import type { LLMClient } from "../llm/client.js";
 import type { LLMResponse } from "../llm/client.js";
 import type { MessageParam, TextBlock } from "../messages.js";
 
-export class CompressionService {
+export interface CompressionStrategy {
+  compress(
+    messages: MessageParam[],
+    client: LLMClient,
+    model: string | undefined,
+  ): Promise<MessageParam[]>;
+}
+
+export class SummaryCompressionStrategy implements CompressionStrategy {
   private readonly recentCount = 10;
 
   async compress(
@@ -91,3 +99,6 @@ ${conversationText}`;
     return "Conversation summary unavailable";
   }
 }
+
+/** @deprecated Use SummaryCompressionStrategy instead. */
+export const CompressionService = SummaryCompressionStrategy;

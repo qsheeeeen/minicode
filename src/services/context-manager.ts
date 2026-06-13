@@ -11,7 +11,10 @@ import type { Model } from "../llm/model.js";
 import type { SessionStats } from "./session-stats.js";
 import { Signal } from "../utils/signal.js";
 import { TokenTracker } from "./token-tracker.js";
-import { CompressionService } from "./compression-service.js";
+import {
+  SummaryCompressionStrategy,
+  type CompressionStrategy,
+} from "./compression-service.js";
 import { ChangeJournal } from "./change-journal.js";
 import type { LLMContextManager } from "../llm-context-manager.js";
 import type { StatusReporter } from "./session-manager.js";
@@ -23,6 +26,7 @@ export interface ContextManagerOpts {
   readonly contextManager: LLMContextManager;
   readonly statusReporter: StatusReporter;
   readonly sessionStats?: SessionStats;
+  readonly compressionStrategy?: CompressionStrategy;
 }
 
 export interface CompressDeps {
@@ -35,7 +39,7 @@ export interface CompressDeps {
 
 export class ContextManager {
   private tokenTracker: TokenTracker;
-  private compressionService = new CompressionService();
+  private compressionService: CompressionStrategy;
   private isCompressing = false;
   readonly tokenCount$: Signal<number>;
   private statusReporter: StatusReporter;
@@ -43,6 +47,8 @@ export class ContextManager {
   constructor(opts: ContextManagerOpts) {
     this.tokenCount$ = opts.tokenCount$;
     this.statusReporter = opts.statusReporter;
+    this.compressionService =
+      opts.compressionStrategy ?? new SummaryCompressionStrategy();
     this.tokenTracker = new TokenTracker(
       opts.contextLength,
       opts.compressionThresholdRatio,
