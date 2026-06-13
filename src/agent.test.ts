@@ -165,7 +165,7 @@ vi.mock("./services/token-tracker.js", () => ({
 }));
 
 vi.mock("./services/compression-service.js", () => ({
-  CompressionService: vi.fn().mockImplementation(function () {
+  SummaryCompressionStrategy: vi.fn().mockImplementation(function () {
     return {
       compress: vi
         .fn()
