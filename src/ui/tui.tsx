@@ -159,7 +159,9 @@ function AppContent({
       config,
       context,
       sessionManager,
-      changeJournal: sessionManager.getChangeJournal(),
+      get changeJournal() {
+        return sessionManager.getChangeJournal();
+      },
       tokenCount$,
       sessionStats,
       modelSwitchService,

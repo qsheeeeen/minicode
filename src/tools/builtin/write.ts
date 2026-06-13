@@ -1,7 +1,13 @@
-import fs from "fs/promises";
-import path from "path";
-import type { ToolDef, ToolResult } from "../registry.js";
+import {
+  createDefaultFileSystemService,
+  type FileSystemService,
+} from "../../services/filesystem.js";
+import type { ToolDef, ToolExecutionContext, ToolResult } from "../registry.js";
 import { register } from "../registry.js";
+
+function getFileSystem(context?: ToolExecutionContext): FileSystemService {
+  return context?.services?.fs ?? createDefaultFileSystemService();
+}
 
 export const writeTool: ToolDef = {
   name: "Write",
@@ -19,13 +25,14 @@ export const writeTool: ToolDef = {
     },
     required: ["path", "content"],
   },
-  execute: async (args: Record<string, unknown>): Promise<ToolResult> => {
+  execute: async (
+    args: Record<string, unknown>,
+    context?: ToolExecutionContext,
+  ): Promise<ToolResult> => {
     try {
       const filePath = args.path as string;
       const content = args.content as string;
-      const dir = path.dirname(filePath);
-      await fs.mkdir(dir, { recursive: true });
-      await fs.writeFile(filePath, content, "utf-8");
+      await getFileSystem(context).writeText(filePath, content);
       return { output: `Wrote ${filePath}` };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

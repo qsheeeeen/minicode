@@ -19,7 +19,10 @@ function makeTool(overrides?: Partial<ToolDef>): ToolDef {
 
 function makeExecutor(overrides?: {
   tools?: Map<string, ToolDef>;
-  permissionMode?: PermissionService["getMode"] extends () => infer R ? R : never;
+  permissionMode?: PermissionService["getMode"] extends () => infer R
+    ? R
+    : never;
+  getChangeJournal?: () => ChangeJournal;
 }) {
   const tools = overrides?.tools ?? new Map([["testTool", makeTool()]]);
   const permissionService = new PermissionService(
@@ -30,7 +33,7 @@ function makeExecutor(overrides?: {
   const executor = new ToolExecutor({
     tools,
     permissionService,
-    changeJournal,
+    getChangeJournal: overrides?.getChangeJournal ?? (() => changeJournal),
     context,
   });
   return { executor, tools, permissionService, context, changeJournal };
@@ -43,7 +46,7 @@ function makeContext(): ToolExecutionContext {
       model: {
         getName: () => "test-model",
         getProvider: () => "test",
-        getClient: () => ({} as any),
+        getClient: () => ({}) as any,
         getContextLength: () => 200000,
         getEffort: () => undefined,
         setEffort: () => {},
@@ -62,7 +65,12 @@ function makeToolCall(
   input: Record<string, unknown> = {},
 ): ToolCall {
   return {
-    block: { type: "tool_use" as const, id: "call_1", name: tool?.name ?? "unknown", input },
+    block: {
+      type: "tool_use" as const,
+      id: "call_1",
+      name: tool?.name ?? "unknown",
+      input,
+    },
     tool,
   };
 }
@@ -101,11 +109,7 @@ describe("ToolExecutor", () => {
       });
       const spy = vi.spyOn(context, "addToolResults");
 
-      await executor.execute(
-        [makeToolCall(tool)],
-        makeContext(),
-        1,
-      );
+      await executor.execute([makeToolCall(tool)], makeContext(), 1);
 
       expect(tool.execute).toHaveBeenCalled();
       expect(spy).toHaveBeenCalledWith([
@@ -117,14 +121,13 @@ describe("ToolExecutor", () => {
       const { executor, context } = makeExecutor({ tools: new Map() });
       const spy = vi.spyOn(context, "addToolResults");
 
-      await executor.execute(
-        [makeToolCall(undefined)],
-        makeContext(),
-        1,
-      );
+      await executor.execute([makeToolCall(undefined)], makeContext(), 1);
 
       expect(spy).toHaveBeenCalledWith([
-        { toolUseId: "call_1", content: "Error: Tool 'unknown' not found or not available." },
+        {
+          toolUseId: "call_1",
+          content: "Error: Tool 'unknown' not found or not available.",
+        },
       ]);
     });
 
@@ -168,7 +171,10 @@ describe("ToolExecutor", () => {
       await executor.execute([makeToolCall(tool)], makeContext(), 1);
 
       expect(spy).toHaveBeenCalledWith([
-        { toolUseId: "call_1", content: "Tool execution denied by auto-gate: too risky" },
+        {
+          toolUseId: "call_1",
+          content: "Tool execution denied by auto-gate: too risky",
+        },
       ]);
     });
 
@@ -212,6 +218,38 @@ describe("ToolExecutor", () => {
         { toolUseId: "call_1", content: "ok" },
         { toolUseId: "call_1", content: "ok" },
       ]);
+    });
+
+    it("records tracked changes through the latest change journal getter", async () => {
+      const tool = makeTool({
+        readOnly: false,
+        trackChanges: true,
+        changeOp: "write",
+      });
+      const firstJournal = new ChangeJournal();
+      const secondJournal = new ChangeJournal();
+      const firstSpy = vi.spyOn(firstJournal, "recordBefore");
+      const secondSpy = vi.spyOn(secondJournal, "recordBefore");
+      let currentJournal = firstJournal;
+      const { executor } = makeExecutor({
+        tools: new Map([["testTool", tool]]),
+        getChangeJournal: () => currentJournal,
+      });
+
+      currentJournal = secondJournal;
+      await executor.execute(
+        [makeToolCall(tool, { path: "/tmp/minicode-missing-file" })],
+        makeContext(),
+        1,
+      );
+
+      expect(firstSpy).not.toHaveBeenCalled();
+      expect(secondSpy).toHaveBeenCalledWith(
+        1,
+        "/tmp/minicode-missing-file",
+        "write",
+        "",
+      );
     });
   });
 });

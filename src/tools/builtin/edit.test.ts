@@ -1,12 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { editTool } from "./edit.js";
 
-vi.mock("fs/promises", () => ({
-  default: {
-    readFile: vi.fn(),
-    writeFile: vi.fn().mockResolvedValue(undefined),
-  },
-}));
+function makeContext() {
+  return {
+    services: {
+      fs: {
+        editText: vi.fn().mockResolvedValue({
+          path: "/workspace/test.txt",
+          oldText: "world",
+          newText: "minicode",
+          content: "hello minicode",
+          count: 1,
+        }),
+      },
+    },
+  } as any;
+}
 
 describe("editTool", () => {
   beforeEach(() => {
@@ -15,91 +24,63 @@ describe("editTool", () => {
 
   describe("execute", () => {
     it("replaces oldText with newText", async () => {
-      const fs = await import("fs/promises");
-      (fs.default.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(
-        "hello world",
+      const context = makeContext();
+
+      const result = await editTool.execute(
+        {
+          path: "test.txt",
+          oldText: "world",
+          newText: "minicode",
+        },
+        context,
       );
-      const result = await editTool.execute({
-        path: "test.txt",
-        oldText: "world",
-        newText: "minicode",
-      });
+
       expect(result.output).toContain("Edited test.txt");
-      expect(fs.default.writeFile).toHaveBeenCalledWith(
+      expect(context.services.fs.editText).toHaveBeenCalledWith(
         "test.txt",
-        "hello minicode",
-        "utf-8",
+        "world",
+        "minicode",
+        undefined,
       );
     });
 
-    it("errors when oldText appears multiple times without replaceAll", async () => {
-      const fs = await import("fs/promises");
-      (fs.default.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(
-        "foo bar foo",
+    it("passes replaceAll to the file system service", async () => {
+      const context = makeContext();
+
+      await editTool.execute(
+        {
+          path: "test.txt",
+          oldText: "foo",
+          newText: "baz",
+          replaceAll: true,
+        },
+        context,
       );
-      const result = await editTool.execute({
-        path: "test.txt",
-        oldText: "foo",
-        newText: "baz",
-      });
-      expect(result.output).toContain("found 2 times");
+
+      expect(context.services.fs.editText).toHaveBeenCalledWith(
+        "test.txt",
+        "foo",
+        "baz",
+        true,
+      );
     });
 
-    it("replaces all occurrences with replaceAll=true", async () => {
-      const fs = await import("fs/promises");
-      (fs.default.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(
-        "foo bar foo",
+    it("returns edit errors", async () => {
+      const context = makeContext();
+      context.services.fs.editText.mockRejectedValue(
+        new Error("oldText not found in file"),
       );
-      await editTool.execute({
-        path: "test.txt",
-        oldText: "foo",
-        newText: "baz",
-        replaceAll: true,
-      });
-      const written = (fs.default.writeFile as ReturnType<typeof vi.fn>).mock
-        .calls[0][1];
-      expect(written).toBe("baz bar baz");
-    });
 
-    it("replaces single occurrence without replaceAll", async () => {
-      const fs = await import("fs/promises");
-      (fs.default.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(
-        "foo bar baz",
+      const result = await editTool.execute(
+        {
+          path: "test.txt",
+          oldText: "notfound",
+          newText: "replacement",
+        },
+        context,
       );
-      await editTool.execute({
-        path: "test.txt",
-        oldText: "foo",
-        newText: "qux",
-      });
-      const written = (fs.default.writeFile as ReturnType<typeof vi.fn>).mock
-        .calls[0][1];
-      expect(written).toBe("qux bar baz");
-    });
 
-    it("throws when oldText not found", async () => {
-      const fs = await import("fs/promises");
-      (fs.default.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(
-        "hello world",
-      );
-      const result = await editTool.execute({
-        path: "test.txt",
-        oldText: "notfound",
-        newText: "replacement",
-      });
       expect(result.output).toContain("oldText not found");
-    });
-
-    it("returns error when file not found", async () => {
-      const fs = await import("fs/promises");
-      (fs.default.readFile as ReturnType<typeof vi.fn>).mockRejectedValue(
-        new Error("ENOENT"),
-      );
-      const result = await editTool.execute({
-        path: "nonexistent.txt",
-        oldText: "old",
-        newText: "new",
-      });
-      expect(result.output).toContain("ENOENT");
     });
   });
 });

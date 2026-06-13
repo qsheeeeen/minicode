@@ -6,6 +6,7 @@ import { ContextManager } from "./services/context-manager.js";
 import { PromptManager } from "./services/prompt-manager.js";
 import { ToolExecutor } from "./tools/executor.js";
 import { PermissionService } from "./services/permission.js";
+import { SessionPersistence } from "./services/session-persistence.js";
 import { Signal } from "./utils/signal.js";
 import { getAll } from "./tools/index.js";
 
@@ -42,7 +43,7 @@ function makeAgent(overrides?: {
   const toolExecutor = new ToolExecutor({
     tools: getAll(),
     permissionService,
-    changeJournal: sessionManager.getChangeJournal(),
+    getChangeJournal: () => sessionManager.getChangeJournal(),
     context,
   });
   const agent = new Agent({
@@ -92,7 +93,9 @@ class MockStream implements AsyncIterable<any> {
 
   private end() {
     this.isDone = true;
-    const fakeResponse = { usage: { input: { total: 10, cache_miss: 0, cache_hit: 0 }, output: 10 } };
+    const fakeResponse = {
+      usage: { input: { total: 10, cache_miss: 0, cache_hit: 0 }, output: 10 },
+    };
     if (this.resolveNext) {
       this.resolveNext({ value: fakeResponse, done: true });
       this.resolveNext = null;
@@ -137,7 +140,7 @@ vi.mock("./llm/client.js", () => ({
 }));
 
 vi.mock("./tools/index.js", async (importOriginal) => {
-  const original = await importOriginal() as any;
+  const original = (await importOriginal()) as any;
   const testTool = {
     name: "testTool",
     description: "Test Tool",
@@ -156,7 +159,9 @@ vi.mock("./services/token-tracker.js", () => ({
   TokenTracker: vi.fn().mockImplementation(function () {
     return {
       getTotal: vi.fn().mockReturnValue(100),
-      processUsage: vi.fn().mockReturnValue({ percentage: 10, shouldCompress: false }),
+      processUsage: vi
+        .fn()
+        .mockReturnValue({ percentage: 10, shouldCompress: false }),
       reset: vi.fn(),
       setCount: vi.fn(),
       setContextLength: vi.fn(),
@@ -212,6 +217,7 @@ import { Agent } from "./agent.js";
 describe("Agent", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.spyOn(SessionPersistence, "getSessionDir").mockReturnValue("/tmp");
   });
   afterEach(() => {
     vi.restoreAllMocks();
@@ -257,7 +263,9 @@ describe("Agent", () => {
       }
       await agent.compress();
       expect(reportStatusSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ content: expect.stringContaining("Not enough") }),
+        expect.objectContaining({
+          content: expect.stringContaining("Not enough"),
+        }),
       );
     });
   });
@@ -282,7 +290,10 @@ describe("Agent", () => {
       stream.emit("text", "Hi ");
       stream.emit("text", "there!");
       stream.resolveFinal({
-        usage: { input: { total: 10, cache_miss: 0, cache_hit: 0 }, output: 20 },
+        usage: {
+          input: { total: 10, cache_miss: 0, cache_hit: 0 },
+          output: 20,
+        },
         stop_reason: "end_turn",
       });
 
@@ -307,7 +318,10 @@ describe("Agent", () => {
 
       stream.emit("thinking", "Hmm...");
       stream.resolveFinal({
-        usage: { input: { total: 10, cache_miss: 0, cache_hit: 0 }, output: 20 },
+        usage: {
+          input: { total: 10, cache_miss: 0, cache_hit: 0 },
+          output: 20,
+        },
         stop_reason: "end_turn",
       });
 
@@ -333,13 +347,19 @@ describe("Agent", () => {
         input: {},
       });
       stream1.resolveFinal({
-        usage: { input: { total: 10, cache_miss: 0, cache_hit: 0 }, output: 20 },
+        usage: {
+          input: { total: 10, cache_miss: 0, cache_hit: 0 },
+          output: 20,
+        },
         stop_reason: "tool_use",
       });
 
       setImmediate(() => {
         stream2.resolveFinal({
-          usage: { input: { total: 10, cache_miss: 0, cache_hit: 0 }, output: 20 },
+          usage: {
+            input: { total: 10, cache_miss: 0, cache_hit: 0 },
+            output: 20,
+          },
           stop_reason: "end_turn",
         });
       });
@@ -364,7 +384,10 @@ describe("Agent", () => {
       const run2 = agent.run("Second message");
       await expect(run2).resolves.toBe(false);
       stream.resolveFinal({
-        usage: { input: { total: 10, cache_miss: 0, cache_hit: 0 }, output: 20 },
+        usage: {
+          input: { total: 10, cache_miss: 0, cache_hit: 0 },
+          output: 20,
+        },
         stop_reason: "end_turn",
       });
       await run1;
@@ -373,7 +396,10 @@ describe("Agent", () => {
       mockChatStream.mockReturnValueOnce(stream2);
       const run3 = agent.run("Third message");
       stream2.resolveFinal({
-        usage: { input: { total: 10, cache_miss: 0, cache_hit: 0 }, output: 20 },
+        usage: {
+          input: { total: 10, cache_miss: 0, cache_hit: 0 },
+          output: 20,
+        },
         stop_reason: "end_turn",
       });
       await expect(run3).resolves.toBe(true);
@@ -422,7 +448,10 @@ describe("Agent", () => {
         input: {},
       });
       stream.resolveFinal({
-        usage: { input: { total: 10, cache_miss: 0, cache_hit: 0 }, output: 20 },
+        usage: {
+          input: { total: 10, cache_miss: 0, cache_hit: 0 },
+          output: 20,
+        },
         stop_reason: "tool_use",
       });
 
@@ -435,7 +464,10 @@ describe("Agent", () => {
       expect((lastTurn.content as any)[0].content).toBe("User rejected");
 
       expect(reportStatusSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ role: "error", content: expect.stringContaining("denied by user") }),
+        expect.objectContaining({
+          role: "error",
+          content: expect.stringContaining("denied by user"),
+        }),
       );
     });
 
@@ -459,7 +491,10 @@ describe("Agent", () => {
           setImmediate(() => {
             stream2.emit("text", "I cannot do that because it is too risky.");
             stream2.resolveFinal({
-              usage: { input: { total: 5, cache_miss: 0, cache_hit: 0 }, output: 10 },
+              usage: {
+                input: { total: 5, cache_miss: 0, cache_hit: 0 },
+                output: 10,
+              },
               stop_reason: "end_turn",
             });
           });
@@ -478,7 +513,10 @@ describe("Agent", () => {
         input: {},
       });
       stream1.resolveFinal({
-        usage: { input: { total: 10, cache_miss: 0, cache_hit: 0 }, output: 20 },
+        usage: {
+          input: { total: 10, cache_miss: 0, cache_hit: 0 },
+          output: 20,
+        },
         stop_reason: "tool_use",
       });
 

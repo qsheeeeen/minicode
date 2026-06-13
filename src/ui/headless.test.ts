@@ -36,11 +36,21 @@ const mockAgent = {
 import { runHeadless } from "./headless.js";
 
 describe("runHeadless", () => {
+  const originalIsTTY = process.stdin.isTTY;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    Object.defineProperty(process.stdin, "isTTY", {
+      value: true,
+      configurable: true,
+    });
   });
   afterEach(() => {
     vi.restoreAllMocks();
+    Object.defineProperty(process.stdin, "isTTY", {
+      value: originalIsTTY,
+      configurable: true,
+    });
   });
 
   it("calls agent.run with prompter that returns empty string", async () => {

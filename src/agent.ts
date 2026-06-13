@@ -16,7 +16,9 @@ import type { SessionManager } from "./services/session-manager.js";
 import type { ContextManager } from "./services/context-manager.js";
 import type { LLMContextManager } from "./llm-context-manager.js";
 import type { AppConfig } from "./config.js";
+import type { FileSystemService } from "./services/filesystem.js";
 import type { ModelSwitchService } from "./services/model-switcher.js";
+import type { ShellService } from "./services/shell-service.js";
 import type pino from "pino";
 
 export interface AgentOpts {
@@ -30,6 +32,8 @@ export interface AgentOpts {
   readonly currentAgentId?: string;
   readonly appConfig: AppConfig;
   readonly modelSwitchService?: ModelSwitchService;
+  readonly fileSystemService?: FileSystemService;
+  readonly shellService?: ShellService;
 }
 
 export class Agent {
@@ -43,6 +47,8 @@ export class Agent {
   private currentAgentId: string;
   private readonly appConfig: AppConfig;
   private readonly modelSwitchService?: ModelSwitchService;
+  private readonly fileSystemService?: FileSystemService;
+  private readonly shellService?: ShellService;
   private abortController: AbortController | null = null;
   public logger?: pino.Logger;
 
@@ -72,6 +78,8 @@ export class Agent {
     this.currentAgentId = opts.currentAgentId ?? "1";
     this.appConfig = opts.appConfig;
     this.modelSwitchService = opts.modelSwitchService;
+    this.fileSystemService = opts.fileSystemService;
+    this.shellService = opts.shellService;
   }
 
   private async saveStore(): Promise<void> {
@@ -273,7 +281,9 @@ export class Agent {
           currentAgentId: this.currentAgentId,
           prompter: opts?.prompter,
           services: {
+            fs: this.fileSystemService,
             modelSwitcher: this.modelSwitchService,
+            shell: this.shellService,
           },
         };
 

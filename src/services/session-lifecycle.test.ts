@@ -1,6 +1,10 @@
 import { describe, it, expect, vi } from "vitest";
 import { switchSession } from "./session-lifecycle.js";
 
+vi.mock("../utils/logger.js", () => ({
+  createLogger: vi.fn().mockResolvedValue({ info: vi.fn(), error: vi.fn() }),
+}));
+
 describe("switchSession", () => {
   it("wires session, logger, stats, and status message", async () => {
     const agent = {

@@ -22,6 +22,9 @@ function createService() {
     saveStore: vi.fn().mockResolvedValue(undefined),
     reportStatus: vi.fn(),
   };
+  const permissionService = {
+    updateAutoGate: vi.fn(),
+  };
   vi.spyOn(appConfig, "setModel").mockResolvedValue();
   vi.spyOn(appConfig, "setTier").mockResolvedValue();
 
@@ -29,16 +32,30 @@ function createService() {
     appConfig,
     contextManager: contextManager as any,
     sessionManager: sessionManager as any,
+    permissionService: permissionService as any,
   });
   const agent = { model: undefined } as any;
 
-  return { service, appConfig, contextManager, sessionManager, agent };
+  return {
+    service,
+    appConfig,
+    contextManager,
+    sessionManager,
+    permissionService,
+    agent,
+  };
 }
 
 describe("ModelSwitchService", () => {
   it("switches the agent model and updates dependent runtime state", async () => {
-    const { service, appConfig, contextManager, sessionManager, agent } =
-      createService();
+    const {
+      service,
+      appConfig,
+      contextManager,
+      sessionManager,
+      permissionService,
+      agent,
+    } = createService();
 
     const model = await service.switchAgentModel({
       agent,
@@ -48,6 +65,10 @@ describe("ModelSwitchService", () => {
     expect(agent.model).toBe(model);
     expect(model.getName()).toBe("next-model");
     expect(contextManager.setContextLength).toHaveBeenCalledWith(1234);
+    expect(permissionService.updateAutoGate).toHaveBeenCalledWith(
+      model.getClient(),
+      "next-model",
+    );
     expect(appConfig.setModel).toHaveBeenCalledWith("next-model@test");
     expect(sessionManager.saveStore).toHaveBeenCalledWith({
       model: "next-model",

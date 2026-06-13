@@ -2,12 +2,14 @@ import type { Agent } from "../agent.js";
 import type { AppConfig } from "../config.js";
 import { ModelFactory, type Model } from "../llm/model.js";
 import type { ContextManager } from "./context-manager.js";
+import type { PermissionService } from "./permission.js";
 import type { SessionManager } from "./session-manager.js";
 
 export interface ModelSwitchServiceOpts {
   readonly appConfig: AppConfig;
   readonly contextManager: ContextManager;
   readonly sessionManager: SessionManager;
+  readonly permissionService?: PermissionService;
 }
 
 export interface SwitchAgentModelOpts {
@@ -22,11 +24,13 @@ export class ModelSwitchService {
   private appConfig: AppConfig;
   private contextManager: ContextManager;
   private sessionManager: SessionManager;
+  private permissionService?: PermissionService;
 
   constructor(opts: ModelSwitchServiceOpts) {
     this.appConfig = opts.appConfig;
     this.contextManager = opts.contextManager;
     this.sessionManager = opts.sessionManager;
+    this.permissionService = opts.permissionService;
   }
 
   async switchAgentModel(opts: SwitchAgentModelOpts): Promise<Model> {
@@ -38,6 +42,10 @@ export class ModelSwitchService {
 
     opts.agent.model = newModel;
     this.contextManager.setContextLength(newModel.getContextLength());
+    this.permissionService?.updateAutoGate(
+      newModel.getClient(),
+      newModel.getName(),
+    );
 
     if (opts.tier) {
       await this.appConfig.setTier(opts.tier, opts.modelSpec);

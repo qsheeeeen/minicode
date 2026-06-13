@@ -1,0 +1,117 @@
+import { beforeEach, describe, it, expect, vi } from "vitest";
+import { AppConfig } from "../config.js";
+import { SessionPersistence } from "../services/session-persistence.js";
+import { createRuntime } from "./create-runtime.js";
+
+vi.mock("../utils/logger.js", () => ({
+  createLogger: vi.fn().mockResolvedValue({
+    info: vi.fn(),
+    error: vi.fn(),
+    warn: vi.fn(),
+  }),
+}));
+
+vi.mock("../utils/prompts.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../utils/prompts.js")>()),
+  loadGlobalPrompt: vi.fn().mockResolvedValue("global prompt"),
+}));
+
+vi.mock("../skills/skill-manager.js", () => ({
+  SkillManager: vi.fn().mockImplementation(function () {
+    return {
+      addDirectory: vi.fn().mockReturnThis(),
+      loadAll: vi.fn().mockResolvedValue(undefined),
+      registerAsCommands: vi.fn(),
+    };
+  }),
+}));
+
+function makeArgs(overrides: Record<string, unknown> = {}) {
+  return {
+    model: {
+      protocol: "anthropic",
+      apiKey: "test-key",
+      model: "test-model",
+      provider: "test-provider",
+      contextLength: 1000,
+      displayName: "Test Model",
+    },
+    permissionMode: "yolo",
+    compressionThreshold: 0.5,
+    thinking: {},
+    initialPrompt: "hello",
+    sessionName: "test-session",
+    resumeRecent: false,
+    headless: true,
+    ...overrides,
+  } as any;
+}
+
+describe("createRuntime", () => {
+  beforeEach(() => {
+    vi.spyOn(SessionPersistence, "getSessionDir").mockReturnValue(
+      "/tmp/minicode-runtime-test",
+    );
+  });
+
+  it("creates the application runtime object graph", async () => {
+    const config = new AppConfig({});
+
+    const runtime = await createRuntime({
+      args: makeArgs(),
+      config,
+      version: "1.0.0",
+      cwd: "/tmp",
+      programStartTime: 123,
+      stdinIsTTY: false,
+    });
+
+    expect(runtime.agent).toBeDefined();
+    expect(runtime.config).toBe(config);
+    expect(runtime.version).toBe("1.0.0");
+    expect(runtime.headless).toBe(true);
+    expect(runtime.initialSession).toBe("test-session");
+    expect(runtime.promptFiles).toContain("~/.minicode/AGENTS.md");
+    expect(runtime.commandContext.agent).toBe(runtime.agent);
+    expect(runtime.commandContext.model.getName()).toBe("test-model");
+  });
+
+  it("uses a live status reporter callback for token threshold messages", async () => {
+    const runtime = await createRuntime({
+      args: makeArgs(),
+      config: new AppConfig({}),
+      version: "1.0.0",
+      cwd: "/tmp",
+      programStartTime: 123,
+      stdinIsTTY: false,
+    });
+    const reporter = vi.fn();
+    runtime.sessionManager.setStatusReporter(reporter);
+
+    runtime.contextManager.processTokenUsage("test-model", {
+      input: { total: 600, cache_hit: 0, cache_miss: 600 },
+      output: 0,
+    });
+
+    expect(reporter).toHaveBeenCalled();
+  });
+
+  it("exposes the latest change journal through command context", async () => {
+    const runtime = await createRuntime({
+      args: makeArgs(),
+      config: new AppConfig({}),
+      version: "1.0.0",
+      cwd: "/tmp",
+      programStartTime: 123,
+      stdinIsTTY: false,
+    });
+    const original = runtime.commandContext.changeJournal;
+
+    runtime.sessionManager.clearSession();
+
+    expect(runtime.commandContext.changeJournal).toBe(
+      runtime.sessionManager.getChangeJournal(),
+    );
+    expect(runtime.commandContext.changeJournal).not.toBe(original);
+  });
+});

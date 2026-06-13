@@ -1,7 +1,14 @@
-import fs from "fs/promises";
+import {
+  createDefaultFileSystemService,
+  type FileSystemService,
+} from "../../services/filesystem.js";
 import { generateDiffSummary } from "../../utils/diff.js";
-import type { ToolDef, ToolResult } from "../registry.js";
+import type { ToolDef, ToolExecutionContext, ToolResult } from "../registry.js";
 import { register } from "../registry.js";
+
+function getFileSystem(context?: ToolExecutionContext): FileSystemService {
+  return context?.services?.fs ?? createDefaultFileSystemService();
+}
 
 export const editTool: ToolDef = {
   name: "Edit",
@@ -25,27 +32,16 @@ export const editTool: ToolDef = {
     },
     required: ["path", "oldText", "newText"],
   },
-  execute: async (args: Record<string, unknown>): Promise<ToolResult> => {
+  execute: async (
+    args: Record<string, unknown>,
+    context?: ToolExecutionContext,
+  ): Promise<ToolResult> => {
     try {
       const path = args.path as string;
       const oldText = args.oldText as string;
       const newText = args.newText as string;
       const replaceAll = args.replaceAll as boolean | undefined;
-      let content = await fs.readFile(path, "utf-8");
-      const count = content.split(oldText).length - 1;
-      if (count === 0) {
-        throw new Error("oldText not found in file");
-      }
-      if (!replaceAll && count > 1) {
-        throw new Error(
-          `oldText found ${count} times. Set replaceAll=true to replace all occurrences, or make oldText more specific to match exactly once.`,
-        );
-      }
-      const separator = oldText;
-      content = replaceAll
-        ? content.split(separator).join(newText)
-        : content.replace(separator, newText);
-      await fs.writeFile(path, content, "utf-8");
+      await getFileSystem(context).editText(path, oldText, newText, replaceAll);
       const diffLines = generateDiffSummary(path, oldText, newText);
       const headerLine = diffLines.find((l) => l.type === "header");
       const diffText = diffLines

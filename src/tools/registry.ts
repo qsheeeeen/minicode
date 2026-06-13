@@ -1,7 +1,9 @@
 import type { AgentRegistry } from "../services/agent-registry.js";
 import type { Model } from "../llm/model.js";
 import type { AppConfig } from "../config.js";
+import type { FileSystemService } from "../services/filesystem.js";
 import type { ModelSwitchService } from "../services/model-switcher.js";
+import type { ShellService } from "../services/shell-service.js";
 
 /**
  * UI interaction interfaces defined by the tool execution layer.
@@ -41,7 +43,9 @@ export interface ToolExecutionContext {
   signal: AbortSignal | undefined;
   prompter?: UserPrompter;
   services?: {
+    fs?: FileSystemService;
     modelSwitcher?: ModelSwitchService;
+    shell?: ShellService;
   };
 }
 

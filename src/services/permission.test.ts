@@ -79,6 +79,48 @@ describe("PermissionService", () => {
       expect(result).toEqual({ allowed: false, reason: "User cancelled" });
     });
 
+    it("keeps strategies scoped to each service instance", async () => {
+      const first = new PermissionService("auto");
+      const second = new PermissionService("auto");
+      first.setStrategy("auto", {
+        check: vi.fn().mockResolvedValue({ allowed: true }),
+      });
+
+      await expect(first.check("Shell", {}, "Shell(ls)")).resolves.toEqual({
+        allowed: true,
+      });
+      await expect(second.check("Shell", {}, "Shell(ls)")).resolves.toEqual({
+        allowed: false,
+        reason: expect.stringContaining("No LLM client"),
+      });
+    });
+
+    it("can update the auto gate client and model", async () => {
+      const mockClient = {
+        chatStream: vi.fn().mockReturnValue({
+          next: vi.fn().mockResolvedValue({
+            done: true,
+            value: { content: [{ type: "text", text: "yes" }] },
+          }),
+        }),
+      } as unknown as LLMClient;
+      const service = new PermissionService("auto");
+
+      service.updateAutoGate(mockClient, "new-model");
+      const result = await service.check(
+        "Shell",
+        { command: "ls" },
+        "Shell(ls)",
+      );
+
+      expect(result).toEqual({ allowed: true });
+      expect(mockClient.chatStream).toHaveBeenCalledWith(
+        expect.any(Array),
+        [],
+        expect.objectContaining({ model: "new-model" }),
+      );
+    });
+
     it('manual returns allowed: false and "User rejected" when prompter returns no', async () => {
       const service = new PermissionService("manual");
       const promptMock = vi.fn().mockResolvedValue("no");

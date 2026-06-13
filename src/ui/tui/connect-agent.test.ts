@@ -1,10 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Agent } from "../../agent.js";
 import { Model } from "../../llm/model.js";
-import {
-  VirtualLLMClient,
-  defaultTextResponse,
-} from "../../llm/virtual.js";
+import { VirtualLLMClient, defaultTextResponse } from "../../llm/virtual.js";
 import { createVirtualTool } from "../../testing.js";
 import type { ToolDef } from "../../tools/registry.js";
 import { SessionManager } from "../../services/session-manager.js";
@@ -12,6 +9,7 @@ import { ContextManager } from "../../services/context-manager.js";
 import { PromptManager } from "../../services/prompt-manager.js";
 import { ToolExecutor } from "../../tools/executor.js";
 import { PermissionService } from "../../services/permission.js";
+import { SessionPersistence } from "../../services/session-persistence.js";
 import { Signal } from "../../utils/signal.js";
 import { AgentRegistry } from "../../services/agent-registry.js";
 import { connectAgent } from "./connect-agent.js";
@@ -21,7 +19,10 @@ function createTestAgent(responses = [defaultTextResponse("OK")]) {
   const tools = new Map<string, ToolDef>([
     [
       "VirtualTool",
-      createVirtualTool("VirtualTool", (args) => `result: ${JSON.stringify(args)}`),
+      createVirtualTool(
+        "VirtualTool",
+        (args) => `result: ${JSON.stringify(args)}`,
+      ),
     ],
   ]);
   const client = new VirtualLLMClient(responses);
@@ -38,7 +39,7 @@ function createTestAgent(responses = [defaultTextResponse("OK")]) {
   const toolExecutor = new ToolExecutor({
     tools,
     permissionService: new PermissionService("yolo"),
-    changeJournal: sessionManager.getChangeJournal(),
+    getChangeJournal: () => sessionManager.getChangeJournal(),
     context: sessionManager.getContext(),
   });
   const agent = new Agent({
@@ -58,11 +59,15 @@ describe("connectAgent", () => {
   beforeEach(() => {
     // Reset Zustand state but keep dispatch function (shallow merge, not replace)
     useTuiStore.setState(initialState);
+    vi.spyOn(SessionPersistence, "getSessionDir").mockReturnValue(
+      "/tmp/minicode-connect-agent-test",
+    );
   });
 
   afterEach(() => {
     cleanup?.();
     cleanup = undefined;
+    vi.restoreAllMocks();
   });
 
   it("should dispatch SET_MESSAGES with assistant text after agent.run()", async () => {

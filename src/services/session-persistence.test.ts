@@ -1,14 +1,25 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import fs from "fs/promises";
 import path from "path";
 import os from "os";
 import { SessionPersistence } from "./session-persistence.js";
 
-// Use a temporary directory for test isolation
-const TEST_BASE_DIR = path.join(os.homedir(), ".minicode", "sessions");
-
 describe("SessionPersistence", () => {
-  const testHash = SessionPersistence.getProjectHash();
+  let testSessionDir: string;
+
+  beforeEach(async () => {
+    testSessionDir = await fs.mkdtemp(
+      path.join(os.tmpdir(), "minicode-sessions-"),
+    );
+    vi.spyOn(SessionPersistence, "getSessionDir").mockReturnValue(
+      testSessionDir,
+    );
+  });
+
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    await fs.rm(testSessionDir, { recursive: true, force: true });
+  });
 
   describe("getProjectHash", () => {
     it("returns consistent 12-char hex", () => {
@@ -22,27 +33,22 @@ describe("SessionPersistence", () => {
   });
 
   describe("getSessionDir", () => {
-    it("returns path under .minicode/sessions", () => {
+    it("returns the configured session directory", () => {
       const dir = SessionPersistence.getSessionDir();
-      expect(dir).toContain(".minicode/sessions");
-      expect(dir).toContain(testHash);
+      expect(dir).toBe(testSessionDir);
     });
   });
 
   describe("save and load", () => {
     const sessionName = `test-persist-${Date.now()}`;
 
-    afterEach(async () => {
-      // Clean up test session
-      const dir = SessionPersistence.getSessionDir();
-      const filePath = path.join(dir, `${sessionName}.context.jsonl`);
-      await fs.unlink(filePath).catch(() => {});
-    });
-
     it("saves and loads session data", async () => {
       const turns = [
         { role: "user" as const, content: "hello" },
-        { role: "assistant" as const, content: [{ type: "text" as const, text: "world" }] },
+        {
+          role: "assistant" as const,
+          content: [{ type: "text" as const, text: "world" }],
+        },
       ];
 
       await SessionPersistence.save(sessionName, turns as any, {
@@ -76,10 +82,16 @@ describe("SessionPersistence", () => {
       const name2 = `test-list-b-${Date.now()}`;
 
       try {
-        await SessionPersistence.save(name1, [], { model: "test", totalTokens: 0 });
+        await SessionPersistence.save(name1, [], {
+          model: "test",
+          totalTokens: 0,
+        });
         // Small delay to ensure different mtime
         await new Promise((r) => setTimeout(r, 50));
-        await SessionPersistence.save(name2, [], { model: "test", totalTokens: 0 });
+        await SessionPersistence.save(name2, [], {
+          model: "test",
+          totalTokens: 0,
+        });
 
         const sessions = await SessionPersistence.list();
         const names = sessions.map((s) => s.name);
@@ -92,8 +104,12 @@ describe("SessionPersistence", () => {
         }
       } finally {
         const dir = SessionPersistence.getSessionDir();
-        await fs.unlink(path.join(dir, `${name1}.context.jsonl`)).catch(() => {});
-        await fs.unlink(path.join(dir, `${name2}.context.jsonl`)).catch(() => {});
+        await fs
+          .unlink(path.join(dir, `${name1}.context.jsonl`))
+          .catch(() => {});
+        await fs
+          .unlink(path.join(dir, `${name2}.context.jsonl`))
+          .catch(() => {});
       }
     });
   });
@@ -104,7 +120,10 @@ describe("SessionPersistence", () => {
       const newName = `test-rename-new-${Date.now()}`;
 
       try {
-        await SessionPersistence.save(oldName, [], { model: "test", totalTokens: 0 });
+        await SessionPersistence.save(oldName, [], {
+          model: "test",
+          totalTokens: 0,
+        });
         await SessionPersistence.rename(oldName, newName);
 
         const data = await SessionPersistence.load(newName);
@@ -114,8 +133,12 @@ describe("SessionPersistence", () => {
         expect(oldData).toBeNull();
       } finally {
         const dir = SessionPersistence.getSessionDir();
-        await fs.unlink(path.join(dir, `${oldName}.context.jsonl`)).catch(() => {});
-        await fs.unlink(path.join(dir, `${newName}.context.jsonl`)).catch(() => {});
+        await fs
+          .unlink(path.join(dir, `${oldName}.context.jsonl`))
+          .catch(() => {});
+        await fs
+          .unlink(path.join(dir, `${newName}.context.jsonl`))
+          .catch(() => {});
       }
     });
   });
@@ -125,7 +148,10 @@ describe("SessionPersistence", () => {
       const name = `test-delete-${Date.now()}`;
 
       try {
-        await SessionPersistence.save(name, [], { model: "test", totalTokens: 0 });
+        await SessionPersistence.save(name, [], {
+          model: "test",
+          totalTokens: 0,
+        });
         const data = await SessionPersistence.load(name);
         expect(data).not.toBeNull();
 
@@ -134,7 +160,9 @@ describe("SessionPersistence", () => {
         expect(afterDelete).toBeNull();
       } finally {
         const dir = SessionPersistence.getSessionDir();
-        await fs.unlink(path.join(dir, `${name}.context.jsonl`)).catch(() => {});
+        await fs
+          .unlink(path.join(dir, `${name}.context.jsonl`))
+          .catch(() => {});
       }
     });
   });

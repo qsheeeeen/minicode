@@ -20,19 +20,6 @@ export interface PermissionStrategy {
   ): Promise<PermissionCheckResult>;
 }
 
-const strategies = new Map<PermissionMode, PermissionStrategy>();
-
-export function registerPermissionStrategy(
-  mode: PermissionMode,
-  strategy: PermissionStrategy,
-): void {
-  strategies.set(mode, strategy);
-}
-
-export function getPermissionStrategy(mode: PermissionMode): PermissionStrategy | undefined {
-  return strategies.get(mode);
-}
-
 // ── Built-in strategies ────────────────────────────────────────────────────
 
 export class YoloPermissionStrategy implements PermissionStrategy {
@@ -133,23 +120,17 @@ Reply with exactly one of:
   }
 }
 
-// Register built-in strategies
-registerPermissionStrategy("yolo", new YoloPermissionStrategy());
-registerPermissionStrategy("manual", new ManualPermissionStrategy());
-
 export class PermissionService {
   private mode: PermissionMode;
+  private strategies: Map<PermissionMode, PermissionStrategy>;
 
-  constructor(
-    initialMode: PermissionMode,
-    client?: LLMClient,
-    model?: string,
-  ) {
+  constructor(initialMode: PermissionMode, client?: LLMClient, model?: string) {
     this.mode = initialMode;
-    // Ensure auto strategy is registered with the provided client/model.
-    if (!strategies.has("auto")) {
-      registerPermissionStrategy("auto", new AutoPermissionStrategy(client, model));
-    }
+    this.strategies = new Map<PermissionMode, PermissionStrategy>([
+      ["yolo", new YoloPermissionStrategy()],
+      ["manual", new ManualPermissionStrategy()],
+      ["auto", new AutoPermissionStrategy(client, model)],
+    ]);
   }
 
   getMode(): PermissionMode {
@@ -158,6 +139,18 @@ export class PermissionService {
 
   setMode(mode: PermissionMode): void {
     this.mode = mode;
+  }
+
+  setStrategy(mode: PermissionMode, strategy: PermissionStrategy): void {
+    this.strategies.set(mode, strategy);
+  }
+
+  getStrategy(mode: PermissionMode): PermissionStrategy | undefined {
+    return this.strategies.get(mode);
+  }
+
+  updateAutoGate(client?: LLMClient, model?: string): void {
+    this.strategies.set("auto", new AutoPermissionStrategy(client, model));
   }
 
   cycleMode(): PermissionMode {
@@ -172,9 +165,12 @@ export class PermissionService {
     displayText: string,
     prompter?: UserPrompter,
   ): Promise<PermissionCheckResult> {
-    const strategy = strategies.get(this.mode);
+    const strategy = this.strategies.get(this.mode);
     if (!strategy) {
-      return { allowed: false, reason: `Unknown permission mode: ${this.mode}` };
+      return {
+        allowed: false,
+        reason: `Unknown permission mode: ${this.mode}`,
+      };
     }
     return strategy.check(toolName, toolInput, displayText, prompter);
   }

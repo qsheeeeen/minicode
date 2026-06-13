@@ -1,9 +1,12 @@
-import { spawn } from "child_process";
+import {
+  createDefaultShellService,
+  type ShellService,
+} from "../../services/shell-service.js";
 import type { ToolDef, ToolResult, ToolExecutionContext } from "../registry.js";
 import { register } from "../registry.js";
 
-function stripAnsiCodes(text: string): string {
-  return text.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");
+function getShell(context?: ToolExecutionContext): ShellService {
+  return context?.services?.shell ?? createDefaultShellService();
 }
 
 export const shellTool: ToolDef = {
@@ -27,43 +30,12 @@ export const shellTool: ToolDef = {
     try {
       const command = args.command as string;
       const timeout = args.timeout as number | undefined;
-      const output = await new Promise<string>((resolve, reject) => {
-        const proc = spawn(command, [], { shell: true });
-
-        let stdout = "";
-        let stderr = "";
-
-        proc.stdout?.on("data", (d) => {
-          stdout += stripAnsiCodes(d.toString());
-        });
-        proc.stderr?.on("data", (d) => {
-          stderr += stripAnsiCodes(d.toString());
-        });
-
-        if (timeout) {
-          setTimeout(() => proc.kill(), timeout * 1000);
-        }
-
-        if (context?.signal?.aborted) {
-          proc.kill();
-          resolve("Aborted");
-          return;
-        }
-        context?.signal?.addEventListener("abort", () => {
-          proc.kill();
-        });
-
-        proc.on("close", (code) => {
-          if (context?.signal?.aborted) {
-            resolve("Aborted");
-          } else if (code === 0) {
-            resolve(stdout || stderr);
-          } else {
-            reject(new Error(`Exit code ${code}: ${stderr || stdout}`));
-          }
-        });
+      const shell = getShell(context);
+      const result = await shell.run(command, {
+        timeoutMs: timeout ? timeout * 1000 : undefined,
+        signal: context?.signal,
       });
-      return { output: output.trim() };
+      return { output: shell.formatResult(result) };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       return { output: msg };

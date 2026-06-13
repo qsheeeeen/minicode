@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Agent } from "./agent.js";
 import { Model } from "./llm/model.js";
 import {
@@ -15,6 +15,7 @@ import { ContextManager } from "./services/context-manager.js";
 import { PromptManager } from "./services/prompt-manager.js";
 import { ToolExecutor } from "./tools/executor.js";
 import { PermissionService } from "./services/permission.js";
+import { SessionPersistence } from "./services/session-persistence.js";
 import { Signal } from "./utils/signal.js";
 
 function createTestAgent(options?: {
@@ -29,8 +30,9 @@ function createTestAgent(options?: {
     new Map<string, ToolDef>([
       [
         "VirtualTool",
-        createVirtualTool("VirtualTool", (args) =>
-          `result: ${JSON.stringify(args)}`,
+        createVirtualTool(
+          "VirtualTool",
+          (args) => `result: ${JSON.stringify(args)}`,
         ),
       ],
     ]);
@@ -48,7 +50,7 @@ function createTestAgent(options?: {
   const toolExecutor = new ToolExecutor({
     tools,
     permissionService: new PermissionService(options?.permissionMode ?? "yolo"),
-    changeJournal: sessionManager.getChangeJournal(),
+    getChangeJournal: () => sessionManager.getChangeJournal(),
     context: sessionManager.getContext(),
   });
   const agent = new Agent({
@@ -64,6 +66,12 @@ function createTestAgent(options?: {
 }
 
 describe("Agent virtual integration", () => {
+  beforeEach(() => {
+    vi.spyOn(SessionPersistence, "getSessionDir").mockReturnValue(
+      "/tmp/minicode-agent-virtual-test",
+    );
+  });
+
   it("scenario 1: pure text — LLM returns text, run ends, context has correct messages", async () => {
     const { agent, context } = createTestAgent({
       responses: [defaultTextResponse("Hello, I am the agent.")],
@@ -88,7 +96,10 @@ describe("Agent virtual integration", () => {
   });
 
   it("scenario 2: tool call — LLM tool_use, virtual tool executes, tool_result, LLM text reply", async () => {
-    const virtualTool = createVirtualTool("Echo", (args) => `echoed: ${args.input}`);
+    const virtualTool = createVirtualTool(
+      "Echo",
+      (args) => `echoed: ${args.input}`,
+    );
     const tools = new Map([["Echo", virtualTool]]);
 
     const { agent, context } = createTestAgent({
@@ -224,11 +235,10 @@ describe("Agent virtual integration", () => {
   });
 
   it("scenario 4: permission rejection — requiresPermission tool in manual mode, user rejects", async () => {
-    const dangerousTool = createVirtualTool(
-      "Dangerous",
-      () => "destroyed",
-      { requiresPermission: true, readOnly: false },
-    );
+    const dangerousTool = createVirtualTool("Dangerous", () => "destroyed", {
+      requiresPermission: true,
+      readOnly: false,
+    });
     const tools = new Map<string, ToolDef>([["Dangerous", dangerousTool]]);
 
     const prompter: UserPrompter = { prompt: async () => "no" };
@@ -254,7 +264,7 @@ describe("Agent virtual integration", () => {
     const toolExecutor = new ToolExecutor({
       tools,
       permissionService: new PermissionService("manual"),
-      changeJournal: sessionManager.getChangeJournal(),
+      getChangeJournal: () => sessionManager.getChangeJournal(),
       context: sessionManager.getContext(),
     });
     const agent = new Agent({
@@ -285,7 +295,10 @@ describe("Agent virtual integration", () => {
 
     // Status message should indicate denial
     expect(reportStatusSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ role: "error", content: expect.stringContaining("denied by user") }),
+      expect.objectContaining({
+        role: "error",
+        content: expect.stringContaining("denied by user"),
+      }),
     );
   });
 });

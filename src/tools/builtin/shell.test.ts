@@ -1,9 +1,23 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { shellTool } from "./shell.js";
 
-vi.mock("child_process", () => ({
-  spawn: vi.fn(),
-}));
+function makeContext(output = "output") {
+  return {
+    services: {
+      shell: {
+        run: vi.fn().mockResolvedValue({
+          stdout: output,
+          stderr: "",
+          exitCode: 0,
+          timedOut: false,
+          aborted: false,
+        }),
+        formatResult: vi.fn().mockReturnValue(output),
+      },
+    },
+    signal: undefined,
+  } as any;
+}
 
 describe("shellTool", () => {
   beforeEach(() => {
@@ -11,54 +25,39 @@ describe("shellTool", () => {
   });
 
   describe("execute", () => {
-    it("returns stdout on success", async () => {
-      const { spawn } = await import("child_process");
-      const mockProc = {
-        stdout: {
-          on: vi.fn((evt, cb) => evt === "data" && cb(Buffer.from("output"))),
-        },
-        stderr: { on: vi.fn() },
-        on: vi.fn((evt, cb) => evt === "close" && cb(0)),
-        kill: vi.fn(),
-      };
-      (spawn as ReturnType<typeof vi.fn>).mockReturnValue(mockProc as any);
+    it("returns formatted shell output on success", async () => {
+      const context = makeContext("output");
 
-      const result = await shellTool.execute({ command: "echo hello" });
+      const result = await shellTool.execute(
+        { command: "echo hello" },
+        context,
+      );
+
       expect(result.output).toBe("output");
+      expect(context.services.shell.run).toHaveBeenCalledWith("echo hello", {
+        timeoutMs: undefined,
+        signal: undefined,
+      });
     });
 
-    it("throws error on non-zero exit", async () => {
-      const { spawn } = await import("child_process");
-      const mockProc = {
-        stdout: { on: vi.fn() },
-        stderr: {
-          on: vi.fn((evt, cb) => evt === "data" && cb(Buffer.from("error"))),
-        },
-        on: vi.fn((evt, cb) => evt === "close" && cb(1)),
-        kill: vi.fn(),
-      };
-      (spawn as ReturnType<typeof vi.fn>).mockReturnValue(mockProc as any);
+    it("converts timeout seconds to milliseconds", async () => {
+      const context = makeContext("output");
 
-      const result = await shellTool.execute({ command: "exit 1" });
-      expect(result.output).toContain("Exit code 1");
+      await shellTool.execute({ command: "sleep 1", timeout: 2 }, context);
+
+      expect(context.services.shell.run).toHaveBeenCalledWith("sleep 1", {
+        timeoutMs: 2000,
+        signal: undefined,
+      });
     });
 
-    it("returns error when command not found", async () => {
-      const { spawn } = await import("child_process");
-      const mockProc = {
-        stdout: { on: vi.fn() },
-        stderr: {
-          on: vi.fn(
-            (evt, cb) => evt === "data" && cb(Buffer.from("command not found")),
-          ),
-        },
-        on: vi.fn((evt, cb) => evt === "close" && cb(127)),
-        kill: vi.fn(),
-      };
-      (spawn as ReturnType<typeof vi.fn>).mockReturnValue(mockProc as any);
+    it("returns errors from the shell service", async () => {
+      const context = makeContext();
+      context.services.shell.run.mockRejectedValue(new Error("boom"));
 
-      const result = await shellTool.execute({ command: "nonexistent_cmd" });
-      expect(result.output).toContain("127");
+      const result = await shellTool.execute({ command: "bad" }, context);
+
+      expect(result.output).toContain("boom");
     });
   });
 });

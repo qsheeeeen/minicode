@@ -18,7 +18,7 @@ export interface ToolCall {
 export interface ToolExecutorOpts {
   readonly tools: Map<string, ToolDef>;
   readonly permissionService: PermissionService;
-  readonly changeJournal: ChangeJournal;
+  readonly getChangeJournal: () => ChangeJournal;
   readonly context: LLMContextManager;
   readonly logger?: pino.Logger;
 }
@@ -30,14 +30,14 @@ export interface ToolExecutorOpts {
 export class ToolExecutor {
   private tools: Map<string, ToolDef>;
   private permissionService: PermissionService;
-  private changeJournal: ChangeJournal;
+  private getChangeJournal: () => ChangeJournal;
   private context: LLMContextManager;
   private logger?: pino.Logger;
 
   constructor(opts: ToolExecutorOpts) {
     this.tools = opts.tools;
     this.permissionService = opts.permissionService;
-    this.changeJournal = opts.changeJournal;
+    this.getChangeJournal = opts.getChangeJournal;
     this.context = opts.context;
     this.logger = opts.logger;
   }
@@ -78,7 +78,7 @@ export class ToolExecutor {
       } catch {
         // File doesn't exist yet — before stays ""
       }
-      this.changeJournal.recordBefore(
+      this.getChangeJournal().recordBefore(
         activeTurnIdx,
         filePath,
         tool.changeOp ?? "write",
