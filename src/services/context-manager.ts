@@ -27,6 +27,7 @@ export interface ContextManagerOpts {
   readonly statusReporter: StatusReporter;
   readonly sessionStats?: SessionStats;
   readonly compressionStrategy?: CompressionStrategy;
+  readonly thresholdPolicy?: import("./token-tracker.js").ThresholdPolicy;
 }
 
 export interface CompressDeps {
@@ -55,6 +56,7 @@ export class ContextManager {
       opts.tokenCount$,
       opts.statusReporter,
       opts.sessionStats,
+      opts.thresholdPolicy,
     );
   }
 

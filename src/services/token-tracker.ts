@@ -3,6 +3,24 @@ import type { StatusReporter } from "./session-manager.js";
 import type { TokenUsage } from "../llm/client.js";
 import type { Signal } from "../utils/signal.js";
 
+export interface ThresholdPolicy {
+  readonly thresholds: readonly number[];
+  shouldCompress(total: number, contextLength: number, ratio: number): boolean;
+}
+
+export class DefaultThresholdPolicy implements ThresholdPolicy {
+  readonly thresholds = [25, 50, 75, 90] as const;
+
+  shouldCompress(
+    total: number,
+    contextLength: number,
+    ratio: number,
+  ): boolean {
+    const threshold = Math.floor(contextLength * ratio);
+    return total > threshold;
+  }
+}
+
 export class TokenTracker {
   private lastShownThreshold = 0;
 
@@ -12,6 +30,7 @@ export class TokenTracker {
     private tokenCount: Signal<number>,
     private statusReporter: StatusReporter,
     private sessionStats?: SessionStats,
+    private thresholdPolicy: ThresholdPolicy = new DefaultThresholdPolicy(),
   ) {}
 
   processUsage(
@@ -25,8 +44,7 @@ export class TokenTracker {
     const ratio = total / this.contextLength;
     const percentage = Math.floor(ratio * 100);
 
-    const thresholds = [25, 50, 75, 90];
-    for (const t of thresholds) {
+    for (const t of this.thresholdPolicy.thresholds) {
       if (percentage >= t && this.lastShownThreshold < t) {
         this.statusReporter({
           role: "status",
@@ -38,8 +56,11 @@ export class TokenTracker {
       }
     }
 
-    const threshold = Math.floor(this.contextLength * this.compressionThresholdRatio);
-    const shouldCompress = total > threshold;
+    const shouldCompress = this.thresholdPolicy.shouldCompress(
+      total,
+      this.contextLength,
+      this.compressionThresholdRatio,
+    );
 
     return { percentage, shouldCompress };
   }
