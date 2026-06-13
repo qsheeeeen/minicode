@@ -44,10 +44,10 @@ describe("SessionPersistence", () => {
 
     it("saves and loads session data", async () => {
       const turns = [
-        { role: "user" as const, content: "hello" },
         {
-          role: "assistant" as const,
-          content: [{ type: "text" as const, text: "world" }],
+          userText: "hello",
+          process: [],
+          assistantText: "world",
         },
       ];
 
@@ -60,8 +60,8 @@ describe("SessionPersistence", () => {
       expect(data).not.toBeNull();
       expect(data!.model).toBe("test-model");
       expect(data!.totalTokens).toBe(100);
-      expect(data!.messages).toHaveLength(2);
-      expect(data!.messages[0].content).toBe("hello");
+      expect(data!.turns).toHaveLength(1);
+      expect(data!.turns[0].userText).toBe("hello");
     });
 
     it("returns null when session not found", async () => {

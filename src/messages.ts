@@ -1,19 +1,10 @@
 export type {
-  AssistantBlock,
-  ContentBlock,
-  ContextBlock,
   ContextTurn,
   DisplayMessage,
-  MessageParam,
   MessageRole,
+  ProcessBlock,
   StatusMessage,
-  TextBlock,
   ThinkingBlock,
-  ToolResultBlock,
-  ToolUseBlock,
-  UserContentBlock,
+  ToolCallBlock,
 } from "./context/index.js";
-export {
-  groupMessagesIntoContextTurns,
-  toDisplayMessages,
-} from "./context/index.js";
+export { toDisplayMessages } from "./context/index.js";

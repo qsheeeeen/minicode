@@ -16,14 +16,14 @@ import {
   type CompressionStrategy,
 } from "./compression-service.js";
 import { ChangeJournal } from "./change-journal.js";
-import type { LLMContextManager } from "../context/index.js";
+import type { ContextStore } from "../context/index.js";
 import type { StatusReporter } from "./session-manager.js";
 
 export interface ContextManagerOpts {
   readonly contextLength: number;
   readonly compressionThresholdRatio: number;
   readonly tokenCount$: Signal<number>;
-  readonly contextManager: LLMContextManager;
+  readonly contextManager: ContextStore;
   readonly statusReporter: StatusReporter;
   readonly sessionStats?: SessionStats;
   readonly compressionStrategy?: CompressionStrategy;
@@ -31,7 +31,7 @@ export interface ContextManagerOpts {
 }
 
 export interface CompressDeps {
-  context: LLMContextManager;
+  context: ContextStore;
   model: Model;
   changeJournal: ChangeJournal;
   activeTurnIdx: number;
@@ -94,44 +94,26 @@ export class ContextManager {
         timestamp: new Date(),
       });
 
-      // Count original user prompts
-      let originalUserPrompts = 0;
-      for (const turn of turns) {
-        if (turn.role === "user" && typeof turn.content === "string") {
-          originalUserPrompts++;
-        }
-      }
+      const originalUserPrompts = turns.length;
 
       const compressed = await this.compressionService.compress(
-        deps.context.toLLMMessages(),
+        turns,
         deps.model.getClient() as LLMClient,
         deps.model.getName(),
       );
 
-      // Count kept user prompts in compressed result
-      let keptUserPrompts = 0;
-      for (const turn of compressed) {
-        if (turn.role === "user" && typeof turn.content === "string") {
-          keptUserPrompts++;
-        }
-      }
-      const originalKept = keptUserPrompts - 1; // compression adds 1 summary
+      const originalKept = compressed.length - 1; // compression adds 1 summary
       const prunedCount = originalUserPrompts - originalKept;
 
       if (prunedCount > 0) {
         deps.changeJournal.pruneAndRenumber(prunedCount, 1);
       }
 
-      deps.context.setTurns(compressed);
+      deps.context.replaceTurns(compressed);
       this.tokenTracker.reset();
 
       // Recalculate activeTurnIdx
-      let newActiveIdx = 0;
-      for (const turn of compressed) {
-        if (turn.role === "user" && typeof turn.content === "string") {
-          newActiveIdx++;
-        }
-      }
+      const newActiveIdx = compressed.length;
 
       deps.statusReporter({
         role: "status",

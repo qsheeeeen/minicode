@@ -5,24 +5,22 @@
 // Provides StatusReporter callback for services to emit UI notifications.
 // Agent delegates session operations here.
 
-import { LLMContextManager } from "../context/index.js";
+import { ContextStore } from "../context/index.js";
 import { ChangeJournal } from "./change-journal.js";
 import { SessionPersistence } from "./session-persistence.js";
 import type { SessionStats } from "./session-stats.js";
-import type { MessageParam, StatusMessage } from "../messages.js";
+import type { ContextTurn, StatusMessage } from "../messages.js";
 /**
  * StatusReporter — callback for emitting UI status/error notifications.
  * Defined here (SessionManager) because this is the primary owner of
  * status reporting lifecycle. Other services (ContextManager, TokenTracker)
  * receive it as a dependency.
  */
-export type StatusReporter = (
-  msg: Omit<StatusMessage, "messageIndex" | "turnIndex">,
-) => void;
+export type StatusReporter = (msg: Omit<StatusMessage, "turnIndex">) => void;
 
 export class SessionManager {
   private _currentSession: string;
-  private context = new LLMContextManager();
+  private context = new ContextStore();
   private changeJournal = new ChangeJournal();
   private activeTurnIdx = 0;
   private sessionStats?: SessionStats;
@@ -45,7 +43,7 @@ export class SessionManager {
   }
 
   /** Convenience: report a status via the configured reporter. */
-  reportStatus(msg: Omit<StatusMessage, "messageIndex" | "turnIndex">): void {
+  reportStatus(msg: Omit<StatusMessage, "turnIndex">): void {
     this._statusReporter(msg);
   }
 
@@ -82,7 +80,7 @@ export class SessionManager {
 
   // -- Context accessors --
 
-  getContext(): LLMContextManager {
+  getContext(): ContextStore {
     return this.context;
   }
 
@@ -106,12 +104,12 @@ export class SessionManager {
 
   // -- Convenience shortcuts for common context operations --
 
-  getMessages(): MessageParam[] {
+  getMessages(): ContextTurn[] {
     return this.context.getTurns();
   }
 
-  setMessages(messages: MessageParam[]): void {
-    this.context.setTurns(messages);
+  setMessages(messages: ContextTurn[]): void {
+    this.context.replaceTurns(messages);
   }
 
   getSessionStats(): SessionStats | undefined {

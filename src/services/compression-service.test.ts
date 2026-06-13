@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { SummaryCompressionStrategy } from "./compression-service.js";
 import type { LLMClient } from "../llm/client.js";
-import type { MessageParam } from "../messages.js";
+import type { ContextTurn } from "../messages.js";
 
 describe("SummaryCompressionStrategy", () => {
   let service: SummaryCompressionStrategy;
@@ -11,20 +11,20 @@ describe("SummaryCompressionStrategy", () => {
   });
 
   describe("compress", () => {
-    it("returns unchanged messages when below threshold (12 or fewer)", async () => {
-      const messages: MessageParam[] = Array.from({ length: 12 }, (_, i) => ({
-        role: i % 2 === 0 ? "user" : "assistant",
-        content: `message ${i}`,
+    it("returns unchanged turns when below threshold (12 or fewer)", async () => {
+      const turns: ContextTurn[] = Array.from({ length: 12 }, (_, i) => ({
+        userText: `message ${i}`,
+        process: [],
       }));
       const mockClient = {} as LLMClient;
-      const result = await service.compress(messages, mockClient, "claude-3");
-      expect(result).toEqual(messages);
+      const result = await service.compress(turns, mockClient, "claude-3");
+      expect(result).toEqual(turns);
     });
 
-    it("compresses when above threshold (more than 12 messages)", async () => {
-      const messages: MessageParam[] = Array.from({ length: 15 }, (_, i) => ({
-        role: i % 2 === 0 ? "user" : "assistant",
-        content: `message ${i}`,
+    it("compresses when above threshold (more than 12 turns)", async () => {
+      const turns: ContextTurn[] = Array.from({ length: 15 }, (_, i) => ({
+        userText: `message ${i}`,
+        process: [],
       }));
       const mockClient = {
         chatStream: vi.fn().mockReturnValue({
@@ -37,20 +37,20 @@ describe("SummaryCompressionStrategy", () => {
         }),
       } as unknown as LLMClient;
 
-      const result = await service.compress(messages, mockClient, "claude-3");
+      const result = await service.compress(turns, mockClient, "claude-3");
 
-      // Should include summary and last 10 messages
-      expect(result.length).toBeLessThan(messages.length);
+      // Should include summary and last 10 turns
+      expect(result.length).toBeLessThan(turns.length);
       expect(result[0]).toEqual({
-        role: "user",
-        content: expect.stringContaining("Summary"),
+        userText: expect.stringContaining("Summary"),
+        process: [],
       });
     });
 
     it("throws error when compression fails", async () => {
-      const messages: MessageParam[] = Array.from({ length: 15 }, (_, i) => ({
-        role: i % 2 === 0 ? "user" : "assistant",
-        content: `message ${i}`,
+      const turns: ContextTurn[] = Array.from({ length: 15 }, (_, i) => ({
+        userText: `message ${i}`,
+        process: [],
       }));
       const mockClient = {
         chatStream: vi.fn().mockReturnValue({
@@ -59,14 +59,14 @@ describe("SummaryCompressionStrategy", () => {
       } as unknown as LLMClient;
 
       await expect(
-        service.compress(messages, mockClient, "claude-3"),
+        service.compress(turns, mockClient, "claude-3"),
       ).rejects.toThrow("Compression failed");
     });
 
     it("calls client.chat with correct parameters", async () => {
-      const messages: MessageParam[] = Array.from({ length: 15 }, (_, i) => ({
-        role: i % 2 === 0 ? "user" : "assistant",
-        content: `message ${i}`,
+      const turns: ContextTurn[] = Array.from({ length: 15 }, (_, i) => ({
+        userText: `message ${i}`,
+        process: [],
       }));
       const mockClient = {
         chatStream: vi.fn().mockReturnValue({
@@ -77,7 +77,7 @@ describe("SummaryCompressionStrategy", () => {
         }),
       } as unknown as LLMClient;
 
-      await service.compress(messages, mockClient, "claude-3");
+      await service.compress(turns, mockClient, "claude-3");
 
       expect(mockClient.chatStream).toHaveBeenCalledWith(
         expect.arrayContaining([
@@ -91,10 +91,10 @@ describe("SummaryCompressionStrategy", () => {
       );
     });
 
-    it("uses last 10 messages in result", async () => {
-      const messages: MessageParam[] = Array.from({ length: 15 }, (_, i) => ({
-        role: "user" as const,
-        content: `msg${i}`,
+    it("uses last 10 turns in result", async () => {
+      const turns: ContextTurn[] = Array.from({ length: 15 }, (_, i) => ({
+        userText: `msg${i}`,
+        process: [],
       }));
       const mockClient = {
         chatStream: vi.fn().mockReturnValue({
@@ -105,10 +105,10 @@ describe("SummaryCompressionStrategy", () => {
         }),
       } as unknown as LLMClient;
 
-      const result = await service.compress(messages, mockClient, undefined);
+      const result = await service.compress(turns, mockClient, undefined);
 
-      // Last 10 messages should be preserved
-      const last10 = messages.slice(-10);
+      // Last 10 turns should be preserved
+      const last10 = turns.slice(-10);
       expect(result.slice(-10)).toEqual(last10);
     });
   });

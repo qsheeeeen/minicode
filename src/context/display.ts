@@ -2,8 +2,6 @@ export interface StatusMessage {
   role: "status" | "error";
   content: string;
   timestamp: Date;
-  messageIndex?: number;
-  /** @deprecated Use messageIndex. This indexes provider messages, not ContextTurn. */
   turnIndex?: number;
   element?: unknown;
   toolDisplay?: {

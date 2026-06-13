@@ -1,5 +1,5 @@
 import type { Agent } from "../agent.js";
-import type { LLMContextManager } from "../context/index.js";
+import type { ContextStore } from "../context/index.js";
 
 export type AgentStatus = "idle" | "running" | "completed" | "error";
 
@@ -7,7 +7,7 @@ export interface AgentSession {
   id: string;
   type: "main" | "sub";
   agent: Agent;
-  context: LLMContextManager;
+  context: ContextStore;
   status: AgentStatus;
   task?: string;
   parentId?: string;

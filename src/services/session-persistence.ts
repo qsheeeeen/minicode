@@ -9,11 +9,11 @@ import fs from "fs/promises";
 import path from "path";
 import os from "os";
 import crypto from "crypto";
-import type { MessageParam } from "../messages.js";
+import type { ContextTurn } from "../messages.js";
 
 export interface SessionData {
   model: string;
-  messages: MessageParam[];
+  turns: ContextTurn[];
   totalTokens: number;
   createdAt?: string;
   updatedAt?: string;
@@ -47,21 +47,21 @@ export class SessionPersistence {
   }
 
   static getSessionDir(): string {
-    return path.join(SessionPersistence.BASE_DIR, SessionPersistence.getProjectHash());
+    return path.join(
+      SessionPersistence.BASE_DIR,
+      SessionPersistence.getProjectHash(),
+    );
   }
 
   static async save(
     sessionName: string,
-    turns: MessageParam[],
+    turns: ContextTurn[],
     meta: { model: string; totalTokens: number },
   ): Promise<void> {
     if (!sessionName) return;
     const dir = SessionPersistence.getSessionDir();
     await fs.mkdir(dir, { recursive: true });
-    const filePath = path.join(
-      dir,
-      `${sessionName}${SessionPersistence.EXT}`,
-    );
+    const filePath = path.join(dir, `${sessionName}${SessionPersistence.EXT}`);
     const tmpPath = filePath + ".tmp";
     const header: SessionHeader = {
       model: meta.model,
@@ -85,26 +85,19 @@ export class SessionPersistence {
       const lines = content.split("\n").filter((l) => l.trim());
       if (lines.length === 0) return null;
       const header: SessionHeader = JSON.parse(lines[0]);
-      const messages: SessionData["messages"] = [];
+      const turns: ContextTurn[] = [];
       for (let i = 1; i < lines.length; i++) {
         try {
-          messages.push(JSON.parse(lines[i]));
+          turns.push(JSON.parse(lines[i]));
         } catch {
           // skip malformed lines
         }
       }
       return {
         model: header.model,
-        messages,
+        turns,
         totalTokens: header.totalTokens,
       };
-    } catch {
-      // JSONL not found, try legacy .json format
-    }
-    const legacyPath = path.join(dir, `${name}.json`);
-    try {
-      const content = await fs.readFile(legacyPath, "utf-8");
-      return JSON.parse(content);
     } catch {
       return null;
     }

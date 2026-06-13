@@ -1,31 +1,13 @@
-import type { ContentBlock } from "./blocks.js";
 import type { DisplayMessage, StatusMessage } from "./display.js";
-import type { MessageParam } from "./turns.js";
+import type { ContextTurn } from "./turns.js";
 
 export function toDisplayMessages(
-  turns: MessageParam[],
+  turns: ContextTurn[],
   statuses: StatusMessage[],
-  displayOverrides?: Map<number, string>,
 ): DisplayMessage[] {
-  const results = new Map<string, string>();
-  for (const turn of turns) {
-    if (turn.role === "user" && Array.isArray(turn.content)) {
-      for (const block of turn.content) {
-        if (block.type === "tool_result") {
-          results.set(
-            block.tool_use_id,
-            typeof block.content === "string"
-              ? block.content
-              : JSON.stringify(block.content),
-          );
-        }
-      }
-    }
-  }
-
   const byTurnIndex = new Map<number, StatusMessage[]>();
   for (const s of statuses) {
-    const idx = s.messageIndex ?? s.turnIndex ?? turns.length;
+    const idx = s.turnIndex ?? turns.length;
     if (!byTurnIndex.has(idx)) byTurnIndex.set(idx, []);
     byTurnIndex.get(idx)!.push(s);
   }
@@ -44,28 +26,22 @@ export function toDisplayMessages(
 
   for (let i = 0; i < turns.length; i++) {
     const turn = turns[i];
-    if (turn.role === "user") {
-      if (typeof turn.content === "string") {
-        const displayContent = displayOverrides?.get(i) ?? turn.content;
-        result.push({ role: "user", content: displayContent });
+    result.push({ role: "user", content: turn.userText });
+    for (const block of turn.process) {
+      if (block.type === "thinking") {
+        result.push({ role: "thinking", content: block.thinking });
+      } else if (block.type === "tool_call") {
+        result.push({
+          role: "tool",
+          name: block.name,
+          input: block.input,
+          output: block.result,
+          slotId: block.id,
+        });
       }
-    } else if (turn.role === "assistant") {
-      const blocks = Array.isArray(turn.content) ? turn.content : [];
-      for (const block of blocks as ContentBlock[]) {
-        if (block.type === "thinking") {
-          result.push({ role: "thinking", content: block.thinking });
-        } else if (block.type === "text") {
-          result.push({ role: "text", content: block.text });
-        } else if (block.type === "tool_use") {
-          result.push({
-            role: "tool",
-            name: block.name,
-            input: (block.input as Record<string, unknown>) ?? {},
-            output: results.get(block.id),
-            slotId: block.id,
-          });
-        }
-      }
+    }
+    if (turn.assistantText) {
+      result.push({ role: "text", content: turn.assistantText });
     }
     for (const s of byTurnIndex.get(i + 1) ?? []) {
       result.push({
@@ -79,7 +55,7 @@ export function toDisplayMessages(
   }
 
   for (const s of statuses) {
-    const idx = s.messageIndex ?? s.turnIndex;
+    const idx = s.turnIndex;
     if (idx !== undefined && idx > turns.length) {
       result.push({
         role: s.role,

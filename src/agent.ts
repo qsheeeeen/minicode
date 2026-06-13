@@ -1,6 +1,6 @@
 import type { Model } from "./llm/model.js";
-import type { MessageParam, TextBlock, ThinkingBlock } from "./messages.js";
 import type { LLMToolDef, LLMResponse } from "./llm/client.js";
+import { contextToProviderMessages } from "./llm/context-projection.js";
 import {
   type ToolDef,
   type ToolExecutionContext,
@@ -10,11 +10,10 @@ import type { ToolExecutor, ToolCall } from "./tools/executor.js";
 import type { UserPrompter } from "./tools/registry.js";
 import type { Signal } from "./utils/signal.js";
 import type { AgentRegistry } from "./services/agent-registry.js";
-import type { ContentBlock } from "./messages.js";
 import type { PromptManager } from "./services/prompt-manager.js";
 import type { SessionManager } from "./services/session-manager.js";
 import type { ContextManager } from "./services/context-manager.js";
-import type { LLMContextManager } from "./context/index.js";
+import type { ContextStore } from "./context/index.js";
 import type { AppConfig } from "./config.js";
 import type { FileSystemService } from "./services/filesystem.js";
 import type { ModelSwitchService } from "./services/model-switcher.js";
@@ -55,7 +54,7 @@ export class Agent {
   private _isRunning: boolean = false;
 
   /** Cached access to the context manager. */
-  private get context(): LLMContextManager {
+  private get context(): ContextStore {
     return this.sessionManager.getContext();
   }
 
@@ -148,38 +147,22 @@ export class Agent {
   private async streamLLM(toolDefs: LLMToolDef[]) {
     const stream = this.model
       .getClient()
-      .chatStream(this.context.toLLMMessages(), toolDefs, {
-        system: this.promptManager.getSystemPrompt(),
-        model: this.model.getName(),
-        signal: this.abortController?.signal,
-        effort: this.model.getEffort(),
-      });
+      .chatStream(
+        contextToProviderMessages(this.context.getTurns()),
+        toolDefs,
+        {
+          system: this.promptManager.getSystemPrompt(),
+          model: this.model.getName(),
+          signal: this.abortController?.signal,
+          effort: this.model.getEffort(),
+        },
+      );
 
-    let blockStreaming = false;
     const toolCalls: ToolCall[] = [];
 
     const handleDelta = (field: "text" | "thinking", delta: string) => {
-      const block =
-        field === "thinking"
-          ? { type: "thinking" as const, thinking: delta.trimStart() }
-          : { type: "text" as const, text: delta.trimStart() };
-      if (!blockStreaming) {
-        blockStreaming = true;
-        this.context.setStreaming(true);
-        this.context.appendToLastAssistantTurn(block as ContentBlock);
-      } else {
-        const last = this.context.getLastBlock();
-        if (last?.type === field && field in last) {
-          const currentText =
-            field === "text"
-              ? (last as TextBlock).text
-              : (last as ThinkingBlock).thinking;
-          const newText = currentText === "" ? delta.trimStart() : delta;
-          this.context.updateLastBlock({ [field]: currentText + newText });
-        } else {
-          this.context.appendToLastAssistantTurn(block as ContentBlock);
-        }
-      }
+      if (field === "thinking") this.context.appendThinking(delta);
+      else this.context.appendAssistantText(delta);
     };
 
     let response: LLMResponse | undefined;
@@ -198,10 +181,13 @@ export class Agent {
           // @ts-expect-error - text or thinking fields exist based on type
           handleDelta(chunk.type, chunk[chunk.type]);
         } else if (chunk.type === "tool_use") {
-          blockStreaming = false;
           const tool = this.toolExecutor.getTools().get(chunk.block.name);
           toolCalls.push({ block: chunk.block, tool });
-          this.context.appendToLastAssistantTurn(chunk.block as ContentBlock);
+          this.context.startToolCall(
+            chunk.block.id,
+            chunk.block.name,
+            chunk.block.input,
+          );
           this.saveStore();
         }
       }
@@ -214,7 +200,6 @@ export class Agent {
       throw e;
     } finally {
       this.saveStore();
-      this.context.setStreaming(false);
     }
 
     return { response, toolCalls };
@@ -227,15 +212,8 @@ export class Agent {
     if (this._isRunning) return false;
 
     this._isRunning = true;
-    this.context.addUserMessage(userMessage, opts?.displayContent);
-
-    // Count user prompts to determine current turn index
-    const turns = this.context.getTurns();
-    let promptCount = 0;
-    for (const t of turns) {
-      if (t.role === "user" && typeof t.content === "string") promptCount++;
-    }
-    this.sessionManager.setActiveTurnIdx(promptCount);
+    this.context.startTurn(userMessage);
+    this.sessionManager.setActiveTurnIdx(this.context.getTurnCount());
 
     this.abortController = new AbortController();
     this.logger?.info(
@@ -315,12 +293,7 @@ export class Agent {
       this._isRunning = false;
       if (this.abortController?.signal.aborted) {
         // Remove the last user message that triggered this aborted run
-        this.context.removeLastTurn(
-          (last) =>
-            last.role === "user" &&
-            typeof last.content === "string" &&
-            last.content === userMessage,
-        );
+        this.context.removeLastTurn((last) => last.userText === userMessage);
       }
       this.abortController = null;
       this.logger?.info(

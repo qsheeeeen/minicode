@@ -8,8 +8,23 @@
 
 import OpenAI from "openai";
 
-import type { LLMClient, LLMStream, StreamEvent, LLMToolDef, ChatOptions, LLMResponse, TokenUsage, EffortLevel } from "./client.js";
-import type { MessageParam, ContentBlock, TextBlock, ToolUseBlock, ToolResultBlock } from "../messages.js";
+import type {
+  LLMClient,
+  LLMStream,
+  StreamEvent,
+  LLMToolDef,
+  ChatOptions,
+  LLMResponse,
+  TokenUsage,
+  EffortLevel,
+} from "./client.js";
+import type {
+  ProviderMessage,
+  ProviderAssistantBlock,
+  ProviderTextBlock,
+  ProviderToolUseBlock,
+  ProviderToolResultBlock,
+} from "./client.js";
 
 // The OpenAI SDK's ResponseStreamEvent union doesn't cover all streaming event
 // types (delta, output_item.done, etc.). These interfaces fill the gap.
@@ -73,8 +88,8 @@ function toSdkTools(tools: LLMToolDef[]): OpenAI.Responses.FunctionTool[] {
 
 type ResponseInputItem = OpenAI.Responses.ResponseInputItem;
 
-// Convert MessageParam[] to an OpenAI Responses `input` array.
-function toSdkMessages(messages: MessageParam[]): ResponseInputItem[] {
+// Convert ProviderMessage[] to an OpenAI Responses `input` array.
+function toSdkMessages(messages: ProviderMessage[]): ResponseInputItem[] {
   const input: ResponseInputItem[] = [];
 
   for (const msg of messages) {
@@ -83,9 +98,9 @@ function toSdkMessages(messages: MessageParam[]): ResponseInputItem[] {
         // Plain text user message
         input.push({ role: "user", content: msg.content });
       } else if (Array.isArray(msg.content)) {
-        // User content blocks — expected to be ToolResultBlock[]
+        // User content blocks — expected to be ProviderToolResultBlock[]
         for (const block of msg.content) {
-          const b = block as ToolResultBlock;
+          const b = block as ProviderToolResultBlock;
           if (b.type === "tool_result") {
             input.push({
               type: "function_call_output",
@@ -116,12 +131,12 @@ function toSdkMessages(messages: MessageParam[]): ResponseInputItem[] {
         for (const block of msg.content) {
           switch (block.type) {
             case "text":
-              textParts.push((block as TextBlock).text);
+              textParts.push((block as ProviderTextBlock).text);
               break;
             case "tool_use": {
               // Flush any accumulated text before adding function call
               flushText();
-              const tb = block as ToolUseBlock;
+              const tb = block as ProviderToolUseBlock;
               input.push({
                 type: "function_call",
                 id: tb.id,
@@ -150,7 +165,7 @@ function toSdkMessages(messages: MessageParam[]): ResponseInputItem[] {
 
 // Convert an OpenAI Responses response object to LLMResponse.
 function toLLMResponse(response: OpenAI.Responses.Response): LLMResponse {
-  const content: ContentBlock[] = [];
+  const content: ProviderAssistantBlock[] = [];
   let hasToolCalls = false;
 
   for (const item of response.output) {
@@ -248,7 +263,7 @@ export class OpenAIResponsesClient implements LLMClient {
   }
 
   chatStream(
-    messages: MessageParam[],
+    messages: ProviderMessage[],
     tools: LLMToolDef[],
     options: ChatOptions = {},
   ): LLMStream {
@@ -340,7 +355,8 @@ export class OpenAIResponsesClient implements LLMClient {
             break;
           }
           case "response.completed": {
-            const response = (event as unknown as StreamCompletedEvent).response;
+            const response = (event as unknown as StreamCompletedEvent)
+              .response;
             if (response) {
               finalResult = toLLMResponse(response);
             }

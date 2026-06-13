@@ -241,15 +241,15 @@ describe("Agent", () => {
   describe("getMessages and setMessages", () => {
     it("setMessages stores turns directly", () => {
       const { context, sessionManager } = makeAgent();
-      const messages: any[] = [{ role: "user", content: "hello" }];
+      const messages: any[] = [{ userText: "hello", process: [] }];
       sessionManager.setMessages(messages);
       expect(context.getTurns()).toEqual(messages);
     });
 
     it("getMessages returns context turns", () => {
       const { context } = makeAgent();
-      context.addUserMessage("hello");
-      expect(context.getTurns()).toEqual([{ role: "user", content: "hello" }]);
+      context.startTurn("hello");
+      expect(context.getTurns()).toEqual([{ userText: "hello", process: [] }]);
     });
   });
 
@@ -259,7 +259,7 @@ describe("Agent", () => {
       const reportStatusSpy = vi.fn();
       sessionManager.setStatusReporter(reportStatusSpy);
       for (let i = 0; i < 5; i++) {
-        context.addUserMessage(`msg ${i}`);
+        context.startTurn(`msg ${i}`);
       }
       await agent.compress();
       expect(reportStatusSpy).toHaveBeenCalledWith(
@@ -273,7 +273,7 @@ describe("Agent", () => {
   describe("clearSession", () => {
     it("clears the context", () => {
       const { agent, context } = makeAgent();
-      context.addUserMessage("hi");
+      context.startTurn("hi");
       agent.clearSession();
       expect(context.getTurns()).toHaveLength(0);
     });
@@ -299,8 +299,9 @@ describe("Agent", () => {
 
       await runPromise;
       const turns = context.getTurns();
-      expect(turns[0]).toEqual({ role: "user", content: "Hello agent" });
-      expect(turns[1].role).toBe("assistant");
+      expect(turns).toEqual([
+        { userText: "Hello agent", process: [], assistantText: "Hi there!" },
+      ]);
     });
 
     it("handles thinking blocks", async () => {
@@ -327,8 +328,9 @@ describe("Agent", () => {
 
       await runPromise;
       const turns = context.getTurns();
-      const content = turns[1].content as any[];
-      expect(content.some((b: any) => b.type === "thinking")).toBe(true);
+      expect(turns[0].process).toEqual([
+        { type: "thinking", thinking: "Hmm..." },
+      ]);
     });
 
     it("handles tool calls", async () => {
@@ -366,12 +368,16 @@ describe("Agent", () => {
 
       await runPromise;
       const turns = context.getTurns();
-      const assistantContent = turns[1].content as any[];
-      expect(assistantContent.some((b: any) => b.type === "tool_use")).toBe(
-        true,
-      );
-      expect(turns[2].role).toBe("user");
-      expect(Array.isArray(turns[2].content)).toBe(true);
+      expect(turns).toHaveLength(1);
+      expect(turns[0].process).toEqual([
+        {
+          type: "tool_call",
+          id: "call_1",
+          name: "testTool",
+          input: {},
+          result: "success",
+        },
+      ]);
     });
   });
 
@@ -458,10 +464,16 @@ describe("Agent", () => {
       await runPromise;
 
       const turns = context.getTurns();
-      expect(turns).toHaveLength(3);
-      const lastTurn = turns[2];
-      expect(lastTurn.role).toBe("user");
-      expect((lastTurn.content as any)[0].content).toBe("User rejected");
+      expect(turns).toHaveLength(1);
+      expect(turns[0].process).toEqual([
+        {
+          type: "tool_call",
+          id: "call_1",
+          name: "testTool",
+          input: {},
+          result: "User rejected",
+        },
+      ]);
 
       expect(reportStatusSpy).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -523,14 +535,13 @@ describe("Agent", () => {
       await runPromise;
 
       const turns = context.getTurns();
-      expect(turns).toHaveLength(4);
-      const toolResultTurn = turns[2];
-      expect((toolResultTurn.content as any)[0].content).toContain(
+      expect(turns).toHaveLength(1);
+      expect((turns[0].process[0] as any).result).toContain(
         "Tool execution denied by auto-gate: too risky",
       );
-
-      const finalTurn = turns[3];
-      expect(finalTurn.role).toBe("assistant");
+      expect(turns[0].assistantText).toBe(
+        "I cannot do that because it is too risky.",
+      );
     });
   });
 });

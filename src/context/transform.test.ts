@@ -1,36 +1,29 @@
 import { describe, it, expect } from "vitest";
-import type { MessageParam, StatusMessage } from "./index.js";
+import type { ContextTurn, StatusMessage } from "./index.js";
 import { toDisplayMessages } from "./index.js";
 
 describe("toDisplayMessages", () => {
   it("converts context blocks and attaches tool results", () => {
-    const turns: MessageParam[] = [
-      { role: "user", content: "hello" },
+    const turns: ContextTurn[] = [
       {
-        role: "assistant",
-        content: [
+        userText: "hello",
+        process: [
           { type: "thinking", thinking: "plan" },
-          { type: "text", text: "hi" },
           {
-            type: "tool_use",
+            type: "tool_call",
             id: "tool-1",
             name: "Read",
             input: { path: "a" },
+            result: "content",
           },
         ],
-      },
-      {
-        role: "user",
-        content: [
-          { type: "tool_result", tool_use_id: "tool-1", content: "content" },
-        ],
+        assistantText: "hi",
       },
     ];
 
     expect(toDisplayMessages(turns, [])).toEqual([
       { role: "user", content: "hello" },
       { role: "thinking", content: "plan" },
-      { role: "text", content: "hi" },
       {
         role: "tool",
         name: "Read",
@@ -38,22 +31,21 @@ describe("toDisplayMessages", () => {
         output: "content",
         slotId: "tool-1",
       },
+      { role: "text", content: "hi" },
     ]);
   });
 
   it("interleaves statuses by message index and applies display overrides", () => {
     const timestamp = new Date("2026-01-01T00:00:00.000Z");
-    const turns: MessageParam[] = [{ role: "user", content: "internal" }];
+    const turns: ContextTurn[] = [{ userText: "internal", process: [] }];
     const statuses: StatusMessage[] = [
-      { role: "status", content: "before", timestamp, messageIndex: 0 },
-      { role: "error", content: "after", timestamp, messageIndex: 1 },
+      { role: "status", content: "before", timestamp, turnIndex: 0 },
+      { role: "error", content: "after", timestamp, turnIndex: 1 },
     ];
 
-    expect(
-      toDisplayMessages(turns, statuses, new Map([[0, "display"]])),
-    ).toEqual([
+    expect(toDisplayMessages(turns, statuses)).toEqual([
       { role: "status", content: "before", timestamp },
-      { role: "user", content: "display" },
+      { role: "user", content: "internal" },
       { role: "error", content: "after", timestamp },
     ]);
   });

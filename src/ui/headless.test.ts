@@ -8,8 +8,7 @@ const mockContext = {
   onChange: mockOnChange,
   getTurns: mockGetTurns,
   getTurnCount: vi.fn().mockReturnValue(0),
-  toLLMMessages: vi.fn().mockReturnValue([]),
-  setTurns: vi.fn(),
+  replaceTurns: vi.fn(),
 };
 
 const mockSetSession = vi.fn();

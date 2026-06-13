@@ -14,7 +14,7 @@ import type {
   TokenUsage,
   StreamEvent,
 } from "./client.js";
-import type { MessageParam } from "../messages.js";
+import type { ProviderMessage } from "./client.js";
 
 // Types
 
@@ -52,7 +52,7 @@ export class VirtualLLMClient implements LLMClient {
   }
 
   chatStream(
-    _messages: MessageParam[],
+    _messages: ProviderMessage[],
     _tools: LLMToolDef[],
     options?: ChatOptions,
   ): LLMStream {
@@ -116,9 +116,7 @@ export class VirtualLLMClient implements LLMClient {
         },
       ],
       response: {
-        content: [
-          { type: "tool_use", id: toolId, name: toolName, input },
-        ],
+        content: [{ type: "tool_use", id: toolId, name: toolName, input }],
         stop_reason: "tool_use",
         usage: DEFAULT_USAGE,
       },

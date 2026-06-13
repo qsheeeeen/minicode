@@ -14,12 +14,7 @@ registerCommand({
     }
 
     const turns = ctx.context.getTurns();
-    const userMessages: string[] = [];
-    for (const t of turns) {
-      if (t.role === "user" && typeof t.content === "string") {
-        userMessages.push(t.content);
-      }
-    }
+    const userMessages = turns.map((t) => t.userText);
 
     if (userMessages.length === 0) {
       ctx.sessionManager.reportStatus({

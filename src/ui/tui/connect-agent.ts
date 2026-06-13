@@ -12,7 +12,7 @@ import type { Agent } from "../../agent.js";
 import type { AgentRegistry } from "../../services/index.js";
 import type { SessionManager } from "../../services/session-manager.js";
 import type { UserPrompter, Prompt } from "../../tools/registry.js";
-import type { MessageParam } from "../../messages.js";
+import { toDisplayMessages } from "../../messages.js";
 import { SessionPersistence } from "../../services/session-persistence.js";
 import type { Signal } from "../../utils/signal.js";
 import { useTuiStore } from "./store.js";
@@ -51,12 +51,12 @@ export function connectAgent(options: ConnectAgentOptions): {
   const context = sessionManager.getContext();
   const { dispatch } = useTuiStore.getState();
 
-  // Helper: sync display messages from LLMContextManager + Zustand statuses
+  // Helper: sync display messages from ContextStore + Zustand statuses
   const syncMessages = () => {
     const { statuses } = useTuiStore.getState();
     dispatch({
       type: "SET_MESSAGES",
-      payload: context.toDisplayMessages(statuses),
+      payload: toDisplayMessages(context.getTurns(), statuses),
     });
   };
 
@@ -78,12 +78,12 @@ export function connectAgent(options: ConnectAgentOptions): {
 
   // 3. Wire StatusReporter: statuses → Zustand + re-sync display messages
   sessionManager.setStatusReporter((msg) => {
-    const messageIndex = context.getTurnCount();
-    dispatch({ type: "ADD_STATUS", payload: { ...msg, messageIndex } });
+    const turnIndex = context.getTurnCount();
+    dispatch({ type: "ADD_STATUS", payload: { ...msg, turnIndex } });
     syncMessages();
   });
 
-  // 4. Subscribe to LLMContextManager changes → re-sync display messages
+  // 4. Subscribe to ContextStore changes → re-sync display messages
   const unsubStore = context.onChange(syncMessages);
 
   // 5. Register main agent in the registry
@@ -100,7 +100,7 @@ export function connectAgent(options: ConnectAgentOptions): {
     if (sessionName || resumeRecent) {
       const data = await SessionPersistence.load(initialSession);
       if (data) {
-        context.setTurns(data.messages as MessageParam[]);
+        context.replaceTurns(data.turns);
         const totalTokens = data.totalTokens || 0;
         if (totalTokens > 0) {
           tokenCount$.set(totalTokens);

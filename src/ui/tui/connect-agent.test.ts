@@ -134,11 +134,7 @@ describe("connectAgent", () => {
 
     await agent.run("Hello");
 
-    // Should have dispatched SET_MESSAGES at least:
-    // 1. addUserMessage → user message
-    // 2. setStreaming(true) → streaming flag
-    // 3. appendToLastAssistantTurn → first text block
-    // 4. setStreaming(false) → final state
+    // Should have dispatched SET_MESSAGES while the context turn updates.
     expect(dispatchHistory.length).toBeGreaterThanOrEqual(2);
 
     // Last dispatch should have the final messages

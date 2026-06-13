@@ -42,8 +42,8 @@ export async function runHeadless(
   // Set up renderer with status forwarding
   const renderer = new HeadlessRenderer(context);
   sessionManager.setStatusReporter((msg) => {
-    const messageIndex = context.getTurnCount();
-    renderer.addStatus({ ...msg, messageIndex });
+    const turnIndex = context.getTurnCount();
+    renderer.addStatus({ ...msg, turnIndex });
   });
 
   // Load session if requested
@@ -54,7 +54,7 @@ export async function runHeadless(
       `session-${Date.now()}`;
     const data = await SessionPersistence.load(name);
     if (data) {
-      context.setTurns(data.messages);
+      context.replaceTurns(data.turns);
       const totalTokens = data.totalTokens || 0;
       if (totalTokens > 0) {
         tokenCount$.set(totalTokens);

@@ -1,5 +1,5 @@
 import type { ToolDef, ToolResult, ToolExecutionContext } from "../registry.js";
-import type { MessageParam, ContentBlock } from "../../messages.js";
+import type { ContextTurn } from "../../messages.js";
 import { Agent } from "../../agent.js";
 import { SessionManager } from "../../services/session-manager.js";
 import { ContextManager } from "../../services/context-manager.js";
@@ -124,11 +124,7 @@ export const agentTool: ToolDef = {
       const turns = subContext.getTurns();
       let tc = 0;
       for (const turn of turns) {
-        if (turn.role === "assistant" && Array.isArray(turn.content)) {
-          for (const block of turn.content) {
-            if (block.type === "tool_use") tc++;
-          }
-        }
+        tc += turn.process.filter((block) => block.type === "tool_call").length;
       }
       if (tc !== toolCallCount) {
         toolCallCount = tc;
@@ -162,29 +158,23 @@ export const agentTool: ToolDef = {
   },
 };
 
-function extractFinalResponse(turns: MessageParam[]): string | null {
+function extractFinalResponse(turns: ContextTurn[]): string | null {
   for (let i = turns.length - 1; i >= 0; i--) {
     const turn = turns[i];
-    if (turn.role === "assistant" && Array.isArray(turn.content)) {
-      for (const block of turn.content as ContentBlock[]) {
-        if (block.type === "text" && block.text.trim()) {
-          return block.text.trim();
-        }
-      }
+    if (turn.assistantText?.trim()) {
+      return turn.assistantText.trim();
     }
   }
   return null;
 }
 
-function generateSummary(turns: MessageParam[]): string {
+function generateSummary(turns: ContextTurn[]): string {
   let toolCallCount = 0;
 
   for (const turn of turns) {
-    if (turn.role === "assistant" && Array.isArray(turn.content)) {
-      for (const block of turn.content as ContentBlock[]) {
-        if (block.type === "tool_use") toolCallCount++;
-      }
-    }
+    toolCallCount += turn.process.filter(
+      (block) => block.type === "tool_call",
+    ).length;
   }
 
   return toolCallCount > 0 ? `${toolCallCount} operations` : "Task completed";

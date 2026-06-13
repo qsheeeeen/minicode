@@ -4,14 +4,24 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { MessageStreamEvent } from "@anthropic-ai/sdk/resources/messages.js";
 import type { LLMStream, StreamEvent } from "./client.js";
+import type { MessageCreateParamsStreaming } from "@anthropic-ai/sdk/resources/messages.js";
+
 import type {
-  MessageCreateParamsStreaming,
-} from "@anthropic-ai/sdk/resources/messages.js";
+  LLMClient,
+  LLMToolDef,
+  ChatOptions,
+  LLMResponse,
+  EffortLevel,
+} from "./client.js";
+import type {
+  ProviderMessage,
+  ProviderAssistantBlock,
+  ProviderToolResultBlock,
+} from "./client.js";
 
-import type { LLMClient, LLMToolDef, ChatOptions, LLMResponse, EffortLevel } from "./client.js";
-import type { MessageParam, ContentBlock, ToolResultBlock } from "../messages.js";
-
-function toSdkEffort(effort: EffortLevel): "low" | "medium" | "high" | "xhigh" | "max" {
+function toSdkEffort(
+  effort: EffortLevel,
+): "low" | "medium" | "high" | "xhigh" | "max" {
   switch (effort) {
     case "none":
     case "minimal":
@@ -35,15 +45,15 @@ type AnthropicContentBlockParam = Anthropic.Messages.ContentBlockParam;
 // Thinking blocks are filtered out — they're output-only and not accepted
 // as input by the API (adaptive thinking reconstructs context automatically).
 function toSdkMessages(
-  messages: MessageParam[],
+  messages: ProviderMessage[],
 ): Anthropic.Messages.MessageParam[] {
   return messages.map((msg) => {
     if (msg.role === "user") {
       if (typeof msg.content === "string") {
         return { role: "user" as const, content: msg.content };
       }
-      // ToolResultBlock → Anthropic ToolResultBlockParam
-      const blocks = msg.content as ToolResultBlock[];
+      // ProviderToolResultBlock → Anthropic ProviderToolResultBlockParam
+      const blocks = msg.content as ProviderToolResultBlock[];
       const content = blocks.map((b) => ({
         type: "tool_result" as const,
         tool_use_id: b.tool_use_id,
@@ -84,9 +94,9 @@ function toSdkTools(tools: LLMToolDef[]): AnthropicTool[] {
 // Map SDK content blocks to our internal types.
 // SDK ThinkingBlock has extra fields (signature, redacted_thinking variants)
 // that our ThinkingBlock doesn't carry.
-function toContentBlock(
+function toProviderAssistantBlock(
   block: Anthropic.ContentBlock,
-): ContentBlock {
+): ProviderAssistantBlock {
   if (block.type === "text") {
     return { type: "text", text: block.text };
   }
@@ -116,7 +126,7 @@ function toLLMResponse(msg: Anthropic.Messages.Message): LLMResponse {
   const cacheMiss = cacheUsage.cache_creation_input_tokens ?? 0;
   const cacheHit = cacheUsage.cache_read_input_tokens ?? 0;
   return {
-    content: msg.content.map(toContentBlock),
+    content: msg.content.map(toProviderAssistantBlock),
     stop_reason: msg.stop_reason ?? "end_turn",
     usage: {
       input: {
@@ -143,7 +153,7 @@ export class AnthropicClient implements LLMClient {
   }
 
   chatStream(
-    messages: MessageParam[],
+    messages: ProviderMessage[],
     tools: LLMToolDef[],
     options: ChatOptions = {},
   ): LLMStream {
@@ -168,7 +178,11 @@ export class AnthropicClient implements LLMClient {
     });
 
     async function* run(): AsyncGenerator<StreamEvent, LLMResponse, unknown> {
-      let currentToolCall: { id: string; name: string; arguments: string } | null = null;
+      let currentToolCall: {
+        id: string;
+        name: string;
+        arguments: string;
+      } | null = null;
       let currentText = "";
       let currentThinking = "";
 

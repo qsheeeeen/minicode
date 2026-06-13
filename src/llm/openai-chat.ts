@@ -4,8 +4,22 @@
 // converts between internal types and the OpenAI Chat Completions API format.
 
 import OpenAI from "openai";
-import type { LLMClient, LLMStream, StreamEvent, LLMToolDef, ChatOptions, LLMResponse, EffortLevel } from "./client.js";
-import type { MessageParam, ContentBlock, TextBlock, ToolUseBlock, ToolResultBlock } from "../messages.js";
+import type {
+  LLMClient,
+  LLMStream,
+  StreamEvent,
+  LLMToolDef,
+  ChatOptions,
+  LLMResponse,
+  EffortLevel,
+} from "./client.js";
+import type {
+  ProviderMessage,
+  ProviderAssistantBlock,
+  ProviderTextBlock,
+  ProviderToolUseBlock,
+  ProviderToolResultBlock,
+} from "./client.js";
 
 // Constants
 
@@ -56,7 +70,7 @@ type OpenAIMessage =
   | OpenAI.ChatCompletionToolMessageParam;
 
 function toSdkMessages(
-  messages: MessageParam[],
+  messages: ProviderMessage[],
   system?: string,
 ): OpenAIMessage[] {
   const out: OpenAIMessage[] = [];
@@ -72,7 +86,7 @@ function toSdkMessages(
         out.push({ role: "user", content: msg.content });
       } else if (Array.isArray(msg.content)) {
         // Check if these are tool results
-        const blocks = msg.content as ToolResultBlock[];
+        const blocks = msg.content as ProviderToolResultBlock[];
         if (blocks.length > 0 && blocks[0].type === "tool_result") {
           for (const block of blocks) {
             out.push({
@@ -83,8 +97,8 @@ function toSdkMessages(
           }
         } else {
           // Fallback: concatenate text blocks
-          const text = (msg.content as ContentBlock[])
-            .filter((b): b is TextBlock => b.type === "text")
+          const text = (msg.content as ProviderAssistantBlock[])
+            .filter((b): b is ProviderTextBlock => b.type === "text")
             .map((b) => b.text)
             .join("");
           out.push({ role: "user", content: text });
@@ -95,7 +109,7 @@ function toSdkMessages(
       if (typeof msg.content === "string") {
         out.push({ role: "assistant", content: msg.content });
       } else if (Array.isArray(msg.content)) {
-        const blocks = msg.content as ContentBlock[];
+        const blocks = msg.content as ProviderAssistantBlock[];
         const textParts: string[] = [];
         const toolCalls: OpenAI.ChatCompletionMessageToolCall[] = [];
 
@@ -160,7 +174,7 @@ export class OpenAIChatClient implements LLMClient {
   }
 
   chatStream(
-    messages: MessageParam[],
+    messages: ProviderMessage[],
     tools: LLMToolDef[],
     options: ChatOptions = {},
   ): LLMStream {
@@ -259,7 +273,7 @@ export class OpenAIChatClient implements LLMClient {
         }
       }
 
-      const content: ContentBlock[] = [];
+      const content: ProviderAssistantBlock[] = [];
 
       if (thinkingContent.length > 0) {
         content.push({ type: "thinking", thinking: thinkingContent });
@@ -274,7 +288,7 @@ export class OpenAIChatClient implements LLMClient {
         try {
           input = JSON.parse(pending.arguments);
         } catch {}
-        const block: ToolUseBlock = {
+        const block: ProviderToolUseBlock = {
           type: "tool_use",
           id: pending.id,
           name: pending.name,

@@ -1,29 +1,29 @@
 import type { LLMClient } from "../llm/client.js";
 import type { LLMResponse } from "../llm/client.js";
-import type { MessageParam, TextBlock } from "../messages.js";
+import type { ContextTurn } from "../messages.js";
 
 export interface CompressionStrategy {
   compress(
-    messages: MessageParam[],
+    turns: ContextTurn[],
     client: LLMClient,
     model: string | undefined,
-  ): Promise<MessageParam[]>;
+  ): Promise<ContextTurn[]>;
 }
 
 export class SummaryCompressionStrategy implements CompressionStrategy {
   private readonly recentCount = 10;
 
   async compress(
-    messages: MessageParam[],
+    turns: ContextTurn[],
     client: LLMClient,
     model: string | undefined,
-  ): Promise<MessageParam[]> {
-    if (messages.length <= this.recentCount + 2) {
-      return messages; // Not enough to compress
+  ): Promise<ContextTurn[]> {
+    if (turns.length <= this.recentCount + 2) {
+      return turns; // Not enough to compress
     }
 
-    const messagesToSummarize = messages.slice(0, -this.recentCount);
-    const conversationText = this.extractConversationText(messagesToSummarize);
+    const turnsToSummarize = turns.slice(0, -this.recentCount);
+    const conversationText = this.extractConversationText(turnsToSummarize);
 
     const summaryPrompt = `Summarize the following conversation concisely. Focus on:
 - What was being worked on
@@ -54,38 +54,31 @@ ${conversationText}`;
       const summaryText = this.extractSummaryText(response!);
       return [
         {
-          role: "user",
-          content: `[Previous conversation summary]\n${summaryText}`,
+          userText: `[Previous conversation summary]\n${summaryText}`,
+          process: [],
         },
-        ...messages.slice(-this.recentCount),
+        ...turns.slice(-this.recentCount),
       ];
     } catch (e) {
       throw new Error(`Compression failed: ${(e as Error).message}`);
     }
   }
 
-  private extractConversationText(messages: MessageParam[]): string {
+  private extractConversationText(turns: ContextTurn[]): string {
     const lines: string[] = [];
-    for (const msg of messages) {
-      const role = msg.role === "user" ? "User" : "Assistant";
-      const content = msg.content;
-      if (typeof content === "string") {
-        lines.push(`${role}: ${content}`);
-      } else if (Array.isArray(content)) {
-        for (const block of content) {
-          const b = block as unknown as Record<string, unknown>;
-          if (b.type === "text" && typeof b.text === "string") {
-            lines.push(`${role}: ${b.text}`);
-          } else if (b.type === "tool_use") {
-            lines.push(`${role}: [Called tool: ${b.name}]`);
-          } else if (b.type === "tool_result") {
-            const resultContent = b.content;
-            if (typeof resultContent === "string") {
-              lines.push(`Tool result: ${resultContent.slice(0, 500)}`);
-            }
+    for (const turn of turns) {
+      lines.push(`User: ${turn.userText}`);
+      for (const block of turn.process) {
+        if (block.type === "thinking") {
+          lines.push(`Assistant thinking: ${block.thinking}`);
+        } else {
+          lines.push(`Assistant: [Called tool: ${block.name}]`);
+          if (block.result !== undefined) {
+            lines.push(`Tool result: ${block.result.slice(0, 500)}`);
           }
         }
       }
+      if (turn.assistantText) lines.push(`Assistant: ${turn.assistantText}`);
     }
     return lines.join("\n");
   }
@@ -93,7 +86,7 @@ ${conversationText}`;
   private extractSummaryText(summary: LLMResponse): string {
     for (const block of summary.content) {
       if (block.type === "text") {
-        return (block as TextBlock).text;
+        return block.text;
       }
     }
     return "Conversation summary unavailable";

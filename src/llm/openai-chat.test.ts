@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { StreamEvent, LLMResponse } from "./client.js";
-import type { MessageParam } from "../messages.js";
+import type { ProviderMessage } from "./client.js";
 
 async function collectStream(
   stream: AsyncGenerator<StreamEvent, LLMResponse, unknown>,
@@ -56,14 +56,10 @@ describe("OpenAIChatClient", () => {
       chatCreateMock.mockReturnValue(
         mockStream([
           {
-            choices: [
-              { delta: { content: "Hello" }, finish_reason: null },
-            ],
+            choices: [{ delta: { content: "Hello" }, finish_reason: null }],
           },
           {
-            choices: [
-              { delta: { content: " world" }, finish_reason: null },
-            ],
+            choices: [{ delta: { content: " world" }, finish_reason: null }],
           },
           {
             choices: [{ delta: {}, finish_reason: "stop" }],
@@ -185,18 +181,16 @@ describe("OpenAIChatClient", () => {
       const stream = client.chatStream([], []);
       const collected = await collectStream(stream);
 
-      const toolEvents = collected.events.filter(
-        (e) => e.type === "tool_use",
-      );
+      const toolEvents = collected.events.filter((e) => e.type === "tool_use");
       expect(toolEvents).toHaveLength(1);
-      expect(
-        (toolEvents[0] as { type: "tool_use"; block: any }).block,
-      ).toEqual({
-        type: "tool_use",
-        id: "call_1",
-        name: "Read",
-        input: { path: "test.ts" },
-      });
+      expect((toolEvents[0] as { type: "tool_use"; block: any }).block).toEqual(
+        {
+          type: "tool_use",
+          id: "call_1",
+          name: "Read",
+          input: { path: "test.ts" },
+        },
+      );
 
       expect(collected.response.stop_reason).toBe("tool_use");
       expect(collected.response.content[0].type).toBe("tool_use");
@@ -239,9 +233,7 @@ describe("OpenAIChatClient", () => {
       const stream = client.chatStream([], []);
       const collected = await collectStream(stream);
 
-      const toolEvents = collected.events.filter(
-        (e) => e.type === "tool_use",
-      );
+      const toolEvents = collected.events.filter((e) => e.type === "tool_use");
       expect(toolEvents).toHaveLength(2);
       expect(collected.response.content).toHaveLength(2);
     });
@@ -287,9 +279,7 @@ describe("OpenAIChatClient", () => {
       chatCreateMock.mockReturnValue(
         mockStream([
           {
-            choices: [
-              { delta: { content: "truncated" }, finish_reason: null },
-            ],
+            choices: [{ delta: { content: "truncated" }, finish_reason: null }],
           },
           {
             choices: [{ delta: {}, finish_reason: "length" }],
@@ -308,9 +298,7 @@ describe("OpenAIChatClient", () => {
       chatCreateMock.mockReturnValue(
         mockStream([
           {
-            choices: [
-              { delta: { content: "hi" }, finish_reason: null },
-            ],
+            choices: [{ delta: { content: "hi" }, finish_reason: null }],
           },
           { choices: [{ delta: {}, finish_reason: "stop" }] },
         ]),
@@ -332,9 +320,7 @@ describe("OpenAIChatClient", () => {
       chatCreateMock.mockReturnValue(
         mockStream([
           {
-            choices: [
-              { delta: { content: "ok" }, finish_reason: null },
-            ],
+            choices: [{ delta: { content: "ok" }, finish_reason: null }],
           },
           {
             choices: [{ delta: {}, finish_reason: "stop" }],
@@ -358,9 +344,7 @@ describe("OpenAIChatClient", () => {
       chatCreateMock.mockReturnValue(
         mockStream([
           {
-            choices: [
-              { delta: { content: "ok" }, finish_reason: null },
-            ],
+            choices: [{ delta: { content: "ok" }, finish_reason: null }],
           },
           {
             choices: [{ delta: {}, finish_reason: "stop" }],
@@ -369,7 +353,7 @@ describe("OpenAIChatClient", () => {
         ]),
       );
 
-      const messages: MessageParam[] = [
+      const messages: ProviderMessage[] = [
         { role: "user", content: "do something" },
         {
           role: "assistant",
@@ -406,9 +390,7 @@ describe("OpenAIChatClient", () => {
       chatCreateMock.mockReturnValue(
         mockStream([
           {
-            choices: [
-              { delta: { content: "ok" }, finish_reason: null },
-            ],
+            choices: [{ delta: { content: "ok" }, finish_reason: null }],
           },
           {
             choices: [{ delta: {}, finish_reason: "stop" }],
@@ -417,7 +399,7 @@ describe("OpenAIChatClient", () => {
         ]),
       );
 
-      const messages: MessageParam[] = [
+      const messages: ProviderMessage[] = [
         {
           role: "assistant",
           content: [

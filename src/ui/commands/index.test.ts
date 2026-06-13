@@ -88,7 +88,7 @@ describe("Builtin commands", () => {
   /** Create a mock context (ctx.context) */
   function makeContextMock() {
     return {
-      setTurns: vi.fn(),
+      replaceTurns: vi.fn(),
       getTurns: vi.fn().mockReturnValue([]),
     };
   }
@@ -101,7 +101,9 @@ describe("Builtin commands", () => {
   }
 
   /** Create a mock SessionManager (ctx.sessionManager) */
-  function makeSessionManagerMock(contextMock: ReturnType<typeof makeContextMock>) {
+  function makeSessionManagerMock(
+    contextMock: ReturnType<typeof makeContextMock>,
+  ) {
     return {
       setSession: vi.fn(),
       getStore: vi.fn().mockReturnValue(contextMock),
@@ -163,7 +165,15 @@ describe("Builtin commands", () => {
       ...overrides,
     };
 
-    return { ctx, context, model, sessionManager, changeJournal, tokenCount$, agent };
+    return {
+      ctx,
+      context,
+      model,
+      sessionManager,
+      changeJournal,
+      tokenCount$,
+      agent,
+    };
   }
 
   describe("handlers", () => {
@@ -258,7 +268,7 @@ describe("Builtin commands", () => {
 
     it("/resume with args loads session", async () => {
       sessionPersistenceMock.load.mockResolvedValue({
-        messages: [],
+        turns: [],
         totalTokens: 100,
       });
       const { ctx, context, tokenCount$, sessionManager } = makeCtx();
@@ -270,7 +280,7 @@ describe("Builtin commands", () => {
       );
       expect(result.handled).toBe(true);
       expect(sessionPersistenceMock.load).toHaveBeenCalledWith("session-1");
-      expect(context.setTurns).toHaveBeenCalled();
+      expect(context.replaceTurns).toHaveBeenCalled();
       expect(tokenCount$.set).toHaveBeenCalledWith(100);
       expect(ctx.setCurrentSession).toHaveBeenCalledWith("session-1");
       // switchSession reports a status message

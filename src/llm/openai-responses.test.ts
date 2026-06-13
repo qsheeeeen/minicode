@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { StreamEvent, LLMResponse } from "./client.js";
-import type { MessageParam } from "../messages.js";
+import type { ProviderMessage } from "./client.js";
 
 async function collectStream(
   stream: AsyncGenerator<StreamEvent, LLMResponse, unknown>,
@@ -62,9 +62,7 @@ describe("OpenAIResponsesClient", () => {
               output: [
                 {
                   type: "message",
-                  content: [
-                    { type: "output_text", text: "Hello world" },
-                  ],
+                  content: [{ type: "output_text", text: "Hello world" }],
                 },
               ],
               status: "completed",
@@ -181,18 +179,16 @@ describe("OpenAIResponsesClient", () => {
       const stream = client.chatStream([], []);
       const collected = await collectStream(stream);
 
-      const toolEvents = collected.events.filter(
-        (e) => e.type === "tool_use",
-      );
+      const toolEvents = collected.events.filter((e) => e.type === "tool_use");
       expect(toolEvents).toHaveLength(1);
-      expect(
-        (toolEvents[0] as { type: "tool_use"; block: any }).block,
-      ).toEqual({
-        type: "tool_use",
-        id: "call_1",
-        name: "Read",
-        input: { path: "/tmp/test.ts" },
-      });
+      expect((toolEvents[0] as { type: "tool_use"; block: any }).block).toEqual(
+        {
+          type: "tool_use",
+          id: "call_1",
+          name: "Read",
+          input: { path: "/tmp/test.ts" },
+        },
+      );
 
       expect(collected.response.stop_reason).toBe("tool_use");
     });
@@ -267,9 +263,7 @@ describe("OpenAIResponsesClient", () => {
               output: [
                 {
                   type: "message",
-                  content: [
-                    { type: "output_text", text: "truncated" },
-                  ],
+                  content: [{ type: "output_text", text: "truncated" }],
                 },
               ],
               status: "incomplete",
@@ -301,7 +295,7 @@ describe("OpenAIResponsesClient", () => {
         ]),
       );
 
-      const messages: MessageParam[] = [
+      const messages: ProviderMessage[] = [
         {
           role: "assistant",
           content: [
@@ -349,7 +343,7 @@ describe("OpenAIResponsesClient", () => {
         ]),
       );
 
-      const messages: MessageParam[] = [
+      const messages: ProviderMessage[] = [
         {
           role: "assistant",
           content: [

@@ -1,6 +1,6 @@
 import fs from "fs/promises";
 import type { ChangeEntry, ChangeJournal } from "./change-journal.js";
-import type { LLMContextManager } from "../context/index.js";
+import type { ContextStore } from "../context/index.js";
 
 export interface RollbackResult {
   filesRestored: string[];
@@ -10,7 +10,7 @@ export interface RollbackResult {
 export class RollbackExecutor {
   async rollbackConversation(
     changeJournal: ChangeJournal,
-    context: LLMContextManager,
+    context: ContextStore,
     fromTurnIdx: number,
   ): Promise<RollbackResult> {
     this.truncateConversation(context, fromTurnIdx);
@@ -20,7 +20,7 @@ export class RollbackExecutor {
 
   async rollbackFilesAndConversation(
     changeJournal: ChangeJournal,
-    context: LLMContextManager,
+    context: ContextStore,
     fromTurnIdx: number,
   ): Promise<RollbackResult> {
     // Step 1: Restore files
@@ -74,21 +74,11 @@ export class RollbackExecutor {
   }
 
   private truncateConversation(
-    context: LLMContextManager,
+    context: ContextStore,
     fromTurnIdx: number,
   ): void {
     const turns = context.getTurns();
-    let userPromptCount = 0;
-    let cutAt = turns.length;
-    for (let i = 0; i < turns.length; i++) {
-      if (turns[i].role === "user" && typeof turns[i].content === "string") {
-        userPromptCount++;
-        if (userPromptCount === fromTurnIdx) {
-          cutAt = i;
-          break;
-        }
-      }
-    }
-    context.setTurns(turns.slice(0, cutAt));
+    const cutAt = Math.max(0, Math.min(fromTurnIdx - 1, turns.length));
+    context.replaceTurns(turns.slice(0, cutAt));
   }
 }

@@ -81,18 +81,13 @@ describe("Agent virtual integration", () => {
     expect(completed).toBe(true);
 
     const turns = context.getTurns();
-    expect(turns).toHaveLength(2);
-
-    // Turn 0: user message
-    expect(turns[0].role).toBe("user");
-    expect(turns[0].content).toBe("Hi there");
-
-    // Turn 1: assistant text
-    expect(turns[1].role).toBe("assistant");
-    const content = turns[1].content as Array<{ type: string; text: string }>;
-    expect(content).toHaveLength(1);
-    expect(content[0].type).toBe("text");
-    expect(content[0].text).toBe("Hello, I am the agent.");
+    expect(turns).toEqual([
+      {
+        userText: "Hi there",
+        process: [],
+        assistantText: "Hello, I am the agent.",
+      },
+    ]);
   });
 
   it("scenario 2: tool call — LLM tool_use, virtual tool executes, tool_result, LLM text reply", async () => {
@@ -114,36 +109,21 @@ describe("Agent virtual integration", () => {
     expect(completed).toBe(true);
 
     const turns = context.getTurns();
-    // Turn 0: user message
-    // Turn 1: assistant [tool_use block]
-    // Turn 2: user [tool_result block]
-    // Turn 3: assistant [text]
-    expect(turns).toHaveLength(4);
-
-    // Turn 1: assistant tool_use
-    const assistantContent = turns[1].content as Array<{
-      type: string;
-      name: string;
-    }>;
-    expect(assistantContent[0].type).toBe("tool_use");
-    expect(assistantContent[0].name).toBe("Echo");
-
-    // Turn 2: tool_result
-    expect(turns[2].role).toBe("user");
-    const toolResult = turns[2].content as Array<{
-      type: string;
-      content: string;
-    }>;
-    expect(toolResult[0].type).toBe("tool_result");
-    expect(toolResult[0].content).toBe("echoed: hello");
-
-    // Turn 3: assistant text reply
-    const finalContent = turns[3].content as Array<{
-      type: string;
-      text: string;
-    }>;
-    expect(finalContent[0].type).toBe("text");
-    expect(finalContent[0].text).toBe("The tool said: echoed: hello");
+    expect(turns).toEqual([
+      {
+        userText: "Use the Echo tool",
+        process: [
+          {
+            type: "tool_call",
+            id: "call_1",
+            name: "Echo",
+            input: { input: "hello" },
+            result: "echoed: hello",
+          },
+        ],
+        assistantText: "The tool said: echoed: hello",
+      },
+    ]);
   });
 
   it("scenario 3: multi-tool chain — tool A, tool B, text reply, verify order", async () => {
@@ -219,19 +199,28 @@ describe("Agent virtual integration", () => {
     expect(callOrder).toEqual(["A", "B"]);
 
     const turns = context.getTurns();
-    // Turn 0: user
-    // Turn 1: assistant [tool_use A, tool_use B]
-    // Turn 2: user [tool_result A, tool_result B]
-    // Turn 3: assistant [text]
-    expect(turns).toHaveLength(4);
-
-    const toolResults = turns[2].content as Array<{
-      type: string;
-      content: string;
-    }>;
-    expect(toolResults).toHaveLength(2);
-    expect(toolResults[0].content).toBe("A-result: 1");
-    expect(toolResults[1].content).toBe("B-result: 2");
+    expect(turns).toEqual([
+      {
+        userText: "Run both tools",
+        process: [
+          {
+            type: "tool_call",
+            id: "call_a",
+            name: "ToolA",
+            input: { q: "1" },
+            result: "A-result: 1",
+          },
+          {
+            type: "tool_call",
+            id: "call_b",
+            name: "ToolB",
+            input: { q: "2" },
+            result: "B-result: 2",
+          },
+        ],
+        assistantText: "Both tools done.",
+      },
+    ]);
   });
 
   it("scenario 4: permission rejection — requiresPermission tool in manual mode, user rejects", async () => {
@@ -282,16 +271,16 @@ describe("Agent virtual integration", () => {
     expect(completed).toBe(true);
 
     const turns = context.getTurns();
-    // Turn 0: user message
-    // Turn 1: assistant [tool_use]
-    // Turn 2: user [tool_result with rejection reason]
-    expect(turns).toHaveLength(3);
-
-    const toolResult = turns[2].content as Array<{
-      type: string;
-      content: string;
-    }>;
-    expect(toolResult[0].content).toContain("User rejected");
+    expect(turns).toHaveLength(1);
+    expect(turns[0].process).toEqual([
+      {
+        type: "tool_call",
+        id: "call_1",
+        name: "Dangerous",
+        input: { action: "delete" },
+        result: "User rejected",
+      },
+    ]);
 
     // Status message should indicate denial
     expect(reportStatusSpy).toHaveBeenCalledWith(

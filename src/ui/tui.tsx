@@ -3,6 +3,7 @@ import { Box, useInput, useApp } from "ink";
 import { Agent } from "../agent.js";
 import type { AppConfig } from "../config.js";
 import type { DisplayMessage } from "../messages.js";
+import { toDisplayMessages } from "../messages.js";
 import type { UserPrompter } from "../tools/registry.js";
 import { routeInput } from "./routing.js";
 import { processRoute } from "./route-handler.js";
@@ -11,7 +12,7 @@ import type { SessionStats } from "../services/session-stats.js";
 import type { SessionManager } from "../services/session-manager.js";
 import type { PermissionService } from "../services/permission.js";
 import type { ModelSwitchService } from "../services/model-switcher.js";
-import type { LLMContextManager } from "../context/index.js";
+import type { ContextStore } from "../context/index.js";
 import type { Signal } from "../utils/signal.js";
 import { Receipt } from "./tui/Receipt.js";
 
@@ -40,7 +41,7 @@ export interface AppProps {
   sessionStats: SessionStats;
   sessionManager: SessionManager;
   modelSwitchService: ModelSwitchService;
-  context: LLMContextManager;
+  context: ContextStore;
   tokenCount$: Signal<number>;
   permissionService: PermissionService;
 }
@@ -74,7 +75,7 @@ function useMultiAgent(
       dispatch({ type: "CLEAR_STATUSES" });
       dispatch({
         type: "SET_MESSAGES",
-        payload: session.context.toDisplayMessages([]),
+        payload: toDisplayMessages(session.context.getTurns(), []),
       });
       agentRef.current = session.agent;
     },
@@ -201,7 +202,7 @@ function AppContent({
           const { statuses } = useTuiStore.getState();
           dispatch({
             type: "SET_MESSAGES",
-            payload: context.toDisplayMessages(statuses),
+            payload: toDisplayMessages(context.getTurns(), statuses),
           });
         }
         return false;
@@ -243,7 +244,7 @@ function AppContent({
         const { statuses } = useTuiStore.getState();
         dispatch({
           type: "SET_MESSAGES",
-          payload: context.toDisplayMessages(statuses),
+          payload: toDisplayMessages(context.getTurns(), statuses),
         });
         dispatch({ type: "SET_IS_LOADING", payload: false });
         dispatch({ type: "SET_STATUS", payload: "" });

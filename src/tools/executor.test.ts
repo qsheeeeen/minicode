@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { ToolExecutor, type ToolCall } from "./executor.js";
 import { PermissionService } from "../services/permission.js";
-import { LLMContextManager } from "../context/index.js";
+import { ContextStore } from "../context/index.js";
 import { ChangeJournal } from "../services/change-journal.js";
 import type { ToolDef, ToolExecutionContext } from "./registry.js";
 import { ToolDeniedError } from "./registry.js";
@@ -28,7 +28,7 @@ function makeExecutor(overrides?: {
   const permissionService = new PermissionService(
     overrides?.permissionMode ?? "yolo",
   );
-  const context = new LLMContextManager();
+  const context = new ContextStore();
   const changeJournal = new ChangeJournal();
   const executor = new ToolExecutor({
     tools,
@@ -63,16 +63,24 @@ function makeContext(): ToolExecutionContext {
 function makeToolCall(
   tool: ToolDef | undefined,
   input: Record<string, unknown> = {},
+  id = "call_1",
 ): ToolCall {
   return {
     block: {
       type: "tool_use" as const,
-      id: "call_1",
+      id,
       name: tool?.name ?? "unknown",
       input,
     },
     tool,
   };
+}
+
+function prepareToolCalls(context: ContextStore, calls: ToolCall[]): void {
+  context.startTurn("task");
+  for (const call of calls) {
+    context.startToolCall(call.block.id, call.block.name, call.block.input);
+  }
 }
 
 describe("ToolExecutor", () => {
@@ -97,7 +105,7 @@ describe("ToolExecutor", () => {
   describe("execute", () => {
     it("does nothing with empty tool calls", async () => {
       const { executor, context } = makeExecutor();
-      const spy = vi.spyOn(context, "addToolResults");
+      const spy = vi.spyOn(context, "completeToolCall");
       await executor.execute([], makeContext(), 1);
       expect(spy).not.toHaveBeenCalled();
     });
@@ -107,28 +115,28 @@ describe("ToolExecutor", () => {
       const { executor, context } = makeExecutor({
         tools: new Map([["testTool", tool]]),
       });
-      const spy = vi.spyOn(context, "addToolResults");
+      const call = makeToolCall(tool);
+      prepareToolCalls(context, [call]);
+      const spy = vi.spyOn(context, "completeToolCall");
 
-      await executor.execute([makeToolCall(tool)], makeContext(), 1);
+      await executor.execute([call], makeContext(), 1);
 
       expect(tool.execute).toHaveBeenCalled();
-      expect(spy).toHaveBeenCalledWith([
-        { toolUseId: "call_1", content: "ok" },
-      ]);
+      expect(spy).toHaveBeenCalledWith("call_1", "ok");
     });
 
     it("handles tool not found", async () => {
       const { executor, context } = makeExecutor({ tools: new Map() });
-      const spy = vi.spyOn(context, "addToolResults");
+      const call = makeToolCall(undefined);
+      prepareToolCalls(context, [call]);
+      const spy = vi.spyOn(context, "completeToolCall");
 
-      await executor.execute([makeToolCall(undefined)], makeContext(), 1);
+      await executor.execute([call], makeContext(), 1);
 
-      expect(spy).toHaveBeenCalledWith([
-        {
-          toolUseId: "call_1",
-          content: "Error: Tool 'unknown' not found or not available.",
-        },
-      ]);
+      expect(spy).toHaveBeenCalledWith(
+        "call_1",
+        "Error: Tool 'unknown' not found or not available.",
+      );
     });
 
     it("throws ToolDeniedError when permission denied in manual mode", async () => {
@@ -136,7 +144,7 @@ describe("ToolExecutor", () => {
         readOnly: false,
         requiresPermission: true,
       });
-      const { executor } = makeExecutor({
+      const { executor, context } = makeExecutor({
         tools: new Map([["testTool", tool]]),
         permissionMode: "manual",
       });
@@ -146,10 +154,12 @@ describe("ToolExecutor", () => {
         allowed: false,
         reason: "User rejected",
       });
+      const call = makeToolCall(tool);
+      prepareToolCalls(context, [call]);
 
-      await expect(
-        executor.execute([makeToolCall(tool)], makeContext(), 1),
-      ).rejects.toThrow(ToolDeniedError);
+      await expect(executor.execute([call], makeContext(), 1)).rejects.toThrow(
+        ToolDeniedError,
+      );
     });
 
     it("returns auto-gate denial message in auto mode", async () => {
@@ -161,21 +171,21 @@ describe("ToolExecutor", () => {
         tools: new Map([["testTool", tool]]),
         permissionMode: "auto",
       });
-      const spy = vi.spyOn(context, "addToolResults");
+      const call = makeToolCall(tool);
+      prepareToolCalls(context, [call]);
+      const spy = vi.spyOn(context, "completeToolCall");
 
       vi.spyOn(executor.getPermissionService(), "check").mockResolvedValue({
         allowed: false,
         reason: "too risky",
       });
 
-      await executor.execute([makeToolCall(tool)], makeContext(), 1);
+      await executor.execute([call], makeContext(), 1);
 
-      expect(spy).toHaveBeenCalledWith([
-        {
-          toolUseId: "call_1",
-          content: "Tool execution denied by auto-gate: too risky",
-        },
-      ]);
+      expect(spy).toHaveBeenCalledWith(
+        "call_1",
+        "Tool execution denied by auto-gate: too risky",
+      );
     });
 
     it("handles tool execution error", async () => {
@@ -186,13 +196,13 @@ describe("ToolExecutor", () => {
       const { executor, context } = makeExecutor({
         tools: new Map([["testTool", tool]]),
       });
-      const spy = vi.spyOn(context, "addToolResults");
+      const call = makeToolCall(tool);
+      prepareToolCalls(context, [call]);
+      const spy = vi.spyOn(context, "completeToolCall");
 
-      await executor.execute([makeToolCall(tool)], makeContext(), 1);
+      await executor.execute([call], makeContext(), 1);
 
-      expect(spy).toHaveBeenCalledWith([
-        { toolUseId: "call_1", content: "Error: boom" },
-      ]);
+      expect(spy).toHaveBeenCalledWith("call_1", "Error: boom");
     });
 
     it("executes multiple tools sequentially", async () => {
@@ -204,20 +214,19 @@ describe("ToolExecutor", () => {
           ["tool2", tool2],
         ]),
       });
-      const spy = vi.spyOn(context, "addToolResults");
+      const calls = [
+        makeToolCall(tool1, {}, "call_1"),
+        makeToolCall(tool2, {}, "call_2"),
+      ];
+      prepareToolCalls(context, calls);
+      const spy = vi.spyOn(context, "completeToolCall");
 
-      await executor.execute(
-        [makeToolCall(tool1), makeToolCall(tool2)],
-        makeContext(),
-        1,
-      );
+      await executor.execute(calls, makeContext(), 1);
 
       expect(tool1.execute).toHaveBeenCalled();
       expect(tool2.execute).toHaveBeenCalled();
-      expect(spy).toHaveBeenCalledWith([
-        { toolUseId: "call_1", content: "ok" },
-        { toolUseId: "call_1", content: "ok" },
-      ]);
+      expect(spy).toHaveBeenCalledWith("call_1", "ok");
+      expect(spy).toHaveBeenCalledWith("call_2", "ok");
     });
 
     it("records tracked changes through the latest change journal getter", async () => {
@@ -231,17 +240,15 @@ describe("ToolExecutor", () => {
       const firstSpy = vi.spyOn(firstJournal, "recordBefore");
       const secondSpy = vi.spyOn(secondJournal, "recordBefore");
       let currentJournal = firstJournal;
-      const { executor } = makeExecutor({
+      const { executor, context } = makeExecutor({
         tools: new Map([["testTool", tool]]),
         getChangeJournal: () => currentJournal,
       });
 
       currentJournal = secondJournal;
-      await executor.execute(
-        [makeToolCall(tool, { path: "/tmp/minicode-missing-file" })],
-        makeContext(),
-        1,
-      );
+      const call = makeToolCall(tool, { path: "/tmp/minicode-missing-file" });
+      prepareToolCalls(context, [call]);
+      await executor.execute([call], makeContext(), 1);
 
       expect(firstSpy).not.toHaveBeenCalled();
       expect(secondSpy).toHaveBeenCalledWith(

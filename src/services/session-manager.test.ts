@@ -59,7 +59,7 @@ describe("SessionManager", () => {
 
     it("stores and retrieves messages", () => {
       const sm = new SessionManager();
-      const msgs = [{ role: "user" as const, content: "hello" }];
+      const msgs = [{ userText: "hello", process: [] }];
       sm.setMessages(msgs);
       expect(sm.getMessages()).toEqual(msgs);
     });
@@ -75,7 +75,7 @@ describe("SessionManager", () => {
 
     it("clears messages", () => {
       const sm = new SessionManager();
-      sm.setMessages([{ role: "user", content: "hello" }]);
+      sm.setMessages([{ userText: "hello", process: [] }]);
       sm.clearSession();
       expect(sm.getMessages()).toEqual([]);
     });

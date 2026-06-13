@@ -3,8 +3,6 @@
 // Every provider adapter implements these interfaces. The rest of the
 // codebase programs against these abstractions, never against a concrete SDK.
 
-import type { MessageParam, ContentBlock, ToolUseBlock } from "../messages.js";
-
 import { AnthropicClient } from "./anthropic.js";
 import { OpenAIChatClient } from "./openai-chat.js";
 import { OpenAIResponsesClient } from "./openai-responses.js";
@@ -39,6 +37,39 @@ export interface LLMToolDef {
   input_schema: Record<string, unknown>;
 }
 
+export interface ProviderTextBlock {
+  type: "text";
+  text: string;
+}
+
+export interface ProviderThinkingBlock {
+  type: "thinking";
+  thinking: string;
+}
+
+export interface ProviderToolUseBlock {
+  type: "tool_use";
+  id: string;
+  name: string;
+  input: Record<string, unknown>;
+}
+
+export interface ProviderToolResultBlock {
+  type: "tool_result";
+  tool_use_id: string;
+  content: string;
+}
+
+export type ProviderAssistantBlock =
+  | ProviderTextBlock
+  | ProviderThinkingBlock
+  | ProviderToolUseBlock;
+
+export interface ProviderMessage {
+  role: "user" | "assistant";
+  content: string | ProviderAssistantBlock[] | ProviderToolResultBlock[];
+}
+
 export interface ChatOptions {
   model?: string;
   maxTokens?: number;
@@ -53,7 +84,7 @@ export interface TokenUsage {
 }
 
 export interface LLMResponse {
-  content: ContentBlock[];
+  content: ProviderAssistantBlock[];
   stop_reason: string;
   usage: TokenUsage;
 }
@@ -63,7 +94,7 @@ export interface LLMResponse {
 export type StreamEvent =
   | { type: "text"; text: string }
   | { type: "thinking"; thinking: string }
-  | { type: "tool_use"; block: ToolUseBlock };
+  | { type: "tool_use"; block: ProviderToolUseBlock };
 
 export type LLMStream = AsyncGenerator<StreamEvent, LLMResponse, unknown>;
 
@@ -72,7 +103,7 @@ export type LLMStream = AsyncGenerator<StreamEvent, LLMResponse, unknown>;
 export interface LLMClient {
   // Streaming completion — returns immediately, emits events as tokens arrive.
   chatStream(
-    messages: MessageParam[],
+    messages: ProviderMessage[],
     tools: LLMToolDef[],
     options?: ChatOptions,
   ): LLMStream;
@@ -93,6 +124,15 @@ export function createClient(
 }
 
 // Built-in protocol registrations
-registerProtocol("anthropic", (apiKey, baseURL) => new AnthropicClient(apiKey, baseURL));
-registerProtocol("openai", (apiKey, baseURL) => new OpenAIChatClient(apiKey, baseURL));
-registerProtocol("openai-responses", (apiKey, baseURL) => new OpenAIResponsesClient(apiKey, baseURL));
+registerProtocol(
+  "anthropic",
+  (apiKey, baseURL) => new AnthropicClient(apiKey, baseURL),
+);
+registerProtocol(
+  "openai",
+  (apiKey, baseURL) => new OpenAIChatClient(apiKey, baseURL),
+);
+registerProtocol(
+  "openai-responses",
+  (apiKey, baseURL) => new OpenAIResponsesClient(apiKey, baseURL),
+);

@@ -1,7 +1,7 @@
 import type { ToolDef, ToolExecutionContext } from "./registry.js";
 import { ToolDeniedError } from "./registry.js";
-import type { ToolUseBlock } from "../messages.js";
-import type { LLMContextManager } from "../context/index.js";
+import type { ProviderToolUseBlock } from "../llm/client.js";
+import type { ContextStore } from "../context/index.js";
 import type { ChangeJournal } from "../services/change-journal.js";
 import {
   PermissionService,
@@ -11,7 +11,7 @@ import { callContent } from "../utils/tool-format.js";
 import type pino from "pino";
 
 export interface ToolCall {
-  block: ToolUseBlock;
+  block: ProviderToolUseBlock;
   tool?: ToolDef;
 }
 
@@ -19,7 +19,7 @@ export interface ToolExecutorOpts {
   readonly tools: Map<string, ToolDef>;
   readonly permissionService: PermissionService;
   readonly getChangeJournal: () => ChangeJournal;
-  readonly context: LLMContextManager;
+  readonly context: ContextStore;
   readonly logger?: pino.Logger;
 }
 
@@ -31,7 +31,7 @@ export class ToolExecutor {
   private tools: Map<string, ToolDef>;
   private permissionService: PermissionService;
   private getChangeJournal: () => ChangeJournal;
-  private context: LLMContextManager;
+  private context: ContextStore;
   private logger?: pino.Logger;
 
   constructor(opts: ToolExecutorOpts) {
@@ -144,7 +144,9 @@ export class ToolExecutor {
               content: reason.reason,
             });
           }
-          this.context.addToolResults(results);
+          for (const result of results) {
+            this.context.completeToolCall(result.toolUseId, result.content);
+          }
           throw reason;
         }
         const error = `Error: ${reason instanceof Error ? reason.message : String(reason)}`;
@@ -156,8 +158,9 @@ export class ToolExecutor {
       }
     }
 
-    // Push all tool results as a single user turn
-    this.context.addToolResults(results);
+    for (const result of results) {
+      this.context.completeToolCall(result.toolUseId, result.content);
+    }
   }
 
   // -- Accessors for Agent to use in the LLM loop --

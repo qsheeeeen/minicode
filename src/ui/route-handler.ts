@@ -1,5 +1,5 @@
 import type { RouteResult } from "./routing.js";
-import type { LLMContextManager } from "../context/index.js";
+import type { ContextStore } from "../context/index.js";
 import type { StatusReporter } from "../services/session-manager.js";
 import { runShell } from "../services/index.js";
 
@@ -22,7 +22,7 @@ export type ProcessedRoute =
 export function processRoute(
   route: RouteResult,
   rawInput: string,
-  context: LLMContextManager,
+  context: ContextStore,
   reportStatus?: StatusReporter,
 ): ProcessedRoute {
   if (route.action === "none") {
@@ -34,10 +34,7 @@ export function processRoute(
     const output = runShell(command);
 
     // Inject into LLM history so the agent sees the command + result
-    context.addUserMessage(
-      `Ran: ${command}\n\n\`\`\`\n${output}\n\`\`\``,
-      rawInput.trim(),
-    );
+    context.startTurn(`Ran: ${command}\n\n\`\`\`\n${output}\n\`\`\``);
     reportStatus?.({
       role: "status",
       content: `$ ${command}\n${output}`,
@@ -48,8 +45,6 @@ export function processRoute(
       },
       timestamp: new Date(),
     });
-    context.startAssistantTurn();
-
     return { type: "done", shellOutput: { command, output } };
   }
 
