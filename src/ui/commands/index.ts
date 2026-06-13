@@ -7,6 +7,7 @@ import type { ChangeJournal } from "../../services/change-journal.js";
 import type { Signal } from "../../utils/signal.js";
 import type { LLMContextManager } from "../../llm-context-manager.js";
 import type { AppConfig } from "../../config.js";
+import type { ModelSwitchService } from "../../services/model-switcher.js";
 import { getSkillBody, getAvailableSkills } from "../../skills/index.js";
 import {
   registerCommand,
@@ -27,6 +28,7 @@ export interface CommandContext {
   changeJournal: ChangeJournal;
   tokenCount$: Signal<number>;
   sessionStats: SessionStats;
+  modelSwitchService: ModelSwitchService;
   setMessages: (msg: DisplayMessage[]) => void;
   setCurrentSession: (name: string) => void;
   setMode: (mode: "chat" | "session-list" | "effort-select") => void;

@@ -16,6 +16,7 @@ import type { SessionManager } from "./services/session-manager.js";
 import type { ContextManager } from "./services/context-manager.js";
 import type { LLMContextManager } from "./llm-context-manager.js";
 import type { AppConfig } from "./config.js";
+import type { ModelSwitchService } from "./services/model-switcher.js";
 import type pino from "pino";
 
 export interface AgentOpts {
@@ -28,6 +29,7 @@ export interface AgentOpts {
   readonly agentRegistry?: AgentRegistry;
   readonly currentAgentId?: string;
   readonly appConfig: AppConfig;
+  readonly modelSwitchService?: ModelSwitchService;
 }
 
 export class Agent {
@@ -40,6 +42,7 @@ export class Agent {
   private agentRegistry?: AgentRegistry;
   private currentAgentId: string;
   private readonly appConfig: AppConfig;
+  private readonly modelSwitchService?: ModelSwitchService;
   private abortController: AbortController | null = null;
   public logger?: pino.Logger;
 
@@ -68,19 +71,32 @@ export class Agent {
     this.agentRegistry = opts.agentRegistry;
     this.currentAgentId = opts.currentAgentId ?? "1";
     this.appConfig = opts.appConfig;
+    this.modelSwitchService = opts.modelSwitchService;
   }
 
   private async saveStore(): Promise<void> {
-    await this.sessionManager.saveStore({
-      model: this.model.getName(),
-      totalTokens: this.contextManager.getTokenCount(),
-    }).catch((e: unknown) => {
-      this.logger?.error({ error: String(e) }, "Failed to save session");
-    });
+    await this.sessionManager
+      .saveStore({
+        model: this.model.getName(),
+        totalTokens: this.contextManager.getTokenCount(),
+      })
+      .catch((e: unknown) => {
+        this.logger?.error({ error: String(e) }, "Failed to save session");
+      });
   }
 
   /** Report a status message via the session's StatusReporter. */
-  private reportStatus(msg: { role: "status" | "error"; content: string; timestamp: Date; element?: unknown; toolDisplay?: { name: string; input: Record<string, unknown>; output?: string } }): void {
+  private reportStatus(msg: {
+    role: "status" | "error";
+    content: string;
+    timestamp: Date;
+    element?: unknown;
+    toolDisplay?: {
+      name: string;
+      input: Record<string, unknown>;
+      output?: string;
+    };
+  }): void {
     this.sessionManager.reportStatus(msg);
   }
 
@@ -122,16 +138,14 @@ export class Agent {
   // Stream LLM response, updating context in real-time.
   // Returns the final response and any tool calls the LLM requested.
   private async streamLLM(toolDefs: LLMToolDef[]) {
-    const stream = this.model.getClient().chatStream(
-      this.context.toLLMMessages(),
-      toolDefs,
-      {
+    const stream = this.model
+      .getClient()
+      .chatStream(this.context.toLLMMessages(), toolDefs, {
         system: this.promptManager.getSystemPrompt(),
         model: this.model.getName(),
         signal: this.abortController?.signal,
         effort: this.model.getEffort(),
-      },
-    );
+      });
 
     let blockStreaming = false;
     const toolCalls: ToolCall[] = [];
@@ -148,7 +162,10 @@ export class Agent {
       } else {
         const last = this.context.getLastBlock();
         if (last?.type === field && field in last) {
-          const currentText = (field === "text" ? (last as TextBlock).text : (last as ThinkingBlock).thinking);
+          const currentText =
+            field === "text"
+              ? (last as TextBlock).text
+              : (last as ThinkingBlock).thinking;
           const newText = currentText === "" ? delta.trimStart() : delta;
           this.context.updateLastBlock({ [field]: currentText + newText });
         } else {
@@ -182,7 +199,8 @@ export class Agent {
       }
 
       if (this.abortController?.signal.aborted) throw new Error("Aborted");
-      if (!response) throw new Error("Stream closed without returning a response");
+      if (!response)
+        throw new Error("Stream closed without returning a response");
     } catch (e) {
       if (this.abortController?.signal.aborted) throw new Error("Aborted");
       throw e;
@@ -221,11 +239,13 @@ export class Agent {
       while (true) {
         this.throwIfAborted();
 
-        const toolDefs = [...this.toolExecutor.getTools().values()].map((t) => ({
-          name: t.name,
-          description: t.description,
-          input_schema: t.input_schema,
-        })) as LLMToolDef[];
+        const toolDefs = [...this.toolExecutor.getTools().values()].map(
+          (t) => ({
+            name: t.name,
+            description: t.description,
+            input_schema: t.input_schema,
+          }),
+        ) as LLMToolDef[];
 
         const { response, toolCalls } = await this.streamLLM(toolDefs);
 
@@ -252,10 +272,17 @@ export class Agent {
           appConfig: this.appConfig,
           currentAgentId: this.currentAgentId,
           prompter: opts?.prompter,
+          services: {
+            modelSwitcher: this.modelSwitchService,
+          },
         };
 
         try {
-          await this.toolExecutor.execute(toolCalls, toolContext, this.sessionManager.getActiveTurnIdx());
+          await this.toolExecutor.execute(
+            toolCalls,
+            toolContext,
+            this.sessionManager.getActiveTurnIdx(),
+          );
         } catch (e) {
           if (e instanceof ToolDeniedError) {
             this.reportStatus({

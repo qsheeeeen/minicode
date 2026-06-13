@@ -1,19 +1,16 @@
-import React, { useCallback, useRef, useEffect, useMemo } from "react";
+import React, { useCallback, useRef, useEffect } from "react";
 import { Box, useInput, useApp } from "ink";
 import { Agent } from "../agent.js";
 import type { AppConfig } from "../config.js";
 import type { DisplayMessage } from "../messages.js";
 import type { UserPrompter } from "../tools/registry.js";
-import { ModelFactory } from "../llm/model.js";
 import { routeInput } from "./routing.js";
 import { processRoute } from "./route-handler.js";
-import {
-  AgentRegistry,
-  type AgentSession,
-} from "../services/index.js";
+import { AgentRegistry, type AgentSession } from "../services/index.js";
 import type { SessionStats } from "../services/session-stats.js";
 import type { SessionManager } from "../services/session-manager.js";
 import type { PermissionService } from "../services/permission.js";
+import type { ModelSwitchService } from "../services/model-switcher.js";
 import type { LLMContextManager } from "../llm-context-manager.js";
 import type { Signal } from "../utils/signal.js";
 import { Receipt } from "./tui/Receipt.js";
@@ -42,6 +39,7 @@ export interface AppProps {
   programStartTime: number;
   sessionStats: SessionStats;
   sessionManager: SessionManager;
+  modelSwitchService: ModelSwitchService;
   context: LLMContextManager;
   tokenCount$: Signal<number>;
   permissionService: PermissionService;
@@ -126,13 +124,13 @@ function AppContent({
   programStartTime,
   sessionStats,
   sessionManager,
+  modelSwitchService,
   context,
   tokenCount$,
   permissionService,
   prompterRef,
 }: AppProps & { prompterRef: React.RefObject<UserPrompter | null> }) {
   const { exit } = useApp();
-  const modelFactory = useMemo(() => new ModelFactory(config), [config]);
   const dispatch = useTuiStore((s) => s.dispatch);
   const input = useTuiStore((s) => s.input);
   const pendingPrompt = useTuiStore((s) => s.pendingPrompt);
@@ -164,6 +162,7 @@ function AppContent({
       changeJournal: sessionManager.getChangeJournal(),
       tokenCount$,
       sessionStats,
+      modelSwitchService,
       setMessages: (msgs: DisplayMessage[]) => {
         dispatch({ type: "SET_MESSAGES", payload: msgs });
       },
@@ -178,7 +177,7 @@ function AppContent({
         dispatch({ type: "SET_SELECTED_SESSION_INDEX", payload: index }),
       exit: () => dispatch({ type: "SET_SHOW_RECEIPT", payload: true }),
     }),
-    [dispatch, sessionManager, tokenCount$, config],
+    [dispatch, sessionManager, tokenCount$, config, modelSwitchService],
   );
 
   const handleSubmit = useCallback(
@@ -188,7 +187,12 @@ function AppContent({
 
       const agent = agentRef.current;
       const route = await routeInput(value, cmdContext());
-      const processed = processRoute(route, value, context, sessionManager.reportStatus.bind(sessionManager));
+      const processed = processRoute(
+        route,
+        value,
+        context,
+        sessionManager.reportStatus.bind(sessionManager),
+      );
 
       if (processed.type === "done") {
         if (processed.shellOutput) {
@@ -235,7 +239,10 @@ function AppContent({
         loadingRef.current = false;
         // Ensure final messages are always synced to Zustand after run
         const { statuses } = useTuiStore.getState();
-        dispatch({ type: "SET_MESSAGES", payload: context.toDisplayMessages(statuses) });
+        dispatch({
+          type: "SET_MESSAGES",
+          payload: context.toDisplayMessages(statuses),
+        });
         dispatch({ type: "SET_IS_LOADING", payload: false });
         dispatch({ type: "SET_STATUS", payload: "" });
       }
@@ -267,8 +274,7 @@ function AppContent({
         return;
       }
       if (key.shift && key.tab) {
-        const next =
-          permissionService.cycleMode();
+        const next = permissionService.cycleMode();
         dispatch({ type: "SET_PERMISSION_MODE", payload: next });
         return;
       }
@@ -306,7 +312,7 @@ function AppContent({
           handleSubmit={handleSubmit}
           loadingRef={loadingRef}
           config={config}
-          modelFactory={modelFactory}
+          modelSwitchService={modelSwitchService}
         />
       )}
       <SubAgentBar />

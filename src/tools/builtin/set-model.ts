@@ -1,5 +1,4 @@
 import type { ToolDef, ToolResult, ToolExecutionContext } from "../registry.js";
-import { ModelFactory } from "../../llm/model.js";
 import { register } from "../registry.js";
 
 export const setModelTool: ToolDef = {
@@ -31,19 +30,25 @@ export const setModelTool: ToolDef = {
       return { output: `Error: No model mapped to tier ${tier}.` };
     }
 
-    const factory = new ModelFactory(appConfig);
-    const newModel = factory.fromSpec(modelSpec);
-    if (!newModel) {
+    const agent = context?.registry?.get(context.currentAgentId || "1")?.agent;
+    const modelSwitcher = context?.services?.modelSwitcher;
+    if (!agent || !modelSwitcher) {
+      return { output: "Error: model switch service not available." };
+    }
+
+    try {
+      await modelSwitcher.switchAgentModel({
+        agent,
+        modelSpec,
+        persistDefault: context.currentAgentId === "1",
+        reportStatus: false,
+      });
+    } catch {
       return {
         output: `Error: Could not resolve "${modelSpec}" for tier ${tier}.`,
       };
     }
 
-    const agent = context?.registry?.get(context.currentAgentId || "1")?.agent;
-    if (agent) {
-      agent.model = newModel;
-    }
-    await appConfig.setModel(modelSpec);
     return { output: `Switched to ${tier}: ${modelSpec}` };
   },
 };

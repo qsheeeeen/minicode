@@ -1,12 +1,12 @@
 import type { Agent } from "../../agent.js";
 import type { EffortLevel } from "../../llm/client.js";
 import type { AppConfig } from "../../config.js";
-import type { ModelFactory } from "../../llm/model.js";
+import type { ModelSwitchService } from "../../services/model-switcher.js";
 
 export interface ModeHandlerDeps {
   agentRef: React.MutableRefObject<Agent>;
   config: AppConfig;
-  modelFactory: ModelFactory;
+  modelSwitchService: ModelSwitchService;
   dispatch: (action: any) => void;
   handleSubmit: (value: string) => Promise<boolean>;
 }
@@ -34,14 +34,14 @@ async function effortSelectHandler(
 
 async function sessionListHandler(
   value: string,
-  { handleSubmit, dispatch }: ModeHandlerDeps,
+  { handleSubmit }: ModeHandlerDeps,
 ): Promise<void> {
   handleSubmit(`/resume ${value}`);
 }
 
 async function modelSelectHandler(
   value: string,
-  { agentRef, config, modelFactory, dispatch }: ModeHandlerDeps,
+  { agentRef, config, modelSwitchService, dispatch }: ModeHandlerDeps,
 ): Promise<void> {
   const tierMatch = value.match(/^(pro|flash):(.*)$/);
   if (tierMatch) {
@@ -53,18 +53,18 @@ async function modelSelectHandler(
     }
 
     if (modelSpec) {
-      const newModel = modelFactory.fromSpec(modelSpec);
-      if (newModel) {
-        agentRef.current.model = newModel;
-        await config.setModel(modelSpec);
-        if (tierMatch[2]) {
-          await config.setTier(tier, modelSpec);
-        }
+      try {
+        await modelSwitchService.switchAgentModel({
+          agent: agentRef.current,
+          modelSpec,
+          tier: tierMatch[2] ? tier : undefined,
+        });
+      } catch (error) {
         dispatch({
           type: "ADD_MESSAGE",
           payload: {
-            role: "status",
-            content: `(Model set to: ${modelSpec})`,
+            role: "error",
+            content: `(Error: ${error instanceof Error ? error.message : String(error)})`,
             timestamp: new Date(),
           },
         });

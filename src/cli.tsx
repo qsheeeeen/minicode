@@ -9,6 +9,7 @@ import { AgentRegistry, SessionStats } from "./services/index.js";
 import { SessionManager } from "./services/session-manager.js";
 import { ContextManager } from "./services/context-manager.js";
 import { PromptManager } from "./services/prompt-manager.js";
+import { ModelSwitchService } from "./services/model-switcher.js";
 import { ToolExecutor } from "./tools/executor.js";
 import { PermissionService } from "./services/permission.js";
 import { getAll } from "./tools/index.js";
@@ -39,7 +40,15 @@ const config = await AppConfig.load();
 // 2. Parse args overlaid onto config — yargs handles --help/--version,
 //    then args (model/permission) override config.
 const args = new Args(process.argv, config, VERSION);
-const { model, permissionMode, compressionThreshold, thinking, initialPrompt, sessionName, resumeRecent } = args;
+const {
+  model,
+  permissionMode,
+  compressionThreshold,
+  thinking,
+  initialPrompt,
+  sessionName,
+  resumeRecent,
+} = args;
 
 // Auto-headless when stdin is not a TTY (piped input or no terminal).
 // Piped content is read inside runHeadless; here we only decide the branch.
@@ -118,6 +127,11 @@ const contextManager = new ContextManager({
   statusReporter: sessionManager.getStatusReporter(),
   sessionStats: sessionManager.getSessionStats(),
 });
+const modelSwitchService = new ModelSwitchService({
+  appConfig: config,
+  contextManager,
+  sessionManager,
+});
 const promptManager = new PromptManager(userPrompt, projectPromptFile);
 promptManager.refreshEnvironment(); // async, non-blocking
 
@@ -145,6 +159,7 @@ const agent = new Agent({
   tokenCount$,
   agentRegistry: sharedAgentRegistry,
   appConfig: config,
+  modelSwitchService,
 });
 sessionManager.setSession(initialSession);
 agent.logger = logger;
@@ -159,6 +174,7 @@ const cmdContext = {
   changeJournal: sessionManager.getChangeJournal(),
   tokenCount$,
   sessionStats: sharedSessionStats,
+  modelSwitchService,
   setMessages: () => {},
   setCurrentSession: (name: string) => {
     initialSession = name;
@@ -200,6 +216,7 @@ render(
     agentRegistry={sharedAgentRegistry}
     programStartTime={programStartTime}
     sessionStats={sharedSessionStats}
+    modelSwitchService={modelSwitchService}
     sessionManager={sessionManager}
     context={sessionManager.getContext()}
     tokenCount$={tokenCount$}

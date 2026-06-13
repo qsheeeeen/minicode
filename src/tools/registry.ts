@@ -1,6 +1,7 @@
 import type { AgentRegistry } from "../services/agent-registry.js";
 import type { Model } from "../llm/model.js";
 import type { AppConfig } from "../config.js";
+import type { ModelSwitchService } from "../services/model-switcher.js";
 
 /**
  * UI interaction interfaces defined by the tool execution layer.
@@ -39,6 +40,9 @@ export interface ToolExecutionContext {
   currentAgentId: string;
   signal: AbortSignal | undefined;
   prompter?: UserPrompter;
+  services?: {
+    modelSwitcher?: ModelSwitchService;
+  };
 }
 
 export interface ToolResult {

@@ -151,7 +151,7 @@ function Demo() {
           }}
           loadingRef={{ current: false }}
           config={{} as any}
-          modelFactory={{ fromSpec: () => null } as any}
+          modelSwitchService={{ switchAgentModel: async () => null } as any}
         />
       ) : mode === "effort" ? (
         <Box

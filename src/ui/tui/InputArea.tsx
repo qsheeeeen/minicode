@@ -6,14 +6,14 @@ import { getCommandList } from "../commands/index.js";
 import { modeHandlers } from "./mode-handlers.js";
 import type { Agent } from "../../agent.js";
 import type { AppConfig } from "../../config.js";
-import type { ModelFactory } from "../../llm/model.js";
+import type { ModelSwitchService } from "../../services/model-switcher.js";
 
 interface InputAreaProps {
   agentRef: React.MutableRefObject<Agent>;
   handleSubmit: (value: string) => Promise<boolean>;
   loadingRef: React.MutableRefObject<boolean>;
   config: AppConfig;
-  modelFactory: ModelFactory;
+  modelSwitchService: ModelSwitchService;
 }
 
 export function InputArea({
@@ -21,7 +21,7 @@ export function InputArea({
   handleSubmit,
   loadingRef,
   config,
-  modelFactory,
+  modelSwitchService,
 }: InputAreaProps) {
   const input = useTuiStore((s) => s.input);
   const pendingPrompt = useTuiStore((s) => s.pendingPrompt);
@@ -77,7 +77,13 @@ export function InputArea({
     async (value: string) => {
       const handler = modeHandlers[input.mode];
       if (handler) {
-        await handler(value, { agentRef, config, modelFactory, dispatch, handleSubmit });
+        await handler(value, {
+          agentRef,
+          config,
+          modelSwitchService,
+          dispatch,
+          handleSubmit,
+        });
         dispatch({ type: "SET_INPUT_MODE", payload: { mode: "chat" } });
         dispatch({ type: "SET_INPUT_VALUE", payload: "" });
         dispatch({ type: "INCREMENT_INPUT_KEY" });
@@ -92,7 +98,15 @@ export function InputArea({
         await handleSubmit(value);
       }
     },
-    [input.mode, agentRef, dispatch, handleSubmit],
+    [
+      input.mode,
+      agentRef,
+      config,
+      modelSwitchService,
+      dispatch,
+      handleSubmit,
+      loadingRef,
+    ],
   );
 
   const handleCancel = useCallback(() => {
