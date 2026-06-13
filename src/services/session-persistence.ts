@@ -9,7 +9,7 @@ import fs from "fs/promises";
 import path from "path";
 import os from "os";
 import crypto from "crypto";
-import type { ContextTurn } from "../messages.js";
+import type { ContextTurn } from "../context/index.js";
 
 export interface SessionData {
   model: string;

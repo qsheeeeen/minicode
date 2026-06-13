@@ -1,5 +1,5 @@
 import type { ToolDef, ToolResult, ToolExecutionContext } from "../registry.js";
-import type { ContextTurn } from "../../messages.js";
+import type { ContextTurn } from "../../context/index.js";
 import { Agent } from "../../agent.js";
 import { SessionManager } from "../../services/session-manager.js";
 import { ContextManager } from "../../services/context-manager.js";

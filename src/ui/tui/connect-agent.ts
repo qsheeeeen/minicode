@@ -12,7 +12,7 @@ import type { Agent } from "../../agent.js";
 import type { AgentRegistry } from "../../services/index.js";
 import type { SessionManager } from "../../services/session-manager.js";
 import type { UserPrompter, Prompt } from "../../tools/registry.js";
-import { toDisplayMessages } from "../../messages.js";
+import { toDisplayMessages } from "../display.js";
 import { SessionPersistence } from "../../services/session-persistence.js";
 import type { Signal } from "../../utils/signal.js";
 import { useTuiStore } from "./store.js";

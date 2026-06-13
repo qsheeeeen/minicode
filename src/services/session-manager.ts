@@ -9,7 +9,8 @@ import { ContextStore } from "../context/index.js";
 import { ChangeJournal } from "./change-journal.js";
 import { SessionPersistence } from "./session-persistence.js";
 import type { SessionStats } from "./session-stats.js";
-import type { ContextTurn, StatusMessage } from "../messages.js";
+import type { ContextTurn } from "../context/index.js";
+import type { StatusMessage } from "../ui/display.js";
 /**
  * StatusReporter — callback for emitting UI status/error notifications.
  * Defined here (SessionManager) because this is the primary owner of

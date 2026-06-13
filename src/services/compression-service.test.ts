@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { SummaryCompressionStrategy } from "./compression-service.js";
 import type { LLMClient } from "../llm/client.js";
-import type { ContextTurn } from "../messages.js";
+import type { ContextTurn } from "../context/index.js";
 
 describe("SummaryCompressionStrategy", () => {
   let service: SummaryCompressionStrategy;

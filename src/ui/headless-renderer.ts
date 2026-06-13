@@ -1,4 +1,4 @@
-import type { StatusMessage } from "../messages.js";
+import type { StatusMessage } from "./display.js";
 import type { ContextStore } from "../context/index.js";
 
 /**

@@ -1,6 +1,6 @@
 import type { LLMClient } from "../llm/client.js";
 import type { LLMResponse } from "../llm/client.js";
-import type { ContextTurn } from "../messages.js";
+import type { ContextTurn } from "../context/index.js";
 
 export interface CompressionStrategy {
   compress(

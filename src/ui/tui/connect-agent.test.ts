@@ -215,4 +215,4 @@ describe("connectAgent", () => {
 });
 
 // Import DisplayMessage type for dispatch spy
-import type { DisplayMessage } from "../../messages.js";
+import type { DisplayMessage } from "../display.js";

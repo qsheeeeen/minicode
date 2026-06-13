@@ -1,8 +1,8 @@
 import { create } from "zustand";
-import type { DisplayMessage } from "../../messages.js";
+import type { DisplayMessage } from "../display.js";
 import type { Prompt } from "../../tools/registry.js";
 import type { AgentSession, PermissionMode } from "../../services/index.js";
-import type { StatusMessage } from "../../messages.js";
+import type { StatusMessage } from "../display.js";
 
 export interface InputState {
   mode: string;

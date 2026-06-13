@@ -1,7 +1,7 @@
 import { Box, Text } from "ink";
 import { StatusMessage } from "@inkjs/ui";
 import Markdown from "ink-markdown-es";
-import type { DisplayMessage } from "../../messages.js";
+import type { DisplayMessage } from "../display.js";
 import { ToolDisplay } from "./tool-display.js";
 
 const markdownStyles = {

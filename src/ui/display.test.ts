@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
-import type { ContextTurn, StatusMessage } from "./index.js";
-import { toDisplayMessages } from "./index.js";
+import type { ContextTurn } from "../context/index.js";
+import type { StatusMessage } from "./display.js";
+import { toDisplayMessages } from "./display.js";
 
 describe("toDisplayMessages", () => {
   it("converts context blocks and attaches tool results", () => {
@@ -35,7 +36,7 @@ describe("toDisplayMessages", () => {
     ]);
   });
 
-  it("interleaves statuses by message index and applies display overrides", () => {
+  it("interleaves statuses by turn index", () => {
     const timestamp = new Date("2026-01-01T00:00:00.000Z");
     const turns: ContextTurn[] = [{ userText: "internal", process: [] }];
     const statuses: StatusMessage[] = [

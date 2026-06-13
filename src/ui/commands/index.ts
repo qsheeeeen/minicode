@@ -1,5 +1,5 @@
 import type { Agent } from "../../agent.js";
-import type { DisplayMessage } from "../../messages.js";
+import type { DisplayMessage } from "../display.js";
 import type { Model } from "../../llm/model.js";
 import type { SessionStats } from "../../services/session-stats.js";
 import type { SessionManager } from "../../services/session-manager.js";

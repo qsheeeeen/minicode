@@ -5,7 +5,7 @@ import {
   type TuiState,
   type TuiAction,
 } from "./store.js";
-import type { StatusMessage } from "../../messages.js";
+import type { StatusMessage } from "../display.js";
 
 describe("tuiReducer", () => {
   it("should update input value correctly and return new state", () => {
