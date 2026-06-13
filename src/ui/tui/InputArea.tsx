@@ -3,8 +3,8 @@ import { Box, Text, useInput } from "ink";
 import { useTuiStore } from "./store.js";
 import { getInputComponent } from "./inputs.js";
 import { getCommandList } from "../commands/index.js";
+import { modeHandlers } from "./mode-handlers.js";
 import type { Agent } from "../../agent.js";
-import type { EffortLevel } from "../../llm/client.js";
 import type { AppConfig } from "../../config.js";
 import type { ModelFactory } from "../../llm/model.js";
 
@@ -72,64 +72,18 @@ export function InputArea({
     },
   );
 
-  // Input value submission handler mapped from previous monolithic App
+  // Input value submission handler
   const handleSubmitValue = useCallback(
     async (value: string) => {
-      if (input.mode === "effort-select") {
-        agentRef.current.model.setEffort(value as EffortLevel);
-        config.setEffort(value as EffortLevel);
-        dispatch({
-          type: "ADD_MESSAGE",
-          payload: {
-            role: "status",
-            content: `(Effort set to: ${value})`,
-            timestamp: new Date(),
-          },
-        });
-        dispatch({ type: "SET_INPUT_MODE", payload: { mode: "chat" } });
-        dispatch({ type: "SET_INPUT_VALUE", payload: "" });
-        dispatch({ type: "INCREMENT_INPUT_KEY" });
-        setSelectedSuggestion(0);
-      } else if (input.mode === "session-list") {
-        handleSubmit(`/resume ${value}`);
-        dispatch({ type: "SET_INPUT_MODE", payload: { mode: "chat" } });
-        dispatch({ type: "SET_INPUT_VALUE", payload: "" });
-        dispatch({ type: "INCREMENT_INPUT_KEY" });
-        setSelectedSuggestion(0);
-      } else if (input.mode === "model-select") {
-        const tierMatch = value.match(/^(pro|flash):(.*)$/);
-        if (tierMatch) {
-          const tier = tierMatch[1];
-          let modelSpec = tierMatch[2];
-
-          if (!modelSpec) {
-            modelSpec = config.tiers[tier] || "";
-          }
-
-          if (modelSpec) {
-            const newModel = modelFactory.fromSpec(modelSpec);
-            if (newModel) {
-              agentRef.current.model = newModel;
-              await config.setModel(modelSpec);
-              if (tierMatch[2]) {
-                await config.setTier(tier, modelSpec);
-              }
-              dispatch({
-                type: "ADD_MESSAGE",
-                payload: {
-                  role: "status",
-                  content: `(Model set to: ${modelSpec})`,
-                  timestamp: new Date(),
-                },
-              });
-            }
-          }
-        }
+      const handler = modeHandlers[input.mode];
+      if (handler) {
+        await handler(value, { agentRef, config, modelFactory, dispatch, handleSubmit });
         dispatch({ type: "SET_INPUT_MODE", payload: { mode: "chat" } });
         dispatch({ type: "SET_INPUT_VALUE", payload: "" });
         dispatch({ type: "INCREMENT_INPUT_KEY" });
         setSelectedSuggestion(0);
       } else {
+        // Default chat mode
         if (loadingRef.current) return;
         dispatch({ type: "SET_INPUT_VALUE", payload: "" });
         dispatch({ type: "INCREMENT_INPUT_KEY" });
@@ -145,7 +99,7 @@ export function InputArea({
     dispatch({ type: "SET_INPUT_MODE", payload: { mode: "chat" } });
     dispatch({ type: "SET_INPUT_VALUE", payload: "" });
     setSelectedSuggestion(0);
-  }, [dispatch, config, modelFactory, handleSubmit]);
+  }, [dispatch]);
 
   const handleChange = useCallback(
     (v: string) => {
