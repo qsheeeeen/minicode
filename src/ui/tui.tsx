@@ -11,7 +11,7 @@ import type { SessionStats } from "../services/session-stats.js";
 import type { SessionManager } from "../services/session-manager.js";
 import type { PermissionService } from "../services/permission.js";
 import type { ModelSwitchService } from "../services/model-switcher.js";
-import type { LLMContextManager } from "../llm-context-manager.js";
+import type { LLMContextManager } from "../context/index.js";
 import type { Signal } from "../utils/signal.js";
 import { Receipt } from "./tui/Receipt.js";
 

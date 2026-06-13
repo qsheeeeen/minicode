@@ -1,6 +1,6 @@
 import fs from "fs/promises";
 import type { ChangeEntry, ChangeJournal } from "./change-journal.js";
-import type { LLMContextManager } from "../llm-context-manager.js";
+import type { LLMContextManager } from "../context/index.js";
 
 export interface RollbackResult {
   filesRestored: string[];

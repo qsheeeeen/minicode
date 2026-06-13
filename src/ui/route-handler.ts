@@ -1,5 +1,5 @@
 import type { RouteResult } from "./routing.js";
-import type { LLMContextManager } from "../llm-context-manager.js";
+import type { LLMContextManager } from "../context/index.js";
 import type { StatusReporter } from "../services/session-manager.js";
 import { runShell } from "../services/index.js";
 

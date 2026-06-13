@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { ContextManager } from "./context-manager.js";
 import { Signal } from "../utils/signal.js";
-import { LLMContextManager } from "../llm-context-manager.js";
+import { LLMContextManager } from "../context/index.js";
 
 function createContextManager(overrides?: {
   compressionThresholdRatio?: number;
@@ -9,7 +9,10 @@ function createContextManager(overrides?: {
   const tokenCount$ = new Signal(0);
   const context = new LLMContextManager();
   const statusReporter = vi.fn();
-  const sessionStats = { recordUsage: vi.fn(), incrementSessionCount: vi.fn() } as any;
+  const sessionStats = {
+    recordUsage: vi.fn(),
+    incrementSessionCount: vi.fn(),
+  } as any;
   const cm = new ContextManager({
     contextLength: 200000,
     compressionThresholdRatio: overrides?.compressionThresholdRatio ?? 0.8,
@@ -49,7 +52,12 @@ describe("ContextManager", () => {
       const { cm } = createContextManager({ compressionThresholdRatio: 0.5 });
       // contextLength=200000, threshold=0.5 → compress at 100000
       const result = cm.processTokenUsage("test-model", {
-        input: { total: 150000, prompt: 150000, cache_read: 0, cache_creation: 0 },
+        input: {
+          total: 150000,
+          prompt: 150000,
+          cache_read: 0,
+          cache_creation: 0,
+        },
         output: 50000,
       });
       expect(result).toBe(true);

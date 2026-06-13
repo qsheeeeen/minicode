@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { LLMContextManager } from "./llm-context-manager.js";
-import type { MessageParam, StatusMessage } from "./messages.js";
+import type { MessageParam, StatusMessage } from "../messages.js";
 
 describe("LLMContextManager", () => {
   describe("observable", () => {
@@ -14,7 +14,7 @@ describe("LLMContextManager", () => {
 
       unsub();
       mgr.addUserMessage("world");
-      expect(listener).toHaveBeenCalledTimes(1); // no more calls after unsub
+      expect(listener).toHaveBeenCalledTimes(1);
     });
 
     it("supports multiple listeners", () => {
@@ -99,7 +99,6 @@ describe("LLMContextManager", () => {
 
     it("updateLastBlock does nothing if no assistant turn", () => {
       const mgr = new LLMContextManager();
-      // Should not throw
       mgr.updateLastBlock({ text: "nope" });
       expect(mgr.getTurns()).toHaveLength(0);
     });
@@ -130,7 +129,7 @@ describe("LLMContextManager", () => {
       const turns = mgr.getTurns();
       expect(turns).toHaveLength(1);
       expect(turns[0].role).toBe("user");
-      expect((turns[0].content as any[])).toHaveLength(2);
+      expect(turns[0].content as any[]).toHaveLength(2);
       expect((turns[0].content as any[])[0]).toEqual({
         type: "tool_result",
         tool_use_id: "id1",
@@ -164,7 +163,6 @@ describe("LLMContextManager", () => {
       mgr.addUserMessage("raw", "display");
       mgr.setTurns([]);
 
-      // Display override should be gone
       const msgs = mgr.toDisplayMessages([]);
       expect(msgs).toHaveLength(0);
     });
@@ -239,10 +237,10 @@ describe("LLMContextManager", () => {
       const listener = vi.fn();
       mgr.onChange(listener);
 
-      mgr.setStreaming(false); // no change
+      mgr.setStreaming(false);
       expect(listener).not.toHaveBeenCalled();
 
-      mgr.setStreaming(true); // change
+      mgr.setStreaming(true);
       expect(listener).toHaveBeenCalledTimes(1);
     });
   });
@@ -267,12 +265,21 @@ describe("LLMContextManager", () => {
       mgr.appendToLastAssistantTurn({ type: "text", text: "world" });
 
       const statuses: StatusMessage[] = [
-        { role: "status", content: "status after turn 0", turnIndex: 1, timestamp: new Date() },
-        { role: "status", content: "status at end", turnIndex: 3, timestamp: new Date() },
+        {
+          role: "status",
+          content: "status after turn 0",
+          turnIndex: 1,
+          timestamp: new Date(),
+        },
+        {
+          role: "status",
+          content: "status at end",
+          turnIndex: 3,
+          timestamp: new Date(),
+        },
       ];
 
       const msgs = mgr.toDisplayMessages(statuses);
-      // user(0), status(turnIndex=1), assistant(1), status(turnIndex=3)
       expect(msgs).toHaveLength(4);
       expect(msgs[0].role).toBe("user");
       expect(msgs[1].role).toBe("status");

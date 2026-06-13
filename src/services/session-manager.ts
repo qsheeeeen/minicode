@@ -5,7 +5,7 @@
 // Provides StatusReporter callback for services to emit UI notifications.
 // Agent delegates session operations here.
 
-import { LLMContextManager } from "../llm-context-manager.js";
+import { LLMContextManager } from "../context/index.js";
 import { ChangeJournal } from "./change-journal.js";
 import { SessionPersistence } from "./session-persistence.js";
 import type { SessionStats } from "./session-stats.js";
@@ -65,10 +65,7 @@ export class SessionManager {
   }
 
   /** Persist session to disk. Caller provides model name and token count. */
-  async saveStore(meta: {
-    model: string;
-    totalTokens: number;
-  }): Promise<void> {
+  async saveStore(meta: { model: string; totalTokens: number }): Promise<void> {
     if (meta.model !== undefined) this._meta.model = meta.model;
     if (meta.totalTokens !== undefined)
       this._meta.totalTokens = meta.totalTokens;

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { ToolExecutor, type ToolCall } from "./executor.js";
 import { PermissionService } from "../services/permission.js";
-import { LLMContextManager } from "../llm-context-manager.js";
+import { LLMContextManager } from "../context/index.js";
 import { ChangeJournal } from "../services/change-journal.js";
 import type { ToolDef, ToolExecutionContext } from "./registry.js";
 import { ToolDeniedError } from "./registry.js";

@@ -1,6 +1,6 @@
 import type { ContentBlock } from "../messages.js";
 import type { StatusMessage } from "../messages.js";
-import type { LLMContextManager } from "../llm-context-manager.js";
+import type { LLMContextManager } from "../context/index.js";
 
 /**
  * HeadlessRenderer — incremental stdout renderer for non-TUI mode.
@@ -100,7 +100,9 @@ export class HeadlessRenderer {
             if (block.text.length > prevLen) {
               if (prevLen === 0) process.stdout.write(`[assistant]\n`);
               const content =
-                prevLen === 0 ? block.text.trimStart() : block.text.slice(prevLen);
+                prevLen === 0
+                  ? block.text.trimStart()
+                  : block.text.slice(prevLen);
               process.stdout.write(content);
               this.streamedChars.set(blockKey, block.text.length);
             }
@@ -108,9 +110,7 @@ export class HeadlessRenderer {
               (!isLastBlock || isFinal) &&
               !this.finalizedBlocks.has(blockKey)
             ) {
-              process.stdout.write(
-                block.text.endsWith("\n") ? "\n" : "\n\n",
-              );
+              process.stdout.write(block.text.endsWith("\n") ? "\n" : "\n\n");
               this.finalizedBlocks.add(blockKey);
             }
           }
@@ -158,10 +158,7 @@ export class HeadlessRenderer {
           this.printedTurns = ti + 1;
         } else {
           // While streaming, keep the last block "active"
-          this.printedBlocks.set(
-            ti,
-            blocks.length > 0 ? blocks.length - 1 : 0,
-          );
+          this.printedBlocks.set(ti, blocks.length > 0 ? blocks.length - 1 : 0);
         }
       }
     }

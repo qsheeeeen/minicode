@@ -14,8 +14,9 @@ import type {
   ThinkingBlock,
   ContentBlock,
   DisplayMessage,
-} from "./messages.js";
-import { toDisplayMessages } from "./messages.js";
+  StatusMessage,
+} from "../messages.js";
+import { toDisplayMessages } from "../messages.js";
 import { LLMContext } from "./llm-context.js";
 
 export class LLMContextManager {
@@ -23,21 +24,16 @@ export class LLMContextManager {
   private listeners = new Set<() => void>();
   private streaming = false;
 
-  // ── Observable ──────────────────────────────────────────
-
   private notify(): void {
     for (const cb of this.listeners) cb();
   }
 
-  /** Subscribe to changes. Returns unsubscribe function. */
   onChange(callback: () => void): () => void {
     this.listeners.add(callback);
     return () => {
       this.listeners.delete(callback);
     };
   }
-
-  // ── Read ────────────────────────────────────────────────
 
   getTurns(): MessageParam[] {
     return [...this.ctx.turns];
@@ -47,12 +43,10 @@ export class LLMContextManager {
     return this.ctx.turns.length;
   }
 
-  /** Get API-format messages for LLM. */
   toLLMMessages(): MessageParam[] {
     return this.ctx.turns as MessageParam[];
   }
 
-  /** Get the last block in the last assistant turn (if any). */
   getLastBlock(): ContentBlock | undefined {
     const last = this.ctx.turns[this.ctx.turns.length - 1];
     if (!last || last.role !== "assistant" || !Array.isArray(last.content))
@@ -60,8 +54,6 @@ export class LLMContextManager {
     const blocks = last.content as ContentBlock[];
     return blocks[blocks.length - 1];
   }
-
-  // ── Mutation ────────────────────────────────────────────
 
   addUserMessage(content: string, displayContent?: string): void {
     const msg: MessageParam = { role: "user", content } as MessageParam;
@@ -72,13 +64,11 @@ export class LLMContextManager {
     this.notify();
   }
 
-  /** Start a new assistant turn (empty content array). */
   startAssistantTurn(): void {
     this.ctx.turns.push({ role: "assistant", content: [] });
     this.notify();
   }
 
-  /** Append a block to the last (open) assistant turn. Creates the turn if needed. */
   appendToLastAssistantTurn(block: ContentBlock): void {
     const last = this.ctx.turns[this.ctx.turns.length - 1];
     if (!last || last.role !== "assistant" || !Array.isArray(last.content)) {
@@ -90,7 +80,6 @@ export class LLMContextManager {
     this.notify();
   }
 
-  /** Update the text/thinking content of the last block in the last assistant turn. */
   updateLastBlock(updates: { text?: string; thinking?: string }): void {
     const last = this.ctx.turns[this.ctx.turns.length - 1];
     if (!last || last.role !== "assistant" || !Array.isArray(last.content))
@@ -101,7 +90,6 @@ export class LLMContextManager {
     this.notify();
   }
 
-  /** Add a user turn containing tool_result blocks. */
   addToolResults(results: Array<{ toolUseId: string; content: string }>): void {
     if (results.length === 0) return;
     const blocks = results.map((r) => ({
@@ -113,14 +101,12 @@ export class LLMContextManager {
     this.notify();
   }
 
-  /** Replace all turns (for session resume / compression). */
   setTurns(turns: MessageParam[]): void {
     this.ctx.turns = turns;
     this.ctx.displayOverrides.clear();
     this.notify();
   }
 
-  /** Remove the last turn if it matches the predicate. Returns true if removed. */
   removeLastTurn(predicate: (turn: MessageParam) => boolean): boolean {
     const last = this.ctx.turns[this.ctx.turns.length - 1];
     if (last && predicate(last)) {
@@ -133,14 +119,11 @@ export class LLMContextManager {
     return false;
   }
 
-  /** Clear all turns and display overrides. */
   clear(): void {
     this.ctx.turns = [];
     this.ctx.displayOverrides.clear();
     this.notify();
   }
-
-  // ── Streaming state ─────────────────────────────────────
 
   setStreaming(v: boolean): void {
     if (this.streaming !== v) {
@@ -153,14 +136,7 @@ export class LLMContextManager {
     return this.streaming;
   }
 
-  // ── Display ─────────────────────────────────────────────
-
-  /**
-   * Convenience: generate display messages from current state.
-   * Callers that also have statuses should use the standalone
-   * toDisplayMessages() function and pass statuses separately.
-   */
-  toDisplayMessages(statuses: import("./messages.js").StatusMessage[] = []): DisplayMessage[] {
+  toDisplayMessages(statuses: StatusMessage[] = []): DisplayMessage[] {
     const msgs = toDisplayMessages(
       this.ctx.turns,
       statuses,

@@ -1,5 +1,5 @@
 import type { Agent } from "../agent.js";
-import type { LLMContextManager } from "../llm-context-manager.js";
+import type { LLMContextManager } from "../context/index.js";
 
 export type AgentStatus = "idle" | "running" | "completed" | "error";
 

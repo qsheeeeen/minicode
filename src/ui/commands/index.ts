@@ -5,7 +5,7 @@ import type { SessionStats } from "../../services/session-stats.js";
 import type { SessionManager } from "../../services/session-manager.js";
 import type { ChangeJournal } from "../../services/change-journal.js";
 import type { Signal } from "../../utils/signal.js";
-import type { LLMContextManager } from "../../llm-context-manager.js";
+import type { LLMContextManager } from "../../context/index.js";
 import type { AppConfig } from "../../config.js";
 import type { ModelSwitchService } from "../../services/model-switcher.js";
 import { getSkillBody, getAvailableSkills } from "../../skills/index.js";

@@ -16,7 +16,7 @@ import {
   type CompressionStrategy,
 } from "./compression-service.js";
 import { ChangeJournal } from "./change-journal.js";
-import type { LLMContextManager } from "../llm-context-manager.js";
+import type { LLMContextManager } from "../context/index.js";
 import type { StatusReporter } from "./session-manager.js";
 
 export interface ContextManagerOpts {

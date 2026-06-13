@@ -1,7 +1,7 @@
 import type { ToolDef, ToolExecutionContext } from "./registry.js";
 import { ToolDeniedError } from "./registry.js";
 import type { ToolUseBlock } from "../messages.js";
-import type { LLMContextManager } from "../llm-context-manager.js";
+import type { LLMContextManager } from "../context/index.js";
 import type { ChangeJournal } from "../services/change-journal.js";
 import {
   PermissionService,

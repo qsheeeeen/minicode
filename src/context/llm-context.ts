@@ -6,7 +6,7 @@
  *
  * Mutated only through LLMContextManager — never directly.
  */
-import type { MessageParam } from "./messages.js";
+import type { MessageParam } from "../messages.js";
 
 export class LLMContext {
   constructor(

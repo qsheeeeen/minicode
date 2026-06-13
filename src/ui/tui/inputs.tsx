@@ -4,7 +4,7 @@ import { Select, TextInput } from "@inkjs/ui";
 import type { ProviderConfig } from "../../config.js";
 import type { ChangeEntry } from "../../services/change-journal.js";
 import type { ChangeJournal } from "../../services/change-journal.js";
-import type { LLMContextManager } from "../../llm-context-manager.js";
+import type { LLMContextManager } from "../../context/index.js";
 import type { StatusReporter } from "../../services/session-manager.js";
 
 export interface InputComponentProps {
