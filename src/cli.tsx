@@ -3,7 +3,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { AppConfig } from "./config.js";
 import { Args } from "./args.js";
-import { createRuntime } from "./runtime/create-runtime.js";
+import { createApp } from "./app/create-app.js";
 import { HeadlessSurface } from "./surfaces/headless-surface.js";
 import { TuiSurface } from "./surfaces/tui-surface.js";
 
@@ -22,7 +22,7 @@ const args = new Args(process.argv, config, VERSION);
 
 let runtime;
 try {
-  runtime = await createRuntime({
+  runtime = await createApp({
     args,
     config,
     version: VERSION,

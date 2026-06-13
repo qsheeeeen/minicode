@@ -1,4 +1,4 @@
-import type { AppRuntime } from "../runtime/types.js";
+import type { AppRuntime } from "../app/types.js";
 
 export interface Surface {
   run(runtime: AppRuntime): Promise<void>;

@@ -1,5 +1,5 @@
 import { render } from "ink";
-import type { AppRuntime } from "../runtime/types.js";
+import type { AppRuntime } from "../app/types.js";
 import { App } from "../ui/tui.js";
 import type { Surface } from "./types.js";
 

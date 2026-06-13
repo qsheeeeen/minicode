@@ -22,7 +22,7 @@ import { loadGlobalPrompt } from "../utils/prompts.js";
 import { Signal } from "../utils/signal.js";
 import type { AppRuntime } from "./types.js";
 
-export interface CreateRuntimeOpts {
+export interface CreateAppOpts {
   readonly args: Args;
   readonly config: AppConfig;
   readonly version: string;
@@ -31,9 +31,7 @@ export interface CreateRuntimeOpts {
   readonly stdinIsTTY: boolean;
 }
 
-export async function createRuntime(
-  opts: CreateRuntimeOpts,
-): Promise<AppRuntime> {
+export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
   const { args, config, version, cwd, programStartTime, stdinIsTTY } = opts;
   const {
     model,

@@ -1,7 +1,7 @@
 import { beforeEach, describe, it, expect, vi } from "vitest";
 import { AppConfig } from "../config.js";
 import { SessionPersistence } from "../services/session-persistence.js";
-import { createRuntime } from "./create-runtime.js";
+import { createApp } from "./create-app.js";
 
 vi.mock("../utils/logger.js", () => ({
   createLogger: vi.fn().mockResolvedValue({
@@ -47,17 +47,17 @@ function makeArgs(overrides: Record<string, unknown> = {}) {
   } as any;
 }
 
-describe("createRuntime", () => {
+describe("createApp", () => {
   beforeEach(() => {
     vi.spyOn(SessionPersistence, "getSessionDir").mockReturnValue(
-      "/tmp/minicode-runtime-test",
+      "/tmp/minicode-app-test",
     );
   });
 
-  it("creates the application runtime object graph", async () => {
+  it("creates the application app object graph", async () => {
     const config = new AppConfig({});
 
-    const runtime = await createRuntime({
+    const runtime = await createApp({
       args: makeArgs(),
       config,
       version: "1.0.0",
@@ -77,7 +77,7 @@ describe("createRuntime", () => {
   });
 
   it("uses a live status reporter callback for token threshold messages", async () => {
-    const runtime = await createRuntime({
+    const runtime = await createApp({
       args: makeArgs(),
       config: new AppConfig({}),
       version: "1.0.0",
@@ -97,7 +97,7 @@ describe("createRuntime", () => {
   });
 
   it("exposes the latest change journal through command context", async () => {
-    const runtime = await createRuntime({
+    const runtime = await createApp({
       args: makeArgs(),
       config: new AppConfig({}),
       version: "1.0.0",

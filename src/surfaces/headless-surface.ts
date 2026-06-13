@@ -1,4 +1,4 @@
-import type { AppRuntime } from "../runtime/types.js";
+import type { AppRuntime } from "../app/types.js";
 import { runHeadless } from "../ui/headless.js";
 import type { Surface } from "./types.js";
 
