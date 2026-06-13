@@ -42,8 +42,8 @@ export async function runHeadless(
   // Set up renderer with status forwarding
   const renderer = new HeadlessRenderer(context);
   sessionManager.setStatusReporter((msg) => {
-    const turnIndex = context.getTurnCount();
-    renderer.addStatus({ ...msg, turnIndex });
+    const messageIndex = context.getTurnCount();
+    renderer.addStatus({ ...msg, messageIndex });
   });
 
   // Load session if requested
@@ -60,7 +60,10 @@ export async function runHeadless(
         tokenCount$.set(totalTokens);
       }
       const { createLogger } = await import("../utils/logger.js");
-      const newLogger = await createLogger(SessionPersistence.getProjectHash(), name);
+      const newLogger = await createLogger(
+        SessionPersistence.getProjectHash(),
+        name,
+      );
       sessionManager.setSession(name);
       agent.logger = newLogger;
     }
@@ -86,11 +89,18 @@ export async function runHeadless(
     }
 
     const route = await routeInput(initialPrompt, cmdContext);
-    const processed = processRoute(route, initialPrompt, context, sessionManager.reportStatus.bind(sessionManager));
+    const processed = processRoute(
+      route,
+      initialPrompt,
+      context,
+      sessionManager.reportStatus.bind(sessionManager),
+    );
 
     if (processed.type === "done") {
       if (processed.shellOutput) {
-        console.log(`$ ${processed.shellOutput.command}\n${processed.shellOutput.output}`);
+        console.log(
+          `$ ${processed.shellOutput.command}\n${processed.shellOutput.output}`,
+        );
       }
       renderer.renderFinal();
       return;

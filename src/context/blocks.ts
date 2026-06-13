@@ -21,10 +21,9 @@ export interface ToolResultBlock {
   content: string;
 }
 
-export type ContentBlock = TextBlock | ThinkingBlock | ToolUseBlock;
-export type UserContentBlock = ToolResultBlock;
+export type AssistantBlock = TextBlock | ThinkingBlock | ToolUseBlock;
+export type ContextBlock = AssistantBlock | ToolResultBlock;
 
-export interface MessageParam {
-  role: "user" | "assistant";
-  content: string | ContentBlock[] | UserContentBlock[];
-}
+// Compatibility aliases for provider-facing code.
+export type ContentBlock = AssistantBlock;
+export type UserContentBlock = ToolResultBlock;

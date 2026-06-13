@@ -35,15 +35,29 @@ export interface ConnectAgentOptions {
   registry: AgentRegistry;
 }
 
-export function connectAgent(options: ConnectAgentOptions): { cleanup: () => void; prompter: UserPrompter } {
-  const { agent, sessionManager, tokenCount$, initialSession, sessionName, resumeRecent, registry } = options;
+export function connectAgent(options: ConnectAgentOptions): {
+  cleanup: () => void;
+  prompter: UserPrompter;
+} {
+  const {
+    agent,
+    sessionManager,
+    tokenCount$,
+    initialSession,
+    sessionName,
+    resumeRecent,
+    registry,
+  } = options;
   const context = sessionManager.getContext();
   const { dispatch } = useTuiStore.getState();
 
   // Helper: sync display messages from LLMContextManager + Zustand statuses
   const syncMessages = () => {
     const { statuses } = useTuiStore.getState();
-    dispatch({ type: "SET_MESSAGES", payload: context.toDisplayMessages(statuses) });
+    dispatch({
+      type: "SET_MESSAGES",
+      payload: context.toDisplayMessages(statuses),
+    });
   };
 
   // 1. Subscribe to token count signal
@@ -64,8 +78,8 @@ export function connectAgent(options: ConnectAgentOptions): { cleanup: () => voi
 
   // 3. Wire StatusReporter: statuses → Zustand + re-sync display messages
   sessionManager.setStatusReporter((msg) => {
-    const turnIndex = context.getTurnCount();
-    dispatch({ type: "ADD_STATUS", payload: { ...msg, turnIndex } });
+    const messageIndex = context.getTurnCount();
+    dispatch({ type: "ADD_STATUS", payload: { ...msg, messageIndex } });
     syncMessages();
   });
 

@@ -8,15 +8,11 @@
  * Every consumer that needs to read or modify the conversation turns
  * goes through this class.
  */
-import type {
-  MessageParam,
-  TextBlock,
-  ThinkingBlock,
-  ContentBlock,
-  DisplayMessage,
-  StatusMessage,
-} from "../messages.js";
-import { toDisplayMessages } from "../messages.js";
+import type { ContextTurn, MessageParam } from "./turns.js";
+import type { ContentBlock } from "./blocks.js";
+import type { DisplayMessage, StatusMessage } from "./display.js";
+import { groupMessagesIntoContextTurns } from "./turns.js";
+import { toDisplayMessages } from "./transform.js";
 import { LLMContext } from "./llm-context.js";
 
 export class LLMContextManager {
@@ -41,6 +37,13 @@ export class LLMContextManager {
 
   getTurnCount(): number {
     return this.ctx.turns.length;
+  }
+
+  getContextTurns(): ContextTurn[] {
+    return groupMessagesIntoContextTurns(
+      this.ctx.turns,
+      this.ctx.displayOverrides,
+    );
   }
 
   toLLMMessages(): MessageParam[] {

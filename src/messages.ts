@@ -1,5 +1,8 @@
 export type {
+  AssistantBlock,
   ContentBlock,
+  ContextBlock,
+  ContextTurn,
   DisplayMessage,
   MessageParam,
   MessageRole,
@@ -9,5 +12,8 @@ export type {
   ToolResultBlock,
   ToolUseBlock,
   UserContentBlock,
-} from "./conversation/index.js";
-export { toDisplayMessages } from "./conversation/index.js";
+} from "./context/index.js";
+export {
+  groupMessagesIntoContextTurns,
+  toDisplayMessages,
+} from "./context/index.js";

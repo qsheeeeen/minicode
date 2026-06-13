@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { LLMContextManager } from "./llm-context-manager.js";
-import type { MessageParam, StatusMessage } from "../messages.js";
+import type { MessageParam, StatusMessage } from "./index.js";
 
 describe("LLMContextManager", () => {
   describe("observable", () => {
@@ -220,6 +220,69 @@ describe("LLMContextManager", () => {
     });
   });
 
+  describe("getContextTurns", () => {
+    it("groups user text through assistant and tool blocks into one context turn", () => {
+      const mgr = new LLMContextManager();
+      mgr.addUserMessage("inspect file", "Inspect file");
+      mgr.startAssistantTurn();
+      mgr.appendToLastAssistantTurn({ type: "thinking", thinking: "plan" });
+      mgr.appendToLastAssistantTurn({
+        type: "tool_use",
+        id: "tool-1",
+        name: "read",
+        input: { path: "a.ts" },
+      });
+      mgr.addToolResults([{ toolUseId: "tool-1", content: "file content" }]);
+      mgr.startAssistantTurn();
+      mgr.appendToLastAssistantTurn({ type: "text", text: "done" });
+
+      expect(mgr.getContextTurns()).toEqual([
+        {
+          userText: "inspect file",
+          displayUserText: "Inspect file",
+          blocks: [
+            { type: "thinking", thinking: "plan" },
+            {
+              type: "tool_use",
+              id: "tool-1",
+              name: "read",
+              input: { path: "a.ts" },
+            },
+            {
+              type: "tool_result",
+              tool_use_id: "tool-1",
+              content: "file content",
+            },
+            { type: "text", text: "done" },
+          ],
+        },
+      ]);
+    });
+
+    it("starts a new context turn at the next user text message", () => {
+      const mgr = new LLMContextManager();
+      mgr.addUserMessage("first");
+      mgr.startAssistantTurn();
+      mgr.appendToLastAssistantTurn({ type: "text", text: "one" });
+      mgr.addUserMessage("second");
+      mgr.startAssistantTurn();
+      mgr.appendToLastAssistantTurn({ type: "text", text: "two" });
+
+      expect(mgr.getContextTurns()).toEqual([
+        {
+          userText: "first",
+          displayUserText: undefined,
+          blocks: [{ type: "text", text: "one" }],
+        },
+        {
+          userText: "second",
+          displayUserText: undefined,
+          blocks: [{ type: "text", text: "two" }],
+        },
+      ]);
+    });
+  });
+
   describe("streaming state", () => {
     it("setStreaming toggles state", () => {
       const mgr = new LLMContextManager();
@@ -258,7 +321,7 @@ describe("LLMContextManager", () => {
       expect(msgs[1]).toEqual({ role: "text", content: "world" });
     });
 
-    it("interleaves statuses by turnIndex", () => {
+    it("interleaves statuses by messageIndex", () => {
       const mgr = new LLMContextManager();
       mgr.addUserMessage("hello");
       mgr.startAssistantTurn();
@@ -268,13 +331,13 @@ describe("LLMContextManager", () => {
         {
           role: "status",
           content: "status after turn 0",
-          turnIndex: 1,
+          messageIndex: 1,
           timestamp: new Date(),
         },
         {
           role: "status",
           content: "status at end",
-          turnIndex: 3,
+          messageIndex: 3,
           timestamp: new Date(),
         },
       ];

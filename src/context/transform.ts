@@ -1,5 +1,6 @@
-import type { ContentBlock, MessageParam } from "./types.js";
+import type { ContentBlock } from "./blocks.js";
 import type { DisplayMessage, StatusMessage } from "./display.js";
+import type { MessageParam } from "./turns.js";
 
 export function toDisplayMessages(
   turns: MessageParam[],
@@ -24,7 +25,7 @@ export function toDisplayMessages(
 
   const byTurnIndex = new Map<number, StatusMessage[]>();
   for (const s of statuses) {
-    const idx = s.turnIndex ?? turns.length;
+    const idx = s.messageIndex ?? s.turnIndex ?? turns.length;
     if (!byTurnIndex.has(idx)) byTurnIndex.set(idx, []);
     byTurnIndex.get(idx)!.push(s);
   }
@@ -78,7 +79,8 @@ export function toDisplayMessages(
   }
 
   for (const s of statuses) {
-    if (s.turnIndex !== undefined && s.turnIndex > turns.length) {
+    const idx = s.messageIndex ?? s.turnIndex;
+    if (idx !== undefined && idx > turns.length) {
       result.push({
         role: s.role,
         content: s.content,

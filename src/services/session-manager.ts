@@ -16,7 +16,9 @@ import type { MessageParam, StatusMessage } from "../messages.js";
  * status reporting lifecycle. Other services (ContextManager, TokenTracker)
  * receive it as a dependency.
  */
-export type StatusReporter = (msg: Omit<StatusMessage, "turnIndex">) => void;
+export type StatusReporter = (
+  msg: Omit<StatusMessage, "messageIndex" | "turnIndex">,
+) => void;
 
 export class SessionManager {
   private _currentSession: string;
@@ -43,7 +45,7 @@ export class SessionManager {
   }
 
   /** Convenience: report a status via the configured reporter. */
-  reportStatus(msg: Omit<StatusMessage, "turnIndex">): void {
+  reportStatus(msg: Omit<StatusMessage, "messageIndex" | "turnIndex">): void {
     this._statusReporter(msg);
   }
 
