@@ -12,7 +12,7 @@ import type { AgentRegistry } from "./services/agent-registry.js";
 import type { PromptManager } from "./services/prompt-manager.js";
 import type { SessionManager } from "./services/session-manager.js";
 import type { ContextManager } from "./services/context-manager.js";
-import type { LLMHistory } from "./llm/history.js";
+import type { LLMContext } from "./llm/context.js";
 import type { AppConfig } from "./config.js";
 import type { FileSystemService } from "./services/filesystem.js";
 import type { ModelSwitchService } from "./services/model-switcher.js";
@@ -55,8 +55,8 @@ export class Agent {
   private _isRunning: boolean = false;
 
   /** Cached access to the context manager. */
-  private get context(): LLMHistory {
-    return this.sessionManager.getHistory();
+  private get context(): LLMContext {
+    return this.sessionManager.getContext();
   }
 
   get currentSession(): string {

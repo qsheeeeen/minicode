@@ -9,7 +9,7 @@ import fs from "fs/promises";
 import path from "path";
 import os from "os";
 import crypto from "crypto";
-import type { LLMBlock } from "../llm/history.js";
+import type { LLMBlock } from "../llm/context.js";
 
 export interface SessionData {
   model: string;

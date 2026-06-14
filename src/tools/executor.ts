@@ -1,7 +1,7 @@
 import type { ToolDef, ToolExecutionContext } from "./registry.js";
 import { ToolDeniedError } from "./registry.js";
 import type { LLMToolUseBlock } from "../llm/client.js";
-import type { LLMHistory } from "../llm/history.js";
+import type { LLMContext } from "../llm/context.js";
 import type { ChangeJournal } from "../services/change-journal.js";
 import {
   PermissionService,
@@ -19,7 +19,7 @@ export interface ToolExecutorOpts {
   readonly tools: Map<string, ToolDef>;
   readonly permissionService: PermissionService;
   readonly getChangeJournal: () => ChangeJournal;
-  readonly context: LLMHistory;
+  readonly context: LLMContext;
   readonly logger?: pino.Logger;
 }
 
@@ -31,7 +31,7 @@ export class ToolExecutor {
   private tools: Map<string, ToolDef>;
   private permissionService: PermissionService;
   private getChangeJournal: () => ChangeJournal;
-  private context: LLMHistory;
+  private context: LLMContext;
   private logger?: pino.Logger;
 
   constructor(opts: ToolExecutorOpts) {

@@ -1,4 +1,4 @@
-import type { LLMBlock } from "../llm/history.js";
+import type { LLMBlock } from "../llm/context.js";
 
 export interface StatusMessage {
   role: "status" | "error";

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { SummaryCompressionStrategy } from "./compression-service.js";
 import type { LLMClient } from "../llm/client.js";
-import { LLMHistory, type LLMBlock } from "../llm/history.js";
+import { LLMContext, type LLMBlock } from "../llm/context.js";
 import { Model } from "../llm/model.js";
 
 function userBlocks(count: number, prefix = "message"): LLMBlock[] {
@@ -11,10 +11,10 @@ function userBlocks(count: number, prefix = "message"): LLMBlock[] {
   }));
 }
 
-function historyWith(blocks: LLMBlock[]): LLMHistory {
-  const history = new LLMHistory();
-  history.replaceBlocks(blocks);
-  return history;
+function contextWith(blocks: LLMBlock[]): LLMContext {
+  const context = new LLMContext();
+  context.replaceBlocks(blocks);
+  return context;
 }
 
 describe("SummaryCompressionStrategy", () => {
@@ -30,7 +30,7 @@ describe("SummaryCompressionStrategy", () => {
       const mockClient = {} as LLMClient;
       const model = new Model("claude-3", "test-provider", 1000);
       const result = await service.compress(
-        historyWith(blocks),
+        contextWith(blocks),
         mockClient,
         model,
       );
@@ -52,7 +52,7 @@ describe("SummaryCompressionStrategy", () => {
       const model = new Model("claude-3", "test-provider", 1000);
 
       const result = await service.compress(
-        historyWith(blocks),
+        contextWith(blocks),
         mockClient,
         model,
       );
@@ -74,7 +74,7 @@ describe("SummaryCompressionStrategy", () => {
       const model = new Model("claude-3", "test-provider", 1000);
 
       await expect(
-        service.compress(historyWith(blocks), mockClient, model),
+        service.compress(contextWith(blocks), mockClient, model),
       ).rejects.toThrow("Compression failed");
     });
 
@@ -90,7 +90,7 @@ describe("SummaryCompressionStrategy", () => {
       } as unknown as LLMClient;
       const model = new Model("claude-3", "test-provider", 1000);
 
-      await service.compress(historyWith(blocks), mockClient, model);
+      await service.compress(contextWith(blocks), mockClient, model);
 
       expect(mockClient.chatStream).toHaveBeenCalledWith(
         expect.arrayContaining([
@@ -116,7 +116,7 @@ describe("SummaryCompressionStrategy", () => {
       } as unknown as LLMClient;
 
       const result = await service.compress(
-        historyWith(blocks),
+        contextWith(blocks),
         mockClient,
         undefined,
       );

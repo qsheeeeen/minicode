@@ -1,15 +1,15 @@
-// SessionManager owns all session-level state: LLM history, change journal,
+// SessionManager owns all session-level state: LLM context, change journal,
 // session name, user message ordinal, and session stats.
 //
-// Coordinates history + changeJournal on session switch.
+// Coordinates context + changeJournal on session switch.
 // Provides StatusReporter callback for services to emit UI notifications.
 // Agent delegates session operations here.
 
-import { LLMHistory } from "../llm/history.js";
+import { LLMContext } from "../llm/context.js";
 import { ChangeJournal } from "./change-journal.js";
 import { SessionPersistence } from "./session-persistence.js";
 import type { SessionStats } from "./session-stats.js";
-import type { LLMBlock } from "../llm/history.js";
+import type { LLMBlock } from "../llm/context.js";
 import type { StatusMessage } from "../ui/display.js";
 /**
  * StatusReporter — callback for emitting UI status/error notifications.
@@ -23,7 +23,7 @@ export type StatusReporter = (
 
 export class SessionManager {
   private _currentSession: string;
-  private history = new LLMHistory();
+  private context = new LLMContext();
   private changeJournal = new ChangeJournal();
   private activeUserMessageOrdinal = 0;
   private sessionStats?: SessionStats;
@@ -50,7 +50,7 @@ export class SessionManager {
     this._statusReporter(msg);
   }
 
-  /** Switch to a new session. Coordinates history + journal. */
+  /** Switch to a new session. Coordinates context + journal. */
   setSession(sessionName: string): void {
     this._currentSession = sessionName;
     this.changeJournal.startSession(
@@ -59,9 +59,9 @@ export class SessionManager {
     );
   }
 
-  /** Clear all session state (history, journal, user message ordinal). */
+  /** Clear all session state (context, journal, user message ordinal). */
   clearSession(): void {
-    this.history.clear();
+    this.context.clear();
     this.changeJournal.close();
     this.changeJournal = new ChangeJournal();
     this.activeUserMessageOrdinal = 0;
@@ -74,17 +74,17 @@ export class SessionManager {
       this._meta.totalTokens = meta.totalTokens;
     await SessionPersistence.save(
       this._currentSession,
-      this.history.getBlocks(),
+      this.context.getBlocks(),
       { model: this._meta.model, totalTokens: this._meta.totalTokens },
     ).catch((e) => {
       throw e;
     });
   }
 
-  // -- History accessors --
+  // -- Context accessors --
 
-  getHistory(): LLMHistory {
-    return this.history;
+  getContext(): LLMContext {
+    return this.context;
   }
 
   getChangeJournal(): ChangeJournal {
@@ -105,14 +105,14 @@ export class SessionManager {
     this.activeUserMessageOrdinal = idx;
   }
 
-  // -- Convenience shortcuts for common history operations --
+  // -- Convenience shortcuts for common context operations --
 
   getMessages(): LLMBlock[] {
-    return this.history.getBlocks();
+    return this.context.getBlocks();
   }
 
   setMessages(messages: LLMBlock[]): void {
-    this.history.replaceBlocks(messages);
+    this.context.replaceBlocks(messages);
   }
 
   getSessionStats(): SessionStats | undefined {

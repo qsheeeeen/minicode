@@ -29,7 +29,7 @@ describe("SessionManager", () => {
   describe("context and journal accessors", () => {
     it("provides a MessageStore", () => {
       const sm = new SessionManager();
-      expect(sm.getHistory()).toBeDefined();
+      expect(sm.getContext()).toBeDefined();
     });
 
     it("provides a ChangeJournal", () => {

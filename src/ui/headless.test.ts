@@ -11,7 +11,7 @@ const mockContext = {
 const mockSetSession = vi.fn();
 const mockSetStatusReporter = vi.fn();
 const mockSessionManager = {
-  getHistory: vi.fn().mockReturnValue(mockContext),
+  getContext: vi.fn().mockReturnValue(mockContext),
   setSession: mockSetSession,
   setStatusReporter: mockSetStatusReporter,
   reportStatus: vi.fn(),

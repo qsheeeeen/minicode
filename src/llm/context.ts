@@ -5,6 +5,8 @@ import type {
   LLMToolUseBlock,
 } from "./client.js";
 
+export type { LLMBlock, LLMThinkingBlock, LLMToolUseBlock } from "./client.js";
+
 function cloneBlock(block: LLMBlock): LLMBlock {
   if (block.type === "tool_use") {
     return { ...block, input: { ...block.input } };
@@ -12,7 +14,7 @@ function cloneBlock(block: LLMBlock): LLMBlock {
   return { ...block };
 }
 
-export class LLMHistory {
+export class LLMContext {
   private blocks: LLMBlock[] = [];
   private listeners = new Set<() => void>();
 
@@ -65,7 +67,7 @@ export class LLMHistory {
 
   private static validateBlocks(blocks: LLMBlock[]): void {
     if (!Array.isArray(blocks)) {
-      throw new Error("Invalid LLM history: blocks must be an array");
+      throw new Error("Invalid LLM context: blocks must be an array");
     }
 
     let seenUser = false;
@@ -84,7 +86,7 @@ export class LLMHistory {
       }
 
       if (!seenUser) {
-        throw new Error("Invalid LLM history: first block must be user");
+        throw new Error("Invalid LLM context: first block must be user");
       }
 
       if (block.type === "text") {
@@ -145,7 +147,7 @@ export class LLMHistory {
   }
 
   replaceBlocks(blocks: LLMBlock[]): void {
-    LLMHistory.validateBlocks(blocks);
+    LLMContext.validateBlocks(blocks);
     this.blocks = blocks.map(cloneBlock);
     this.notify();
   }

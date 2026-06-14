@@ -16,14 +16,14 @@ import {
   type CompressionStrategy,
 } from "./compression-service.js";
 import { ChangeJournal } from "./change-journal.js";
-import type { LLMHistory } from "../llm/history.js";
+import type { LLMContext } from "../llm/context.js";
 import type { StatusReporter } from "./session-manager.js";
 
 export interface ContextManagerOpts {
   readonly contextLength: number;
   readonly compressionThresholdRatio: number;
   readonly tokenCount$: Signal<number>;
-  readonly contextManager: LLMHistory;
+  readonly contextManager: LLMContext;
   readonly statusReporter: StatusReporter;
   readonly sessionStats?: SessionStats;
   readonly compressionStrategy?: CompressionStrategy;
@@ -31,7 +31,7 @@ export interface ContextManagerOpts {
 }
 
 export interface CompressDeps {
-  context: LLMHistory;
+  context: LLMContext;
   client: LLMClient;
   model: Model;
   changeJournal: ChangeJournal;
@@ -69,7 +69,7 @@ export class ContextManager {
   }
 
   /**
-   * Compress conversation history when context window threshold is exceeded.
+   * Compress conversation context when context window threshold is exceeded.
    * Receives cross-manager deps as params. Returns the new activeUserMessageOrdinal.
    */
   async compress(deps: CompressDeps): Promise<number> {

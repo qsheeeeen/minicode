@@ -43,7 +43,7 @@ function createTestAgent(options?: {
     contextLength: model.getContextLength(),
     compressionThresholdRatio: 0.8,
     tokenCount$,
-    contextManager: sessionManager.getHistory(),
+    contextManager: sessionManager.getContext(),
     statusReporter: sessionManager.reportStatus.bind(sessionManager),
   });
   const promptManager = new PromptManager();
@@ -51,7 +51,7 @@ function createTestAgent(options?: {
     tools,
     permissionService: new PermissionService(options?.permissionMode ?? "yolo"),
     getChangeJournal: () => sessionManager.getChangeJournal(),
-    context: sessionManager.getHistory(),
+    context: sessionManager.getContext(),
   });
   const agent = new Agent({
     client,
@@ -63,7 +63,7 @@ function createTestAgent(options?: {
     tokenCount$,
   });
 
-  return { agent, context: sessionManager.getHistory() };
+  return { agent, context: sessionManager.getContext() };
 }
 
 describe("Agent virtual integration", () => {
@@ -229,7 +229,7 @@ describe("Agent virtual integration", () => {
       contextLength: model.getContextLength(),
       compressionThresholdRatio: 0.8,
       tokenCount$,
-      contextManager: sessionManager.getHistory(),
+      contextManager: sessionManager.getContext(),
       statusReporter: sessionManager.reportStatus.bind(sessionManager),
     });
     const promptManager = new PromptManager();
@@ -237,7 +237,7 @@ describe("Agent virtual integration", () => {
       tools,
       permissionService: new PermissionService("manual"),
       getChangeJournal: () => sessionManager.getChangeJournal(),
-      context: sessionManager.getHistory(),
+      context: sessionManager.getContext(),
     });
     const agent = new Agent({
       client,
@@ -248,7 +248,7 @@ describe("Agent virtual integration", () => {
       promptManager,
       tokenCount$,
     });
-    const context = sessionManager.getHistory();
+    const context = sessionManager.getContext();
     const reportStatusSpy = vi.spyOn(sessionManager, "reportStatus");
 
     const completed = await agent.run("Do something dangerous", { prompter });

@@ -48,10 +48,10 @@ export function connectAgent(options: ConnectAgentOptions): {
     resumeRecent,
     registry,
   } = options;
-  const context = sessionManager.getHistory();
+  const context = sessionManager.getContext();
   const { dispatch } = useTuiStore.getState();
 
-  // Helper: sync display messages from LLMHistory + Zustand statuses
+  // Helper: sync display messages from LLMContext + Zustand statuses
   const syncMessages = () => {
     const { statuses } = useTuiStore.getState();
     dispatch({
@@ -83,7 +83,7 @@ export function connectAgent(options: ConnectAgentOptions): {
     syncMessages();
   });
 
-  // 4. Subscribe to LLMHistory changes → re-sync display messages
+  // 4. Subscribe to LLMContext changes → re-sync display messages
   const unsubStore = context.onChange(syncMessages);
 
   // 5. Register main agent in the registry

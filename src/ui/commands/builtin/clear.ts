@@ -3,7 +3,7 @@ import { switchSession } from "../../../services/session-lifecycle.js";
 
 registerCommand({
   name: "clear",
-  description: "Clear all history and start a new session",
+  description: "Clear all context and start a new session",
   handler: async (_args, ctx): Promise<void> => {
     ctx.agent.clearSession();
     ctx.tokenCount$.set(0);

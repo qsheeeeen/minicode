@@ -1,5 +1,5 @@
 import type { ToolDef, ToolResult, ToolExecutionContext } from "../registry.js";
-import type { LLMBlock } from "../../llm/history.js";
+import type { LLMBlock } from "../../llm/context.js";
 import { Agent } from "../../agent.js";
 import { SessionManager } from "../../services/session-manager.js";
 import { ContextManager } from "../../services/context-manager.js";
@@ -74,7 +74,7 @@ export const agentTool: ToolDef = {
       contextLength: subModel.getContextLength(),
       compressionThresholdRatio: 0.8,
       tokenCount$,
-      contextManager: sessionManager.getHistory(),
+      contextManager: sessionManager.getContext(),
       statusReporter: () => {}, // sub-agents don't report statuses
     });
     const promptManager = new PromptManager(config.userPrompt);
@@ -82,7 +82,7 @@ export const agentTool: ToolDef = {
       tools: getSubAgentTools(),
       permissionService: new PermissionService("manual"),
       getChangeJournal: () => sessionManager.getChangeJournal(),
-      context: sessionManager.getHistory(),
+      context: sessionManager.getContext(),
     });
     const subAgent = new Agent({
       client: subClient,
@@ -101,7 +101,7 @@ export const agentTool: ToolDef = {
       subAgent.abort();
     });
 
-    const subContext = sessionManager.getHistory();
+    const subContext = sessionManager.getContext();
 
     registry.register({
       id: subId,

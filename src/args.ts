@@ -57,7 +57,7 @@ export class Args {
       .example("minicode -s my-session", "Use specific session")
       .example('minicode -H --perm yolo "ls"', "Headless, no permission checks")
       .epilog(
-        "In TUI mode:\n  /compress       # Compress conversation history\n  /new <name>     # Create new session\n  /resume         # List and resume sessions\n  /rename <name>  # Rename current session\n  /exit           # Quit (or Ctrl+C)\n  Shift+Tab       # Cycle permission mode (manual/yolo/auto)\n  Ctrl+O          # Switch active agent",
+        "In TUI mode:\n  /compress       # Compress conversation context\n  /new <name>     # Create new session\n  /resume         # List and resume sessions\n  /rename <name>  # Rename current session\n  /exit           # Quit (or Ctrl+C)\n  Shift+Tab       # Cycle permission mode (manual/yolo/auto)\n  Ctrl+O          # Switch active agent",
       );
 
     if (version !== undefined) {
@@ -70,9 +70,12 @@ export class Args {
 
     // Overlay args onto config (one-time; args are never persisted)
     const modelOverride = parsed.model as string | undefined;
-    this.model = modelOverride ? config.resolveModel(modelOverride) : config.model;
+    this.model = modelOverride
+      ? config.resolveModel(modelOverride)
+      : config.model;
     this.permissionMode =
-      (parsed.permission as PermissionMode | undefined) ?? config.permissionMode;
+      (parsed.permission as PermissionMode | undefined) ??
+      config.permissionMode;
     this.compressionThreshold = config.compressionThreshold;
     this.thinking = config.thinking;
     this.initialPrompt = parsed._.length > 0 ? parsed._.join(" ") : undefined;

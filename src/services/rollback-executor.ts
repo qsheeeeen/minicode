@@ -1,6 +1,6 @@
 import fs from "fs/promises";
 import type { ChangeEntry, ChangeJournal } from "./change-journal.js";
-import type { LLMHistory } from "../llm/history.js";
+import type { LLMContext } from "../llm/context.js";
 
 export interface RollbackResult {
   filesRestored: string[];
@@ -10,7 +10,7 @@ export interface RollbackResult {
 export class RollbackExecutor {
   async rollbackConversation(
     changeJournal: ChangeJournal,
-    context: LLMHistory,
+    context: LLMContext,
     fromUserMessageOrdinal: number,
   ): Promise<RollbackResult> {
     this.truncateConversation(context, fromUserMessageOrdinal);
@@ -20,7 +20,7 @@ export class RollbackExecutor {
 
   async rollbackFilesAndConversation(
     changeJournal: ChangeJournal,
-    context: LLMHistory,
+    context: LLMContext,
     fromUserMessageOrdinal: number,
   ): Promise<RollbackResult> {
     // Step 1: Restore files
@@ -77,7 +77,7 @@ export class RollbackExecutor {
   }
 
   private truncateConversation(
-    context: LLMHistory,
+    context: LLMContext,
     fromUserMessageOrdinal: number,
   ): void {
     context.truncateBeforeUserMessageOrdinal(fromUserMessageOrdinal);

@@ -26,7 +26,7 @@ function makeAgent(overrides?: {
   const model = o.model ?? makeTestModel();
   const tokenCount$ = new Signal(0);
   const sessionManager = new SessionManager();
-  const context = sessionManager.getHistory();
+  const context = sessionManager.getContext();
   const contextManager = new ContextManager({
     contextLength: model.getContextLength(),
     compressionThresholdRatio: o.compressionThresholdRatio ?? 0.8,
@@ -243,7 +243,7 @@ describe("Agent", () => {
       expect(context.getBlocks()).toEqual(messages);
     });
 
-    it("getMessages returns history blocks", () => {
+    it("getMessages returns context blocks", () => {
       const { context } = makeAgent();
       context.startUserMessage("hello");
       expect(context.getBlocks()).toEqual([{ type: "user", text: "hello" }]);

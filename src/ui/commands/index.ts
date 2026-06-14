@@ -5,7 +5,7 @@ import type { SessionStats } from "../../services/session-stats.js";
 import type { SessionManager } from "../../services/session-manager.js";
 import type { ChangeJournal } from "../../services/change-journal.js";
 import type { Signal } from "../../utils/signal.js";
-import type { LLMHistory } from "../../llm/history.js";
+import type { LLMContext } from "../../llm/context.js";
 import type { AppConfig } from "../../config.js";
 import type { ModelSwitchService } from "../../services/model-switcher.js";
 import { getSkillBody, getAvailableSkills } from "../../skills/index.js";
@@ -23,7 +23,7 @@ export interface CommandContext {
   agent: Agent;
   model: Model;
   config: AppConfig;
-  context: LLMHistory;
+  context: LLMContext;
   sessionManager: SessionManager;
   changeJournal: ChangeJournal;
   tokenCount$: Signal<number>;

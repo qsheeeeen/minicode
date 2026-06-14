@@ -1,5 +1,5 @@
 import type { RouteResult } from "./routing.js";
-import type { LLMHistory } from "../llm/history.js";
+import type { LLMContext } from "../llm/context.js";
 import type { StatusReporter } from "../services/session-manager.js";
 import { runShell } from "../services/index.js";
 
@@ -22,7 +22,7 @@ export type ProcessedRoute =
 export function processRoute(
   route: RouteResult,
   rawInput: string,
-  context: LLMHistory,
+  context: LLMContext,
   reportStatus?: StatusReporter,
 ): ProcessedRoute {
   if (route.action === "none") {
@@ -33,7 +33,7 @@ export function processRoute(
     const command = route.promptText!;
     const output = runShell(command);
 
-    // Inject into LLM history so the agent sees the command + result
+    // Inject into LLM context so the agent sees the command + result
     context.startUserMessage(`Ran: ${command}\n\n\`\`\`\n${output}\n\`\`\``);
     reportStatus?.({
       role: "status",

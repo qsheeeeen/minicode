@@ -1,10 +1,10 @@
 import type { LLMClient, LLMResponse } from "../llm/client.js";
-import type { LLMBlock, LLMHistory } from "../llm/history.js";
+import type { LLMBlock, LLMContext } from "../llm/context.js";
 import type { Model } from "../llm/model.js";
 
 export interface CompressionStrategy {
   compress(
-    history: LLMHistory,
+    context: LLMContext,
     client: LLMClient,
     model: Model | undefined,
   ): Promise<LLMBlock[]>;
@@ -14,15 +14,15 @@ export class SummaryCompressionStrategy implements CompressionStrategy {
   private readonly recentCount = 10;
 
   async compress(
-    history: LLMHistory,
+    context: LLMContext,
     client: LLMClient,
     model: Model | undefined,
   ): Promise<LLMBlock[]> {
-    if (history.getUserMessageCount() <= this.recentCount + 2) {
-      return history.getBlocks();
+    if (context.getUserMessageCount() <= this.recentCount + 2) {
+      return context.getBlocks();
     }
 
-    const { prefix, suffix } = history.splitAtRecentUserMessages(
+    const { prefix, suffix } = context.splitAtRecentUserMessages(
       this.recentCount,
     );
     const conversationText = this.extractConversationText(prefix);

@@ -1,13 +1,13 @@
 import type { StatusMessage } from "./display.js";
-import type { LLMBlock, LLMHistory } from "../llm/history.js";
+import type { LLMBlock, LLMContext } from "../llm/context.js";
 
 /**
  * HeadlessRenderer — incremental stdout renderer for non-TUI mode.
  *
- * It renders the LLMHistory block stream directly.
+ * It renders the LLMContext block stream directly.
  */
 export class HeadlessRenderer {
-  private context: LLMHistory;
+  private context: LLMContext;
   private statuses: StatusMessage[] = [];
   private printedBlocks = 0;
   private streamedChars = new Map<number, number>();
@@ -17,7 +17,7 @@ export class HeadlessRenderer {
   private lastStatusIdx = 0;
   private unsubscribe: (() => void) | null = null;
 
-  constructor(context: LLMHistory) {
+  constructor(context: LLMContext) {
     this.context = context;
   }
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { LLMHistory } from "../llm/history.js";
+import { LLMContext } from "../llm/context.js";
 
 vi.mock("fs/promises", () => ({
   default: {
@@ -20,16 +20,16 @@ describe("RollbackExecutor", () => {
     } as any;
   }
 
-  function makeHistory(blocks: any[]) {
-    const history = new LLMHistory();
-    history.replaceBlocks(blocks);
-    return history;
+  function makeContext(blocks: any[]) {
+    const context = new LLMContext();
+    context.replaceBlocks(blocks);
+    return context;
   }
 
   describe("rollbackConversation", () => {
     it("truncates conversation and prunes journal", async () => {
       const journal = makeMockJournal([]);
-      const context = makeHistory([
+      const context = makeContext([
         { type: "user", text: "first" },
         { type: "text", text: "reply" },
         { type: "user", text: "second" },
@@ -63,7 +63,7 @@ describe("RollbackExecutor", () => {
         { turnIdx: 3, path: "b.ts", op: "write", before: "", ts: 200 },
       ];
       const journal = makeMockJournal(entries);
-      const context = makeHistory([
+      const context = makeContext([
         { type: "user", text: "first" },
         { type: "user", text: "second" },
         { type: "user", text: "third" },
@@ -96,7 +96,7 @@ describe("RollbackExecutor", () => {
       const journal = makeMockJournal([
         { turnIdx: 1, path: "a.ts", op: "edit", before: "old", ts: 100 },
       ]);
-      const context = makeHistory([{ type: "user", text: "first" }]);
+      const context = makeContext([{ type: "user", text: "first" }]);
 
       const { RollbackExecutor } = await import("./rollback-executor.js");
       const executor = new RollbackExecutor();
@@ -128,7 +128,7 @@ describe("RollbackExecutor", () => {
         },
       ];
       const journal = makeMockJournal(entries);
-      const context = makeHistory([
+      const context = makeContext([
         { type: "user", text: "first" },
         { type: "user", text: "second" },
       ]);

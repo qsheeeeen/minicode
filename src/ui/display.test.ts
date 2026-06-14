@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { LLMBlock } from "../llm/history.js";
+import type { LLMBlock } from "../llm/context.js";
 import type { StatusMessage } from "./display.js";
 import { toDisplayMessages } from "./display.js";
 

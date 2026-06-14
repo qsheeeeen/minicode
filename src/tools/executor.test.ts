@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { ToolExecutor, type ToolCall } from "./executor.js";
 import { PermissionService } from "../services/permission.js";
-import { LLMHistory } from "../llm/history.js";
+import { LLMContext } from "../llm/context.js";
 import { ChangeJournal } from "../services/change-journal.js";
 import type { ToolDef, ToolExecutionContext } from "./registry.js";
 import { ToolDeniedError } from "./registry.js";
@@ -28,7 +28,7 @@ function makeExecutor(overrides?: {
   const permissionService = new PermissionService(
     overrides?.permissionMode ?? "yolo",
   );
-  const context = new LLMHistory();
+  const context = new LLMContext();
   const changeJournal = new ChangeJournal();
   const executor = new ToolExecutor({
     tools,
@@ -76,7 +76,7 @@ function makeToolCall(
   };
 }
 
-function prepareToolCalls(context: LLMHistory, calls: ToolCall[]): void {
+function prepareToolCalls(context: LLMContext, calls: ToolCall[]): void {
   context.startUserMessage("task");
   for (const call of calls) {
     context.startToolCall(call.block.id, call.block.name, call.block.input);
