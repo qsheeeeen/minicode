@@ -17,7 +17,7 @@ export type ProcessedRoute =
  * or pass through to the LLM. Returns what the caller should do next.
  *
  * Shell results are always injected into the agent's context so
- * the LLM can see them in future turns, regardless of display mode.
+ * the LLM can see them in future user messages, regardless of display mode.
  */
 export function processRoute(
   route: RouteResult,
@@ -34,7 +34,7 @@ export function processRoute(
     const output = runShell(command);
 
     // Inject into LLM history so the agent sees the command + result
-    context.startTurn(`Ran: ${command}\n\n\`\`\`\n${output}\n\`\`\``);
+    context.startUserMessage(`Ran: ${command}\n\n\`\`\`\n${output}\n\`\`\``);
     reportStatus?.({
       role: "status",
       content: `$ ${command}\n${output}`,

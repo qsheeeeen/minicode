@@ -1,5 +1,5 @@
 // SessionManager owns all session-level state: LLM history, change journal,
-// session name, turn index, and session stats.
+// session name, user message ordinal, and session stats.
 //
 // Coordinates history + changeJournal on session switch.
 // Provides StatusReporter callback for services to emit UI notifications.
@@ -17,13 +17,15 @@ import type { StatusMessage } from "../ui/display.js";
  * status reporting lifecycle. Other services (ContextManager, TokenTracker)
  * receive it as a dependency.
  */
-export type StatusReporter = (msg: Omit<StatusMessage, "turnIndex">) => void;
+export type StatusReporter = (
+  msg: Omit<StatusMessage, "userMessageIndex">,
+) => void;
 
 export class SessionManager {
   private _currentSession: string;
   private history = new LLMHistory();
   private changeJournal = new ChangeJournal();
-  private activeTurnIdx = 0;
+  private activeUserMessageOrdinal = 0;
   private sessionStats?: SessionStats;
   private _meta = { model: "unknown", totalTokens: 0 };
   private _statusReporter: StatusReporter = () => {};
@@ -44,7 +46,7 @@ export class SessionManager {
   }
 
   /** Convenience: report a status via the configured reporter. */
-  reportStatus(msg: Omit<StatusMessage, "turnIndex">): void {
+  reportStatus(msg: Omit<StatusMessage, "userMessageIndex">): void {
     this._statusReporter(msg);
   }
 
@@ -57,12 +59,12 @@ export class SessionManager {
     );
   }
 
-  /** Clear all session state (history, journal, turn index). */
+  /** Clear all session state (history, journal, user message ordinal). */
   clearSession(): void {
     this.history.clear();
     this.changeJournal.close();
     this.changeJournal = new ChangeJournal();
-    this.activeTurnIdx = 0;
+    this.activeUserMessageOrdinal = 0;
   }
 
   /** Persist session to disk. Caller provides model name and token count. */
@@ -93,14 +95,14 @@ export class SessionManager {
     return this._currentSession;
   }
 
-  // -- Turn index --
+  // -- User message ordinal --
 
-  getActiveTurnIdx(): number {
-    return this.activeTurnIdx;
+  getActiveUserMessageOrdinal(): number {
+    return this.activeUserMessageOrdinal;
   }
 
-  setActiveTurnIdx(idx: number): void {
-    this.activeTurnIdx = idx;
+  setActiveUserMessageOrdinal(idx: number): void {
+    this.activeUserMessageOrdinal = idx;
   }
 
   // -- Convenience shortcuts for common history operations --

@@ -120,15 +120,16 @@ export class Agent {
   }
 
   async compress(): Promise<void> {
-    const newTurnIdx = await this.contextManager.compress({
+    const newUserMessageOrdinal = await this.contextManager.compress({
       context: this.context,
       client: this.client,
       model: this.model,
       changeJournal: this.sessionManager.getChangeJournal(),
-      activeTurnIdx: this.sessionManager.getActiveTurnIdx(),
+      activeUserMessageOrdinal:
+        this.sessionManager.getActiveUserMessageOrdinal(),
       statusReporter: this.sessionManager.getStatusReporter(),
     });
-    this.sessionManager.setActiveTurnIdx(newTurnIdx);
+    this.sessionManager.setActiveUserMessageOrdinal(newUserMessageOrdinal);
   }
 
   // Track token usage and trigger auto-compression
@@ -208,8 +209,10 @@ export class Agent {
     if (this._isRunning) return false;
 
     this._isRunning = true;
-    this.context.startTurn(userMessage);
-    this.sessionManager.setActiveTurnIdx(this.context.getTurnCount());
+    this.context.startUserMessage(userMessage);
+    this.sessionManager.setActiveUserMessageOrdinal(
+      this.context.getUserMessageCount(),
+    );
 
     this.abortController = new AbortController();
     this.logger?.info(
@@ -266,7 +269,7 @@ export class Agent {
           await this.toolExecutor.execute(
             toolCalls,
             toolContext,
-            this.sessionManager.getActiveTurnIdx(),
+            this.sessionManager.getActiveUserMessageOrdinal(),
           );
         } catch (e) {
           if (e instanceof ToolDeniedError) {
@@ -290,7 +293,7 @@ export class Agent {
       this._isRunning = false;
       if (this.abortController?.signal.aborted) {
         // Remove the last user message that triggered this aborted run
-        this.context.removeLastTurn(
+        this.context.removeFromLastUserMessage(
           (last) => last[0]?.type === "user" && last[0].text === userMessage,
         );
       }

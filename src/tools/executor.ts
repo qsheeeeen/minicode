@@ -49,7 +49,7 @@ export class ToolExecutor {
     tool: ToolDef,
     args: Record<string, unknown>,
     context: ToolExecutionContext,
-    activeTurnIdx: number,
+    activeUserMessageOrdinal: number,
   ): Promise<{ output: string }> {
     if (!(tool.readOnly ?? !tool.requiresPermission)) {
       const displayText = callContent(tool.name, args);
@@ -69,7 +69,7 @@ export class ToolExecutor {
       }
     }
 
-    if (tool.trackChanges && args.path && activeTurnIdx > 0) {
+    if (tool.trackChanges && args.path && activeUserMessageOrdinal > 0) {
       const filePath = args.path as string;
       let before = "";
       try {
@@ -79,7 +79,7 @@ export class ToolExecutor {
         // File doesn't exist yet — before stays ""
       }
       this.getChangeJournal().recordBefore(
-        activeTurnIdx,
+        activeUserMessageOrdinal,
         filePath,
         tool.changeOp ?? "write",
         before,
@@ -90,12 +90,12 @@ export class ToolExecutor {
   }
 
   /**
-   * Execute tool calls sequentially and push tool_result turns.
+   * Execute tool calls sequentially and push tool_result blocks.
    */
   async execute(
     toolCalls: ToolCall[],
     context: ToolExecutionContext,
-    activeTurnIdx: number,
+    activeUserMessageOrdinal: number,
   ): Promise<void> {
     if (toolCalls.length === 0) return;
 
@@ -128,7 +128,7 @@ export class ToolExecutor {
           tool,
           block.input as Record<string, unknown>,
           context,
-          activeTurnIdx,
+          activeUserMessageOrdinal,
         );
         results.push({ toolUseId: block.id, content: result.output });
         this.logger?.info(

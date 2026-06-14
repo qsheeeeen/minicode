@@ -68,11 +68,11 @@ function Demo() {
       )}
       {current === "undo" && (
         <UndoInput
-          totalTurns={3}
+          totalUserMessages={3}
           userMessages={["Fix login bug", "Add validation", "Write tests"]}
-          entriesByTurn={[
+          entriesByUserMessage={[
             {
-              turnIdx: 1,
+              userMessageOrdinal: 1,
               entries: [
                 { path: "src/auth.ts", op: "edit", before: "..." } as any,
               ],

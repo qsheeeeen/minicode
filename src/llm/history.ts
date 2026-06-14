@@ -1,2 +1,2 @@
 export type { LLMBlock, LLMThinkingBlock, LLMToolUseBlock } from "./client.js";
-export { LLMHistory, splitHistoryTurns } from "./history-store.js";
+export { LLMHistory } from "./history-store.js";

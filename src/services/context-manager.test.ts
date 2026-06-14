@@ -96,13 +96,13 @@ describe("ContextManager", () => {
   });
 
   describe("compress", () => {
-    it("returns activeTurnIdx unchanged when not enough turns", async () => {
+    it("returns activeUserMessageOrdinal unchanged when not enough user messages", async () => {
       const { cm, context, statusReporter } = createContextManager();
       const newIdx = await cm.compress({
         context,
         model: {} as any,
         changeJournal: {} as any,
-        activeTurnIdx: 3,
+        activeUserMessageOrdinal: 3,
         statusReporter,
       });
       expect(newIdx).toBe(3);

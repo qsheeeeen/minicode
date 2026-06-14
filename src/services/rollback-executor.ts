@@ -1,7 +1,6 @@
 import fs from "fs/promises";
 import type { ChangeEntry, ChangeJournal } from "./change-journal.js";
 import type { LLMHistory } from "../llm/history.js";
-import { splitHistoryTurns } from "../llm/history.js";
 
 export interface RollbackResult {
   filesRestored: string[];
@@ -12,33 +11,36 @@ export class RollbackExecutor {
   async rollbackConversation(
     changeJournal: ChangeJournal,
     context: LLMHistory,
-    fromTurnIdx: number,
+    fromUserMessageOrdinal: number,
   ): Promise<RollbackResult> {
-    this.truncateConversation(context, fromTurnIdx);
-    await changeJournal.pruneFrom(fromTurnIdx);
+    this.truncateConversation(context, fromUserMessageOrdinal);
+    await changeJournal.pruneFrom(fromUserMessageOrdinal);
     return { filesRestored: [], filesDeleted: [] };
   }
 
   async rollbackFilesAndConversation(
     changeJournal: ChangeJournal,
     context: LLMHistory,
-    fromTurnIdx: number,
+    fromUserMessageOrdinal: number,
   ): Promise<RollbackResult> {
     // Step 1: Restore files
-    const result = await this.restoreFiles(changeJournal, fromTurnIdx);
+    const result = await this.restoreFiles(
+      changeJournal,
+      fromUserMessageOrdinal,
+    );
     // Step 2: Truncate conversation
-    this.truncateConversation(context, fromTurnIdx);
+    this.truncateConversation(context, fromUserMessageOrdinal);
     // Step 3: Prune journal (last — only after everything else succeeds)
-    await changeJournal.pruneFrom(fromTurnIdx);
+    await changeJournal.pruneFrom(fromUserMessageOrdinal);
     return result;
   }
 
   private async restoreFiles(
     changeJournal: ChangeJournal,
-    fromTurnIdx: number,
+    fromUserMessageOrdinal: number,
   ): Promise<RollbackResult> {
     const entries = await changeJournal.getEntries();
-    const affected = entries.filter((e) => e.turnIdx >= fromTurnIdx);
+    const affected = entries.filter((e) => e.turnIdx >= fromUserMessageOrdinal);
 
     if (affected.length === 0) {
       return { filesRestored: [], filesDeleted: [] };
@@ -74,9 +76,10 @@ export class RollbackExecutor {
     return result;
   }
 
-  private truncateConversation(context: LLMHistory, fromTurnIdx: number): void {
-    const turns = splitHistoryTurns(context.getBlocks());
-    const cutAt = Math.max(0, Math.min(fromTurnIdx - 1, turns.length));
-    context.replaceBlocks(turns.slice(0, cutAt).flat());
+  private truncateConversation(
+    context: LLMHistory,
+    fromUserMessageOrdinal: number,
+  ): void {
+    context.truncateBeforeUserMessageOrdinal(fromUserMessageOrdinal);
   }
 }

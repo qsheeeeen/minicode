@@ -42,8 +42,8 @@ export async function runHeadless(
   // Set up renderer with status forwarding
   const renderer = new HeadlessRenderer(context);
   sessionManager.setStatusReporter((msg) => {
-    const turnIndex = context.getTurnCount();
-    renderer.addStatus({ ...msg, turnIndex });
+    const userMessageIndex = context.getUserMessageCount();
+    renderer.addStatus({ ...msg, userMessageIndex });
   });
 
   // Load session if requested

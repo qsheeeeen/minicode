@@ -228,26 +228,30 @@ export function ModelSelectInput({
   );
 }
 
-// Undo: two-step rollback UI (select turn → select scope)
+// Undo: two-step rollback UI (select user message → select scope)
 export function UndoInput({
   onExecute: _onExecute,
   onCancel,
-  entriesByTurn = [],
+  entriesByUserMessage = [],
   userMessages = [],
-  totalTurns = 0,
+  totalUserMessages = 0,
   changeJournal,
   context,
   reportStatus,
 }: InputComponentProps & {
-  entriesByTurn?: Array<{ turnIdx: number; entries: ChangeEntry[] }>;
+  entriesByUserMessage?: Array<{
+    userMessageOrdinal: number;
+    entries: ChangeEntry[];
+  }>;
   userMessages?: string[];
-  totalTurns?: number;
+  totalUserMessages?: number;
   changeJournal?: ChangeJournal;
   context?: LLMHistory;
   reportStatus?: StatusReporter;
 }) {
   const [step, setStep] = useState<"list" | "confirm">("list");
-  const [selectedTurnIdx, setSelectedTurnIdx] = useState(0);
+  const [selectedUserMessageOrdinal, setSelectedUserMessageOrdinal] =
+    useState(0);
   const [processing, setProcessing] = useState(false);
 
   useInput((_input, key) => {
@@ -260,9 +264,9 @@ export function UndoInput({
     }
   });
 
-  const turnCount = totalTurns || userMessages.length;
+  const userMessageCount = totalUserMessages || userMessages.length;
 
-  if (turnCount === 0) {
+  if (userMessageCount === 0) {
     return (
       <Box flexDirection="column">
         <Text dimColor>Nothing to rollback</Text>
@@ -271,9 +275,11 @@ export function UndoInput({
   }
 
   if (step === "list") {
-    const entriesMap = new Map(entriesByTurn.map((e) => [e.turnIdx, e]));
+    const entriesMap = new Map(
+      entriesByUserMessage.map((e) => [e.userMessageOrdinal, e]),
+    );
     const options = [];
-    for (let i = turnCount; i >= 1; i--) {
+    for (let i = userMessageCount; i >= 1; i--) {
       const msg = userMessages[i - 1] || "(unknown)";
       const summary = msg.length > 40 ? msg.slice(0, 40) + "..." : msg;
       const entry = entriesMap.get(i);
@@ -291,7 +297,7 @@ export function UndoInput({
     return (
       <Box flexDirection="column">
         <Text bold color="yellow">
-          Select a turn to rollback to:
+          Select a user message to rollback to:
         </Text>
         <Select
           options={options}
@@ -299,7 +305,7 @@ export function UndoInput({
             if (v === "_cancel_") {
               onCancel?.();
             } else {
-              setSelectedTurnIdx(Number(v));
+              setSelectedUserMessageOrdinal(Number(v));
               setStep("confirm");
             }
           }}
@@ -310,9 +316,11 @@ export function UndoInput({
   }
 
   // Confirm step
-  const turn = entriesByTurn.find((t) => t.turnIdx === selectedTurnIdx);
-  const hasFiles = turn && turn.entries.length > 0;
-  const msg = userMessages[selectedTurnIdx - 1] || "(unknown)";
+  const selected = entriesByUserMessage.find(
+    (e) => e.userMessageOrdinal === selectedUserMessageOrdinal,
+  );
+  const hasFiles = selected && selected.entries.length > 0;
+  const msg = userMessages[selectedUserMessageOrdinal - 1] || "(unknown)";
 
   const scopeOptions = [{ label: "Conversation", value: "conversation" }];
   if (hasFiles) {
@@ -323,13 +331,13 @@ export function UndoInput({
   return (
     <Box flexDirection="column">
       <Text bold color="yellow">
-        Rollback to before turn {selectedTurnIdx}: "
+        Rollback to before user message {selectedUserMessageOrdinal}: "
         {msg.length > 50 ? msg.slice(0, 50) + "..." : msg}"
       </Text>
       {hasFiles && (
         <>
           <Text>Files to restore:</Text>
-          {turn.entries.map((e) => (
+          {selected.entries.map((e) => (
             <Text key={e.path}>
               {"  "}- {e.path} ({e.op})
             </Text>
@@ -360,13 +368,13 @@ export function UndoInput({
               result = await executor.rollbackFilesAndConversation(
                 changeJournal,
                 context,
-                selectedTurnIdx,
+                selectedUserMessageOrdinal,
               );
             } else {
               result = await executor.rollbackConversation(
                 changeJournal,
                 context,
-                selectedTurnIdx,
+                selectedUserMessageOrdinal,
               );
             }
 

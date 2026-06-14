@@ -4,8 +4,7 @@ import type { LLMBlock, LLMHistory } from "../llm/history.js";
 /**
  * HeadlessRenderer — incremental stdout renderer for non-TUI mode.
  *
- * It renders the LLMHistory block stream directly. Turn boundaries are inferred
- * from user blocks when formatting output.
+ * It renders the LLMHistory block stream directly.
  */
 export class HeadlessRenderer {
   private context: LLMHistory;

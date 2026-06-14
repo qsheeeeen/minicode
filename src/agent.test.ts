@@ -171,7 +171,7 @@ vi.mock("./services/compression-service.js", () => ({
     return {
       compress: vi
         .fn()
-        .mockResolvedValue([{ role: "user", content: "compressed" }]),
+        .mockResolvedValue([{ type: "user", text: "compressed" }]),
     };
   }),
 }));
@@ -245,18 +245,18 @@ describe("Agent", () => {
 
     it("getMessages returns history blocks", () => {
       const { context } = makeAgent();
-      context.startTurn("hello");
+      context.startUserMessage("hello");
       expect(context.getBlocks()).toEqual([{ type: "user", text: "hello" }]);
     });
   });
 
   describe("compress", () => {
-    it("does not compress if not enough turns", async () => {
+    it("does not compress if not enough user messages", async () => {
       const { agent, context, sessionManager } = makeAgent();
       const reportStatusSpy = vi.fn();
       sessionManager.setStatusReporter(reportStatusSpy);
       for (let i = 0; i < 5; i++) {
-        context.startTurn(`msg ${i}`);
+        context.startUserMessage(`msg ${i}`);
       }
       await agent.compress();
       expect(reportStatusSpy).toHaveBeenCalledWith(
@@ -270,7 +270,7 @@ describe("Agent", () => {
   describe("clearSession", () => {
     it("clears the context", () => {
       const { agent, context } = makeAgent();
-      context.startTurn("hi");
+      context.startUserMessage("hi");
       agent.clearSession();
       expect(context.getBlocks()).toHaveLength(0);
     });

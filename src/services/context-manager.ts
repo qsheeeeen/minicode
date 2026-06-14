@@ -2,8 +2,8 @@
 // token count signal.
 //
 // The compress() method receives cross-manager deps as params (context, model,
-// changeJournal, activeTurnIdx, statusReporter) to avoid coupling to other managers.
-// It returns the new activeTurnIdx so the caller (Agent) can update
+// changeJournal, activeUserMessageOrdinal, statusReporter) to avoid coupling to other managers.
+// It returns the new activeUserMessageOrdinal so the caller (Agent) can update
 // SessionManager.
 
 import type { LLMClient, TokenUsage } from "../llm/client.js";
@@ -35,7 +35,7 @@ export interface CompressDeps {
   client: LLMClient;
   model: Model;
   changeJournal: ChangeJournal;
-  activeTurnIdx: number;
+  activeUserMessageOrdinal: number;
   statusReporter: StatusReporter;
 }
 
@@ -70,41 +70,40 @@ export class ContextManager {
 
   /**
    * Compress conversation history when context window threshold is exceeded.
-   * Receives cross-manager deps as params. Returns the new activeTurnIdx.
+   * Receives cross-manager deps as params. Returns the new activeUserMessageOrdinal.
    */
   async compress(deps: CompressDeps): Promise<number> {
-    if (this.isCompressing) return deps.activeTurnIdx;
+    if (this.isCompressing) return deps.activeUserMessageOrdinal;
     this.isCompressing = true;
 
     try {
       const recentCount = 10;
-      const blocks = deps.context.getBlocks();
-      const turnCount = deps.context.getTurnCount();
-      if (turnCount <= recentCount + 2) {
+      const userMessageCount = deps.context.getUserMessageCount();
+      if (userMessageCount <= recentCount + 2) {
         deps.statusReporter({
           role: "status",
           content: "Not enough conversation to compress.",
           timestamp: new Date(),
         });
-        return deps.activeTurnIdx;
+        return deps.activeUserMessageOrdinal;
       }
 
       const totalTokens = this.tokenTracker.getTotal();
       deps.statusReporter({
         role: "status",
-        content: `Compressing ${turnCount - recentCount} turns (${totalTokens} tokens)...`,
+        content: `Compressing ${userMessageCount - recentCount} user messages (${totalTokens} tokens)...`,
         timestamp: new Date(),
       });
 
-      const originalUserPrompts = turnCount;
+      const originalUserPrompts = userMessageCount;
 
       const compressed = await this.compressionService.compress(
-        blocks,
+        deps.context,
         deps.client,
         deps.model,
       );
 
-      const originalKept = recentCount + 1; // compression adds 1 summary turn
+      const originalKept = recentCount + 1; // compression adds 1 summary user message
       const prunedCount = originalUserPrompts - originalKept;
 
       if (prunedCount > 0) {
@@ -114,12 +113,12 @@ export class ContextManager {
       deps.context.replaceBlocks(compressed);
       this.tokenTracker.reset();
 
-      // Recalculate activeTurnIdx
-      const newActiveIdx = deps.context.getTurnCount();
+      // Recalculate activeUserMessageOrdinal
+      const newActiveIdx = deps.context.getUserMessageCount();
 
       deps.statusReporter({
         role: "status",
-        content: `Compressed: ${prunedCount} turns removed, ${newActiveIdx} remaining.`,
+        content: `Compressed: ${prunedCount} user messages removed, ${newActiveIdx} remaining.`,
         timestamp: new Date(),
       });
 
@@ -130,7 +129,7 @@ export class ContextManager {
         content: `Compression failed: ${error instanceof Error ? error.message : String(error)}`,
         timestamp: new Date(),
       });
-      return deps.activeTurnIdx;
+      return deps.activeUserMessageOrdinal;
     } finally {
       this.isCompressing = false;
     }

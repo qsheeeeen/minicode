@@ -90,7 +90,7 @@ describe("Builtin commands", () => {
     return {
       replaceBlocks: vi.fn(),
       getBlocks: vi.fn().mockReturnValue([]),
-      getTurns: vi.fn().mockReturnValue([]),
+      getUserMessages: vi.fn().mockReturnValue([]),
     };
   }
 

@@ -1,10 +1,10 @@
-import { splitHistoryTurns, type LLMBlock } from "../llm/history.js";
+import type { LLMBlock } from "../llm/history.js";
 
 export interface StatusMessage {
   role: "status" | "error";
   content: string;
   timestamp: Date;
-  turnIndex?: number;
+  userMessageIndex?: number;
   element?: unknown;
   toolDisplay?: {
     name: string;
@@ -49,17 +49,19 @@ export function toDisplayMessages(
   blocks: LLMBlock[],
   statuses: StatusMessage[],
 ): DisplayMessage[] {
-  const turns = splitHistoryTurns(blocks);
-  const byTurnIndex = new Map<number, StatusMessage[]>();
+  const userMessageCount = blocks.filter(
+    (block) => block.type === "user",
+  ).length;
+  const byUserMessageIndex = new Map<number, StatusMessage[]>();
   for (const s of statuses) {
-    const idx = s.turnIndex ?? turns.length;
-    if (!byTurnIndex.has(idx)) byTurnIndex.set(idx, []);
-    byTurnIndex.get(idx)!.push(s);
+    const idx = s.userMessageIndex ?? userMessageCount;
+    if (!byUserMessageIndex.has(idx)) byUserMessageIndex.set(idx, []);
+    byUserMessageIndex.get(idx)!.push(s);
   }
 
   const result: DisplayMessage[] = [];
 
-  for (const s of byTurnIndex.get(0) ?? []) {
+  for (const s of byUserMessageIndex.get(0) ?? []) {
     result.push({
       role: s.role,
       content: s.content,
@@ -69,34 +71,49 @@ export function toDisplayMessages(
     });
   }
 
-  for (let i = 0; i < turns.length; i++) {
-    const turn = turns[i];
-    const toolMessages = new Map<
-      string,
-      Extract<DisplayMessage, { role: "tool" }>
-    >();
-    for (const block of turn) {
-      if (block.type === "user") {
-        result.push({ role: "user", content: block.text });
-      } else if (block.type === "text") {
-        result.push({ role: "text", content: block.text });
-      } else if (block.type === "thinking") {
-        result.push({ role: "thinking", content: block.thinking });
-      } else if (block.type === "tool_use") {
-        const message: Extract<DisplayMessage, { role: "tool" }> = {
-          role: "tool",
-          name: block.name,
-          input: block.input,
-          slotId: block.id,
-        };
-        toolMessages.set(block.id, message);
-        result.push(message);
-      } else if (block.type === "tool_result") {
-        const message = toolMessages.get(block.tool_use_id);
-        if (message) message.output = block.content;
+  let userMessagesSeen = 0;
+  let toolMessages = new Map<
+    string,
+    Extract<DisplayMessage, { role: "tool" }>
+  >();
+
+  for (const block of blocks) {
+    if (block.type === "user") {
+      if (userMessagesSeen > 0) {
+        for (const s of byUserMessageIndex.get(userMessagesSeen) ?? []) {
+          result.push({
+            role: s.role,
+            content: s.content,
+            element: s.element,
+            toolDisplay: s.toolDisplay,
+            timestamp: s.timestamp,
+          });
+        }
       }
+      userMessagesSeen++;
+      toolMessages = new Map();
+      result.push({ role: "user", content: block.text });
+    } else if (block.type === "text") {
+      result.push({ role: "text", content: block.text });
+    } else if (block.type === "thinking") {
+      result.push({ role: "thinking", content: block.thinking });
+    } else if (block.type === "tool_use") {
+      const message: Extract<DisplayMessage, { role: "tool" }> = {
+        role: "tool",
+        name: block.name,
+        input: block.input,
+        slotId: block.id,
+      };
+      toolMessages.set(block.id, message);
+      result.push(message);
+    } else if (block.type === "tool_result") {
+      const message = toolMessages.get(block.tool_use_id);
+      if (message) message.output = block.content;
     }
-    for (const s of byTurnIndex.get(i + 1) ?? []) {
+  }
+
+  if (userMessagesSeen > 0) {
+    for (const s of byUserMessageIndex.get(userMessagesSeen) ?? []) {
       result.push({
         role: s.role,
         content: s.content,
@@ -108,8 +125,8 @@ export function toDisplayMessages(
   }
 
   for (const s of statuses) {
-    const idx = s.turnIndex;
-    if (idx !== undefined && idx > turns.length) {
+    const idx = s.userMessageIndex;
+    if (idx !== undefined && idx > userMessageCount) {
       result.push({
         role: s.role,
         content: s.content,

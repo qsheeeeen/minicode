@@ -78,8 +78,8 @@ export function connectAgent(options: ConnectAgentOptions): {
 
   // 3. Wire StatusReporter: statuses → Zustand + re-sync display messages
   sessionManager.setStatusReporter((msg) => {
-    const turnIndex = context.getTurnCount();
-    dispatch({ type: "ADD_STATUS", payload: { ...msg, turnIndex } });
+    const userMessageIndex = context.getUserMessageCount();
+    dispatch({ type: "ADD_STATUS", payload: { ...msg, userMessageIndex } });
     syncMessages();
   });
 

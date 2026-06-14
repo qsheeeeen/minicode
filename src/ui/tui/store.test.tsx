@@ -99,7 +99,7 @@ describe("tuiReducer", () => {
       const status: StatusMessage = {
         role: "status",
         content: "test status",
-        turnIndex: 1,
+        userMessageIndex: 1,
         timestamp: new Date(),
       };
       const action: TuiAction = { type: "ADD_STATUS", payload: status };
@@ -110,10 +110,23 @@ describe("tuiReducer", () => {
     });
 
     it("should accumulate multiple statuses", () => {
-      const s1: StatusMessage = { role: "status", content: "first", turnIndex: 1, timestamp: new Date() };
-      const s2: StatusMessage = { role: "error", content: "second", turnIndex: 2, timestamp: new Date() };
+      const s1: StatusMessage = {
+        role: "status",
+        content: "first",
+        userMessageIndex: 1,
+        timestamp: new Date(),
+      };
+      const s2: StatusMessage = {
+        role: "error",
+        content: "second",
+        userMessageIndex: 2,
+        timestamp: new Date(),
+      };
 
-      const state1 = tuiReducer(initialState, { type: "ADD_STATUS", payload: s1 });
+      const state1 = tuiReducer(initialState, {
+        type: "ADD_STATUS",
+        payload: s1,
+      });
       const state2 = tuiReducer(state1, { type: "ADD_STATUS", payload: s2 });
 
       expect(state2.statuses).toHaveLength(2);
@@ -124,8 +137,16 @@ describe("tuiReducer", () => {
 
   describe("CLEAR_STATUSES", () => {
     it("should clear all statuses", () => {
-      const status: StatusMessage = { role: "status", content: "temp", turnIndex: 0, timestamp: new Date() };
-      const state1 = tuiReducer(initialState, { type: "ADD_STATUS", payload: status });
+      const status: StatusMessage = {
+        role: "status",
+        content: "temp",
+        userMessageIndex: 0,
+        timestamp: new Date(),
+      };
+      const state1 = tuiReducer(initialState, {
+        type: "ADD_STATUS",
+        payload: status,
+      });
       expect(state1.statuses).toHaveLength(1);
 
       const state2 = tuiReducer(state1, { type: "CLEAR_STATUSES" });

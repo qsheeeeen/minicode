@@ -2,13 +2,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const mockRun = vi.fn();
 const mockOnChange = vi.fn().mockReturnValue(() => {});
-const mockGetTurns = vi.fn().mockReturnValue([]);
 
 const mockContext = {
   onChange: mockOnChange,
-  getTurns: mockGetTurns,
-  getTurnCount: vi.fn().mockReturnValue(0),
-  replaceTurns: vi.fn(),
+  getUserMessageCount: vi.fn().mockReturnValue(0),
 };
 
 const mockSetSession = vi.fn();

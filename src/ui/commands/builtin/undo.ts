@@ -2,7 +2,7 @@ import { registerCommand } from "../registry.js";
 
 registerCommand({
   name: "undo",
-  description: "Rollback to a previous conversation turn",
+  description: "Rollback to a previous user message",
   handler: async (_args, ctx): Promise<void> => {
     if (ctx.agent.isRunning) {
       ctx.sessionManager.reportStatus({
@@ -13,11 +13,7 @@ registerCommand({
       return;
     }
 
-    const turns = ctx.context.getTurns();
-    const userMessages = turns.map((turn) => {
-      const user = turn.find((block) => block.type === "user");
-      return user?.type === "user" ? user.text : "";
-    });
+    const userMessages = ctx.context.getUserMessages();
 
     if (userMessages.length === 0) {
       ctx.sessionManager.reportStatus({
@@ -28,14 +24,14 @@ registerCommand({
       return;
     }
 
-    const entriesByTurnMap = await ctx.changeJournal.getEntriesByTurn();
-    const entriesByTurn = Array.from(entriesByTurnMap.entries()).map(
-      ([turnIdx, entries]) => ({ turnIdx, entries }),
-    );
+    const entriesByUserMessageMap = await ctx.changeJournal.getEntriesByTurn();
+    const entriesByUserMessage = Array.from(
+      entriesByUserMessageMap.entries(),
+    ).map(([userMessageOrdinal, entries]) => ({ userMessageOrdinal, entries }));
 
     ctx.setInputMode("undo", {
-      totalTurns: userMessages.length,
-      entriesByTurn,
+      totalUserMessages: userMessages.length,
+      entriesByUserMessage,
       userMessages,
       changeJournal: ctx.changeJournal,
       context: ctx.context,

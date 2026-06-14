@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { LLMHistory } from "../llm/history.js";
 
 vi.mock("fs/promises", () => ({
   default: {
@@ -19,17 +20,16 @@ describe("RollbackExecutor", () => {
     } as any;
   }
 
-  function makeMockMessageStore(blocks: any[]) {
-    return {
-      getBlocks: vi.fn().mockReturnValue(blocks),
-      replaceBlocks: vi.fn(),
-    } as any;
+  function makeHistory(blocks: any[]) {
+    const history = new LLMHistory();
+    history.replaceBlocks(blocks);
+    return history;
   }
 
   describe("rollbackConversation", () => {
     it("truncates conversation and prunes journal", async () => {
       const journal = makeMockJournal([]);
-      const context = makeMockMessageStore([
+      const context = makeHistory([
         { type: "user", text: "first" },
         { type: "text", text: "reply" },
         { type: "user", text: "second" },
@@ -40,7 +40,7 @@ describe("RollbackExecutor", () => {
       const executor = new RollbackExecutor();
       const result = await executor.rollbackConversation(journal, context, 2);
 
-      expect(context.replaceBlocks).toHaveBeenCalledWith([
+      expect(context.getBlocks()).toEqual([
         { type: "user", text: "first" },
         { type: "text", text: "reply" },
       ]);
@@ -63,7 +63,7 @@ describe("RollbackExecutor", () => {
         { turnIdx: 3, path: "b.ts", op: "write", before: "", ts: 200 },
       ];
       const journal = makeMockJournal(entries);
-      const context = makeMockMessageStore([
+      const context = makeHistory([
         { type: "user", text: "first" },
         { type: "user", text: "second" },
         { type: "user", text: "third" },
@@ -86,10 +86,8 @@ describe("RollbackExecutor", () => {
       expect(fs.writeFile).toHaveBeenCalledWith("a.ts", "old content", "utf-8");
       expect(fs.unlink).toHaveBeenCalledWith("b.ts");
 
-      // Conversation truncated before turn 2
-      expect(context.replaceBlocks).toHaveBeenCalledWith([
-        { type: "user", text: "first" },
-      ]);
+      // Conversation truncated before user message 2
+      expect(context.getBlocks()).toEqual([{ type: "user", text: "first" }]);
       // Journal pruned last
       expect(journal.pruneFrom).toHaveBeenCalledWith(2);
     });
@@ -98,7 +96,7 @@ describe("RollbackExecutor", () => {
       const journal = makeMockJournal([
         { turnIdx: 1, path: "a.ts", op: "edit", before: "old", ts: 100 },
       ]);
-      const context = makeMockMessageStore([{ type: "user", text: "first" }]);
+      const context = makeHistory([{ type: "user", text: "first" }]);
 
       const { RollbackExecutor } = await import("./rollback-executor.js");
       const executor = new RollbackExecutor();
@@ -130,7 +128,7 @@ describe("RollbackExecutor", () => {
         },
       ];
       const journal = makeMockJournal(entries);
-      const context = makeMockMessageStore([
+      const context = makeHistory([
         { type: "user", text: "first" },
         { type: "user", text: "second" },
       ]);

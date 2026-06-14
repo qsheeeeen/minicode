@@ -77,7 +77,7 @@ function makeToolCall(
 }
 
 function prepareToolCalls(context: LLMHistory, calls: ToolCall[]): void {
-  context.startTurn("task");
+  context.startUserMessage("task");
   for (const call of calls) {
     context.startToolCall(call.block.id, call.block.name, call.block.input);
   }

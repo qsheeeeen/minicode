@@ -38,16 +38,16 @@ describe("SessionManager", () => {
     });
   });
 
-  describe("turn index", () => {
+  describe("user message ordinal", () => {
     it("starts at 0", () => {
       const sm = new SessionManager();
-      expect(sm.getActiveTurnIdx()).toBe(0);
+      expect(sm.getActiveUserMessageOrdinal()).toBe(0);
     });
 
     it("can be set and read back", () => {
       const sm = new SessionManager();
-      sm.setActiveTurnIdx(5);
-      expect(sm.getActiveTurnIdx()).toBe(5);
+      sm.setActiveUserMessageOrdinal(5);
+      expect(sm.getActiveUserMessageOrdinal()).toBe(5);
     });
   });
 
@@ -66,11 +66,11 @@ describe("SessionManager", () => {
   });
 
   describe("clearSession", () => {
-    it("resets turn index to 0", () => {
+    it("resets user message ordinal to 0", () => {
       const sm = new SessionManager();
-      sm.setActiveTurnIdx(10);
+      sm.setActiveUserMessageOrdinal(10);
       sm.clearSession();
-      expect(sm.getActiveTurnIdx()).toBe(0);
+      expect(sm.getActiveUserMessageOrdinal()).toBe(0);
     });
 
     it("clears messages", () => {

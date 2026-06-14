@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { SummaryCompressionStrategy } from "./compression-service.js";
 import type { LLMClient } from "../llm/client.js";
-import type { LLMBlock } from "../llm/history.js";
+import { LLMHistory, type LLMBlock } from "../llm/history.js";
 import { Model } from "../llm/model.js";
 
 function userBlocks(count: number, prefix = "message"): LLMBlock[] {
@@ -9,6 +9,12 @@ function userBlocks(count: number, prefix = "message"): LLMBlock[] {
     type: "user" as const,
     text: `${prefix} ${i}`,
   }));
+}
+
+function historyWith(blocks: LLMBlock[]): LLMHistory {
+  const history = new LLMHistory();
+  history.replaceBlocks(blocks);
+  return history;
 }
 
 describe("SummaryCompressionStrategy", () => {
@@ -19,15 +25,19 @@ describe("SummaryCompressionStrategy", () => {
   });
 
   describe("compress", () => {
-    it("returns unchanged blocks when below threshold (12 or fewer turns)", async () => {
+    it("returns unchanged blocks when below threshold (12 or fewer user messages)", async () => {
       const blocks = userBlocks(12);
       const mockClient = {} as LLMClient;
       const model = new Model("claude-3", "test-provider", 1000);
-      const result = await service.compress(blocks, mockClient, model);
+      const result = await service.compress(
+        historyWith(blocks),
+        mockClient,
+        model,
+      );
       expect(result).toEqual(blocks);
     });
 
-    it("compresses when above threshold (more than 12 turns)", async () => {
+    it("compresses when above threshold (more than 12 user messages)", async () => {
       const blocks = userBlocks(15);
       const mockClient = {
         chatStream: vi.fn().mockReturnValue({
@@ -41,7 +51,11 @@ describe("SummaryCompressionStrategy", () => {
       } as unknown as LLMClient;
       const model = new Model("claude-3", "test-provider", 1000);
 
-      const result = await service.compress(blocks, mockClient, model);
+      const result = await service.compress(
+        historyWith(blocks),
+        mockClient,
+        model,
+      );
 
       expect(result.length).toBeLessThan(blocks.length);
       expect(result[0]).toEqual({
@@ -59,9 +73,9 @@ describe("SummaryCompressionStrategy", () => {
       } as unknown as LLMClient;
       const model = new Model("claude-3", "test-provider", 1000);
 
-      await expect(service.compress(blocks, mockClient, model)).rejects.toThrow(
-        "Compression failed",
-      );
+      await expect(
+        service.compress(historyWith(blocks), mockClient, model),
+      ).rejects.toThrow("Compression failed");
     });
 
     it("calls client.chat with correct parameters", async () => {
@@ -76,7 +90,7 @@ describe("SummaryCompressionStrategy", () => {
       } as unknown as LLMClient;
       const model = new Model("claude-3", "test-provider", 1000);
 
-      await service.compress(blocks, mockClient, model);
+      await service.compress(historyWith(blocks), mockClient, model);
 
       expect(mockClient.chatStream).toHaveBeenCalledWith(
         expect.arrayContaining([
@@ -90,7 +104,7 @@ describe("SummaryCompressionStrategy", () => {
       );
     });
 
-    it("uses last 10 turns in result", async () => {
+    it("uses last 10 user messages in result", async () => {
       const blocks = userBlocks(15, "msg");
       const mockClient = {
         chatStream: vi.fn().mockReturnValue({
@@ -101,7 +115,11 @@ describe("SummaryCompressionStrategy", () => {
         }),
       } as unknown as LLMClient;
 
-      const result = await service.compress(blocks, mockClient, undefined);
+      const result = await service.compress(
+        historyWith(blocks),
+        mockClient,
+        undefined,
+      );
 
       expect(result.slice(-10)).toEqual(blocks.slice(-10));
     });

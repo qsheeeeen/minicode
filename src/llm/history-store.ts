@@ -5,28 +5,11 @@ import type {
   LLMToolUseBlock,
 } from "./client.js";
 
-type TurnBlocks = LLMBlock[];
-
 function cloneBlock(block: LLMBlock): LLMBlock {
   if (block.type === "tool_use") {
     return { ...block, input: { ...block.input } };
   }
   return { ...block };
-}
-
-export function splitHistoryTurns(blocks: LLMBlock[]): LLMBlock[][] {
-  const turns: TurnBlocks[] = [];
-  let current: TurnBlocks | undefined;
-
-  for (const block of blocks) {
-    if (block.type === "user" || !current) {
-      current = [];
-      turns.push(current);
-    }
-    current.push(cloneBlock(block));
-  }
-
-  return turns;
 }
 
 export class LLMHistory {
@@ -37,14 +20,14 @@ export class LLMHistory {
     for (const cb of this.listeners) cb();
   }
 
-  private ensureActiveTurn(): void {
+  private ensureActiveUserMessage(): void {
     if (!this.blocks.some((block) => block.type === "user")) {
-      throw new Error("No active LLM turn");
+      throw new Error("No active user message");
     }
   }
 
-  private currentTurnBlocks(): LLMBlock[] {
-    this.ensureActiveTurn();
+  private currentUserMessageBlocks(): LLMBlock[] {
+    this.ensureActiveUserMessage();
     const start = this.findLastUserIndex();
     return this.blocks.slice(start);
   }
@@ -54,6 +37,30 @@ export class LLMHistory {
       if (this.blocks[i].type === "user") return i;
     }
     return -1;
+  }
+
+  private findUserOrdinalIndex(ordinal: number): number {
+    if (ordinal < 1) return -1;
+
+    let seen = 0;
+    for (let i = 0; i < this.blocks.length; i++) {
+      if (this.blocks[i].type !== "user") continue;
+      seen++;
+      if (seen === ordinal) return i;
+    }
+    return -1;
+  }
+
+  private findNthUserFromEndIndex(count: number): number {
+    if (count < 1) return this.blocks.length;
+
+    let seen = 0;
+    for (let i = this.blocks.length - 1; i >= 0; i--) {
+      if (this.blocks[i].type !== "user") continue;
+      seen++;
+      if (seen === count) return i;
+    }
+    return 0;
   }
 
   private static validateBlocks(blocks: LLMBlock[]): void {
@@ -137,28 +144,61 @@ export class LLMHistory {
     return this.blocks.map(cloneBlock);
   }
 
-  getTurns(): LLMBlock[][] {
-    return splitHistoryTurns(this.blocks);
-  }
-
   replaceBlocks(blocks: LLMBlock[]): void {
     LLMHistory.validateBlocks(blocks);
     this.blocks = blocks.map(cloneBlock);
     this.notify();
   }
 
-  getTurnCount(): number {
+  getUserMessageCount(): number {
     return this.blocks.filter((block) => block.type === "user").length;
   }
 
-  removeLastTurn(predicate: (turn: LLMBlock[]) => boolean): boolean {
-    const turns = splitHistoryTurns(this.blocks);
-    const last = turns[turns.length - 1];
-    if (!last || !predicate(last)) return false;
+  getUserMessages(): string[] {
+    return this.blocks
+      .filter((block): block is Extract<LLMBlock, { type: "user" }> => {
+        return block.type === "user";
+      })
+      .map((block) => block.text);
+  }
 
-    this.blocks = this.blocks.slice(0, this.blocks.length - last.length);
+  removeFromLastUserMessage(
+    predicate: (blocks: LLMBlock[]) => boolean,
+  ): boolean {
+    const start = this.findLastUserIndex();
+    if (start < 0) return false;
+
+    const blocks = this.blocks.slice(start).map(cloneBlock);
+    if (!predicate(blocks)) return false;
+
+    this.blocks = this.blocks.slice(0, start);
     this.notify();
     return true;
+  }
+
+  truncateBeforeUserMessageOrdinal(ordinal: number): void {
+    const start = this.findUserOrdinalIndex(ordinal);
+    if (start < 0) {
+      if (ordinal <= 1) {
+        this.blocks = [];
+        this.notify();
+      }
+      return;
+    }
+
+    this.blocks = this.blocks.slice(0, start);
+    this.notify();
+  }
+
+  splitAtRecentUserMessages(count: number): {
+    prefix: LLMBlock[];
+    suffix: LLMBlock[];
+  } {
+    const start = this.findNthUserFromEndIndex(count);
+    return {
+      prefix: this.blocks.slice(0, start).map(cloneBlock),
+      suffix: this.blocks.slice(start).map(cloneBlock),
+    };
   }
 
   clear(): void {
@@ -166,13 +206,13 @@ export class LLMHistory {
     this.notify();
   }
 
-  startTurn(userText: string): void {
+  startUserMessage(userText: string): void {
     this.blocks.push({ type: "user", text: userText });
     this.notify();
   }
 
   appendThinking(delta: string): void {
-    this.ensureActiveTurn();
+    this.ensureActiveUserMessage();
     const last = this.blocks[this.blocks.length - 1];
     if (last?.type === "thinking") {
       last.thinking += delta;
@@ -187,9 +227,9 @@ export class LLMHistory {
     name: string,
     input: Record<string, unknown>,
   ): void {
-    const currentTurn = this.currentTurnBlocks();
+    const currentUserMessage = this.currentUserMessageBlocks();
     if (
-      currentTurn.some(
+      currentUserMessage.some(
         (block): block is LLMToolUseBlock =>
           block.type === "tool_use" && block.id === id,
       )
@@ -201,8 +241,8 @@ export class LLMHistory {
   }
 
   completeToolCall(id: string, result: string): void {
-    const currentTurn = this.currentTurnBlocks();
-    const hasToolUse = currentTurn.some(
+    const currentUserMessage = this.currentUserMessageBlocks();
+    const hasToolUse = currentUserMessage.some(
       (block): block is LLMToolUseBlock =>
         block.type === "tool_use" && block.id === id,
     );
@@ -229,7 +269,7 @@ export class LLMHistory {
   }
 
   appendAssistantText(delta: string): void {
-    this.ensureActiveTurn();
+    this.ensureActiveUserMessage();
     const last = this.blocks[this.blocks.length - 1];
     if (last?.type === "text") {
       last.text += delta;

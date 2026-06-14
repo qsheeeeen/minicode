@@ -32,12 +32,12 @@ describe("toDisplayMessages", () => {
     ]);
   });
 
-  it("interleaves statuses by turn index", () => {
+  it("interleaves statuses by user message index", () => {
     const timestamp = new Date("2026-01-01T00:00:00.000Z");
     const blocks: LLMBlock[] = [{ type: "user", text: "internal" }];
     const statuses: StatusMessage[] = [
-      { role: "status", content: "before", timestamp, turnIndex: 0 },
-      { role: "error", content: "after", timestamp, turnIndex: 1 },
+      { role: "status", content: "before", timestamp, userMessageIndex: 0 },
+      { role: "error", content: "after", timestamp, userMessageIndex: 1 },
     ];
 
     expect(toDisplayMessages(blocks, statuses)).toEqual([

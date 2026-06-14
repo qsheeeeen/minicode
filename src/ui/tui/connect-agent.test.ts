@@ -135,7 +135,7 @@ describe("connectAgent", () => {
 
     await agent.run("Hello");
 
-    // Should have dispatched SET_MESSAGES while the context turn updates.
+    // Should have dispatched SET_MESSAGES while the context updates.
     expect(dispatchHistory.length).toBeGreaterThanOrEqual(2);
 
     // Last dispatch should have the final messages
