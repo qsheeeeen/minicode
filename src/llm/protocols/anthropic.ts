@@ -14,11 +14,7 @@ import type {
   EffortLevel,
   LLMBlock,
 } from "../client.js";
-import type { LLMAssistantBlock, LLMToolResultBlock } from "../client.js";
-import {
-  blocksToChatMessages,
-  type ChatMessage,
-} from "./message-projection.js";
+import type { LLMAssistantBlock } from "../client.js";
 
 function toSdkEffort(
   effort: EffortLevel,
@@ -45,29 +41,15 @@ type AnthropicContentBlockParam = Anthropic.Messages.ContentBlockParam;
 // Convert internal messages to Anthropic SDK format.
 // Thinking blocks are filtered out — they're output-only and not accepted
 // as input by the API (adaptive thinking reconstructs context automatically).
-function toSdkMessages(
-  messages: ChatMessage[],
-): Anthropic.Messages.MessageParam[] {
-  return messages.map((msg) => {
-    if (msg.role === "user") {
-      if (typeof msg.content === "string") {
-        return { role: "user" as const, content: msg.content };
-      }
-      // LLMToolResultBlock -> Anthropic tool_result block param
-      const blocks = msg.content as LLMToolResultBlock[];
-      const content = blocks.map((b) => ({
-        type: "tool_result" as const,
-        tool_use_id: b.tool_use_id,
-        content: b.content,
-      }));
-      return { role: "user" as const, content };
-    }
-    // assistant — filter out thinking blocks (output-only)
-    if (typeof msg.content === "string") {
-      return { role: "assistant" as const, content: msg.content };
-    }
+function toSdkMessages(blocks: LLMBlock[]): Anthropic.Messages.MessageParam[] {
+  const out: Anthropic.Messages.MessageParam[] = [];
+  let assistantBlocks: LLMAssistantBlock[] = [];
+
+  const flushAssistant = () => {
+    if (assistantBlocks.length === 0) return;
+
     const content: AnthropicContentBlockParam[] = [];
-    for (const b of msg.content) {
+    for (const b of assistantBlocks) {
       if (b.type === "text") {
         content.push({ type: "text" as const, text: b.text });
       } else if (b.type === "tool_use") {
@@ -80,8 +62,33 @@ function toSdkMessages(
       }
       // thinking blocks are skipped — not accepted as input
     }
-    return { role: "assistant" as const, content };
-  });
+    out.push({ role: "assistant" as const, content });
+    assistantBlocks = [];
+  };
+
+  for (const block of blocks) {
+    if (block.type === "user") {
+      flushAssistant();
+      out.push({ role: "user" as const, content: block.text });
+    } else if (block.type === "tool_result") {
+      flushAssistant();
+      out.push({
+        role: "user" as const,
+        content: [
+          {
+            type: "tool_result" as const,
+            tool_use_id: block.tool_use_id,
+            content: block.content,
+          },
+        ],
+      });
+    } else {
+      assistantBlocks.push(block);
+    }
+  }
+
+  flushAssistant();
+  return out;
 }
 
 function toSdkTools(tools: LLMToolDef[]): AnthropicTool[] {
@@ -156,13 +163,12 @@ export class AnthropicClient implements LLMClient {
     tools: LLMToolDef[],
     options: ChatOptions = {},
   ): LLMStream {
-    const messages = blocksToChatMessages(blocks);
     const params: MessageCreateParamsStreaming = {
       model: options.model?.getName() || "claude-sonnet-4-5",
       max_tokens: options.maxTokens || 8192,
       stream: true,
       system: options.system,
-      messages: toSdkMessages(messages),
+      messages: toSdkMessages(blocks),
       tools: toSdkTools(tools),
       thinking: { type: "adaptive" },
     };

@@ -21,14 +21,7 @@ import type {
 } from "../client.js";
 import type {
   LLMAssistantBlock,
-  LLMTextBlock,
-  LLMToolUseBlock,
-  LLMToolResultBlock,
 } from "../client.js";
-import {
-  blocksToChatMessages,
-  type ChatMessage,
-} from "./message-projection.js";
 
 // The OpenAI SDK's ResponseStreamEvent union doesn't cover all streaming event
 // types (delta, output_item.done, etc.). These interfaces fill the gap.
@@ -92,76 +85,69 @@ function toSdkTools(tools: LLMToolDef[]): OpenAI.Responses.FunctionTool[] {
 
 type ResponseInputItem = OpenAI.Responses.ResponseInputItem;
 
-// Convert ChatMessage[] to an OpenAI Responses `input` array.
-function toSdkMessages(messages: ChatMessage[]): ResponseInputItem[] {
+function toSdkMessages(blocks: LLMBlock[]): ResponseInputItem[] {
   const input: ResponseInputItem[] = [];
+  let assistantBlocks: LLMAssistantBlock[] = [];
 
-  for (const msg of messages) {
-    if (msg.role === "user") {
-      if (typeof msg.content === "string") {
-        // Plain text user message
-        input.push({ role: "user", content: msg.content });
-      } else if (Array.isArray(msg.content)) {
-        // User content blocks — expected to be LLMToolResultBlock[]
-        for (const block of msg.content) {
-          const b = block as LLMToolResultBlock;
-          if (b.type === "tool_result") {
-            input.push({
-              type: "function_call_output",
-              call_id: b.tool_use_id,
-              output: b.content,
-            });
-          }
-        }
+  const flushAssistant = () => {
+    if (assistantBlocks.length === 0) return;
+
+    // Accumulate text parts to combine into a single message,
+    // and emit function_call items for tool use blocks.
+    let textParts: string[] = [];
+
+    const flushText = () => {
+      if (textParts.length > 0) {
+        input.push({
+          role: "assistant",
+          content: textParts.join(""),
+        });
+        textParts = [];
       }
-    } else if (msg.role === "assistant") {
-      if (typeof msg.content === "string") {
-        input.push({ role: "assistant", content: msg.content });
-      } else if (Array.isArray(msg.content)) {
-        // Accumulate text parts to combine into a single message,
-        // and emit function_call items for tool use blocks.
-        let textParts: string[] = [];
+    };
 
-        const flushText = () => {
-          if (textParts.length > 0) {
-            input.push({
-              role: "assistant",
-              content: textParts.join(""),
-            });
-            textParts = [];
-          }
-        };
-
-        for (const block of msg.content) {
-          switch (block.type) {
-            case "text":
-              textParts.push((block as LLMTextBlock).text);
-              break;
-            case "tool_use": {
-              // Flush any accumulated text before adding function call
-              flushText();
-              const tb = block as LLMToolUseBlock;
-              input.push({
-                type: "function_call",
-                id: tb.id,
-                name: tb.name,
-                arguments: JSON.stringify(tb.input),
-                call_id: tb.id,
-              });
-              break;
-            }
-            case "thinking":
-              // Skip thinking blocks — not sent back to the API
-              break;
-          }
-        }
-
-        // Flush remaining text
-        flushText();
+    for (const block of assistantBlocks) {
+      switch (block.type) {
+        case "text":
+          textParts.push(block.text);
+          break;
+        case "tool_use":
+          flushText();
+          input.push({
+            type: "function_call",
+            id: block.id,
+            name: block.name,
+            arguments: JSON.stringify(block.input),
+            call_id: block.id,
+          });
+          break;
+        case "thinking":
+          // Skip thinking blocks — not sent back to the API.
+          break;
       }
+    }
+
+    flushText();
+    assistantBlocks = [];
+  };
+
+  for (const block of blocks) {
+    if (block.type === "user") {
+      flushAssistant();
+      input.push({ role: "user", content: block.text });
+    } else if (block.type === "tool_result") {
+      flushAssistant();
+      input.push({
+        type: "function_call_output",
+        call_id: block.tool_use_id,
+        output: block.content,
+      });
+    } else {
+      assistantBlocks.push(block);
     }
   }
 
+  flushAssistant();
   return input;
 }
 
@@ -272,8 +258,7 @@ export class OpenAIResponsesClient implements LLMClient {
     options: ChatOptions = {},
   ): LLMStream {
     const model = options.model?.getName() || DEFAULT_MODEL;
-    const messages = blocksToChatMessages(blocks);
-    const input = toSdkMessages(messages);
+    const input = toSdkMessages(blocks);
     const oaiTools = tools.length > 0 ? toSdkTools(tools) : undefined;
     const abortController = new AbortController();
 
