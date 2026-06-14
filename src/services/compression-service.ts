@@ -39,7 +39,7 @@ ${conversationText}`;
 
     try {
       const stream = client.chatStream(
-        [{ role: "user", content: summaryPrompt }],
+        [{ type: "user", text: summaryPrompt }],
         [],
         { model, maxTokens: 1000 },
       );

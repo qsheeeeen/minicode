@@ -1,6 +1,5 @@
 import type { Model } from "./llm/model.js";
 import type { LLMClient, LLMToolDef, LLMResponse } from "./llm/client.js";
-import { historyToLLMMessages } from "./llm/history-projection.js";
 import {
   type ToolDef,
   type ToolExecutionContext,
@@ -149,15 +148,11 @@ export class Agent {
   // Stream LLM response, updating context in real-time.
   // Returns the final response and any tool calls the LLM requested.
   private async streamLLM(toolDefs: LLMToolDef[]) {
-    const stream = this.client.chatStream(
-      historyToLLMMessages(this.context.getBlocks()),
-      toolDefs,
-      {
-        system: this.promptManager.getSystemPrompt(),
-        model: this.model,
-        signal: this.abortController?.signal,
-      },
-    );
+    const stream = this.client.chatStream(this.context.getBlocks(), toolDefs, {
+      system: this.promptManager.getSystemPrompt(),
+      model: this.model,
+      signal: this.abortController?.signal,
+    });
 
     const toolCalls: ToolCall[] = [];
 

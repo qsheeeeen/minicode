@@ -12,12 +12,13 @@ import type {
   ChatOptions,
   LLMResponse,
   EffortLevel,
+  LLMBlock,
 } from "../client.js";
-import type {
-  LLMMessage,
-  LLMAssistantBlock,
-  LLMToolResultBlock,
-} from "../client.js";
+import type { LLMAssistantBlock, LLMToolResultBlock } from "../client.js";
+import {
+  blocksToChatMessages,
+  type ChatMessage,
+} from "./message-projection.js";
 
 function toSdkEffort(
   effort: EffortLevel,
@@ -45,7 +46,7 @@ type AnthropicContentBlockParam = Anthropic.Messages.ContentBlockParam;
 // Thinking blocks are filtered out — they're output-only and not accepted
 // as input by the API (adaptive thinking reconstructs context automatically).
 function toSdkMessages(
-  messages: LLMMessage[],
+  messages: ChatMessage[],
 ): Anthropic.Messages.MessageParam[] {
   return messages.map((msg) => {
     if (msg.role === "user") {
@@ -151,10 +152,11 @@ export class AnthropicClient implements LLMClient {
   }
 
   chatStream(
-    messages: LLMMessage[],
+    blocks: LLMBlock[],
     tools: LLMToolDef[],
     options: ChatOptions = {},
   ): LLMStream {
+    const messages = blocksToChatMessages(blocks);
     const params: MessageCreateParamsStreaming = {
       model: options.model?.getName() || "claude-sonnet-4-5",
       max_tokens: options.maxTokens || 8192,

@@ -17,14 +17,18 @@ import type {
   LLMResponse,
   TokenUsage,
   EffortLevel,
+  LLMBlock,
 } from "../client.js";
 import type {
-  LLMMessage,
   LLMAssistantBlock,
   LLMTextBlock,
   LLMToolUseBlock,
   LLMToolResultBlock,
 } from "../client.js";
+import {
+  blocksToChatMessages,
+  type ChatMessage,
+} from "./message-projection.js";
 
 // The OpenAI SDK's ResponseStreamEvent union doesn't cover all streaming event
 // types (delta, output_item.done, etc.). These interfaces fill the gap.
@@ -88,8 +92,8 @@ function toSdkTools(tools: LLMToolDef[]): OpenAI.Responses.FunctionTool[] {
 
 type ResponseInputItem = OpenAI.Responses.ResponseInputItem;
 
-// Convert LLMMessage[] to an OpenAI Responses `input` array.
-function toSdkMessages(messages: LLMMessage[]): ResponseInputItem[] {
+// Convert ChatMessage[] to an OpenAI Responses `input` array.
+function toSdkMessages(messages: ChatMessage[]): ResponseInputItem[] {
   const input: ResponseInputItem[] = [];
 
   for (const msg of messages) {
@@ -263,11 +267,12 @@ export class OpenAIResponsesClient implements LLMClient {
   }
 
   chatStream(
-    messages: LLMMessage[],
+    blocks: LLMBlock[],
     tools: LLMToolDef[],
     options: ChatOptions = {},
   ): LLMStream {
     const model = options.model?.getName() || DEFAULT_MODEL;
+    const messages = blocksToChatMessages(blocks);
     const input = toSdkMessages(messages);
     const oaiTools = tools.length > 0 ? toSdkTools(tools) : undefined;
     const abortController = new AbortController();

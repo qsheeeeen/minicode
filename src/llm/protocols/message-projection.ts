@@ -1,12 +1,16 @@
 import type {
   LLMAssistantBlock,
   LLMBlock,
-  LLMMessage,
   LLMToolResultBlock,
-} from "./client.js";
+} from "../client.js";
 
-export function historyToLLMMessages(blocks: LLMBlock[]): LLMMessage[] {
-  const messages: LLMMessage[] = [];
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string | LLMAssistantBlock[] | LLMToolResultBlock[];
+}
+
+export function blocksToChatMessages(blocks: LLMBlock[]): ChatMessage[] {
+  const messages: ChatMessage[] = [];
   let assistantBlocks: LLMAssistantBlock[] = [];
 
   const flushAssistant = () => {

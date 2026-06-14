@@ -182,7 +182,7 @@ describe("PermissionService", () => {
 
       expect(result).toEqual({ allowed: true });
       expect(mockClient.chatStream).toHaveBeenCalledWith(
-        expect.arrayContaining([expect.objectContaining({ role: "user" })]),
+        expect.arrayContaining([expect.objectContaining({ type: "user" })]),
         [],
         expect.objectContaining({ model, maxTokens: 100 }),
       );

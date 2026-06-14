@@ -86,7 +86,7 @@ Reply with exactly one of:
 - "no: <reason explaining why it was denied>"`;
 
       const stream = this.client.chatStream(
-        [{ role: "user", content: prompt }],
+        [{ type: "user", text: prompt }],
         [],
         { model: this.model, maxTokens: 100 },
       );

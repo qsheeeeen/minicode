@@ -78,11 +78,6 @@ export type LLMBlock =
   | LLMToolUseBlock
   | LLMToolResultBlock;
 
-export interface LLMMessage {
-  role: "user" | "assistant";
-  content: string | LLMAssistantBlock[] | LLMToolResultBlock[];
-}
-
 export interface ChatOptions {
   model?: Model;
   maxTokens?: number;
@@ -115,7 +110,7 @@ export type LLMStream = AsyncGenerator<StreamEvent, LLMResponse, unknown>;
 export interface LLMClient {
   // Streaming completion — returns immediately, emits events as tokens arrive.
   chatStream(
-    messages: LLMMessage[],
+    blocks: LLMBlock[],
     tools: LLMToolDef[],
     options?: ChatOptions,
   ): LLMStream;

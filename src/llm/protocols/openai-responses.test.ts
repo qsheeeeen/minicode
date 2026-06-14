@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { StreamEvent, LLMResponse } from "../client.js";
-import type { LLMMessage } from "../client.js";
 
 async function collectStream(
   stream: AsyncGenerator<StreamEvent, LLMResponse, unknown>,
@@ -295,27 +294,17 @@ describe("OpenAIResponsesClient", () => {
         ]),
       );
 
-      const messages: LLMMessage[] = [
+      const blocks = [
+        { type: "tool_use" as const, id: "call_1", name: "Read", input: {} },
         {
-          role: "assistant",
-          content: [
-            { type: "tool_use", id: "call_1", name: "Read", input: {} },
-          ],
-        },
-        {
-          role: "user",
-          content: [
-            {
-              type: "tool_result",
-              tool_use_id: "call_1",
-              content: "file content",
-            },
-          ],
+          type: "tool_result" as const,
+          tool_use_id: "call_1",
+          content: "file content",
         },
       ];
 
       const client = new OpenAIResponsesClient("test-key");
-      const stream = client.chatStream(messages, []);
+      const stream = client.chatStream(blocks, []);
       await collectStream(stream);
 
       const params = responsesCreateMock.mock.calls[0][0];
@@ -343,18 +332,13 @@ describe("OpenAIResponsesClient", () => {
         ]),
       );
 
-      const messages: LLMMessage[] = [
-        {
-          role: "assistant",
-          content: [
-            { type: "thinking", thinking: "reasoning..." },
-            { type: "text", text: "answer" },
-          ],
-        },
+      const blocks = [
+        { type: "thinking" as const, thinking: "reasoning..." },
+        { type: "text" as const, text: "answer" },
       ];
 
       const client = new OpenAIResponsesClient("test-key");
-      const stream = client.chatStream(messages, []);
+      const stream = client.chatStream(blocks, []);
       await collectStream(stream);
 
       const params = responsesCreateMock.mock.calls[0][0];

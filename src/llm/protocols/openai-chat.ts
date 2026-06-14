@@ -12,14 +12,18 @@ import type {
   ChatOptions,
   LLMResponse,
   EffortLevel,
+  LLMBlock,
 } from "../client.js";
 import type {
-  LLMMessage,
   LLMAssistantBlock,
   LLMTextBlock,
   LLMToolUseBlock,
   LLMToolResultBlock,
 } from "../client.js";
+import {
+  blocksToChatMessages,
+  type ChatMessage,
+} from "./message-projection.js";
 
 // Constants
 
@@ -70,7 +74,7 @@ type OpenAIMessage =
   | OpenAI.ChatCompletionToolMessageParam;
 
 function toSdkMessages(
-  messages: LLMMessage[],
+  messages: ChatMessage[],
   system?: string,
 ): OpenAIMessage[] {
   const out: OpenAIMessage[] = [];
@@ -174,11 +178,12 @@ export class OpenAIChatClient implements LLMClient {
   }
 
   chatStream(
-    messages: LLMMessage[],
+    blocks: LLMBlock[],
     tools: LLMToolDef[],
     options: ChatOptions = {},
   ): LLMStream {
     const model = options.model?.getName() ?? DEFAULT_MODEL;
+    const messages = blocksToChatMessages(blocks);
     const oaiMessages = toSdkMessages(messages, options.system);
     const oaiTools = toSdkTools(tools);
     const abortController = new AbortController();

@@ -13,8 +13,8 @@ import type {
   ChatOptions,
   TokenUsage,
   StreamEvent,
+  LLMBlock,
 } from "./client.js";
-import type { LLMMessage } from "./client.js";
 
 // Types
 
@@ -52,7 +52,7 @@ export class VirtualLLMClient implements LLMClient {
   }
 
   chatStream(
-    _messages: LLMMessage[],
+    _blocks: LLMBlock[],
     _tools: LLMToolDef[],
     options?: ChatOptions,
   ): LLMStream {

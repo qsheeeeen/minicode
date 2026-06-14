@@ -36,7 +36,7 @@ describe("AnthropicClient", () => {
   describe("chatStream", () => {
     it("sends correct parameters to client.messages.stream", async () => {
       const client = new AnthropicClient("test-key");
-      client.chatStream([{ role: "user", content: "hello" }], [], {
+      client.chatStream([{ type: "user", text: "hello" }], [], {
         model: new Model("custom-model", "test-provider", 1000),
         maxTokens: 1000,
         system: "test system",
@@ -78,7 +78,7 @@ describe("AnthropicClient", () => {
   describe("chatStream", () => {
     it("sends correct parameters to client.messages.stream", () => {
       const client = new AnthropicClient();
-      client.chatStream([{ role: "user", content: "hi" }], [], {});
+      client.chatStream([{ type: "user", text: "hi" }], [], {});
 
       expect(mockStream).toHaveBeenCalledWith(
         expect.objectContaining({

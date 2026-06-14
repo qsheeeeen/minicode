@@ -81,8 +81,8 @@ describe("SummaryCompressionStrategy", () => {
       expect(mockClient.chatStream).toHaveBeenCalledWith(
         expect.arrayContaining([
           expect.objectContaining({
-            role: "user",
-            content: expect.stringContaining("Summarize"),
+            type: "user",
+            text: expect.stringContaining("Summarize"),
           }),
         ]),
         [],
