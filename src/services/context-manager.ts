@@ -78,8 +78,9 @@ export class ContextManager {
 
     try {
       const recentCount = 10;
-      const turns = deps.context.getTurns();
-      if (turns.length <= recentCount + 2) {
+      const blocks = deps.context.getBlocks();
+      const turnCount = deps.context.getTurnCount();
+      if (turnCount <= recentCount + 2) {
         deps.statusReporter({
           role: "status",
           content: "Not enough conversation to compress.",
@@ -91,34 +92,34 @@ export class ContextManager {
       const totalTokens = this.tokenTracker.getTotal();
       deps.statusReporter({
         role: "status",
-        content: `Compressing ${turns.length - recentCount} turns (${totalTokens} tokens)...`,
+        content: `Compressing ${turnCount - recentCount} turns (${totalTokens} tokens)...`,
         timestamp: new Date(),
       });
 
-      const originalUserPrompts = turns.length;
+      const originalUserPrompts = turnCount;
 
       const compressed = await this.compressionService.compress(
-        turns,
+        blocks,
         deps.client,
         deps.model,
       );
 
-      const originalKept = compressed.length - 1; // compression adds 1 summary
+      const originalKept = recentCount + 1; // compression adds 1 summary turn
       const prunedCount = originalUserPrompts - originalKept;
 
       if (prunedCount > 0) {
         deps.changeJournal.pruneAndRenumber(prunedCount, 1);
       }
 
-      deps.context.replaceTurns(compressed);
+      deps.context.replaceBlocks(compressed);
       this.tokenTracker.reset();
 
       // Recalculate activeTurnIdx
-      const newActiveIdx = compressed.length;
+      const newActiveIdx = deps.context.getTurnCount();
 
       deps.statusReporter({
         role: "status",
-        content: `Compressed: ${prunedCount} turns removed, ${compressed.length} remaining.`,
+        content: `Compressed: ${prunedCount} turns removed, ${newActiveIdx} remaining.`,
         timestamp: new Date(),
       });
 

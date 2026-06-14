@@ -9,11 +9,11 @@ import fs from "fs/promises";
 import path from "path";
 import os from "os";
 import crypto from "crypto";
-import type { LLMTurn } from "../llm/history.js";
+import type { LLMBlock } from "../llm/history.js";
 
 export interface SessionData {
   model: string;
-  turns: LLMTurn[];
+  blocks: LLMBlock[];
   totalTokens: number;
   createdAt?: string;
   updatedAt?: string;
@@ -27,7 +27,7 @@ export interface SessionInfo {
 interface SessionHeader {
   model: string;
   totalTokens: number;
-  msgCount: number;
+  blockCount: number;
 }
 
 export class SessionPersistence {
@@ -55,7 +55,7 @@ export class SessionPersistence {
 
   static async save(
     sessionName: string,
-    turns: LLMTurn[],
+    blocks: LLMBlock[],
     meta: { model: string; totalTokens: number },
   ): Promise<void> {
     if (!sessionName) return;
@@ -66,11 +66,11 @@ export class SessionPersistence {
     const header: SessionHeader = {
       model: meta.model,
       totalTokens: meta.totalTokens,
-      msgCount: turns.length,
+      blockCount: blocks.length,
     };
     const lines = [JSON.stringify(header)];
-    for (const msg of turns) {
-      lines.push(JSON.stringify(msg));
+    for (const block of blocks) {
+      lines.push(JSON.stringify(block));
     }
     await fs.writeFile(tmpPath, lines.join("\n") + "\n");
     await fs.rename(tmpPath, filePath);
@@ -85,17 +85,17 @@ export class SessionPersistence {
       const lines = content.split("\n").filter((l) => l.trim());
       if (lines.length === 0) return null;
       const header: SessionHeader = JSON.parse(lines[0]);
-      const turns: LLMTurn[] = [];
+      const blocks: LLMBlock[] = [];
       for (let i = 1; i < lines.length; i++) {
         try {
-          turns.push(JSON.parse(lines[i]));
+          blocks.push(JSON.parse(lines[i]));
         } catch {
           // skip malformed lines
         }
       }
       return {
         model: header.model,
-        turns,
+        blocks,
         totalTokens: header.totalTokens,
       };
     } catch {

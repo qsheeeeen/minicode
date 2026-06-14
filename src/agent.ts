@@ -150,7 +150,7 @@ export class Agent {
   // Returns the final response and any tool calls the LLM requested.
   private async streamLLM(toolDefs: LLMToolDef[]) {
     const stream = this.client.chatStream(
-      historyToLLMMessages(this.context.getTurns()),
+      historyToLLMMessages(this.context.getBlocks()),
       toolDefs,
       {
         system: this.promptManager.getSystemPrompt(),
@@ -295,7 +295,9 @@ export class Agent {
       this._isRunning = false;
       if (this.abortController?.signal.aborted) {
         // Remove the last user message that triggered this aborted run
-        this.context.removeLastTurn((last) => last.userText === userMessage);
+        this.context.removeLastTurn(
+          (last) => last[0]?.type === "user" && last[0].text === userMessage,
+        );
       }
       this.abortController = null;
       this.logger?.info(

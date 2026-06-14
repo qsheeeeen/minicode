@@ -75,7 +75,7 @@ function useMultiAgent(
       dispatch({ type: "CLEAR_STATUSES" });
       dispatch({
         type: "SET_MESSAGES",
-        payload: toDisplayMessages(session.context.getTurns(), []),
+        payload: toDisplayMessages(session.context.getBlocks(), []),
       });
       agentRef.current = session.agent;
     },
@@ -202,7 +202,7 @@ function AppContent({
           const { statuses } = useTuiStore.getState();
           dispatch({
             type: "SET_MESSAGES",
-            payload: toDisplayMessages(context.getTurns(), statuses),
+            payload: toDisplayMessages(context.getBlocks(), statuses),
           });
         }
         return false;
@@ -244,7 +244,7 @@ function AppContent({
         const { statuses } = useTuiStore.getState();
         dispatch({
           type: "SET_MESSAGES",
-          payload: toDisplayMessages(context.getTurns(), statuses),
+          payload: toDisplayMessages(context.getBlocks(), statuses),
         });
         dispatch({ type: "SET_IS_LOADING", payload: false });
         dispatch({ type: "SET_STATUS", payload: "" });

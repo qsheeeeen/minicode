@@ -236,17 +236,17 @@ describe("Agent", () => {
   });
 
   describe("getMessages and setMessages", () => {
-    it("setMessages stores turns directly", () => {
+    it("setMessages stores blocks directly", () => {
       const { context, sessionManager } = makeAgent();
-      const messages: any[] = [{ userText: "hello", process: [] }];
+      const messages: any[] = [{ type: "user", text: "hello" }];
       sessionManager.setMessages(messages);
-      expect(context.getTurns()).toEqual(messages);
+      expect(context.getBlocks()).toEqual(messages);
     });
 
-    it("getMessages returns context turns", () => {
+    it("getMessages returns history blocks", () => {
       const { context } = makeAgent();
       context.startTurn("hello");
-      expect(context.getTurns()).toEqual([{ userText: "hello", process: [] }]);
+      expect(context.getBlocks()).toEqual([{ type: "user", text: "hello" }]);
     });
   });
 
@@ -272,7 +272,7 @@ describe("Agent", () => {
       const { agent, context } = makeAgent();
       context.startTurn("hi");
       agent.clearSession();
-      expect(context.getTurns()).toHaveLength(0);
+      expect(context.getBlocks()).toHaveLength(0);
     });
   });
 
@@ -295,9 +295,10 @@ describe("Agent", () => {
       });
 
       await runPromise;
-      const turns = context.getTurns();
-      expect(turns).toEqual([
-        { userText: "Hello agent", process: [], assistantText: "Hi there!" },
+      const blocks = context.getBlocks();
+      expect(blocks).toEqual([
+        { type: "user", text: "Hello agent" },
+        { type: "text", text: "Hi there!" },
       ]);
     });
 
@@ -319,8 +320,9 @@ describe("Agent", () => {
       });
 
       await runPromise;
-      const turns = context.getTurns();
-      expect(turns[0].process).toEqual([
+      const blocks = context.getBlocks();
+      expect(blocks).toEqual([
+        { type: "user", text: "Solve this" },
         { type: "thinking", thinking: "Hmm..." },
       ]);
     });
@@ -359,16 +361,16 @@ describe("Agent", () => {
       });
 
       await runPromise;
-      const turns = context.getTurns();
-      expect(turns).toHaveLength(1);
-      expect(turns[0].process).toEqual([
+      const blocks = context.getBlocks();
+      expect(blocks).toEqual([
+        { type: "user", text: "Use tool" },
         {
-          type: "tool_call",
+          type: "tool_use",
           id: "call_1",
           name: "testTool",
           input: {},
-          result: "success",
         },
+        { type: "tool_result", tool_use_id: "call_1", content: "success" },
       ]);
     });
   });
@@ -455,15 +457,19 @@ describe("Agent", () => {
 
       await runPromise;
 
-      const turns = context.getTurns();
-      expect(turns).toHaveLength(1);
-      expect(turns[0].process).toEqual([
+      const blocks = context.getBlocks();
+      expect(blocks).toEqual([
+        { type: "user", text: "do something" },
         {
-          type: "tool_call",
+          type: "tool_use",
           id: "call_1",
           name: "testTool",
           input: {},
-          result: "User rejected",
+        },
+        {
+          type: "tool_result",
+          tool_use_id: "call_1",
+          content: "User rejected",
         },
       ]);
 
@@ -526,14 +532,20 @@ describe("Agent", () => {
 
       await runPromise;
 
-      const turns = context.getTurns();
-      expect(turns).toHaveLength(1);
-      expect((turns[0].process[0] as any).result).toContain(
-        "Tool execution denied by auto-gate: too risky",
+      const blocks = context.getBlocks();
+      expect(blocks).toContainEqual(
+        expect.objectContaining({
+          type: "tool_result",
+          tool_use_id: "call_1",
+          content: expect.stringContaining(
+            "Tool execution denied by auto-gate: too risky",
+          ),
+        }),
       );
-      expect(turns[0].assistantText).toBe(
-        "I cannot do that because it is too risky.",
-      );
+      expect(blocks).toContainEqual({
+        type: "text",
+        text: "I cannot do that because it is too risky.",
+      });
     });
   });
 });

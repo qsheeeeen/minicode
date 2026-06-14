@@ -43,15 +43,12 @@ describe("SessionPersistence", () => {
     const sessionName = `test-persist-${Date.now()}`;
 
     it("saves and loads session data", async () => {
-      const turns = [
-        {
-          userText: "hello",
-          process: [],
-          assistantText: "world",
-        },
+      const blocks = [
+        { type: "user" as const, text: "hello" },
+        { type: "text" as const, text: "world" },
       ];
 
-      await SessionPersistence.save(sessionName, turns as any, {
+      await SessionPersistence.save(sessionName, blocks, {
         model: "test-model",
         totalTokens: 100,
       });
@@ -60,8 +57,8 @@ describe("SessionPersistence", () => {
       expect(data).not.toBeNull();
       expect(data!.model).toBe("test-model");
       expect(data!.totalTokens).toBe(100);
-      expect(data!.turns).toHaveLength(1);
-      expect(data!.turns[0].userText).toBe("hello");
+      expect(data!.blocks).toHaveLength(2);
+      expect(data!.blocks[0]).toEqual({ type: "user", text: "hello" });
     });
 
     it("returns null when session not found", async () => {

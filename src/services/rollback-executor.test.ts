@@ -19,10 +19,10 @@ describe("RollbackExecutor", () => {
     } as any;
   }
 
-  function makeMockMessageStore(turns: any[]) {
+  function makeMockMessageStore(blocks: any[]) {
     return {
-      getTurns: vi.fn().mockReturnValue(turns),
-      replaceTurns: vi.fn(),
+      getBlocks: vi.fn().mockReturnValue(blocks),
+      replaceBlocks: vi.fn(),
     } as any;
   }
 
@@ -30,16 +30,19 @@ describe("RollbackExecutor", () => {
     it("truncates conversation and prunes journal", async () => {
       const journal = makeMockJournal([]);
       const context = makeMockMessageStore([
-        { userText: "first", process: [], assistantText: "reply" },
-        { userText: "second", process: [], assistantText: "reply2" },
+        { type: "user", text: "first" },
+        { type: "text", text: "reply" },
+        { type: "user", text: "second" },
+        { type: "text", text: "reply2" },
       ]);
 
       const { RollbackExecutor } = await import("./rollback-executor.js");
       const executor = new RollbackExecutor();
       const result = await executor.rollbackConversation(journal, context, 2);
 
-      expect(context.replaceTurns).toHaveBeenCalledWith([
-        { userText: "first", process: [], assistantText: "reply" },
+      expect(context.replaceBlocks).toHaveBeenCalledWith([
+        { type: "user", text: "first" },
+        { type: "text", text: "reply" },
       ]);
       expect(journal.pruneFrom).toHaveBeenCalledWith(2);
       expect(result.filesRestored).toEqual([]);
@@ -61,9 +64,9 @@ describe("RollbackExecutor", () => {
       ];
       const journal = makeMockJournal(entries);
       const context = makeMockMessageStore([
-        { userText: "first", process: [] },
-        { userText: "second", process: [] },
-        { userText: "third", process: [] },
+        { type: "user", text: "first" },
+        { type: "user", text: "second" },
+        { type: "user", text: "third" },
       ]);
 
       const { RollbackExecutor } = await import("./rollback-executor.js");
@@ -84,8 +87,8 @@ describe("RollbackExecutor", () => {
       expect(fs.unlink).toHaveBeenCalledWith("b.ts");
 
       // Conversation truncated before turn 2
-      expect(context.replaceTurns).toHaveBeenCalledWith([
-        { userText: "first", process: [] },
+      expect(context.replaceBlocks).toHaveBeenCalledWith([
+        { type: "user", text: "first" },
       ]);
       // Journal pruned last
       expect(journal.pruneFrom).toHaveBeenCalledWith(2);
@@ -95,9 +98,7 @@ describe("RollbackExecutor", () => {
       const journal = makeMockJournal([
         { turnIdx: 1, path: "a.ts", op: "edit", before: "old", ts: 100 },
       ]);
-      const context = makeMockMessageStore([
-        { userText: "first", process: [] },
-      ]);
+      const context = makeMockMessageStore([{ type: "user", text: "first" }]);
 
       const { RollbackExecutor } = await import("./rollback-executor.js");
       const executor = new RollbackExecutor();
@@ -130,8 +131,8 @@ describe("RollbackExecutor", () => {
       ];
       const journal = makeMockJournal(entries);
       const context = makeMockMessageStore([
-        { userText: "first", process: [] },
-        { userText: "second", process: [] },
+        { type: "user", text: "first" },
+        { type: "user", text: "second" },
       ]);
 
       const { RollbackExecutor } = await import("./rollback-executor.js");

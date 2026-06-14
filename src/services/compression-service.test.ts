@@ -1,8 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { SummaryCompressionStrategy } from "./compression-service.js";
 import type { LLMClient } from "../llm/client.js";
-import type { LLMTurn } from "../llm/history.js";
+import type { LLMBlock } from "../llm/history.js";
 import { Model } from "../llm/model.js";
+
+function userBlocks(count: number, prefix = "message"): LLMBlock[] {
+  return Array.from({ length: count }, (_, i) => ({
+    type: "user" as const,
+    text: `${prefix} ${i}`,
+  }));
+}
 
 describe("SummaryCompressionStrategy", () => {
   let service: SummaryCompressionStrategy;
@@ -12,22 +19,16 @@ describe("SummaryCompressionStrategy", () => {
   });
 
   describe("compress", () => {
-    it("returns unchanged turns when below threshold (12 or fewer)", async () => {
-      const turns: LLMTurn[] = Array.from({ length: 12 }, (_, i) => ({
-        userText: `message ${i}`,
-        process: [],
-      }));
+    it("returns unchanged blocks when below threshold (12 or fewer turns)", async () => {
+      const blocks = userBlocks(12);
       const mockClient = {} as LLMClient;
       const model = new Model("claude-3", "test-provider", 1000);
-      const result = await service.compress(turns, mockClient, model);
-      expect(result).toEqual(turns);
+      const result = await service.compress(blocks, mockClient, model);
+      expect(result).toEqual(blocks);
     });
 
     it("compresses when above threshold (more than 12 turns)", async () => {
-      const turns: LLMTurn[] = Array.from({ length: 15 }, (_, i) => ({
-        userText: `message ${i}`,
-        process: [],
-      }));
+      const blocks = userBlocks(15);
       const mockClient = {
         chatStream: vi.fn().mockReturnValue({
           next: vi.fn().mockResolvedValue({
@@ -40,38 +41,31 @@ describe("SummaryCompressionStrategy", () => {
       } as unknown as LLMClient;
       const model = new Model("claude-3", "test-provider", 1000);
 
-      const result = await service.compress(turns, mockClient, model);
+      const result = await service.compress(blocks, mockClient, model);
 
-      // Should include summary and last 10 turns
-      expect(result.length).toBeLessThan(turns.length);
+      expect(result.length).toBeLessThan(blocks.length);
       expect(result[0]).toEqual({
-        userText: expect.stringContaining("Summary"),
-        process: [],
+        type: "user",
+        text: expect.stringContaining("Summary"),
       });
     });
 
     it("throws error when compression fails", async () => {
-      const turns: LLMTurn[] = Array.from({ length: 15 }, (_, i) => ({
-        userText: `message ${i}`,
-        process: [],
-      }));
+      const blocks = userBlocks(15);
       const mockClient = {
         chatStream: vi.fn().mockReturnValue({
-          finalMessage: vi.fn().mockRejectedValue(new Error("API error")),
+          next: vi.fn().mockRejectedValue(new Error("API error")),
         }),
       } as unknown as LLMClient;
       const model = new Model("claude-3", "test-provider", 1000);
 
-      await expect(service.compress(turns, mockClient, model)).rejects.toThrow(
+      await expect(service.compress(blocks, mockClient, model)).rejects.toThrow(
         "Compression failed",
       );
     });
 
     it("calls client.chat with correct parameters", async () => {
-      const turns: LLMTurn[] = Array.from({ length: 15 }, (_, i) => ({
-        userText: `message ${i}`,
-        process: [],
-      }));
+      const blocks = userBlocks(15);
       const mockClient = {
         chatStream: vi.fn().mockReturnValue({
           next: vi.fn().mockResolvedValue({
@@ -82,7 +76,7 @@ describe("SummaryCompressionStrategy", () => {
       } as unknown as LLMClient;
       const model = new Model("claude-3", "test-provider", 1000);
 
-      await service.compress(turns, mockClient, model);
+      await service.compress(blocks, mockClient, model);
 
       expect(mockClient.chatStream).toHaveBeenCalledWith(
         expect.arrayContaining([
@@ -97,10 +91,7 @@ describe("SummaryCompressionStrategy", () => {
     });
 
     it("uses last 10 turns in result", async () => {
-      const turns: LLMTurn[] = Array.from({ length: 15 }, (_, i) => ({
-        userText: `msg${i}`,
-        process: [],
-      }));
+      const blocks = userBlocks(15, "msg");
       const mockClient = {
         chatStream: vi.fn().mockReturnValue({
           next: vi.fn().mockResolvedValue({
@@ -110,11 +101,9 @@ describe("SummaryCompressionStrategy", () => {
         }),
       } as unknown as LLMClient;
 
-      const result = await service.compress(turns, mockClient, undefined);
+      const result = await service.compress(blocks, mockClient, undefined);
 
-      // Last 10 turns should be preserved
-      const last10 = turns.slice(-10);
-      expect(result.slice(-10)).toEqual(last10);
+      expect(result.slice(-10)).toEqual(blocks.slice(-10));
     });
   });
 });

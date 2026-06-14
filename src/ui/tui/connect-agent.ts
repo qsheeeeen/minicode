@@ -56,7 +56,7 @@ export function connectAgent(options: ConnectAgentOptions): {
     const { statuses } = useTuiStore.getState();
     dispatch({
       type: "SET_MESSAGES",
-      payload: toDisplayMessages(context.getTurns(), statuses),
+      payload: toDisplayMessages(context.getBlocks(), statuses),
     });
   };
 
@@ -100,7 +100,7 @@ export function connectAgent(options: ConnectAgentOptions): {
     if (sessionName || resumeRecent) {
       const data = await SessionPersistence.load(initialSession);
       if (data) {
-        context.replaceTurns(data.turns);
+        context.replaceBlocks(data.blocks);
         const totalTokens = data.totalTokens || 0;
         if (totalTokens > 0) {
           tokenCount$.set(totalTokens);

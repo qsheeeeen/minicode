@@ -13,7 +13,7 @@ registerCommand({
       const name = args[0];
       const data = await SessionPersistence.load(name);
       if (data) {
-        ctx.context.replaceTurns(data.turns);
+        ctx.context.replaceBlocks(data.blocks);
         const totalTokens = data.totalTokens || 0;
         if (totalTokens > 0) {
           ctx.tokenCount$.set(totalTokens);

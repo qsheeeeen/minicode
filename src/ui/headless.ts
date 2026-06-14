@@ -54,7 +54,7 @@ export async function runHeadless(
       `session-${Date.now()}`;
     const data = await SessionPersistence.load(name);
     if (data) {
-      context.replaceTurns(data.turns);
+      context.replaceBlocks(data.blocks);
       const totalTokens = data.totalTokens || 0;
       if (totalTokens > 0) {
         tokenCount$.set(totalTokens);

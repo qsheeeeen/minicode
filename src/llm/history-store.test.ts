@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
-import { LLMHistory } from "./history-store.js";
-import type { LLMTurn } from "./history.js";
+import { LLMHistory, splitHistoryTurns } from "./history-store.js";
+import type { LLMBlock } from "./history.js";
 
 describe("LLMHistory", () => {
   it("notifies subscribers on mutations and returns unsubscribe", () => {
@@ -16,15 +16,31 @@ describe("LLMHistory", () => {
     expect(listener).toHaveBeenCalledTimes(1);
   });
 
-  it("starts turns and returns defensive copies", () => {
+  it("stores blocks and returns defensive copies", () => {
     const store = new LLMHistory();
     store.startTurn("hello");
 
-    const turns = store.getTurns();
-    expect(turns).toEqual([{ userText: "hello", process: [] }]);
+    const blocks = store.getBlocks();
+    expect(blocks).toEqual([{ type: "user", text: "hello" }]);
 
-    turns.push({ userText: "injected", process: [] });
-    expect(store.getTurns()).toHaveLength(1);
+    blocks.push({ type: "user", text: "injected" });
+    expect(store.getBlocks()).toHaveLength(1);
+  });
+
+  it("derives turns from user block boundaries", () => {
+    const blocks: LLMBlock[] = [
+      { type: "user", text: "one" },
+      { type: "text", text: "reply" },
+      { type: "user", text: "two" },
+    ];
+
+    expect(splitHistoryTurns(blocks)).toEqual([
+      [
+        { type: "user", text: "one" },
+        { type: "text", text: "reply" },
+      ],
+      [{ type: "user", text: "two" }],
+    ]);
   });
 
   it("accumulates consecutive thinking deltas into one block", () => {
@@ -33,7 +49,8 @@ describe("LLMHistory", () => {
     store.appendThinking("plan");
     store.appendThinking(" more");
 
-    expect(store.getTurns()[0].process).toEqual([
+    expect(store.getBlocks()).toEqual([
+      { type: "user", text: "task" },
       { type: "thinking", thinking: "plan more" },
     ]);
   });
@@ -45,9 +62,10 @@ describe("LLMHistory", () => {
     store.startToolCall("t1", "read", { path: "a.ts" });
     store.appendThinking("second");
 
-    expect(store.getTurns()[0].process).toEqual([
+    expect(store.getBlocks()).toEqual([
+      { type: "user", text: "task" },
       { type: "thinking", thinking: "first" },
-      { type: "tool_call", id: "t1", name: "read", input: { path: "a.ts" } },
+      { type: "tool_use", id: "t1", name: "read", input: { path: "a.ts" } },
       { type: "thinking", thinking: "second" },
     ]);
   });
@@ -58,14 +76,10 @@ describe("LLMHistory", () => {
     store.startToolCall("t1", "read", { path: "a.ts" });
     store.completeToolCall("t1", "content");
 
-    expect(store.getTurns()[0].process).toEqual([
-      {
-        type: "tool_call",
-        id: "t1",
-        name: "read",
-        input: { path: "a.ts" },
-        result: "content",
-      },
+    expect(store.getBlocks()).toEqual([
+      { type: "user", text: "task" },
+      { type: "tool_use", id: "t1", name: "read", input: { path: "a.ts" } },
+      { type: "tool_result", tool_use_id: "t1", content: "content" },
     ]);
   });
 
@@ -76,27 +90,29 @@ describe("LLMHistory", () => {
     store.completeToolCall("t1", "one");
     store.completeToolCall("t1", "two");
 
-    expect(store.getTurns()[0].process).toEqual([
-      { type: "tool_call", id: "t1", name: "read", input: {}, result: "two" },
+    expect(store.getBlocks()).toEqual([
+      { type: "user", text: "task" },
+      { type: "tool_use", id: "t1", name: "read", input: {} },
+      { type: "tool_result", tool_use_id: "t1", content: "two" },
     ]);
   });
 
-  it("rejects duplicate tool call ids in the current turn", () => {
+  it("rejects duplicate tool use ids in the current turn", () => {
     const store = new LLMHistory();
     store.startTurn("task");
     store.startToolCall("t1", "read", {});
 
     expect(() => store.startToolCall("t1", "read", {})).toThrow(
-      "Duplicate tool call id",
+      "Duplicate tool use id",
     );
   });
 
-  it("throws when completing a missing tool call", () => {
+  it("throws when completing a missing tool use", () => {
     const store = new LLMHistory();
     store.startTurn("task");
 
     expect(() => store.completeToolCall("missing", "result")).toThrow(
-      "Tool call not found",
+      "Tool use not found",
     );
   });
 
@@ -106,7 +122,10 @@ describe("LLMHistory", () => {
     store.appendAssistantText("hello");
     store.appendAssistantText(" world");
 
-    expect(store.getTurns()[0].assistantText).toBe("hello world");
+    expect(store.getBlocks()).toEqual([
+      { type: "user", text: "task" },
+      { type: "text", text: "hello world" },
+    ]);
   });
 
   it("throws when process mutations happen without a turn", () => {
@@ -122,43 +141,39 @@ describe("LLMHistory", () => {
     expect(() => store.appendAssistantText("x")).toThrow("No active LLM turn");
   });
 
-  it("replaces turns after validation", () => {
+  it("replaces blocks after validation", () => {
     const store = new LLMHistory();
-    const turns: LLMTurn[] = [
-      {
-        userText: "task",
-        process: [{ type: "tool_call", id: "t1", name: "read", input: {} }],
-      },
+    const blocks: LLMBlock[] = [
+      { type: "user", text: "task" },
+      { type: "tool_use", id: "t1", name: "read", input: {} },
     ];
 
-    store.replaceTurns(turns);
-    expect(store.getTurns()).toEqual(turns);
+    store.replaceBlocks(blocks);
+    expect(store.getBlocks()).toEqual(blocks);
   });
 
-  it("rejects invalid replacement turns", () => {
+  it("rejects invalid replacement blocks", () => {
     const store = new LLMHistory();
 
     expect(() =>
-      store.replaceTurns([
-        {
-          userText: "task",
-          process: [
-            { type: "tool_call", id: "t1", name: "read", input: {} },
-            { type: "tool_call", id: "t1", name: "read", input: {} },
-          ],
-        },
+      store.replaceBlocks([
+        { type: "user", text: "task" },
+        { type: "tool_use", id: "t1", name: "read", input: {} },
+        { type: "tool_use", id: "t1", name: "read", input: {} },
       ]),
-    ).toThrow("Duplicate tool call id");
+    ).toThrow("Duplicate tool use id");
   });
 
-  it("removes the last turn when the predicate matches", () => {
+  it("removes the last derived turn when the predicate matches", () => {
     const store = new LLMHistory();
     store.startTurn("keep");
     store.startTurn("remove");
 
-    expect(store.removeLastTurn((turn) => turn.userText === "remove")).toBe(
-      true,
-    );
-    expect(store.getTurns()).toEqual([{ userText: "keep", process: [] }]);
+    expect(
+      store.removeLastTurn(
+        (turn) => turn[0]?.type === "user" && turn[0].text === "remove",
+      ),
+    ).toBe(true);
+    expect(store.getBlocks()).toEqual([{ type: "user", text: "keep" }]);
   });
 });

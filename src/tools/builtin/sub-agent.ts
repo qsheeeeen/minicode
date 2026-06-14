@@ -1,5 +1,5 @@
 import type { ToolDef, ToolResult, ToolExecutionContext } from "../registry.js";
-import type { LLMTurn } from "../../llm/history.js";
+import type { LLMBlock } from "../../llm/history.js";
 import { Agent } from "../../agent.js";
 import { SessionManager } from "../../services/session-manager.js";
 import { ContextManager } from "../../services/context-manager.js";
@@ -124,11 +124,9 @@ export const agentTool: ToolDef = {
       registry.updateProgress(subId, { tokenCount: count });
     });
     subContext.onChange(() => {
-      const turns = subContext.getTurns();
-      let tc = 0;
-      for (const turn of turns) {
-        tc += turn.process.filter((block) => block.type === "tool_call").length;
-      }
+      const tc = subContext
+        .getBlocks()
+        .filter((block) => block.type === "tool_use").length;
       if (tc !== toolCallCount) {
         toolCallCount = tc;
         registry.updateProgress(subId, { toolCalls: tc });
@@ -137,9 +135,9 @@ export const agentTool: ToolDef = {
 
     try {
       await subAgent.run(task);
-      const turns = subContext.getTurns();
-      const finalResponse = extractFinalResponse(turns);
-      const summary = generateSummary(turns);
+      const blocks = subContext.getBlocks();
+      const finalResponse = extractFinalResponse(blocks);
+      const summary = generateSummary(blocks);
       registry.updateProgress(subId, {
         tokenCount: subAgent.tokenCount$.get(),
         toolCalls: toolCallCount,
@@ -161,25 +159,20 @@ export const agentTool: ToolDef = {
   },
 };
 
-function extractFinalResponse(turns: LLMTurn[]): string | null {
-  for (let i = turns.length - 1; i >= 0; i--) {
-    const turn = turns[i];
-    if (turn.assistantText?.trim()) {
-      return turn.assistantText.trim();
+function extractFinalResponse(blocks: LLMBlock[]): string | null {
+  for (let i = blocks.length - 1; i >= 0; i--) {
+    const block = blocks[i];
+    if (block.type === "text" && block.text.trim()) {
+      return block.text.trim();
     }
   }
   return null;
 }
 
-function generateSummary(turns: LLMTurn[]): string {
-  let toolCallCount = 0;
-
-  for (const turn of turns) {
-    toolCallCount += turn.process.filter(
-      (block) => block.type === "tool_call",
-    ).length;
-  }
-
+function generateSummary(blocks: LLMBlock[]): string {
+  const toolCallCount = blocks.filter(
+    (block) => block.type === "tool_use",
+  ).length;
   return toolCallCount > 0 ? `${toolCallCount} operations` : "Task completed";
 }
 register(agentTool);

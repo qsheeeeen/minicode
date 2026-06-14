@@ -14,7 +14,10 @@ registerCommand({
     }
 
     const turns = ctx.context.getTurns();
-    const userMessages = turns.map((t) => t.userText);
+    const userMessages = turns.map((turn) => {
+      const user = turn.find((block) => block.type === "user");
+      return user?.type === "user" ? user.text : "";
+    });
 
     if (userMessages.length === 0) {
       ctx.sessionManager.reportStatus({

@@ -9,7 +9,7 @@ import { LLMHistory } from "../llm/history.js";
 import { ChangeJournal } from "./change-journal.js";
 import { SessionPersistence } from "./session-persistence.js";
 import type { SessionStats } from "./session-stats.js";
-import type { LLMTurn } from "../llm/history.js";
+import type { LLMBlock } from "../llm/history.js";
 import type { StatusMessage } from "../ui/display.js";
 /**
  * StatusReporter — callback for emitting UI status/error notifications.
@@ -72,7 +72,7 @@ export class SessionManager {
       this._meta.totalTokens = meta.totalTokens;
     await SessionPersistence.save(
       this._currentSession,
-      this.history.getTurns(),
+      this.history.getBlocks(),
       { model: this._meta.model, totalTokens: this._meta.totalTokens },
     ).catch((e) => {
       throw e;
@@ -105,12 +105,12 @@ export class SessionManager {
 
   // -- Convenience shortcuts for common history operations --
 
-  getMessages(): LLMTurn[] {
-    return this.history.getTurns();
+  getMessages(): LLMBlock[] {
+    return this.history.getBlocks();
   }
 
-  setMessages(messages: LLMTurn[]): void {
-    this.history.replaceTurns(messages);
+  setMessages(messages: LLMBlock[]): void {
+    this.history.replaceBlocks(messages);
   }
 
   getSessionStats(): SessionStats | undefined {

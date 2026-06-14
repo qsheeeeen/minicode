@@ -81,13 +81,9 @@ describe("Agent virtual integration", () => {
     const completed = await agent.run("Hi there");
     expect(completed).toBe(true);
 
-    const turns = context.getTurns();
-    expect(turns).toEqual([
-      {
-        userText: "Hi there",
-        process: [],
-        assistantText: "Hello, I am the agent.",
-      },
+    expect(context.getBlocks()).toEqual([
+      { type: "user", text: "Hi there" },
+      { type: "text", text: "Hello, I am the agent." },
     ]);
   });
 
@@ -109,21 +105,16 @@ describe("Agent virtual integration", () => {
     const completed = await agent.run("Use the Echo tool");
     expect(completed).toBe(true);
 
-    const turns = context.getTurns();
-    expect(turns).toEqual([
+    expect(context.getBlocks()).toEqual([
+      { type: "user", text: "Use the Echo tool" },
       {
-        userText: "Use the Echo tool",
-        process: [
-          {
-            type: "tool_call",
-            id: "call_1",
-            name: "Echo",
-            input: { input: "hello" },
-            result: "echoed: hello",
-          },
-        ],
-        assistantText: "The tool said: echoed: hello",
+        type: "tool_use",
+        id: "call_1",
+        name: "Echo",
+        input: { input: "hello" },
       },
+      { type: "tool_result", tool_use_id: "call_1", content: "echoed: hello" },
+      { type: "text", text: "The tool said: echoed: hello" },
     ]);
   });
 
@@ -199,28 +190,23 @@ describe("Agent virtual integration", () => {
     // Verify tool execution order
     expect(callOrder).toEqual(["A", "B"]);
 
-    const turns = context.getTurns();
-    expect(turns).toEqual([
+    expect(context.getBlocks()).toEqual([
+      { type: "user", text: "Run both tools" },
       {
-        userText: "Run both tools",
-        process: [
-          {
-            type: "tool_call",
-            id: "call_a",
-            name: "ToolA",
-            input: { q: "1" },
-            result: "A-result: 1",
-          },
-          {
-            type: "tool_call",
-            id: "call_b",
-            name: "ToolB",
-            input: { q: "2" },
-            result: "B-result: 2",
-          },
-        ],
-        assistantText: "Both tools done.",
+        type: "tool_use",
+        id: "call_a",
+        name: "ToolA",
+        input: { q: "1" },
       },
+      {
+        type: "tool_use",
+        id: "call_b",
+        name: "ToolB",
+        input: { q: "2" },
+      },
+      { type: "tool_result", tool_use_id: "call_a", content: "A-result: 1" },
+      { type: "tool_result", tool_use_id: "call_b", content: "B-result: 2" },
+      { type: "text", text: "Both tools done." },
     ]);
   });
 
@@ -268,16 +254,15 @@ describe("Agent virtual integration", () => {
     const completed = await agent.run("Do something dangerous", { prompter });
     expect(completed).toBe(true);
 
-    const turns = context.getTurns();
-    expect(turns).toHaveLength(1);
-    expect(turns[0].process).toEqual([
+    expect(context.getBlocks()).toEqual([
+      { type: "user", text: "Do something dangerous" },
       {
-        type: "tool_call",
+        type: "tool_use",
         id: "call_1",
         name: "Dangerous",
         input: { action: "delete" },
-        result: "User rejected",
       },
+      { type: "tool_result", tool_use_id: "call_1", content: "User rejected" },
     ]);
 
     // Status message should indicate denial

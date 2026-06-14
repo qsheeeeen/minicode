@@ -38,6 +38,11 @@ export interface LLMToolDef {
   input_schema: Record<string, unknown>;
 }
 
+export interface LLMUserBlock {
+  type: "user";
+  text: string;
+}
+
 export interface LLMTextBlock {
   type: "text";
   text: string;
@@ -65,6 +70,13 @@ export type LLMAssistantBlock =
   | LLMTextBlock
   | LLMThinkingBlock
   | LLMToolUseBlock;
+
+export type LLMBlock =
+  | LLMUserBlock
+  | LLMTextBlock
+  | LLMThinkingBlock
+  | LLMToolUseBlock
+  | LLMToolResultBlock;
 
 export interface LLMMessage {
   role: "user" | "assistant";

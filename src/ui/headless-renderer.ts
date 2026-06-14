@@ -1,154 +1,134 @@
 import type { StatusMessage } from "./display.js";
-import type { LLMHistory } from "../llm/history.js";
+import type { LLMBlock, LLMHistory } from "../llm/history.js";
 
 /**
  * HeadlessRenderer — incremental stdout renderer for non-TUI mode.
  *
- * Encapsulates all rendering state (printed turns, streamed chars, etc.)
- * and the render algorithm. Subscribed to LLMHistory changes
- * via onChange() for real-time streaming output.
+ * It renders the LLMHistory block stream directly. Turn boundaries are inferred
+ * from user blocks when formatting output.
  */
 export class HeadlessRenderer {
   private context: LLMHistory;
   private statuses: StatusMessage[] = [];
-
-  // Rendering state
-  private printedTurns = 0;
-  private printedLLMProcessBlocks = new Map<number, number>();
-  private printedAssistantChars = new Map<number, number>();
-  private streamedChars = new Map<string, number>();
-  private finalizedBlocks = new Set<string>();
+  private printedBlocks = 0;
+  private streamedChars = new Map<number, number>();
+  private finalizedBlocks = new Set<number>();
   private printedToolUses = new Set<string>();
   private printedResults = new Set<string>();
   private lastStatusIdx = 0;
-
   private unsubscribe: (() => void) | null = null;
 
   constructor(context: LLMHistory) {
     this.context = context;
   }
 
-  /** Add a status message to be rendered. */
   addStatus(msg: StatusMessage): void {
     this.statuses.push(msg);
   }
 
-  /** Subscribe to context changes for incremental rendering. */
   start(): void {
     this.unsubscribe = this.context.onChange(() => this.render(false));
   }
 
-  /** Stop listening to context changes. */
   stop(): void {
     this.unsubscribe?.();
     this.unsubscribe = null;
   }
 
-  /** Perform a final render pass. */
   renderFinal(): void {
     this.render(true);
   }
 
   render(isFinal = false): void {
-    const turns = this.context.getTurns();
+    const blocks = this.context.getBlocks();
+    const stableCount = this.getStableBlockCount(blocks, isFinal);
 
-    for (let ti = this.printedTurns; ti < turns.length; ti++) {
-      const turn = turns[ti];
-      const isLastTurn = ti === turns.length - 1;
+    for (let i = this.printedBlocks; i < blocks.length; i++) {
+      this.renderBlock(blocks[i], i, i < stableCount, isFinal);
+    }
+    this.printedBlocks = stableCount;
 
-      if (!this.printedLLMProcessBlocks.has(ti)) {
-        process.stdout.write(`[user]\n${turn.userText.trim()}\n\n`);
+    this.renderStatuses();
+  }
+
+  private getStableBlockCount(blocks: LLMBlock[], isFinal: boolean): number {
+    if (isFinal || blocks.length === 0) return blocks.length;
+    const last = blocks[blocks.length - 1];
+    return last.type === "thinking" || last.type === "text"
+      ? blocks.length - 1
+      : blocks.length;
+  }
+
+  private renderBlock(
+    block: LLMBlock,
+    index: number,
+    isStable: boolean,
+    isFinal: boolean,
+  ): void {
+    if (block.type === "user") {
+      process.stdout.write(`[user]\n${block.text.trim()}\n\n`);
+    } else if (block.type === "thinking") {
+      this.renderStreamingText(
+        index,
+        "[thinking]",
+        block.thinking,
+        isStable,
+        isFinal,
+      );
+    } else if (block.type === "text") {
+      this.renderStreamingText(
+        index,
+        "[assistant]",
+        block.text,
+        isStable,
+        isFinal,
+      );
+    } else if (block.type === "tool_use") {
+      if (!this.printedToolUses.has(block.id)) {
+        this.printedToolUses.add(block.id);
+        const callText = `${block.name}(${JSON.stringify(block.input)})`;
+        process.stdout.write(`[tool] ${callText}\n`);
       }
-
-      const blocksPrinted = this.printedLLMProcessBlocks.get(ti) || 0;
-      for (let bi = blocksPrinted; bi < turn.process.length; bi++) {
-        const block = turn.process[bi];
-        const blockKey = `${ti}:${bi}`;
-        const isLastBlock =
-          isLastTurn && bi === turn.process.length - 1 && !turn.assistantText;
-
-        if (block.type === "thinking") {
-          const prevLen = this.streamedChars.get(blockKey) || 0;
-          if (block.thinking.length > prevLen) {
-            if (prevLen === 0) process.stdout.write(`[thinking]\n`);
-            const content =
-              prevLen === 0
-                ? block.thinking.trimStart()
-                : block.thinking.slice(prevLen);
-            process.stdout.write(content);
-            this.streamedChars.set(blockKey, block.thinking.length);
-          }
-          if (
-            (!isLastBlock || isFinal) &&
-            !this.finalizedBlocks.has(blockKey)
-          ) {
-            process.stdout.write(block.thinking.endsWith("\n") ? "\n" : "\n\n");
-            this.finalizedBlocks.add(blockKey);
-          }
+    } else if (block.type === "tool_result") {
+      if (!this.printedResults.has(block.tool_use_id)) {
+        this.printedResults.add(block.tool_use_id);
+        for (const line of block.content.split("\n")) {
+          if (line) process.stdout.write(`       ${line}\n`);
         }
-
-        if (block.type === "tool_call" && !this.printedToolUses.has(block.id)) {
-          this.printedToolUses.add(block.id);
-          const callText = `${block.name}(${JSON.stringify(block.input)})`;
-          process.stdout.write(`[tool] ${callText}\n`);
-        }
-        if (
-          block.type === "tool_call" &&
-          block.result !== undefined &&
-          !this.printedResults.has(block.id)
-        ) {
-          this.printedResults.add(block.id);
-          const lines = block.result.split("\n");
-          for (const line of lines) {
-            if (line) process.stdout.write(`       ${line}\n`);
-          }
-          if (!isLastBlock || isFinal) process.stdout.write("\n");
-        }
-      }
-
-      if (turn.assistantText) {
-        const prevLen = this.printedAssistantChars.get(ti) || 0;
-        if (turn.assistantText.length > prevLen) {
-          if (prevLen === 0) process.stdout.write(`[assistant]\n`);
-          const content =
-            prevLen === 0
-              ? turn.assistantText.trimStart()
-              : turn.assistantText.slice(prevLen);
-          process.stdout.write(content);
-          this.printedAssistantChars.set(ti, turn.assistantText.length);
-        }
-        const blockKey = `${ti}:assistant`;
-        if ((isFinal || !isLastTurn) && !this.finalizedBlocks.has(blockKey)) {
-          process.stdout.write(
-            turn.assistantText.endsWith("\n") ? "\n" : "\n\n",
-          );
-          this.finalizedBlocks.add(blockKey);
-        }
-      }
-
-      if (!isLastTurn || isFinal) {
-        this.printedLLMProcessBlocks.set(ti, turn.process.length);
-        this.printedTurns = ti + 1;
-      } else {
-        const lastProcess = turn.process[turn.process.length - 1];
-        const activeThinking = lastProcess?.type === "thinking";
-        this.printedLLMProcessBlocks.set(
-          ti,
-          activeThinking
-            ? Math.max(0, turn.process.length - 1)
-            : turn.process.length,
-        );
+        if (isStable || isFinal) process.stdout.write("\n");
       }
     }
+  }
 
-    // Print any new status messages
+  private renderStreamingText(
+    index: number,
+    label: string,
+    text: string,
+    isStable: boolean,
+    isFinal: boolean,
+  ): void {
+    const prevLen = this.streamedChars.get(index) || 0;
+    if (text.length > prevLen) {
+      if (prevLen === 0) process.stdout.write(`${label}\n`);
+      const content = prevLen === 0 ? text.trimStart() : text.slice(prevLen);
+      process.stdout.write(content);
+      this.streamedChars.set(index, text.length);
+    }
+
+    if ((isStable || isFinal) && !this.finalizedBlocks.has(index)) {
+      process.stdout.write(text.endsWith("\n") ? "\n" : "\n\n");
+      this.finalizedBlocks.add(index);
+    }
+  }
+
+  private renderStatuses(): void {
     for (let i = this.lastStatusIdx; i < this.statuses.length; i++) {
       const s = this.statuses[i];
       if (s.role === "error") console.error(`[error] ${s.content}`);
       else if (s.toolDisplay) {
         const td = s.toolDisplay;
         console.log(
-          `(${td.name}(${JSON.stringify(td.input)}) → ${td.output ?? ""})`,
+          `(${td.name}(${JSON.stringify(td.input)}) -> ${td.output ?? ""})`,
         );
       } else if (s.content) {
         console.log(s.content);

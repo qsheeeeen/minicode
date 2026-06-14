@@ -1,8 +1,7 @@
 export type {
-  LLMTurn,
-  LLMProcessBlock,
+  LLMBlock,
   LLMThinkingBlock,
-  LLMToolCallBlock,
+  LLMToolUseBlock,
 } from "./llm/history.js";
 export type {
   DisplayMessage,

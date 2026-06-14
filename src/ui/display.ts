@@ -1,4 +1,4 @@
-import type { LLMTurn } from "../llm/history.js";
+import { splitHistoryTurns, type LLMBlock } from "../llm/history.js";
 
 export interface StatusMessage {
   role: "status" | "error";
@@ -46,9 +46,10 @@ export type DisplayMessage =
   | { role: "error"; content: string; timestamp?: Date };
 
 export function toDisplayMessages(
-  turns: LLMTurn[],
+  blocks: LLMBlock[],
   statuses: StatusMessage[],
 ): DisplayMessage[] {
+  const turns = splitHistoryTurns(blocks);
   const byTurnIndex = new Map<number, StatusMessage[]>();
   for (const s of statuses) {
     const idx = s.turnIndex ?? turns.length;
@@ -70,22 +71,30 @@ export function toDisplayMessages(
 
   for (let i = 0; i < turns.length; i++) {
     const turn = turns[i];
-    result.push({ role: "user", content: turn.userText });
-    for (const block of turn.process) {
-      if (block.type === "thinking") {
+    const toolMessages = new Map<
+      string,
+      Extract<DisplayMessage, { role: "tool" }>
+    >();
+    for (const block of turn) {
+      if (block.type === "user") {
+        result.push({ role: "user", content: block.text });
+      } else if (block.type === "text") {
+        result.push({ role: "text", content: block.text });
+      } else if (block.type === "thinking") {
         result.push({ role: "thinking", content: block.thinking });
-      } else if (block.type === "tool_call") {
-        result.push({
+      } else if (block.type === "tool_use") {
+        const message: Extract<DisplayMessage, { role: "tool" }> = {
           role: "tool",
           name: block.name,
           input: block.input,
-          output: block.result,
           slotId: block.id,
-        });
+        };
+        toolMessages.set(block.id, message);
+        result.push(message);
+      } else if (block.type === "tool_result") {
+        const message = toolMessages.get(block.tool_use_id);
+        if (message) message.output = block.content;
       }
-    }
-    if (turn.assistantText) {
-      result.push({ role: "text", content: turn.assistantText });
     }
     for (const s of byTurnIndex.get(i + 1) ?? []) {
       result.push({

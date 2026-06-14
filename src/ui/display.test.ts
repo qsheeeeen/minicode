@@ -1,28 +1,24 @@
 import { describe, it, expect } from "vitest";
-import type { LLMTurn } from "../llm/history.js";
+import type { LLMBlock } from "../llm/history.js";
 import type { StatusMessage } from "./display.js";
 import { toDisplayMessages } from "./display.js";
 
 describe("toDisplayMessages", () => {
   it("converts context blocks and attaches tool results", () => {
-    const turns: LLMTurn[] = [
+    const blocks: LLMBlock[] = [
+      { type: "user", text: "hello" },
+      { type: "thinking", thinking: "plan" },
       {
-        userText: "hello",
-        process: [
-          { type: "thinking", thinking: "plan" },
-          {
-            type: "tool_call",
-            id: "tool-1",
-            name: "Read",
-            input: { path: "a" },
-            result: "content",
-          },
-        ],
-        assistantText: "hi",
+        type: "tool_use",
+        id: "tool-1",
+        name: "Read",
+        input: { path: "a" },
       },
+      { type: "tool_result", tool_use_id: "tool-1", content: "content" },
+      { type: "text", text: "hi" },
     ];
 
-    expect(toDisplayMessages(turns, [])).toEqual([
+    expect(toDisplayMessages(blocks, [])).toEqual([
       { role: "user", content: "hello" },
       { role: "thinking", content: "plan" },
       {
@@ -38,16 +34,28 @@ describe("toDisplayMessages", () => {
 
   it("interleaves statuses by turn index", () => {
     const timestamp = new Date("2026-01-01T00:00:00.000Z");
-    const turns: LLMTurn[] = [{ userText: "internal", process: [] }];
+    const blocks: LLMBlock[] = [{ type: "user", text: "internal" }];
     const statuses: StatusMessage[] = [
       { role: "status", content: "before", timestamp, turnIndex: 0 },
       { role: "error", content: "after", timestamp, turnIndex: 1 },
     ];
 
-    expect(toDisplayMessages(turns, statuses)).toEqual([
-      { role: "status", content: "before", timestamp },
+    expect(toDisplayMessages(blocks, statuses)).toEqual([
+      {
+        role: "status",
+        content: "before",
+        element: undefined,
+        toolDisplay: undefined,
+        timestamp,
+      },
       { role: "user", content: "internal" },
-      { role: "error", content: "after", timestamp },
+      {
+        role: "error",
+        content: "after",
+        element: undefined,
+        toolDisplay: undefined,
+        timestamp,
+      },
     ]);
   });
 });
