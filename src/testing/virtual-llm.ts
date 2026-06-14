@@ -14,7 +14,7 @@ import type {
   TokenUsage,
   StreamEvent,
   LLMBlock,
-} from "./client.js";
+} from "../llm/client.js";
 
 // Types
 

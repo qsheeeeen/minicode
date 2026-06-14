@@ -3,7 +3,14 @@
 // Re-usable helpers for creating test doubles (virtual tools, etc).
 // Test files import directly from here instead of polluting production modules.
 
-import type { ToolDef, ToolResult } from "./tools/registry.js";
+import type { ToolDef, ToolResult } from "../tools/registry.js";
+
+export {
+  VirtualLLMClient,
+  defaultTextResponse,
+  toolUseResponse,
+} from "./virtual-llm.js";
+export type { ScriptedResponse, VirtualLLMOptions } from "./virtual-llm.js";
 
 /**
  * Creates a virtual tool with a custom handler function.

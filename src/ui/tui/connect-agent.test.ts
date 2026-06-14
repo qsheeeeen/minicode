@@ -1,8 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Agent } from "../../agent.js";
 import { Model } from "../../llm/model.js";
-import { VirtualLLMClient, defaultTextResponse } from "../../llm/virtual.js";
-import { createVirtualTool } from "../../testing.js";
+import {
+  VirtualLLMClient,
+  defaultTextResponse,
+  createVirtualTool,
+} from "../../testing/index.js";
 import type { ToolDef } from "../../tools/registry.js";
 import { SessionManager } from "../../services/session-manager.js";
 import { ContextManager } from "../../services/context-manager.js";

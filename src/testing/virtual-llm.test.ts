@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { VirtualLLMClient } from "./virtual.js";
-import { createClient, registerProtocol } from "./client.js";
-import type { LLMStream, StreamEvent } from "./client.js";
+import { VirtualLLMClient } from "./virtual-llm.js";
+import { createClient, registerProtocol } from "../llm/client.js";
+import type { LLMStream, StreamEvent } from "../llm/client.js";
 
 // Helper: collect all events from a stream and return the final response
 async function collectStream(stream: LLMStream) {

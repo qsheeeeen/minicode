@@ -5,11 +5,11 @@ import {
   VirtualLLMClient,
   defaultTextResponse,
   toolUseResponse,
-} from "./llm/virtual.js";
-import type { ScriptedResponse } from "./llm/virtual.js";
-import { createVirtualTool } from "./testing.js";
+  createVirtualTool,
+} from "./testing/index.js";
+import type { ScriptedResponse } from "./testing/index.js";
 
-import type { ToolDef, UserPrompter } from "./tools/registry.js";
+import type { ToolDef, UserPrompter } from "../tools/registry.js";
 import { SessionManager } from "./services/session-manager.js";
 import { ContextManager } from "./services/context-manager.js";
 import { PromptManager } from "./services/prompt-manager.js";
