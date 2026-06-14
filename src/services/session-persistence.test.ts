@@ -102,10 +102,10 @@ describe("SessionPersistence", () => {
       } finally {
         const dir = SessionPersistence.getSessionDir();
         await fs
-          .unlink(path.join(dir, `${name1}.history.jsonl`))
+          .unlink(path.join(dir, `${name1}.context.jsonl`))
           .catch(() => {});
         await fs
-          .unlink(path.join(dir, `${name2}.history.jsonl`))
+          .unlink(path.join(dir, `${name2}.context.jsonl`))
           .catch(() => {});
       }
     });
@@ -131,10 +131,10 @@ describe("SessionPersistence", () => {
       } finally {
         const dir = SessionPersistence.getSessionDir();
         await fs
-          .unlink(path.join(dir, `${oldName}.history.jsonl`))
+          .unlink(path.join(dir, `${oldName}.context.jsonl`))
           .catch(() => {});
         await fs
-          .unlink(path.join(dir, `${newName}.history.jsonl`))
+          .unlink(path.join(dir, `${newName}.context.jsonl`))
           .catch(() => {});
       }
     });
@@ -158,7 +158,7 @@ describe("SessionPersistence", () => {
       } finally {
         const dir = SessionPersistence.getSessionDir();
         await fs
-          .unlink(path.join(dir, `${name}.history.jsonl`))
+          .unlink(path.join(dir, `${name}.context.jsonl`))
           .catch(() => {});
       }
     });

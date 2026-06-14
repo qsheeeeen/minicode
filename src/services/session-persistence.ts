@@ -36,7 +36,7 @@ export class SessionPersistence {
     ".minicode",
     "sessions",
   );
-  private static readonly EXT = ".history.jsonl";
+  private static readonly EXT = ".context.jsonl";
 
   static getProjectHash(): string {
     return crypto
