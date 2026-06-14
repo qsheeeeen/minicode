@@ -1,5 +1,6 @@
 import type { LLMClient } from "../llm/client.js";
 import type { LLMResponse } from "../llm/client.js";
+import type { Model } from "../llm/model.js";
 import type { UserPrompter } from "../tools/registry.js";
 
 export type PermissionMode = "manual" | "yolo" | "auto";
@@ -53,7 +54,7 @@ export class ManualPermissionStrategy implements PermissionStrategy {
 export class AutoPermissionStrategy implements PermissionStrategy {
   constructor(
     private readonly client?: LLMClient,
-    private readonly model?: string,
+    private readonly model?: Model,
   ) {}
 
   async check(
@@ -124,7 +125,7 @@ export class PermissionService {
   private mode: PermissionMode;
   private strategies: Map<PermissionMode, PermissionStrategy>;
 
-  constructor(initialMode: PermissionMode, client?: LLMClient, model?: string) {
+  constructor(initialMode: PermissionMode, client?: LLMClient, model?: Model) {
     this.mode = initialMode;
     this.strategies = new Map<PermissionMode, PermissionStrategy>([
       ["yolo", new YoloPermissionStrategy()],
@@ -149,7 +150,7 @@ export class PermissionService {
     return this.strategies.get(mode);
   }
 
-  updateAutoGate(client?: LLMClient, model?: string): void {
+  updateAutoGate(client?: LLMClient, model?: Model): void {
     this.strategies.set("auto", new AutoPermissionStrategy(client, model));
   }
 

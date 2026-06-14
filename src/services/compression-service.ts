@@ -1,12 +1,13 @@
 import type { LLMClient } from "../llm/client.js";
 import type { LLMResponse } from "../llm/client.js";
+import type { Model } from "../llm/model.js";
 import type { ContextTurn } from "../context/index.js";
 
 export interface CompressionStrategy {
   compress(
     turns: ContextTurn[],
     client: LLMClient,
-    model: string | undefined,
+    model: Model | undefined,
   ): Promise<ContextTurn[]>;
 }
 
@@ -16,7 +17,7 @@ export class SummaryCompressionStrategy implements CompressionStrategy {
   async compress(
     turns: ContextTurn[],
     client: LLMClient,
-    model: string | undefined,
+    model: Model | undefined,
   ): Promise<ContextTurn[]> {
     if (turns.length <= this.recentCount + 2) {
       return turns; // Not enough to compress

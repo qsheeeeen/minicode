@@ -1,5 +1,5 @@
 import type { Model } from "./llm/model.js";
-import type { LLMToolDef, LLMResponse } from "./llm/client.js";
+import type { LLMClient, LLMToolDef, LLMResponse } from "./llm/client.js";
 import { contextToProviderMessages } from "./llm/context-projection.js";
 import {
   type ToolDef,
@@ -21,6 +21,7 @@ import type { ShellService } from "./services/shell-service.js";
 import type pino from "pino";
 
 export interface AgentOpts {
+  readonly client: LLMClient;
   readonly model: Model;
   readonly sessionManager: SessionManager;
   readonly contextManager: ContextManager;
@@ -36,6 +37,7 @@ export interface AgentOpts {
 }
 
 export class Agent {
+  public client: LLMClient;
   public model: Model;
   private sessionManager: SessionManager;
   private contextManager: ContextManager;
@@ -67,6 +69,7 @@ export class Agent {
   }
 
   constructor(opts: AgentOpts) {
+    this.client = opts.client;
     this.model = opts.model;
     this.sessionManager = opts.sessionManager;
     this.contextManager = opts.contextManager;
@@ -120,6 +123,7 @@ export class Agent {
   async compress(): Promise<void> {
     const newTurnIdx = await this.contextManager.compress({
       context: this.context,
+      client: this.client,
       model: this.model,
       changeJournal: this.sessionManager.getChangeJournal(),
       activeTurnIdx: this.sessionManager.getActiveTurnIdx(),
@@ -145,18 +149,15 @@ export class Agent {
   // Stream LLM response, updating context in real-time.
   // Returns the final response and any tool calls the LLM requested.
   private async streamLLM(toolDefs: LLMToolDef[]) {
-    const stream = this.model
-      .getClient()
-      .chatStream(
-        contextToProviderMessages(this.context.getTurns()),
-        toolDefs,
-        {
-          system: this.promptManager.getSystemPrompt(),
-          model: this.model.getName(),
-          signal: this.abortController?.signal,
-          effort: this.model.getEffort(),
-        },
-      );
+    const stream = this.client.chatStream(
+      contextToProviderMessages(this.context.getTurns()),
+      toolDefs,
+      {
+        system: this.promptManager.getSystemPrompt(),
+        model: this.model,
+        signal: this.abortController?.signal,
+      },
+    );
 
     const toolCalls: ToolCall[] = [];
 
@@ -252,6 +253,7 @@ export class Agent {
           registry: this.agentRegistry,
           signal: this.abortController?.signal,
           config: {
+            client: this.client,
             model: this.model,
             userPrompt: this.promptManager.getUserPrompt(),
           },

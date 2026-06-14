@@ -1,7 +1,7 @@
-// Model encapsulates an LLM client together with its metadata.
+// Model is pure metadata for the selected LLM model.
 //
-// A Model is an immutable atom — switching models means replacing the entire
-// object. This guarantees client and metadata are always in sync.
+// The provider client is owned separately by the runtime/agent. The model is
+// passed as request configuration, not as a container for execution capability.
 
 import type { LLMClient, EffortLevel } from "./client.js";
 import { createClient } from "./client.js";
@@ -11,7 +11,6 @@ export class Model {
   private _effort?: EffortLevel;
 
   constructor(
-    private readonly _client: LLMClient,
     private readonly _name: string,
     private readonly _provider: string,
     private readonly _contextLength: number,
@@ -19,11 +18,6 @@ export class Model {
     private readonly _displayName?: string,
   ) {
     this._effort = effort;
-  }
-
-  /** The LLM client for making chat requests. */
-  getClient(): LLMClient {
-    return this._client;
   }
 
   /** Model identifier passed to chatStream options (e.g. "deepseek-chat"). */
@@ -57,13 +51,18 @@ export class Model {
   }
 }
 
-// ModelFactory creates Model instances from an injected AppConfig.
+export interface ModelSelection {
+  model: Model;
+  client: LLMClient;
+}
+
+// ModelFactory resolves model metadata and provider clients from AppConfig.
 
 export class ModelFactory {
   constructor(private readonly config: AppConfig) {}
 
-  /** Create a Model from a "model@provider" specifier string. */
-  fromSpec(spec: string): Model | null {
+  /** Create a model/client selection from a "model@provider" specifier string. */
+  fromSpec(spec: string): ModelSelection | null {
     const parsed = parseModelSpecifier(spec, this.config.providers);
     if (!parsed) return null;
 
@@ -75,13 +74,15 @@ export class ModelFactory {
     );
     const modelConfig = parsed.providerConfig.models?.[parsed.modelName];
 
-    return new Model(
+    return {
       client,
-      parsed.modelName,
-      parsed.providerName,
-      modelConfig?.contextLength ?? 200000,
-      undefined, // effort — resolved per-session, not per-model
-      modelConfig?.name,
-    );
+      model: new Model(
+        parsed.modelName,
+        parsed.providerName,
+        modelConfig?.contextLength ?? 200000,
+        undefined, // effort — resolved per-session, not per-model
+        modelConfig?.name,
+      ),
+    };
   }
 }

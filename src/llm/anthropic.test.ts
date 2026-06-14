@@ -1,13 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-const mockCreate = vi
-  .fn()
-  .mockResolvedValue({
-    id: "msg_1",
-    role: "assistant",
-    content: [],
-    usage: { input_tokens: 10, output_tokens: 5 },
-  });
+const mockCreate = vi.fn().mockResolvedValue({
+  id: "msg_1",
+  role: "assistant",
+  content: [],
+  usage: { input_tokens: 10, output_tokens: 5 },
+});
 const mockStream = vi.fn().mockReturnValue({});
 
 vi.mock("@anthropic-ai/sdk", () => {
@@ -24,6 +22,7 @@ vi.mock("@anthropic-ai/sdk", () => {
 });
 
 import { AnthropicClient } from "./anthropic.js";
+import { Model } from "./model.js";
 
 describe("AnthropicClient", () => {
   beforeEach(() => {
@@ -38,7 +37,7 @@ describe("AnthropicClient", () => {
     it("sends correct parameters to client.messages.stream", async () => {
       const client = new AnthropicClient("test-key");
       client.chatStream([{ role: "user", content: "hello" }], [], {
-        model: "custom-model",
+        model: new Model("custom-model", "test-provider", 1000),
         maxTokens: 1000,
         system: "test system",
       });
@@ -61,7 +60,7 @@ describe("AnthropicClient", () => {
     it("includes effort in output_config when provided", async () => {
       const client = new AnthropicClient();
       client.chatStream([], [], {
-        effort: "xhigh",
+        model: new Model("custom-model", "test-provider", 1000, "xhigh"),
       });
 
       expect(mockStream).toHaveBeenCalledWith(

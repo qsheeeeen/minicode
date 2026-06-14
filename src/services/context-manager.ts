@@ -32,6 +32,7 @@ export interface ContextManagerOpts {
 
 export interface CompressDeps {
   context: ContextStore;
+  client: LLMClient;
   model: Model;
   changeJournal: ChangeJournal;
   activeTurnIdx: number;
@@ -98,8 +99,8 @@ export class ContextManager {
 
       const compressed = await this.compressionService.compress(
         turns,
-        deps.model.getClient() as LLMClient,
-        deps.model.getName(),
+        deps.client,
+        deps.model,
       );
 
       const originalKept = compressed.length - 1; // compression adds 1 summary

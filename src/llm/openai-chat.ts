@@ -178,7 +178,7 @@ export class OpenAIChatClient implements LLMClient {
     tools: LLMToolDef[],
     options: ChatOptions = {},
   ): LLMStream {
-    const model = options.model ?? DEFAULT_MODEL;
+    const model = options.model?.getName() ?? DEFAULT_MODEL;
     const oaiMessages = toSdkMessages(messages, options.system);
     const oaiTools = toSdkTools(tools);
     const abortController = new AbortController();
@@ -202,8 +202,9 @@ export class OpenAIChatClient implements LLMClient {
       params.tools = oaiTools;
     }
 
-    if (options.effort) {
-      params.reasoning_effort = toSdkEffort(options.effort);
+    const effort = options.model?.getEffort();
+    if (effort) {
+      params.reasoning_effort = toSdkEffort(effort);
     }
 
     const streamPromise = this.client.chat.completions.create(params, {

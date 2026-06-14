@@ -34,7 +34,7 @@ function createService() {
     sessionManager: sessionManager as any,
     permissionService: permissionService as any,
   });
-  const agent = { model: undefined } as any;
+  const agent = { client: undefined, model: undefined } as any;
 
   return {
     service,
@@ -57,17 +57,19 @@ describe("ModelSwitchService", () => {
       agent,
     } = createService();
 
-    const model = await service.switchAgentModel({
+    const selection = await service.switchAgentModel({
       agent,
       modelSpec: "next-model@test",
     });
+    const { client, model } = selection;
 
     expect(agent.model).toBe(model);
+    expect(agent.client).toBe(client);
     expect(model.getName()).toBe("next-model");
     expect(contextManager.setContextLength).toHaveBeenCalledWith(1234);
     expect(permissionService.updateAutoGate).toHaveBeenCalledWith(
-      model.getClient(),
-      "next-model",
+      client,
+      model,
     );
     expect(appConfig.setModel).toHaveBeenCalledWith("next-model@test");
     expect(sessionManager.saveStore).toHaveBeenCalledWith({

@@ -26,7 +26,7 @@ function createTestAgent(responses = [defaultTextResponse("OK")]) {
     ],
   ]);
   const client = new VirtualLLMClient(responses);
-  const model = new Model(client, "test-model", "test-provider", 200000);
+  const model = new Model("test-model", "test-provider", 200000);
   const tokenCount$ = new Signal(0);
   const sessionManager = new SessionManager();
   const contextManager = new ContextManager({
@@ -43,6 +43,7 @@ function createTestAgent(responses = [defaultTextResponse("OK")]) {
     context: sessionManager.getContext(),
   });
   const agent = new Agent({
+    client,
     model,
     sessionManager,
     contextManager,

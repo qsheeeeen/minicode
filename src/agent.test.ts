@@ -11,22 +11,18 @@ import { Signal } from "./utils/signal.js";
 import { getAll } from "./tools/index.js";
 
 function makeTestModel() {
-  // Use the mocked chatStream from the llm/client.js mock
-  return new Model(
-    { chatStream: mockChatStream } as any,
-    "test-model",
-    "test-provider",
-    200000,
-  );
+  return new Model("test-model", "test-provider", 200000);
 }
 
 function makeAgent(overrides?: {
+  client?: any;
   model?: Model;
   userPrompt?: string;
   compressionThresholdRatio?: number;
   permissionMode?: any;
 }) {
   const o = overrides ?? {};
+  const client = o.client ?? ({ chatStream: mockChatStream } as any);
   const model = o.model ?? makeTestModel();
   const tokenCount$ = new Signal(0);
   const sessionManager = new SessionManager();
@@ -47,6 +43,7 @@ function makeAgent(overrides?: {
     context,
   });
   const agent = new Agent({
+    client,
     model,
     sessionManager,
     contextManager,
@@ -307,12 +304,7 @@ describe("Agent", () => {
     it("handles thinking blocks", async () => {
       const stream = new MockStream();
       mockChatStream.mockReturnValueOnce(stream);
-      const thinkingModel = new Model(
-        { chatStream: mockChatStream } as any,
-        "test-model",
-        "test-provider",
-        200000,
-      );
+      const thinkingModel = new Model("test-model", "test-provider", 200000);
       const { agent, context } = makeAgent({ model: thinkingModel });
       const runPromise = agent.run("Solve this");
       await new Promise((r) => setTimeout(r, 10));

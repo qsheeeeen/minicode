@@ -3,6 +3,7 @@
 // Every provider adapter implements these interfaces. The rest of the
 // codebase programs against these abstractions, never against a concrete SDK.
 
+import type { Model } from "./model.js";
 import { AnthropicClient } from "./anthropic.js";
 import { OpenAIChatClient } from "./openai-chat.js";
 import { OpenAIResponsesClient } from "./openai-responses.js";
@@ -71,10 +72,9 @@ export interface ProviderMessage {
 }
 
 export interface ChatOptions {
-  model?: string;
+  model?: Model;
   maxTokens?: number;
   system?: string;
-  effort?: EffortLevel;
   signal?: AbortSignal;
 }
 

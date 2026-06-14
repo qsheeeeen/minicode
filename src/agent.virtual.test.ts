@@ -36,7 +36,7 @@ function createTestAgent(options?: {
         ),
       ],
     ]);
-  const model = new Model(client, "test-model", "test-provider", 200000);
+  const model = new Model("test-model", "test-provider", 200000);
   const tokenCount$ = new Signal(0);
   const sessionManager = new SessionManager();
   const contextManager = new ContextManager({
@@ -54,6 +54,7 @@ function createTestAgent(options?: {
     context: sessionManager.getContext(),
   });
   const agent = new Agent({
+    client,
     model,
     sessionManager,
     contextManager,
@@ -232,14 +233,10 @@ describe("Agent virtual integration", () => {
 
     const prompter: UserPrompter = { prompt: async () => "no" };
 
-    const model = new Model(
-      new VirtualLLMClient([
-        toolUseResponse("call_1", "Dangerous", { action: "delete" }),
-      ]),
-      "test-model",
-      "test-provider",
-      200000,
-    );
+    const model = new Model("test-model", "test-provider", 200000);
+    const client = new VirtualLLMClient([
+      toolUseResponse("call_1", "Dangerous", { action: "delete" }),
+    ]);
     const tokenCount$ = new Signal(0);
     const sessionManager = new SessionManager();
     const contextManager = new ContextManager({
@@ -257,6 +254,7 @@ describe("Agent virtual integration", () => {
       context: sessionManager.getContext(),
     });
     const agent = new Agent({
+      client,
       model,
       sessionManager,
       contextManager,

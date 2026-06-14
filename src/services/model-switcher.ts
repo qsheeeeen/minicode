@@ -1,6 +1,6 @@
 import type { Agent } from "../agent.js";
 import type { AppConfig } from "../config.js";
-import { ModelFactory, type Model } from "../llm/model.js";
+import { ModelFactory, type ModelSelection } from "../llm/model.js";
 import type { ContextManager } from "./context-manager.js";
 import type { PermissionService } from "./permission.js";
 import type { SessionManager } from "./session-manager.js";
@@ -33,19 +33,18 @@ export class ModelSwitchService {
     this.permissionService = opts.permissionService;
   }
 
-  async switchAgentModel(opts: SwitchAgentModelOpts): Promise<Model> {
+  async switchAgentModel(opts: SwitchAgentModelOpts): Promise<ModelSelection> {
     const factory = new ModelFactory(this.appConfig);
-    const newModel = factory.fromSpec(opts.modelSpec);
-    if (!newModel) {
+    const selection = factory.fromSpec(opts.modelSpec);
+    if (!selection) {
       throw new Error(`Could not resolve "${opts.modelSpec}".`);
     }
+    const { client, model } = selection;
 
-    opts.agent.model = newModel;
-    this.contextManager.setContextLength(newModel.getContextLength());
-    this.permissionService?.updateAutoGate(
-      newModel.getClient(),
-      newModel.getName(),
-    );
+    opts.agent.client = client;
+    opts.agent.model = model;
+    this.contextManager.setContextLength(model.getContextLength());
+    this.permissionService?.updateAutoGate(client, model);
 
     if (opts.tier) {
       await this.appConfig.setTier(opts.tier, opts.modelSpec);
@@ -55,7 +54,7 @@ export class ModelSwitchService {
     }
 
     await this.sessionManager.saveStore({
-      model: newModel.getName(),
+      model: model.getName(),
       totalTokens: this.contextManager.getTokenCount(),
     });
 
@@ -67,6 +66,6 @@ export class ModelSwitchService {
       });
     }
 
-    return newModel;
+    return selection;
   }
 }

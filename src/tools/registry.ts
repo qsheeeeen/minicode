@@ -1,4 +1,5 @@
 import type { AgentRegistry } from "../services/agent-registry.js";
+import type { LLMClient } from "../llm/client.js";
 import type { Model } from "../llm/model.js";
 import type { AppConfig } from "../config.js";
 import type { FileSystemService } from "../services/filesystem.js";
@@ -31,6 +32,7 @@ export type ToolRequirement = "agentRegistry";
 
 /** Narrow config passed to tools — only what tools actually need. */
 export interface ToolConfig {
+  client: LLMClient;
   model: Model;
   userPrompt: string;
 }

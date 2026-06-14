@@ -54,14 +54,16 @@ export const agentTool: ToolDef = {
 
     // Resolve model (optionally override via tier)
     const appConfig = context?.appConfig;
+    let subClient = config.client;
     let subModel = config.model;
     if (tier && appConfig) {
       const modelSpec = appConfig.tiers?.[tier];
       if (modelSpec) {
         const factory = new ModelFactory(appConfig);
-        const tierModel = factory.fromSpec(modelSpec);
-        if (tierModel) {
-          subModel = tierModel;
+        const selection = factory.fromSpec(modelSpec);
+        if (selection) {
+          subClient = selection.client;
+          subModel = selection.model;
         }
       }
     }
@@ -83,6 +85,7 @@ export const agentTool: ToolDef = {
       context: sessionManager.getContext(),
     });
     const subAgent = new Agent({
+      client: subClient,
       model: subModel,
       sessionManager,
       contextManager,

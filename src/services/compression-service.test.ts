@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { SummaryCompressionStrategy } from "./compression-service.js";
 import type { LLMClient } from "../llm/client.js";
 import type { ContextTurn } from "../context/index.js";
+import { Model } from "../llm/model.js";
 
 describe("SummaryCompressionStrategy", () => {
   let service: SummaryCompressionStrategy;
@@ -17,7 +18,8 @@ describe("SummaryCompressionStrategy", () => {
         process: [],
       }));
       const mockClient = {} as LLMClient;
-      const result = await service.compress(turns, mockClient, "claude-3");
+      const model = new Model("claude-3", "test-provider", 1000);
+      const result = await service.compress(turns, mockClient, model);
       expect(result).toEqual(turns);
     });
 
@@ -36,8 +38,9 @@ describe("SummaryCompressionStrategy", () => {
           }),
         }),
       } as unknown as LLMClient;
+      const model = new Model("claude-3", "test-provider", 1000);
 
-      const result = await service.compress(turns, mockClient, "claude-3");
+      const result = await service.compress(turns, mockClient, model);
 
       // Should include summary and last 10 turns
       expect(result.length).toBeLessThan(turns.length);
@@ -57,10 +60,11 @@ describe("SummaryCompressionStrategy", () => {
           finalMessage: vi.fn().mockRejectedValue(new Error("API error")),
         }),
       } as unknown as LLMClient;
+      const model = new Model("claude-3", "test-provider", 1000);
 
-      await expect(
-        service.compress(turns, mockClient, "claude-3"),
-      ).rejects.toThrow("Compression failed");
+      await expect(service.compress(turns, mockClient, model)).rejects.toThrow(
+        "Compression failed",
+      );
     });
 
     it("calls client.chat with correct parameters", async () => {
@@ -76,8 +80,9 @@ describe("SummaryCompressionStrategy", () => {
           }),
         }),
       } as unknown as LLMClient;
+      const model = new Model("claude-3", "test-provider", 1000);
 
-      await service.compress(turns, mockClient, "claude-3");
+      await service.compress(turns, mockClient, model);
 
       expect(mockClient.chatStream).toHaveBeenCalledWith(
         expect.arrayContaining([
@@ -87,7 +92,7 @@ describe("SummaryCompressionStrategy", () => {
           }),
         ]),
         [],
-        expect.objectContaining({ model: "claude-3", maxTokens: 1000 }),
+        expect.objectContaining({ model, maxTokens: 1000 }),
       );
     });
 

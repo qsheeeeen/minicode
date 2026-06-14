@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { PermissionService, AutoPermissionStrategy } from "./permission.js";
 import type { LLMClient } from "../llm/client.js";
+import { Model } from "../llm/model.js";
 
 describe("PermissionService", () => {
   describe("getMode", () => {
@@ -105,8 +106,9 @@ describe("PermissionService", () => {
         }),
       } as unknown as LLMClient;
       const service = new PermissionService("auto");
+      const model = new Model("new-model", "test-provider", 1000);
 
-      service.updateAutoGate(mockClient, "new-model");
+      service.updateAutoGate(mockClient, model);
       const result = await service.check(
         "Shell",
         { command: "ls" },
@@ -117,7 +119,7 @@ describe("PermissionService", () => {
       expect(mockClient.chatStream).toHaveBeenCalledWith(
         expect.any(Array),
         [],
-        expect.objectContaining({ model: "new-model" }),
+        expect.objectContaining({ model }),
       );
     });
 
@@ -171,7 +173,8 @@ describe("PermissionService", () => {
           }),
         }),
       } as unknown as LLMClient;
-      const strategy = new AutoPermissionStrategy(mockClient, "claude-3");
+      const model = new Model("claude-3", "test-provider", 1000);
+      const strategy = new AutoPermissionStrategy(mockClient, model);
 
       const result = await strategy.check("Read", {
         path: "a.txt",
@@ -181,7 +184,7 @@ describe("PermissionService", () => {
       expect(mockClient.chatStream).toHaveBeenCalledWith(
         expect.arrayContaining([expect.objectContaining({ role: "user" })]),
         [],
-        expect.objectContaining({ model: "claude-3", maxTokens: 100 }),
+        expect.objectContaining({ model, maxTokens: 100 }),
       );
     });
 

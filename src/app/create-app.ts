@@ -90,8 +90,12 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
 
   const agentRegistry = new AgentRegistry();
   const sessionStats = new SessionStats();
+  const initialClient = createClient(
+    model.protocol,
+    model.apiKey,
+    model.baseURL,
+  );
   const initialModel = new Model(
-    createClient(model.protocol, model.apiKey, model.baseURL),
     model.model,
     model.provider,
     model.contextLength ?? 200000,
@@ -111,8 +115,8 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
   });
   const permissionService = new PermissionService(
     permissionMode,
-    initialModel.getClient(),
-    initialModel.getName(),
+    initialClient,
+    initialModel,
   );
   const modelSwitchService = new ModelSwitchService({
     appConfig: config,
@@ -140,6 +144,7 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
   });
 
   const agent = new Agent({
+    client: initialClient,
     model: initialModel,
     sessionManager,
     contextManager,

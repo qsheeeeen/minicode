@@ -158,7 +158,7 @@ export class AnthropicClient implements LLMClient {
     options: ChatOptions = {},
   ): LLMStream {
     const params: MessageCreateParamsStreaming = {
-      model: options.model || "claude-sonnet-4-5",
+      model: options.model?.getName() || "claude-sonnet-4-5",
       max_tokens: options.maxTokens || 8192,
       stream: true,
       system: options.system,
@@ -167,9 +167,10 @@ export class AnthropicClient implements LLMClient {
       thinking: { type: "adaptive" },
     };
 
-    if (options.effort) {
+    const effort = options.model?.getEffort();
+    if (effort) {
       params.output_config = {
-        effort: toSdkEffort(options.effort),
+        effort: toSdkEffort(effort),
       };
     }
 
