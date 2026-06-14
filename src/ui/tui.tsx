@@ -12,7 +12,7 @@ import type { SessionStats } from "../services/session-stats.js";
 import type { SessionManager } from "../services/session-manager.js";
 import type { PermissionService } from "../services/permission.js";
 import type { ModelSwitchService } from "../services/model-switcher.js";
-import type { ContextStore } from "../context/index.js";
+import type { LLMHistory } from "../llm/history.js";
 import type { Signal } from "../utils/signal.js";
 import { Receipt } from "./tui/Receipt.js";
 
@@ -41,7 +41,7 @@ export interface AppProps {
   sessionStats: SessionStats;
   sessionManager: SessionManager;
   modelSwitchService: ModelSwitchService;
-  context: ContextStore;
+  context: LLMHistory;
   tokenCount$: Signal<number>;
   permissionService: PermissionService;
 }

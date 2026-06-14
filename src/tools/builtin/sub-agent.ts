@@ -1,5 +1,5 @@
 import type { ToolDef, ToolResult, ToolExecutionContext } from "../registry.js";
-import type { ContextTurn } from "../../context/index.js";
+import type { LLMTurn } from "../../llm/history.js";
 import { Agent } from "../../agent.js";
 import { SessionManager } from "../../services/session-manager.js";
 import { ContextManager } from "../../services/context-manager.js";
@@ -74,7 +74,7 @@ export const agentTool: ToolDef = {
       contextLength: subModel.getContextLength(),
       compressionThresholdRatio: 0.8,
       tokenCount$,
-      contextManager: sessionManager.getContext(),
+      contextManager: sessionManager.getHistory(),
       statusReporter: () => {}, // sub-agents don't report statuses
     });
     const promptManager = new PromptManager(config.userPrompt);
@@ -82,7 +82,7 @@ export const agentTool: ToolDef = {
       tools: getSubAgentTools(),
       permissionService: new PermissionService("manual"),
       getChangeJournal: () => sessionManager.getChangeJournal(),
-      context: sessionManager.getContext(),
+      context: sessionManager.getHistory(),
     });
     const subAgent = new Agent({
       client: subClient,
@@ -101,7 +101,7 @@ export const agentTool: ToolDef = {
       subAgent.abort();
     });
 
-    const subContext = sessionManager.getContext();
+    const subContext = sessionManager.getHistory();
 
     registry.register({
       id: subId,
@@ -161,7 +161,7 @@ export const agentTool: ToolDef = {
   },
 };
 
-function extractFinalResponse(turns: ContextTurn[]): string | null {
+function extractFinalResponse(turns: LLMTurn[]): string | null {
   for (let i = turns.length - 1; i >= 0; i--) {
     const turn = turns[i];
     if (turn.assistantText?.trim()) {
@@ -171,7 +171,7 @@ function extractFinalResponse(turns: ContextTurn[]): string | null {
   return null;
 }
 
-function generateSummary(turns: ContextTurn[]): string {
+function generateSummary(turns: LLMTurn[]): string {
   let toolCallCount = 0;
 
   for (const turn of turns) {

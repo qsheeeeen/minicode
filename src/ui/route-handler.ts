@@ -1,5 +1,5 @@
 import type { RouteResult } from "./routing.js";
-import type { ContextStore } from "../context/index.js";
+import type { LLMHistory } from "../llm/history.js";
 import type { StatusReporter } from "../services/session-manager.js";
 import { runShell } from "../services/index.js";
 
@@ -22,7 +22,7 @@ export type ProcessedRoute =
 export function processRoute(
   route: RouteResult,
   rawInput: string,
-  context: ContextStore,
+  context: LLMHistory,
   reportStatus?: StatusReporter,
 ): ProcessedRoute {
   if (route.action === "none") {

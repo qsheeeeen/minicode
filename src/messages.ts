@@ -1,9 +1,9 @@
 export type {
-  ContextTurn,
-  ProcessBlock,
-  ThinkingBlock,
-  ToolCallBlock,
-} from "./context/index.js";
+  LLMTurn,
+  LLMProcessBlock,
+  LLMThinkingBlock,
+  LLMToolCallBlock,
+} from "./llm/history.js";
 export type {
   DisplayMessage,
   MessageRole,

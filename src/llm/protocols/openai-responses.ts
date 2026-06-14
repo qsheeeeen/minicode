@@ -17,14 +17,14 @@ import type {
   LLMResponse,
   TokenUsage,
   EffortLevel,
-} from "./client.js";
+} from "../client.js";
 import type {
   LLMMessage,
   LLMAssistantBlock,
   LLMTextBlock,
   LLMToolUseBlock,
   LLMToolResultBlock,
-} from "./client.js";
+} from "../client.js";
 
 // The OpenAI SDK's ResponseStreamEvent union doesn't cover all streaming event
 // types (delta, output_item.done, etc.). These interfaces fill the gap.

@@ -37,7 +37,7 @@ export async function runHeadless(
     process.exit(1);
   }
 
-  const context = sessionManager.getContext();
+  const context = sessionManager.getHistory();
 
   // Set up renderer with status forwarding
   const renderer = new HeadlessRenderer(context);

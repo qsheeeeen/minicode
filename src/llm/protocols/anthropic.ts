@@ -3,7 +3,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import type { MessageStreamEvent } from "@anthropic-ai/sdk/resources/messages.js";
-import type { LLMStream, StreamEvent } from "./client.js";
+import type { LLMStream, StreamEvent } from "../client.js";
 import type { MessageCreateParamsStreaming } from "@anthropic-ai/sdk/resources/messages.js";
 
 import type {
@@ -12,12 +12,12 @@ import type {
   ChatOptions,
   LLMResponse,
   EffortLevel,
-} from "./client.js";
+} from "../client.js";
 import type {
   LLMMessage,
   LLMAssistantBlock,
   LLMToolResultBlock,
-} from "./client.js";
+} from "../client.js";
 
 function toSdkEffort(
   effort: EffortLevel,
@@ -92,8 +92,8 @@ function toSdkTools(tools: LLMToolDef[]): AnthropicTool[] {
 }
 
 // Map SDK content blocks to our internal types.
-// SDK ThinkingBlock has extra fields (signature, redacted_thinking variants)
-// that our ThinkingBlock doesn't carry.
+// SDK LLMThinkingBlock has extra fields (signature, redacted_thinking variants)
+// that our LLMThinkingBlock doesn't carry.
 function toLLMAssistantBlock(block: Anthropic.ContentBlock): LLMAssistantBlock {
   if (block.type === "text") {
     return { type: "text", text: block.text };

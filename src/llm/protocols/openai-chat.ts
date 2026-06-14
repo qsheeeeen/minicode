@@ -12,14 +12,14 @@ import type {
   ChatOptions,
   LLMResponse,
   EffortLevel,
-} from "./client.js";
+} from "../client.js";
 import type {
   LLMMessage,
   LLMAssistantBlock,
   LLMTextBlock,
   LLMToolUseBlock,
   LLMToolResultBlock,
-} from "./client.js";
+} from "../client.js";
 
 // Constants
 

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { SummaryCompressionStrategy } from "./compression-service.js";
 import type { LLMClient } from "../llm/client.js";
-import type { ContextTurn } from "../context/index.js";
+import type { LLMTurn } from "../llm/history.js";
 import { Model } from "../llm/model.js";
 
 describe("SummaryCompressionStrategy", () => {
@@ -13,7 +13,7 @@ describe("SummaryCompressionStrategy", () => {
 
   describe("compress", () => {
     it("returns unchanged turns when below threshold (12 or fewer)", async () => {
-      const turns: ContextTurn[] = Array.from({ length: 12 }, (_, i) => ({
+      const turns: LLMTurn[] = Array.from({ length: 12 }, (_, i) => ({
         userText: `message ${i}`,
         process: [],
       }));
@@ -24,7 +24,7 @@ describe("SummaryCompressionStrategy", () => {
     });
 
     it("compresses when above threshold (more than 12 turns)", async () => {
-      const turns: ContextTurn[] = Array.from({ length: 15 }, (_, i) => ({
+      const turns: LLMTurn[] = Array.from({ length: 15 }, (_, i) => ({
         userText: `message ${i}`,
         process: [],
       }));
@@ -51,7 +51,7 @@ describe("SummaryCompressionStrategy", () => {
     });
 
     it("throws error when compression fails", async () => {
-      const turns: ContextTurn[] = Array.from({ length: 15 }, (_, i) => ({
+      const turns: LLMTurn[] = Array.from({ length: 15 }, (_, i) => ({
         userText: `message ${i}`,
         process: [],
       }));
@@ -68,7 +68,7 @@ describe("SummaryCompressionStrategy", () => {
     });
 
     it("calls client.chat with correct parameters", async () => {
-      const turns: ContextTurn[] = Array.from({ length: 15 }, (_, i) => ({
+      const turns: LLMTurn[] = Array.from({ length: 15 }, (_, i) => ({
         userText: `message ${i}`,
         process: [],
       }));
@@ -97,7 +97,7 @@ describe("SummaryCompressionStrategy", () => {
     });
 
     it("uses last 10 turns in result", async () => {
-      const turns: ContextTurn[] = Array.from({ length: 15 }, (_, i) => ({
+      const turns: LLMTurn[] = Array.from({ length: 15 }, (_, i) => ({
         userText: `msg${i}`,
         process: [],
       }));

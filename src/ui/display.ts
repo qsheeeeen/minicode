@@ -1,4 +1,4 @@
-import type { ContextTurn } from "../context/index.js";
+import type { LLMTurn } from "../llm/history.js";
 
 export interface StatusMessage {
   role: "status" | "error";
@@ -46,7 +46,7 @@ export type DisplayMessage =
   | { role: "error"; content: string; timestamp?: Date };
 
 export function toDisplayMessages(
-  turns: ContextTurn[],
+  turns: LLMTurn[],
   statuses: StatusMessage[],
 ): DisplayMessage[] {
   const byTurnIndex = new Map<number, StatusMessage[]>();

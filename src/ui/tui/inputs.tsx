@@ -4,7 +4,7 @@ import { Select, TextInput } from "@inkjs/ui";
 import type { ProviderConfig } from "../../config.js";
 import type { ChangeEntry } from "../../services/change-journal.js";
 import type { ChangeJournal } from "../../services/change-journal.js";
-import type { ContextStore } from "../../context/index.js";
+import type { LLMHistory } from "../../llm/history.js";
 import type { StatusReporter } from "../../services/session-manager.js";
 
 export interface InputComponentProps {
@@ -243,7 +243,7 @@ export function UndoInput({
   userMessages?: string[];
   totalTurns?: number;
   changeJournal?: ChangeJournal;
-  context?: ContextStore;
+  context?: LLMHistory;
   reportStatus?: StatusReporter;
 }) {
   const [step, setStep] = useState<"list" | "confirm">("list");

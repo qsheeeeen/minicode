@@ -16,14 +16,14 @@ import {
   type CompressionStrategy,
 } from "./compression-service.js";
 import { ChangeJournal } from "./change-journal.js";
-import type { ContextStore } from "../context/index.js";
+import type { LLMHistory } from "../llm/history.js";
 import type { StatusReporter } from "./session-manager.js";
 
 export interface ContextManagerOpts {
   readonly contextLength: number;
   readonly compressionThresholdRatio: number;
   readonly tokenCount$: Signal<number>;
-  readonly contextManager: ContextStore;
+  readonly contextManager: LLMHistory;
   readonly statusReporter: StatusReporter;
   readonly sessionStats?: SessionStats;
   readonly compressionStrategy?: CompressionStrategy;
@@ -31,7 +31,7 @@ export interface ContextManagerOpts {
 }
 
 export interface CompressDeps {
-  context: ContextStore;
+  context: LLMHistory;
   client: LLMClient;
   model: Model;
   changeJournal: ChangeJournal;

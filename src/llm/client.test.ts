@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 
-vi.mock("./anthropic.js", () => ({
+vi.mock("./protocols/anthropic.js", () => ({
   AnthropicClient: class MockAnthropicClient {
     name = "anthropic";
     constructor(
@@ -10,7 +10,7 @@ vi.mock("./anthropic.js", () => ({
   },
 }));
 
-vi.mock("./openai-chat.js", () => ({
+vi.mock("./protocols/openai-chat.js", () => ({
   OpenAIChatClient: class MockOpenAIChatClient {
     name = "openai";
     constructor(
@@ -20,7 +20,7 @@ vi.mock("./openai-chat.js", () => ({
   },
 }));
 
-vi.mock("./openai-responses.js", () => ({
+vi.mock("./protocols/openai-responses.js", () => ({
   OpenAIResponsesClient: class MockOpenAIResponsesClient {
     name = "openai-responses";
     constructor(
@@ -34,7 +34,11 @@ import { createClient, registerProtocol } from "./client.js";
 
 describe("createClient", () => {
   it("returns AnthropicClient for 'anthropic'", () => {
-    const client = createClient("anthropic", "key-1", "https://api.test") as any;
+    const client = createClient(
+      "anthropic",
+      "key-1",
+      "https://api.test",
+    ) as any;
     expect(client.name).toBe("anthropic");
     expect(client.apiKey).toBe("key-1");
     expect(client.baseURL).toBe("https://api.test");
@@ -67,7 +71,11 @@ describe("registerProtocol", () => {
     }));
 
     registerProtocol("custom", mockFactory);
-    const client = createClient("custom", "test-key", "https://custom.api") as any;
+    const client = createClient(
+      "custom",
+      "test-key",
+      "https://custom.api",
+    ) as any;
 
     expect(client.name).toBe("custom");
     expect(mockFactory).toHaveBeenCalledWith("test-key", "https://custom.api");

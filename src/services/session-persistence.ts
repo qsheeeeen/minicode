@@ -9,11 +9,11 @@ import fs from "fs/promises";
 import path from "path";
 import os from "os";
 import crypto from "crypto";
-import type { ContextTurn } from "../context/index.js";
+import type { LLMTurn } from "../llm/history.js";
 
 export interface SessionData {
   model: string;
-  turns: ContextTurn[];
+  turns: LLMTurn[];
   totalTokens: number;
   createdAt?: string;
   updatedAt?: string;
@@ -36,7 +36,7 @@ export class SessionPersistence {
     ".minicode",
     "sessions",
   );
-  private static readonly EXT = ".context.jsonl";
+  private static readonly EXT = ".history.jsonl";
 
   static getProjectHash(): string {
     return crypto
@@ -55,7 +55,7 @@ export class SessionPersistence {
 
   static async save(
     sessionName: string,
-    turns: ContextTurn[],
+    turns: LLMTurn[],
     meta: { model: string; totalTokens: number },
   ): Promise<void> {
     if (!sessionName) return;
@@ -85,7 +85,7 @@ export class SessionPersistence {
       const lines = content.split("\n").filter((l) => l.trim());
       if (lines.length === 0) return null;
       const header: SessionHeader = JSON.parse(lines[0]);
-      const turns: ContextTurn[] = [];
+      const turns: LLMTurn[] = [];
       for (let i = 1; i < lines.length; i++) {
         try {
           turns.push(JSON.parse(lines[i]));

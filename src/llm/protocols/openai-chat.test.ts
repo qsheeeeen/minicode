@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { StreamEvent, LLMResponse } from "./client.js";
-import type { LLMMessage } from "./client.js";
+import type { StreamEvent, LLMResponse } from "../client.js";
+import type { LLMMessage } from "../client.js";
 
 async function collectStream(
   stream: AsyncGenerator<StreamEvent, LLMResponse, unknown>,

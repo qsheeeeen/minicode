@@ -1,24 +1,24 @@
 import type { LLMClient } from "../llm/client.js";
 import type { LLMResponse } from "../llm/client.js";
 import type { Model } from "../llm/model.js";
-import type { ContextTurn } from "../context/index.js";
+import type { LLMTurn } from "../llm/history.js";
 
 export interface CompressionStrategy {
   compress(
-    turns: ContextTurn[],
+    turns: LLMTurn[],
     client: LLMClient,
     model: Model | undefined,
-  ): Promise<ContextTurn[]>;
+  ): Promise<LLMTurn[]>;
 }
 
 export class SummaryCompressionStrategy implements CompressionStrategy {
   private readonly recentCount = 10;
 
   async compress(
-    turns: ContextTurn[],
+    turns: LLMTurn[],
     client: LLMClient,
     model: Model | undefined,
-  ): Promise<ContextTurn[]> {
+  ): Promise<LLMTurn[]> {
     if (turns.length <= this.recentCount + 2) {
       return turns; // Not enough to compress
     }
@@ -65,7 +65,7 @@ ${conversationText}`;
     }
   }
 
-  private extractConversationText(turns: ContextTurn[]): string {
+  private extractConversationText(turns: LLMTurn[]): string {
     const lines: string[] = [];
     for (const turn of turns) {
       lines.push(`User: ${turn.userText}`);

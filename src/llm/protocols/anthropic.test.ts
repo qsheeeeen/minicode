@@ -22,7 +22,7 @@ vi.mock("@anthropic-ai/sdk", () => {
 });
 
 import { AnthropicClient } from "./anthropic.js";
-import { Model } from "./model.js";
+import { Model } from "../model.js";
 
 describe("AnthropicClient", () => {
   beforeEach(() => {

@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest";
-import type { ContextTurn } from "../context/index.js";
+import type { LLMTurn } from "../llm/history.js";
 import type { StatusMessage } from "./display.js";
 import { toDisplayMessages } from "./display.js";
 
 describe("toDisplayMessages", () => {
   it("converts context blocks and attaches tool results", () => {
-    const turns: ContextTurn[] = [
+    const turns: LLMTurn[] = [
       {
         userText: "hello",
         process: [
@@ -38,7 +38,7 @@ describe("toDisplayMessages", () => {
 
   it("interleaves statuses by turn index", () => {
     const timestamp = new Date("2026-01-01T00:00:00.000Z");
-    const turns: ContextTurn[] = [{ userText: "internal", process: [] }];
+    const turns: LLMTurn[] = [{ userText: "internal", process: [] }];
     const statuses: StatusMessage[] = [
       { role: "status", content: "before", timestamp, turnIndex: 0 },
       { role: "error", content: "after", timestamp, turnIndex: 1 },

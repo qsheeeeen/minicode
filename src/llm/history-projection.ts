@@ -1,7 +1,7 @@
-import type { ContextTurn } from "../context/index.js";
+import type { LLMTurn } from "./history.js";
 import type { LLMMessage, LLMAssistantBlock } from "./client.js";
 
-export function contextToLLMMessages(turns: ContextTurn[]): LLMMessage[] {
+export function historyToLLMMessages(turns: LLMTurn[]): LLMMessage[] {
   const messages: LLMMessage[] = [];
 
   for (const turn of turns) {

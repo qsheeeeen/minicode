@@ -1,15 +1,15 @@
-// SessionManager owns all session-level state: context manager, change journal,
+// SessionManager owns all session-level state: LLM history, change journal,
 // session name, turn index, and session stats.
 //
-// Coordinates contextManager + changeJournal on session switch.
+// Coordinates history + changeJournal on session switch.
 // Provides StatusReporter callback for services to emit UI notifications.
 // Agent delegates session operations here.
 
-import { ContextStore } from "../context/index.js";
+import { LLMHistory } from "../llm/history.js";
 import { ChangeJournal } from "./change-journal.js";
 import { SessionPersistence } from "./session-persistence.js";
 import type { SessionStats } from "./session-stats.js";
-import type { ContextTurn } from "../context/index.js";
+import type { LLMTurn } from "../llm/history.js";
 import type { StatusMessage } from "../ui/display.js";
 /**
  * StatusReporter — callback for emitting UI status/error notifications.
@@ -21,7 +21,7 @@ export type StatusReporter = (msg: Omit<StatusMessage, "turnIndex">) => void;
 
 export class SessionManager {
   private _currentSession: string;
-  private context = new ContextStore();
+  private history = new LLMHistory();
   private changeJournal = new ChangeJournal();
   private activeTurnIdx = 0;
   private sessionStats?: SessionStats;
@@ -48,7 +48,7 @@ export class SessionManager {
     this._statusReporter(msg);
   }
 
-  /** Switch to a new session. Coordinates context + journal. */
+  /** Switch to a new session. Coordinates history + journal. */
   setSession(sessionName: string): void {
     this._currentSession = sessionName;
     this.changeJournal.startSession(
@@ -57,9 +57,9 @@ export class SessionManager {
     );
   }
 
-  /** Clear all session state (context, journal, turn index). */
+  /** Clear all session state (history, journal, turn index). */
   clearSession(): void {
-    this.context.clear();
+    this.history.clear();
     this.changeJournal.close();
     this.changeJournal = new ChangeJournal();
     this.activeTurnIdx = 0;
@@ -72,17 +72,17 @@ export class SessionManager {
       this._meta.totalTokens = meta.totalTokens;
     await SessionPersistence.save(
       this._currentSession,
-      this.context.getTurns(),
+      this.history.getTurns(),
       { model: this._meta.model, totalTokens: this._meta.totalTokens },
     ).catch((e) => {
       throw e;
     });
   }
 
-  // -- Context accessors --
+  // -- History accessors --
 
-  getContext(): ContextStore {
-    return this.context;
+  getHistory(): LLMHistory {
+    return this.history;
   }
 
   getChangeJournal(): ChangeJournal {
@@ -103,14 +103,14 @@ export class SessionManager {
     this.activeTurnIdx = idx;
   }
 
-  // -- Convenience shortcuts for common context operations --
+  // -- Convenience shortcuts for common history operations --
 
-  getMessages(): ContextTurn[] {
-    return this.context.getTurns();
+  getMessages(): LLMTurn[] {
+    return this.history.getTurns();
   }
 
-  setMessages(messages: ContextTurn[]): void {
-    this.context.replaceTurns(messages);
+  setMessages(messages: LLMTurn[]): void {
+    this.history.replaceTurns(messages);
   }
 
   getSessionStats(): SessionStats | undefined {

@@ -13,7 +13,7 @@ vi.mock("../ui/tui.js", () => ({
 
 function makeApp() {
   const sessionManager = {
-    getContext: vi.fn().mockReturnValue({ id: "context" }),
+    getHistory: vi.fn().mockReturnValue({ id: "history" }),
   };
   return {
     agent: { id: "agent" },
@@ -43,6 +43,6 @@ describe("runTuiApp", () => {
     expect(render).toHaveBeenCalledWith(expect.anything(), {
       exitOnCtrlC: false,
     });
-    expect(app.sessionManager.getContext).toHaveBeenCalled();
+    expect(app.sessionManager.getHistory).toHaveBeenCalled();
   });
 });

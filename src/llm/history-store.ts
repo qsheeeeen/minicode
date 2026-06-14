@@ -1,21 +1,20 @@
-import type { ContextTurn } from "./turns.js";
-import type { ProcessBlock, ToolCallBlock } from "./blocks.js";
+import type { LLMProcessBlock, LLMTurn, LLMToolCallBlock } from "./turns.js";
 
-export class ContextStore {
-  private turns: ContextTurn[] = [];
+export class LLMHistory {
+  private turns: LLMTurn[] = [];
   private listeners = new Set<() => void>();
 
   private notify(): void {
     for (const cb of this.listeners) cb();
   }
 
-  private currentTurn(): ContextTurn {
+  private currentTurn(): LLMTurn {
     const turn = this.turns[this.turns.length - 1];
-    if (!turn) throw new Error("No active context turn");
+    if (!turn) throw new Error("No active LLM turn");
     return turn;
   }
 
-  private static cloneTurn(turn: ContextTurn): ContextTurn {
+  private static cloneTurn(turn: LLMTurn): LLMTurn {
     return {
       userText: turn.userText,
       assistantText: turn.assistantText,
@@ -30,22 +29,22 @@ export class ContextStore {
     };
   }
 
-  private static validateTurn(turn: ContextTurn): void {
+  private static validateTurn(turn: LLMTurn): void {
     if (typeof turn.userText !== "string") {
-      throw new Error("Invalid context turn: userText must be a string");
+      throw new Error("Invalid LLM turn: userText must be a string");
     }
     if (!Array.isArray(turn.process)) {
-      throw new Error("Invalid context turn: process must be an array");
+      throw new Error("Invalid LLM turn: process must be an array");
     }
     if (
       turn.assistantText !== undefined &&
       typeof turn.assistantText !== "string"
     ) {
-      throw new Error("Invalid context turn: assistantText must be a string");
+      throw new Error("Invalid LLM turn: assistantText must be a string");
     }
 
     const toolIds = new Set<string>();
-    for (const block of turn.process as ProcessBlock[]) {
+    for (const block of turn.process as LLMProcessBlock[]) {
       if (block.type === "thinking") {
         if (typeof block.thinking !== "string") {
           throw new Error("Invalid thinking block: thinking must be a string");
@@ -86,23 +85,23 @@ export class ContextStore {
     };
   }
 
-  getTurns(): ContextTurn[] {
-    return this.turns.map(ContextStore.cloneTurn);
+  getTurns(): LLMTurn[] {
+    return this.turns.map(LLMHistory.cloneTurn);
   }
 
   getTurnCount(): number {
     return this.turns.length;
   }
 
-  replaceTurns(turns: ContextTurn[]): void {
-    for (const turn of turns) ContextStore.validateTurn(turn);
-    this.turns = turns.map(ContextStore.cloneTurn);
+  replaceTurns(turns: LLMTurn[]): void {
+    for (const turn of turns) LLMHistory.validateTurn(turn);
+    this.turns = turns.map(LLMHistory.cloneTurn);
     this.notify();
   }
 
-  removeLastTurn(predicate: (turn: ContextTurn) => boolean): boolean {
+  removeLastTurn(predicate: (turn: LLMTurn) => boolean): boolean {
     const last = this.turns[this.turns.length - 1];
-    if (last && predicate(ContextStore.cloneTurn(last))) {
+    if (last && predicate(LLMHistory.cloneTurn(last))) {
       this.turns.pop();
       this.notify();
       return true;
@@ -139,7 +138,7 @@ export class ContextStore {
     const turn = this.currentTurn();
     if (
       turn.process.some(
-        (block): block is ToolCallBlock =>
+        (block): block is LLMToolCallBlock =>
           block.type === "tool_call" && block.id === id,
       )
     ) {
@@ -152,7 +151,7 @@ export class ContextStore {
   completeToolCall(id: string, result: string): void {
     const turn = this.currentTurn();
     const block = turn.process.find(
-      (item): item is ToolCallBlock =>
+      (item): item is LLMToolCallBlock =>
         item.type === "tool_call" && item.id === id,
     );
     if (!block) throw new Error(`Tool call not found: ${id}`);

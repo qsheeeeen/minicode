@@ -1,20 +1,20 @@
 import type { StatusMessage } from "./display.js";
-import type { ContextStore } from "../context/index.js";
+import type { LLMHistory } from "../llm/history.js";
 
 /**
  * HeadlessRenderer — incremental stdout renderer for non-TUI mode.
  *
  * Encapsulates all rendering state (printed turns, streamed chars, etc.)
- * and the render algorithm. Subscribed to ContextStore changes
+ * and the render algorithm. Subscribed to LLMHistory changes
  * via onChange() for real-time streaming output.
  */
 export class HeadlessRenderer {
-  private context: ContextStore;
+  private context: LLMHistory;
   private statuses: StatusMessage[] = [];
 
   // Rendering state
   private printedTurns = 0;
-  private printedProcessBlocks = new Map<number, number>();
+  private printedLLMProcessBlocks = new Map<number, number>();
   private printedAssistantChars = new Map<number, number>();
   private streamedChars = new Map<string, number>();
   private finalizedBlocks = new Set<string>();
@@ -24,7 +24,7 @@ export class HeadlessRenderer {
 
   private unsubscribe: (() => void) | null = null;
 
-  constructor(context: ContextStore) {
+  constructor(context: LLMHistory) {
     this.context = context;
   }
 
@@ -56,11 +56,11 @@ export class HeadlessRenderer {
       const turn = turns[ti];
       const isLastTurn = ti === turns.length - 1;
 
-      if (!this.printedProcessBlocks.has(ti)) {
+      if (!this.printedLLMProcessBlocks.has(ti)) {
         process.stdout.write(`[user]\n${turn.userText.trim()}\n\n`);
       }
 
-      const blocksPrinted = this.printedProcessBlocks.get(ti) || 0;
+      const blocksPrinted = this.printedLLMProcessBlocks.get(ti) || 0;
       for (let bi = blocksPrinted; bi < turn.process.length; bi++) {
         const block = turn.process[bi];
         const blockKey = `${ti}:${bi}`;
@@ -127,12 +127,12 @@ export class HeadlessRenderer {
       }
 
       if (!isLastTurn || isFinal) {
-        this.printedProcessBlocks.set(ti, turn.process.length);
+        this.printedLLMProcessBlocks.set(ti, turn.process.length);
         this.printedTurns = ti + 1;
       } else {
         const lastProcess = turn.process[turn.process.length - 1];
         const activeThinking = lastProcess?.type === "thinking";
-        this.printedProcessBlocks.set(
+        this.printedLLMProcessBlocks.set(
           ti,
           activeThinking
             ? Math.max(0, turn.process.length - 1)

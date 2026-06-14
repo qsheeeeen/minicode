@@ -1,10 +1,10 @@
 import { describe, it, expect, vi } from "vitest";
-import { ContextStore } from "./context-store.js";
-import type { ContextTurn } from "./index.js";
+import { LLMHistory } from "./history-store.js";
+import type { LLMTurn } from "./history.js";
 
-describe("ContextStore", () => {
+describe("LLMHistory", () => {
   it("notifies subscribers on mutations and returns unsubscribe", () => {
-    const store = new ContextStore();
+    const store = new LLMHistory();
     const listener = vi.fn();
     const unsub = store.onChange(listener);
 
@@ -17,7 +17,7 @@ describe("ContextStore", () => {
   });
 
   it("starts turns and returns defensive copies", () => {
-    const store = new ContextStore();
+    const store = new LLMHistory();
     store.startTurn("hello");
 
     const turns = store.getTurns();
@@ -28,7 +28,7 @@ describe("ContextStore", () => {
   });
 
   it("accumulates consecutive thinking deltas into one block", () => {
-    const store = new ContextStore();
+    const store = new LLMHistory();
     store.startTurn("task");
     store.appendThinking("plan");
     store.appendThinking(" more");
@@ -39,7 +39,7 @@ describe("ContextStore", () => {
   });
 
   it("creates a new thinking block after a tool call", () => {
-    const store = new ContextStore();
+    const store = new LLMHistory();
     store.startTurn("task");
     store.appendThinking("first");
     store.startToolCall("t1", "read", { path: "a.ts" });
@@ -53,7 +53,7 @@ describe("ContextStore", () => {
   });
 
   it("starts and completes tool calls", () => {
-    const store = new ContextStore();
+    const store = new LLMHistory();
     store.startTurn("task");
     store.startToolCall("t1", "read", { path: "a.ts" });
     store.completeToolCall("t1", "content");
@@ -70,7 +70,7 @@ describe("ContextStore", () => {
   });
 
   it("overwrites repeated tool results", () => {
-    const store = new ContextStore();
+    const store = new LLMHistory();
     store.startTurn("task");
     store.startToolCall("t1", "read", {});
     store.completeToolCall("t1", "one");
@@ -82,7 +82,7 @@ describe("ContextStore", () => {
   });
 
   it("rejects duplicate tool call ids in the current turn", () => {
-    const store = new ContextStore();
+    const store = new LLMHistory();
     store.startTurn("task");
     store.startToolCall("t1", "read", {});
 
@@ -92,7 +92,7 @@ describe("ContextStore", () => {
   });
 
   it("throws when completing a missing tool call", () => {
-    const store = new ContextStore();
+    const store = new LLMHistory();
     store.startTurn("task");
 
     expect(() => store.completeToolCall("missing", "result")).toThrow(
@@ -101,7 +101,7 @@ describe("ContextStore", () => {
   });
 
   it("accumulates assistant text deltas", () => {
-    const store = new ContextStore();
+    const store = new LLMHistory();
     store.startTurn("task");
     store.appendAssistantText("hello");
     store.appendAssistantText(" world");
@@ -110,23 +110,21 @@ describe("ContextStore", () => {
   });
 
   it("throws when process mutations happen without a turn", () => {
-    const store = new ContextStore();
+    const store = new LLMHistory();
 
-    expect(() => store.appendThinking("x")).toThrow("No active context turn");
+    expect(() => store.appendThinking("x")).toThrow("No active LLM turn");
     expect(() => store.startToolCall("t1", "read", {})).toThrow(
-      "No active context turn",
+      "No active LLM turn",
     );
     expect(() => store.completeToolCall("t1", "result")).toThrow(
-      "No active context turn",
+      "No active LLM turn",
     );
-    expect(() => store.appendAssistantText("x")).toThrow(
-      "No active context turn",
-    );
+    expect(() => store.appendAssistantText("x")).toThrow("No active LLM turn");
   });
 
   it("replaces turns after validation", () => {
-    const store = new ContextStore();
-    const turns: ContextTurn[] = [
+    const store = new LLMHistory();
+    const turns: LLMTurn[] = [
       {
         userText: "task",
         process: [{ type: "tool_call", id: "t1", name: "read", input: {} }],
@@ -138,7 +136,7 @@ describe("ContextStore", () => {
   });
 
   it("rejects invalid replacement turns", () => {
-    const store = new ContextStore();
+    const store = new LLMHistory();
 
     expect(() =>
       store.replaceTurns([
@@ -154,7 +152,7 @@ describe("ContextStore", () => {
   });
 
   it("removes the last turn when the predicate matches", () => {
-    const store = new ContextStore();
+    const store = new LLMHistory();
     store.startTurn("keep");
     store.startTurn("remove");
 

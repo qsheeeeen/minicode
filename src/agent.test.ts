@@ -26,7 +26,7 @@ function makeAgent(overrides?: {
   const model = o.model ?? makeTestModel();
   const tokenCount$ = new Signal(0);
   const sessionManager = new SessionManager();
-  const context = sessionManager.getContext();
+  const context = sessionManager.getHistory();
   const contextManager = new ContextManager({
     contextLength: model.getContextLength(),
     compressionThresholdRatio: o.compressionThresholdRatio ?? 0.8,

@@ -1,13 +1,13 @@
 import { describe, it, expect, vi } from "vitest";
 import { ContextManager } from "./context-manager.js";
 import { Signal } from "../utils/signal.js";
-import { ContextStore } from "../context/index.js";
+import { LLMHistory } from "../llm/history.js";
 
 function createContextManager(overrides?: {
   compressionThresholdRatio?: number;
 }) {
   const tokenCount$ = new Signal(0);
-  const context = new ContextStore();
+  const context = new LLMHistory();
   const statusReporter = vi.fn();
   const sessionStats = {
     recordUsage: vi.fn(),

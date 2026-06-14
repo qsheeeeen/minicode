@@ -1,6 +1,6 @@
 import type { Model } from "./llm/model.js";
 import type { LLMClient, LLMToolDef, LLMResponse } from "./llm/client.js";
-import { contextToLLMMessages } from "./llm/context-projection.js";
+import { historyToLLMMessages } from "./llm/history-projection.js";
 import {
   type ToolDef,
   type ToolExecutionContext,
@@ -13,7 +13,7 @@ import type { AgentRegistry } from "./services/agent-registry.js";
 import type { PromptManager } from "./services/prompt-manager.js";
 import type { SessionManager } from "./services/session-manager.js";
 import type { ContextManager } from "./services/context-manager.js";
-import type { ContextStore } from "./context/index.js";
+import type { LLMHistory } from "./llm/history.js";
 import type { AppConfig } from "./config.js";
 import type { FileSystemService } from "./services/filesystem.js";
 import type { ModelSwitchService } from "./services/model-switcher.js";
@@ -56,8 +56,8 @@ export class Agent {
   private _isRunning: boolean = false;
 
   /** Cached access to the context manager. */
-  private get context(): ContextStore {
-    return this.sessionManager.getContext();
+  private get context(): LLMHistory {
+    return this.sessionManager.getHistory();
   }
 
   get currentSession(): string {
@@ -150,7 +150,7 @@ export class Agent {
   // Returns the final response and any tool calls the LLM requested.
   private async streamLLM(toolDefs: LLMToolDef[]) {
     const stream = this.client.chatStream(
-      contextToLLMMessages(this.context.getTurns()),
+      historyToLLMMessages(this.context.getTurns()),
       toolDefs,
       {
         system: this.promptManager.getSystemPrompt(),

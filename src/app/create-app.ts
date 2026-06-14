@@ -109,7 +109,7 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
     contextLength: initialModel.getContextLength(),
     compressionThresholdRatio: compressionThreshold,
     tokenCount$,
-    contextManager: sessionManager.getContext(),
+    contextManager: sessionManager.getHistory(),
     statusReporter: (msg) => sessionManager.reportStatus(msg),
     sessionStats: sessionManager.getSessionStats(),
   });
@@ -140,7 +140,7 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
     tools,
     permissionService,
     getChangeJournal: () => sessionManager.getChangeJournal(),
-    context: sessionManager.getContext(),
+    context: sessionManager.getHistory(),
   });
 
   const agent = new Agent({
@@ -164,7 +164,7 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
     agent,
     model: initialModel,
     config,
-    context: sessionManager.getContext(),
+    context: sessionManager.getHistory(),
     sessionManager,
     get changeJournal() {
       return sessionManager.getChangeJournal();

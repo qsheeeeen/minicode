@@ -18,7 +18,7 @@ export async function runTuiApp(app: AppRuntime): Promise<void> {
       sessionStats={app.sessionStats}
       modelSwitchService={app.modelSwitchService}
       sessionManager={app.sessionManager}
-      context={app.sessionManager.getContext()}
+      context={app.sessionManager.getHistory()}
       tokenCount$={app.tokenCount$}
       permissionService={app.permissionService}
     />,
