@@ -2,20 +2,20 @@
   "name": "minicode",
   "version": "1.0.0",
   "description": "A minimal coding agent powered by LLMs with TUI",
-  "main": "dist/cli.js",
+  "main": "dist/main.js",
   "type": "module",
   "bin": {
-    "minicode": "dist/cli.js"
+    "minicode": "dist/main.js"
   },
   "files": [
     "dist",
     "package.json"
   ],
   "scripts": {
-    "dev": "bun run src/cli.tsx",
+    "dev": "bun run src/main.ts",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "start": "bun dist/cli.js",
+    "start": "bun dist/main.js",
     "prepublishOnly": "npm run build",
     "test": "vitest",
     "test:run": "vitest run",

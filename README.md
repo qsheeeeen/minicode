@@ -96,7 +96,7 @@ When the main agent delegates sub-tasks via the `agent` tool, sub-agents run in 
 
 ```
 src/
-├── cli.tsx              # CLI entry point — renders App, parses args, starts TUI/headless
+├── main.ts              # Executable entry point — loads config/args and runs the app
 ├── tui.tsx              # Top-level TUI App component + hooks
 ├── headless.ts          # Headless (non-TUI) mode runner
 ├── args.ts              # CLI argument parsing (yargs)

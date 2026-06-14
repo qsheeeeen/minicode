@@ -21,8 +21,8 @@ bun run format        # Prettier formatting on src/
 
 **Headless mode** (non-TUI, for scripting and verification):
 ```bash
-bun run src/cli.tsx -H "<prompt>"           # Basic headless
-bun run src/cli.tsx -H --perm yolo "<prompt>" # Headless with permission mode
+bun run src/main.ts -H "<prompt>"           # Basic headless
+bun run src/main.ts -H --perm yolo "<prompt>" # Headless with permission mode
 ```
 
 ## Slash Commands
@@ -50,7 +50,7 @@ Commands entered at the TUI prompt:
 
 ```
 src/
-├── cli.tsx                 # Entry point: arg parsing, config loading, TUI/headless branching
+├── main.ts                 # Entry point: config/arg loading and app runner selection
 ├── agent.ts                # Core Agent class with LLM loop (stream → tools → repeat)
 ├── agent.virtual.test.ts   # Full agent-loop tests using VirtualLLMClient
 ├── args.ts                 # CLI argument parser
@@ -118,7 +118,7 @@ src/
 
 ### Core Flow
 
-1. `cli.tsx` loads config, skills, creates Agent → branches to TUI (`render(<App>)`) or headless (`runHeadless()`)
+1. `main.ts` loads config/args, creates the app, then runs TUI or headless
 2. Input routed through `routeInput()`: slash command → `executeCommand()`, `!` prefix → `runShell()`, else → `agent.run()`
 3. `Agent.run()` enters loop: `client.chatStream()` → accumulate `StreamEvent` via AsyncGenerator → execute tool calls → repeat
 4. `connectAgent()` bridges Agent observables (Signal, MessageStore) to Zustand store; TUI components read via Zustand selectors
@@ -187,7 +187,7 @@ Providers config supports arbitrary keys — any `model@provider` resolves via `
 After implementing any feature or fix, self-test in headless mode:
 
 ```bash
-bun run src/cli.tsx -H "<prompt that exercises the change>"
+bun run src/main.ts -H "<prompt that exercises the change>"
 ```
 
 Headless mode exposes bugs that TUI doesn't. Always verify output is correct.
