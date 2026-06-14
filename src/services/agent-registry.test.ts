@@ -108,18 +108,28 @@ describe("AgentRegistry", () => {
       expect(registry.allocateSubId()).toBe("2");
     });
 
-    it("wraps when all slots 2-9 are occupied by running agents", () => {
+    it("continues past 9 when lower IDs are occupied", () => {
       const registry = new AgentRegistry();
-      // Fill 2-9 all with running agents
       for (let i = 2; i <= 9; i++) {
         registry.register(createMockSession(String(i), "sub", "running"));
       }
-      // All slots 2-9 are occupied (running), no completed/error to reuse
-      // nextSubId is still 2 (never set since first loop never found free slot)
-      // Falls through: returns nextSubId=2, then increments to 3
-      expect(registry.allocateSubId()).toBe("2");
-      // Next call: nextSubId=3, returns '3', increments to 4
+      expect(registry.allocateSubId()).toBe("10");
+    });
+
+    it("skips manually registered IDs beyond the current counter", () => {
+      const registry = new AgentRegistry();
+      registry.register(createMockSession("2", "sub", "running"));
+      registry.register(createMockSession("3", "sub", "running"));
+
+      expect(registry.allocateSubId()).toBe("4");
+    });
+
+    it("does not delete completed or errored sessions when allocating", () => {
+      const registry = new AgentRegistry();
+      registry.register(createMockSession("2", "sub", "completed"));
+
       expect(registry.allocateSubId()).toBe("3");
+      expect(registry.get("2")).toBeDefined();
     });
   });
 
@@ -140,6 +150,18 @@ describe("AgentRegistry", () => {
       registry.clear();
       expect(registry.getAll()).toHaveLength(0);
       expect(registry.allocateSubId()).toBe("2");
+    });
+
+    it("notifies callback", () => {
+      const registry = new AgentRegistry();
+      const cb = vi.fn();
+      registry.setUpdateCallback(cb);
+      registry.register(createMockSession("2"));
+      cb.mockClear();
+
+      registry.clear();
+
+      expect(cb).toHaveBeenCalledWith([]);
     });
   });
 

@@ -77,30 +77,12 @@ export class AgentRegistry {
   }
 
   allocateSubId(): string {
-    for (let i = 2; i <= 9; i++) {
-      const id = String(i);
-      if (!this.sessions.has(id)) {
-        this.nextSubId = i + 1 > 9 ? 2 : i + 1;
-        return id;
-      }
+    while (this.sessions.has(String(this.nextSubId))) {
+      this.nextSubId++;
     }
-    for (let i = 2; i <= 9; i++) {
-      const id = String(i);
-      const session = this.sessions.get(id);
-      if (
-        session &&
-        session.type === "sub" &&
-        (session.status === "completed" || session.status === "error")
-      ) {
-        this.sessions.delete(id);
-        this.nextSubId = i + 1 > 9 ? 2 : i + 1;
-        this.notifyUpdate();
-        return id;
-      }
-    }
+
     const id = String(this.nextSubId);
     this.nextSubId++;
-    if (this.nextSubId > 9) this.nextSubId = 2;
     return id;
   }
 
@@ -112,5 +94,6 @@ export class AgentRegistry {
   clear(): void {
     this.sessions.clear();
     this.nextSubId = 2;
+    this.notifyUpdate();
   }
 }
