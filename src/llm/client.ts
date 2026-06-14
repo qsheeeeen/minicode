@@ -38,37 +38,37 @@ export interface LLMToolDef {
   input_schema: Record<string, unknown>;
 }
 
-export interface ProviderTextBlock {
+export interface LLMTextBlock {
   type: "text";
   text: string;
 }
 
-export interface ProviderThinkingBlock {
+export interface LLMThinkingBlock {
   type: "thinking";
   thinking: string;
 }
 
-export interface ProviderToolUseBlock {
+export interface LLMToolUseBlock {
   type: "tool_use";
   id: string;
   name: string;
   input: Record<string, unknown>;
 }
 
-export interface ProviderToolResultBlock {
+export interface LLMToolResultBlock {
   type: "tool_result";
   tool_use_id: string;
   content: string;
 }
 
-export type ProviderAssistantBlock =
-  | ProviderTextBlock
-  | ProviderThinkingBlock
-  | ProviderToolUseBlock;
+export type LLMAssistantBlock =
+  | LLMTextBlock
+  | LLMThinkingBlock
+  | LLMToolUseBlock;
 
-export interface ProviderMessage {
+export interface LLMMessage {
   role: "user" | "assistant";
-  content: string | ProviderAssistantBlock[] | ProviderToolResultBlock[];
+  content: string | LLMAssistantBlock[] | LLMToolResultBlock[];
 }
 
 export interface ChatOptions {
@@ -84,7 +84,7 @@ export interface TokenUsage {
 }
 
 export interface LLMResponse {
-  content: ProviderAssistantBlock[];
+  content: LLMAssistantBlock[];
   stop_reason: string;
   usage: TokenUsage;
 }
@@ -94,7 +94,7 @@ export interface LLMResponse {
 export type StreamEvent =
   | { type: "text"; text: string }
   | { type: "thinking"; thinking: string }
-  | { type: "tool_use"; block: ProviderToolUseBlock };
+  | { type: "tool_use"; block: LLMToolUseBlock };
 
 export type LLMStream = AsyncGenerator<StreamEvent, LLMResponse, unknown>;
 
@@ -103,7 +103,7 @@ export type LLMStream = AsyncGenerator<StreamEvent, LLMResponse, unknown>;
 export interface LLMClient {
   // Streaming completion — returns immediately, emits events as tokens arrive.
   chatStream(
-    messages: ProviderMessage[],
+    messages: LLMMessage[],
     tools: LLMToolDef[],
     options?: ChatOptions,
   ): LLMStream;

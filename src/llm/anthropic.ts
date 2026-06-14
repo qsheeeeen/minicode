@@ -14,9 +14,9 @@ import type {
   EffortLevel,
 } from "./client.js";
 import type {
-  ProviderMessage,
-  ProviderAssistantBlock,
-  ProviderToolResultBlock,
+  LLMMessage,
+  LLMAssistantBlock,
+  LLMToolResultBlock,
 } from "./client.js";
 
 function toSdkEffort(
@@ -45,15 +45,15 @@ type AnthropicContentBlockParam = Anthropic.Messages.ContentBlockParam;
 // Thinking blocks are filtered out — they're output-only and not accepted
 // as input by the API (adaptive thinking reconstructs context automatically).
 function toSdkMessages(
-  messages: ProviderMessage[],
+  messages: LLMMessage[],
 ): Anthropic.Messages.MessageParam[] {
   return messages.map((msg) => {
     if (msg.role === "user") {
       if (typeof msg.content === "string") {
         return { role: "user" as const, content: msg.content };
       }
-      // ProviderToolResultBlock → Anthropic ProviderToolResultBlockParam
-      const blocks = msg.content as ProviderToolResultBlock[];
+      // LLMToolResultBlock -> Anthropic tool_result block param
+      const blocks = msg.content as LLMToolResultBlock[];
       const content = blocks.map((b) => ({
         type: "tool_result" as const,
         tool_use_id: b.tool_use_id,
@@ -94,9 +94,7 @@ function toSdkTools(tools: LLMToolDef[]): AnthropicTool[] {
 // Map SDK content blocks to our internal types.
 // SDK ThinkingBlock has extra fields (signature, redacted_thinking variants)
 // that our ThinkingBlock doesn't carry.
-function toProviderAssistantBlock(
-  block: Anthropic.ContentBlock,
-): ProviderAssistantBlock {
+function toLLMAssistantBlock(block: Anthropic.ContentBlock): LLMAssistantBlock {
   if (block.type === "text") {
     return { type: "text", text: block.text };
   }
@@ -126,7 +124,7 @@ function toLLMResponse(msg: Anthropic.Messages.Message): LLMResponse {
   const cacheMiss = cacheUsage.cache_creation_input_tokens ?? 0;
   const cacheHit = cacheUsage.cache_read_input_tokens ?? 0;
   return {
-    content: msg.content.map(toProviderAssistantBlock),
+    content: msg.content.map(toLLMAssistantBlock),
     stop_reason: msg.stop_reason ?? "end_turn",
     usage: {
       input: {
@@ -153,7 +151,7 @@ export class AnthropicClient implements LLMClient {
   }
 
   chatStream(
-    messages: ProviderMessage[],
+    messages: LLMMessage[],
     tools: LLMToolDef[],
     options: ChatOptions = {},
   ): LLMStream {

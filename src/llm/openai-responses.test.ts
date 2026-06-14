@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { StreamEvent, LLMResponse } from "./client.js";
-import type { ProviderMessage } from "./client.js";
+import type { LLMMessage } from "./client.js";
 
 async function collectStream(
   stream: AsyncGenerator<StreamEvent, LLMResponse, unknown>,
@@ -295,7 +295,7 @@ describe("OpenAIResponsesClient", () => {
         ]),
       );
 
-      const messages: ProviderMessage[] = [
+      const messages: LLMMessage[] = [
         {
           role: "assistant",
           content: [
@@ -343,7 +343,7 @@ describe("OpenAIResponsesClient", () => {
         ]),
       );
 
-      const messages: ProviderMessage[] = [
+      const messages: LLMMessage[] = [
         {
           role: "assistant",
           content: [

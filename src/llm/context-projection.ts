@@ -1,15 +1,13 @@
 import type { ContextTurn } from "../context/index.js";
-import type { ProviderMessage, ProviderAssistantBlock } from "./client.js";
+import type { LLMMessage, LLMAssistantBlock } from "./client.js";
 
-export function contextToProviderMessages(
-  turns: ContextTurn[],
-): ProviderMessage[] {
-  const messages: ProviderMessage[] = [];
+export function contextToLLMMessages(turns: ContextTurn[]): LLMMessage[] {
+  const messages: LLMMessage[] = [];
 
   for (const turn of turns) {
     messages.push({ role: "user", content: turn.userText });
 
-    let assistantBlocks: ProviderAssistantBlock[] = [];
+    let assistantBlocks: LLMAssistantBlock[] = [];
     const flushAssistant = () => {
       if (assistantBlocks.length === 0) return;
       messages.push({ role: "assistant", content: assistantBlocks });

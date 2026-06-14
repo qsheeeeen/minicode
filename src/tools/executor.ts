@@ -1,6 +1,6 @@
 import type { ToolDef, ToolExecutionContext } from "./registry.js";
 import { ToolDeniedError } from "./registry.js";
-import type { ProviderToolUseBlock } from "../llm/client.js";
+import type { LLMToolUseBlock } from "../llm/client.js";
 import type { ContextStore } from "../context/index.js";
 import type { ChangeJournal } from "../services/change-journal.js";
 import {
@@ -11,7 +11,7 @@ import { callContent } from "../utils/tool-format.js";
 import type pino from "pino";
 
 export interface ToolCall {
-  block: ProviderToolUseBlock;
+  block: LLMToolUseBlock;
   tool?: ToolDef;
 }
 

@@ -1,6 +1,6 @@
 import type { Model } from "./llm/model.js";
 import type { LLMClient, LLMToolDef, LLMResponse } from "./llm/client.js";
-import { contextToProviderMessages } from "./llm/context-projection.js";
+import { contextToLLMMessages } from "./llm/context-projection.js";
 import {
   type ToolDef,
   type ToolExecutionContext,
@@ -150,7 +150,7 @@ export class Agent {
   // Returns the final response and any tool calls the LLM requested.
   private async streamLLM(toolDefs: LLMToolDef[]) {
     const stream = this.client.chatStream(
-      contextToProviderMessages(this.context.getTurns()),
+      contextToLLMMessages(this.context.getTurns()),
       toolDefs,
       {
         system: this.promptManager.getSystemPrompt(),
