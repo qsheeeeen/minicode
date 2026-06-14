@@ -203,7 +203,7 @@ Headless mode exposes bugs that TUI doesn't. Always verify output is correct.
 
 ## Skills Directory
 
-External skills live in `.agent/skills/` (gitignored except this directory). Each skill is a directory with a `SKILL.md` file containing YAML frontmatter + body. Built-in skills (`skill-creator`, `init`) are in `src/skills/`.
+External skills live in `.agents/skills/` (gitignored except this directory). Each skill is a directory with a `SKILL.md` file containing YAML frontmatter + body. Built-in skills (`skill-creator`, `init`) are in `src/skills/`.
 
 ## Module Convention
 

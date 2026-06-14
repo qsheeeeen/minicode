@@ -105,7 +105,7 @@ Every skill consists of a required \`SKILL.md\` file:
 - **Body** (Markdown): Instructions and guidance for using the skill.
 
 ## Steps
-1. Create a directory for the skill (e.g., \`.agent/my-skill\`).
+1. Create a directory for the skill (e.g., \`.agents/skills/my-skill\`).
 2. Add a \`SKILL.md\` file in that directory.
 3. Write the frontmatter with \`name\` and \`description\`.
 4. Write the body with clear, concise instructions for the agent to follow.`,
@@ -168,7 +168,7 @@ Skills add capabilities the agent can use on demand without bloating every sessi
 - Repeatable workflows (verify changes, deploy, release process)
 - Reference knowledge for specific subsystems
 
-Create each skill in the \`.agent/<skill-name>/SKILL.md\` directory:
+Create each skill in the \`.agents/skills/<skill-name>/SKILL.md\` directory:
 
 \`\`\`yaml
 ---

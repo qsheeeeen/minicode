@@ -10,5 +10,6 @@ package-lock.json
 /testask
 /testsuggest
 /testselect
-.agent/
-!.agent/skills/
+.agents/*
+!.agents/skills/
+!.agents/skills/**

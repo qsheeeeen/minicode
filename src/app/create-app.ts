@@ -84,7 +84,7 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
 
   const skillManager = new SkillManager()
     .addDirectory(path.join(os.homedir(), ".minicode", "skills"))
-    .addDirectory(path.resolve(cwd, ".agent"));
+    .addDirectory(path.resolve(cwd, ".agents", "skills"));
   await skillManager.loadAll();
   skillManager.registerAsCommands();
 
