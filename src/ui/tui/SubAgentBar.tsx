@@ -1,9 +1,9 @@
 import { Box, Text } from "ink";
-import { useTuiStore } from "./store.js";
+import { useTuiState } from "./state.js";
 
 export function SubAgentBar() {
-  const agentSessions = useTuiStore((s) => s.agentSessions);
-  const activeAgentId = useTuiStore((s) => s.activeAgentId);
+  const agentSessions = useTuiState((s) => s.agentSessions);
+  const activeAgentId = useTuiState((s) => s.activeAgentId);
 
   if (agentSessions.length <= 1) return null;
 

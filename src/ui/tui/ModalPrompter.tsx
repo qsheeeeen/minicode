@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Box, Text, useInput } from "ink";
-import { useTuiStore, type TuiState, type TuiAction } from "./store.js";
+import { useTuiState, type TuiState } from "./state.js";
 import type { PromptOption } from "../../tools/registry.js";
 
 function OptionList({
@@ -65,34 +65,31 @@ function MultiOptionList({
 }
 
 export function ModalPrompter() {
-  const pendingPrompt = useTuiStore((s) => s.pendingPrompt);
-  const dispatch = useTuiStore((s) => s.dispatch);
+  const pendingPrompt = useTuiState((s) => s.pendingPrompt);
 
   if (!pendingPrompt) return null;
 
   if (pendingPrompt.multiSelect) {
-    return <MultiPrompt prompt={pendingPrompt} dispatch={dispatch} />;
+    return <MultiPrompt prompt={pendingPrompt} />;
   }
 
-  return <SinglePrompt prompt={pendingPrompt} dispatch={dispatch} />;
+  return <SinglePrompt prompt={pendingPrompt} />;
 }
 
 function SinglePrompt({
   prompt,
-  dispatch,
 }: {
   prompt: NonNullable<TuiState["pendingPrompt"]>;
-  dispatch: (action: TuiAction) => void;
 }) {
   const [cursor, setCursor] = useState(0);
 
   useInput((_input, key) => {
     if (key.escape) {
       prompt.resolve("");
-      dispatch({ type: "SET_PENDING_PROMPT", payload: null });
+      useTuiState.setState({ pendingPrompt: null });
     } else if (key.return) {
       prompt.resolve(prompt.options[cursor].value);
-      dispatch({ type: "SET_PENDING_PROMPT", payload: null });
+      useTuiState.setState({ pendingPrompt: null });
     } else if (key.upArrow) {
       setCursor((c) => Math.max(0, c - 1));
     } else if (key.downArrow) {
@@ -123,10 +120,8 @@ function SinglePrompt({
 
 function MultiPrompt({
   prompt,
-  dispatch,
 }: {
   prompt: NonNullable<TuiState["pendingPrompt"]>;
-  dispatch: (action: TuiAction) => void;
 }) {
   const [cursor, setCursor] = useState(0);
   const [selected, setSelected] = useState(new Set<string>());
@@ -134,13 +129,13 @@ function MultiPrompt({
   useInput((_input, key) => {
     if (key.escape) {
       prompt.resolve("");
-      dispatch({ type: "SET_PENDING_PROMPT", payload: null });
+      useTuiState.setState({ pendingPrompt: null });
     } else if (key.return) {
       const values = prompt.options
         .filter((o) => selected.has(o.value))
         .map((o) => o.value);
       prompt.resolve(values.join(", "));
-      dispatch({ type: "SET_PENDING_PROMPT", payload: null });
+      useTuiState.setState({ pendingPrompt: null });
     } else if (key.upArrow) {
       setCursor((c) => Math.max(0, c - 1));
     } else if (key.downArrow) {

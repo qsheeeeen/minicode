@@ -1,10 +1,25 @@
-import type { StatusMessage } from "../ui/display.js";
+export interface RuntimeStatus {
+  role: "status" | "error";
+  content: string;
+  timestamp: Date;
+  userMessageIndex?: number;
+  element?: unknown;
+  toolDisplay?: {
+    name: string;
+    input: Record<string, unknown>;
+    output?: string;
+  };
+}
+
+export type RuntimeStatusInput = Omit<RuntimeStatus, "userMessageIndex"> & {
+  userMessageIndex?: number;
+};
 
 export type RuntimeEvent =
   | { type: "context.tokens_changed"; tokenCount: number }
   | {
       type: "status.added";
-      message: Omit<StatusMessage, "userMessageIndex">;
+      status: RuntimeStatus;
     };
 
 export type RuntimeEventListener = (event: RuntimeEvent) => void;

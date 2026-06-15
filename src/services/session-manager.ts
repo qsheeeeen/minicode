@@ -9,12 +9,12 @@ import { ChangeJournal } from "./change-journal.js";
 import { SessionPersistence } from "./session-persistence.js";
 import type { SessionStats } from "./session-stats.js";
 import type { LLMBlock } from "../llm/context.js";
-import type { StatusMessage } from "../ui/display.js";
-import { RuntimeEvents } from "./runtime-events.js";
+import {
+  RuntimeEvents,
+  type RuntimeStatusInput,
+} from "./runtime-events.js";
 
-export type StatusReporter = (
-  msg: Omit<StatusMessage, "userMessageIndex">,
-) => void;
+export type StatusReporter = (msg: RuntimeStatusInput) => void;
 
 export class SessionManager {
   private _currentSession: string;
@@ -36,8 +36,15 @@ export class SessionManager {
   }
 
   /** Report a status event. */
-  reportStatus(msg: Omit<StatusMessage, "userMessageIndex">): void {
-    this.events.emit({ type: "status.added", message: msg });
+  reportStatus(status: RuntimeStatusInput): void {
+    this.events.emit({
+      type: "status.added",
+      status: {
+        ...status,
+        userMessageIndex:
+          status.userMessageIndex ?? this.context.getUserMessageCount(),
+      },
+    });
   }
 
   /** Switch to a new session. Coordinates context + journal. */

@@ -149,7 +149,7 @@ describe("ContextManager", () => {
 
       expect(listener).toHaveBeenCalledWith({
         type: "status.added",
-        message: expect.objectContaining({
+        status: expect.objectContaining({
           role: "status",
           content: "[26% context]",
         }),
@@ -254,7 +254,7 @@ describe("ContextManager", () => {
       expect(getActiveUserMessageOrdinal()).toBe(3);
       expect(listener).toHaveBeenCalledWith({
         type: "status.added",
-        message: expect.objectContaining({
+        status: expect.objectContaining({
           role: "status",
           content: "Not enough conversation to compress.",
         }),

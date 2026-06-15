@@ -1,9 +1,9 @@
 import { Box, Text } from "ink";
-import { useTuiStore } from "./store.js";
+import { useTuiState } from "./state.js";
 import { Message } from "./Message.js";
 
 export function MessageList() {
-  const messages = useTuiStore((s) => s.messages);
+  const messages = useTuiState((s) => s.messages);
 
   if (messages.length === 0) {
     return (

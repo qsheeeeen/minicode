@@ -2,7 +2,7 @@
 // Run: bun run src/ui/tui/demos/index.tsx
 import { useState } from "react";
 import { render, Box, useInput } from "ink";
-import { useTuiStore } from "../store.js";
+import { useTuiState } from "../state.js";
 import { Header } from "../Header.js";
 import { Help } from "../Help.js";
 import { Status } from "../Status.js";
@@ -124,7 +124,7 @@ function Demo() {
 
   const mode = inputModes[inputIdx];
 
-  useTuiStore.setState({
+  useTuiState.setState({
     messages,
     agentSessions,
     activeAgentId: "1",

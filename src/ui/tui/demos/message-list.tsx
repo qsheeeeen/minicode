@@ -1,7 +1,7 @@
 // Standalone demo for MessageList component.
 // Run: bun run src/ui/tui/demos/message-list.tsx
 import { render, Box } from "ink";
-import { useTuiStore } from "../store.js";
+import { useTuiState } from "../state.js";
 import { MessageList } from "../MessageList.js";
 
 const messages = [
@@ -49,7 +49,7 @@ const messages = [
   },
 ];
 
-useTuiStore.setState({ messages });
+useTuiState.setState({ messages });
 render(
   <Box flexDirection="column" padding={1}>
     <MessageList />

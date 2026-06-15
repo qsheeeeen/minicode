@@ -2,7 +2,7 @@
 // Run: bun run src/ui/tui/demos/modal-prompter.tsx
 import { useState } from "react";
 import { render, Box, Text, useInput } from "ink";
-import { useTuiStore } from "../store.js";
+import { useTuiState } from "../state.js";
 import { ModalPrompter } from "../ModalPrompter.js";
 
 function Demo() {
@@ -59,7 +59,7 @@ function Demo() {
     },
   };
 
-  useTuiStore.setState(state as any);
+  useTuiState.setState(state as any);
   return (
     <Box flexDirection="column">
       <Text bold>{multi ? "multi" : "single"}</Text>

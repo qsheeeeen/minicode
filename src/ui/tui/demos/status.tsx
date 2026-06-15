@@ -1,16 +1,16 @@
 // Standalone demo for Status component.
 // Run: bun run src/ui/tui/demos/status.tsx
 import { render, Box } from "ink";
-import { useTuiStore } from "../store.js";
+import { useTuiState } from "../state.js";
 import { Status } from "../Status.js";
 
-useTuiStore.setState({ isLoading: true, pendingPrompt: null });
+useTuiState.setState({ isLoading: true, pendingPrompt: null });
 render(
   <Box flexDirection="column" padding={1}>
     <Status />
   </Box>,
 );
-useTuiStore.setState({
+useTuiState.setState({
   isLoading: true,
   pendingPrompt: {
     message: "Pick one",

@@ -1,7 +1,7 @@
 import React from "react";
 import { Box, Text } from "ink";
 import { ProgressBar } from "@inkjs/ui";
-import { useTuiStore } from "./store.js";
+import { useTuiState } from "./state.js";
 import type { Agent } from "../../agent.js";
 
 interface PanelProps {
@@ -10,10 +10,10 @@ interface PanelProps {
 }
 
 export function Panel({ agentRef, promptFiles = [] }: PanelProps) {
-  const tokenCount = useTuiStore((s) => s.tokenCount);
-  const permissionMode = useTuiStore((s) => s.permissionMode);
-  const currentSession = useTuiStore((s) => s.currentSession);
-  const status = useTuiStore((s) => s.status);
+  const tokenCount = useTuiState((s) => s.tokenCount);
+  const permissionMode = useTuiState((s) => s.permissionMode);
+  const currentSession = useTuiState((s) => s.currentSession);
+  const status = useTuiState((s) => s.status);
 
   const currentModel = agentRef.current.model;
   const contextLength = currentModel.getContextLength();

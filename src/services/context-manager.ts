@@ -9,8 +9,10 @@ import {
 } from "./compression-service.js";
 import { ChangeJournal } from "./change-journal.js";
 import type { LLMContext } from "../llm/context.js";
-import type { RuntimeEvents } from "./runtime-events.js";
-import type { StatusMessage } from "../ui/display.js";
+import type {
+  RuntimeEvents,
+  RuntimeStatusInput,
+} from "./runtime-events.js";
 
 export interface ContextManagerOpts {
   readonly client: LLMClient;
@@ -229,7 +231,14 @@ export class ContextManager {
     });
   }
 
-  private reportStatus(message: Omit<StatusMessage, "userMessageIndex">): void {
-    this.events.emit({ type: "status.added", message });
+  private reportStatus(status: RuntimeStatusInput): void {
+    this.events.emit({
+      type: "status.added",
+      status: {
+        ...status,
+        userMessageIndex:
+          status.userMessageIndex ?? this.getContext().getUserMessageCount(),
+      },
+    });
   }
 }

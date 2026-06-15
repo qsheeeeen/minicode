@@ -1,15 +1,15 @@
 import { render } from "ink-testing-library";
 import { describe, it, expect, beforeEach } from "vitest";
 import { MessageList } from "./MessageList.js";
-import { useTuiStore, initialState } from "./store.js";
+import { useTuiState, initialState } from "./state.js";
 
 describe("MessageList Component", () => {
   beforeEach(() => {
-    useTuiStore.setState(initialState, true);
+    useTuiState.setState(initialState, true);
   });
 
   it("shows welcome text when there are no messages", () => {
-    useTuiStore.setState({ messages: [] });
+    useTuiState.setState({ messages: [] });
     const { lastFrame } = render(<MessageList />);
 
     const output = lastFrame();
@@ -17,7 +17,7 @@ describe("MessageList Component", () => {
   });
 
   it("renders a list of messages", () => {
-    useTuiStore.setState({
+    useTuiState.setState({
       messages: [
         { role: "user", content: "Hello", timestamp: new Date() },
         { role: "text", content: "Hi there!", timestamp: new Date() },

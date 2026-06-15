@@ -3,7 +3,6 @@ import { Box, useInput, useApp } from "ink";
 import { Agent } from "../agent.js";
 import type { AppConfig } from "../config.js";
 import type { DisplayMessage } from "./display.js";
-import { toDisplayMessages } from "./display.js";
 import type { UserPrompter } from "../tools/registry.js";
 import { routeInput } from "./routing.js";
 import { processRoute } from "./route-handler.js";
@@ -16,8 +15,9 @@ import type { ModelSwitchService } from "../services/model-switcher.js";
 import type { ContextManager } from "../services/context-manager.js";
 import type { LLMContext } from "../llm/context.js";
 import { Receipt } from "./tui/Receipt.js";
+import { UITimeline } from "./tui/timeline.js";
 
-import { useTuiStore } from "./tui/store.js";
+import { useTuiState } from "./tui/state.js";
 import { connectAgent } from "./tui/connect-agent.js";
 import { Header } from "./tui/Header.js";
 import { MessageList } from "./tui/MessageList.js";
@@ -52,36 +52,32 @@ export interface AppProps {
 function useMultiAgent(
   registry: AgentRegistry,
   agentRef: React.MutableRefObject<Agent>,
+  uiTimeline: UITimeline,
 ) {
-  const activeAgentId = useTuiStore((s) => s.activeAgentId);
-  const dispatch = useTuiStore((s) => s.dispatch);
+  const activeAgentId = useTuiState((s) => s.activeAgentId);
   const activeAgentIdRef = useRef(activeAgentId);
 
   useEffect(() => {
     registry.setUpdateCallback((sessions) => {
-      dispatch({ type: "SET_AGENT_SESSIONS", payload: sessions });
+      useTuiState.setState({ agentSessions: sessions });
       if (
         activeAgentIdRef.current !== "1" &&
         !sessions.find((s) => s.id === activeAgentIdRef.current)
       ) {
         activeAgentIdRef.current = "1";
-        dispatch({ type: "SET_ACTIVE_AGENT_ID", payload: "1" });
+        useTuiState.setState({ activeAgentId: "1" });
       }
     });
-  }, [registry, dispatch]);
+  }, [registry]);
 
   const switchToSession = useCallback(
     (session: AgentSession) => {
       activeAgentIdRef.current = session.id;
-      dispatch({ type: "SET_ACTIVE_AGENT_ID", payload: session.id });
-      dispatch({ type: "CLEAR_STATUSES" });
-      dispatch({
-        type: "SET_MESSAGES",
-        payload: toDisplayMessages(session.context.getBlocks(), []),
-      });
+      useTuiState.setState({ activeAgentId: session.id });
+      uiTimeline.setContext(session.context);
       agentRef.current = session.agent;
     },
-    [dispatch, agentRef],
+    [agentRef, uiTimeline],
   );
 
   useInput((input, key) => {
@@ -133,20 +129,23 @@ function AppContent({
   context,
   permissionService,
   prompterRef,
-}: AppProps & { prompterRef: React.RefObject<UserPrompter | null> }) {
+  uiTimeline,
+}: AppProps & {
+  prompterRef: React.RefObject<UserPrompter | null>;
+  uiTimeline: UITimeline;
+}) {
   const { exit } = useApp();
-  const dispatch = useTuiStore((s) => s.dispatch);
-  const input = useTuiStore((s) => s.input);
-  const pendingPrompt = useTuiStore((s) => s.pendingPrompt);
-  const isLoading = useTuiStore((s) => s.isLoading);
-  const showReceipt = useTuiStore((s) => s.showReceipt);
+  const input = useTuiState((s) => s.input);
+  const pendingPrompt = useTuiState((s) => s.pendingPrompt);
+  const isLoading = useTuiState((s) => s.isLoading);
+  const showReceipt = useTuiState((s) => s.showReceipt);
   const agentRef = useRef<Agent>(agent);
 
   const [autoSubmitPending, setAutoSubmitPending] =
     React.useState(!!initialPrompt);
   const loadingRef = useRef(false);
 
-  useMultiAgent(agentRegistry, agentRef);
+  useMultiAgent(agentRegistry, agentRef, uiTimeline);
 
   useEffect(() => {
     sessionStats.init(
@@ -176,20 +175,26 @@ function AppContent({
         contextManager.setTokenCount(count);
       },
       setMessages: (msgs: DisplayMessage[]) => {
-        dispatch({ type: "SET_MESSAGES", payload: msgs });
+        useTuiState.setState({ messages: msgs });
       },
       setCurrentSession: (session: string) =>
-        dispatch({ type: "SET_CURRENT_SESSION", payload: session }),
+        useTuiState.setState({ currentSession: session }),
       setMode: () => {},
       setInputMode: (mode: string, props?: Record<string, unknown>) =>
-        dispatch({ type: "SET_INPUT_MODE", payload: { mode, props } }),
+        useTuiState.setState((state) => ({
+          input: { ...state.input, mode, props: props ?? {} },
+        })),
       setSessionList: (sessions: Array<{ name: string }>) =>
-        dispatch({ type: "SET_SESSION_LIST", payload: { sessions } }),
+        useTuiState.setState((state) => ({
+          sessionList: { ...state.sessionList, sessions },
+        })),
       setSelectedIndex: (index: number) =>
-        dispatch({ type: "SET_SELECTED_SESSION_INDEX", payload: index }),
-      exit: () => dispatch({ type: "SET_SHOW_RECEIPT", payload: true }),
+        useTuiState.setState((state) => ({
+          sessionList: { ...state.sessionList, selectedIndex: index },
+        })),
+      exit: () => useTuiState.setState({ showReceipt: true }),
     }),
-    [dispatch, sessionManager, contextManager, config, modelSwitchService],
+    [sessionManager, contextManager, config, modelSwitchService],
   );
 
   const handleSubmit = useCallback(
@@ -208,25 +213,21 @@ function AppContent({
 
       if (processed.type === "done") {
         if (processed.shellOutput) {
-          const { statuses } = useTuiStore.getState();
-          dispatch({
-            type: "SET_MESSAGES",
-            payload: toDisplayMessages(context.getBlocks(), statuses),
-          });
+          uiTimeline.sync();
         }
         return false;
       }
 
       // "run" — command with prompt or plain LLM input
       loadingRef.current = true;
-      dispatch({ type: "SET_IS_LOADING", payload: true });
+      useTuiState.setState({ isLoading: true });
       try {
         const sent = await agent.run(processed.promptText, {
           displayContent: processed.displayContent,
           prompter: prompterRef.current ?? undefined,
         });
         if (!sent) {
-          dispatch({ type: "SET_IS_LOADING", payload: false });
+          useTuiState.setState({ isLoading: false });
           return false;
         }
         return true;
@@ -249,17 +250,12 @@ function AppContent({
         return false;
       } finally {
         loadingRef.current = false;
-        // Ensure final messages are always synced to Zustand after run
-        const { statuses } = useTuiStore.getState();
-        dispatch({
-          type: "SET_MESSAGES",
-          payload: toDisplayMessages(context.getBlocks(), statuses),
-        });
-        dispatch({ type: "SET_IS_LOADING", payload: false });
-        dispatch({ type: "SET_STATUS", payload: "" });
+        // Ensure final messages are always synced to UI state after run.
+        uiTimeline.sync();
+        useTuiState.setState({ isLoading: false, status: "" });
       }
     },
-    [dispatch, cmdContext],
+    [cmdContext],
   );
 
   useEffect(() => {
@@ -278,23 +274,23 @@ function AppContent({
           agentRef.current?.abort();
           if (pendingPrompt) {
             pendingPrompt.resolve("");
-            dispatch({ type: "SET_PENDING_PROMPT", payload: null });
+            useTuiState.setState({ pendingPrompt: null });
           }
         } else {
-          dispatch({ type: "SET_SHOW_RECEIPT", payload: true });
+          useTuiState.setState({ showReceipt: true });
         }
         return;
       }
       if (key.shift && key.tab) {
         const next = permissionService.cycleMode();
-        dispatch({ type: "SET_PERMISSION_MODE", payload: next });
+        useTuiState.setState({ permissionMode: next });
         return;
       }
       if (key.escape && isLoading) {
         agentRef.current?.abort();
         if (pendingPrompt) {
           pendingPrompt.resolve("");
-          dispatch({ type: "SET_PENDING_PROMPT", payload: null });
+          useTuiState.setState({ pendingPrompt: null });
         }
         return;
       }
@@ -306,7 +302,7 @@ function AppContent({
     (keyInput, key) => {
       if ((key.escape || (key.ctrl && keyInput === "c")) && pendingPrompt) {
         pendingPrompt.resolve("");
-        dispatch({ type: "SET_PENDING_PROMPT", payload: null });
+        useTuiState.setState({ pendingPrompt: null });
       }
     },
     { isActive: isModal },
@@ -338,21 +334,27 @@ function AppContent({
 }
 
 export function App(props: AppProps) {
-  // Set initial permission mode on Zustand store
+  // Set initial permission mode on UI state.
   useEffect(() => {
-    useTuiStore.setState({
+    useTuiState.setState({
       permissionMode: props.permissionService.getMode(),
     });
   }, []);
 
-  // Bridge Agent domain observables to Zustand
+  // Bridge Agent domain observables to UI state.
   const prompterRef = useRef<UserPrompter | null>(null);
+  const uiTimelineRef = useRef<UITimeline | null>(null);
+  if (!uiTimelineRef.current) {
+    uiTimelineRef.current = new UITimeline(props.context);
+  }
+
   useEffect(() => {
     const { cleanup, prompter } = connectAgent({
       agent: props.agent,
       sessionManager: props.sessionManager,
       contextManager: props.contextManager,
       runtimeEvents: props.runtimeEvents,
+      uiTimeline: uiTimelineRef.current!,
       initialSession: props.initialSession,
       sessionName: props.sessionName,
       resumeRecent: props.resumeRecent,
@@ -362,5 +364,11 @@ export function App(props: AppProps) {
     return cleanup;
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return <AppContent {...props} prompterRef={prompterRef} />;
+  return (
+    <AppContent
+      {...props}
+      prompterRef={prompterRef}
+      uiTimeline={uiTimelineRef.current}
+    />
+  );
 }

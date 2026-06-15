@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 import { Box, Text } from "ink";
-import { useTuiStore } from "./store.js";
+import { useTuiState } from "./state.js";
 
 const FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
 export function Status() {
-  const isLoading = useTuiStore((s) => s.isLoading);
-  const pendingPrompt = useTuiStore((s) => s.pendingPrompt);
+  const isLoading = useTuiState((s) => s.isLoading);
+  const pendingPrompt = useTuiState((s) => s.pendingPrompt);
   const [frame, setFrame] = useState(0);
 
   useEffect(() => {

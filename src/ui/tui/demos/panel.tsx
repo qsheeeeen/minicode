@@ -1,7 +1,7 @@
 // Standalone demo for Panel component.
 // Run: bun run src/ui/tui/demos/panel.tsx
 import { render, Box } from "ink";
-import { useTuiStore } from "../store.js";
+import { useTuiState } from "../state.js";
 import { Panel } from "../Panel.js";
 
 function mkAgent(model: string, provider: string, ctx: number) {
@@ -16,7 +16,7 @@ function mkAgent(model: string, provider: string, ctx: number) {
   };
 }
 
-useTuiStore.setState({
+useTuiState.setState({
   tokenCount: 24000,
   currentSession: "debug-auth",
   permissionMode: "manual",
@@ -30,7 +30,7 @@ render(
     />
   </Box>,
 );
-useTuiStore.setState({
+useTuiState.setState({
   tokenCount: 110000,
   currentSession: "refactor-db",
   permissionMode: "yolo",
@@ -39,7 +39,7 @@ useTuiStore.setState({
 render(
   <Panel agentRef={mkAgent("claude-opus-4-7", "anthropic", 200000)} />,
 );
-useTuiStore.setState({
+useTuiState.setState({
   tokenCount: 178000,
   currentSession: "feature-x",
   permissionMode: "auto",

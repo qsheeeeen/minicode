@@ -1,17 +1,7 @@
 import type { LLMBlock } from "../llm/context.js";
+import type { RuntimeStatus } from "../services/runtime-events.js";
 
-export interface StatusMessage {
-  role: "status" | "error";
-  content: string;
-  timestamp: Date;
-  userMessageIndex?: number;
-  element?: unknown;
-  toolDisplay?: {
-    name: string;
-    input: Record<string, unknown>;
-    output?: string;
-  };
-}
+export type StatusMessage = RuntimeStatus;
 
 export type MessageRole =
   | "user"

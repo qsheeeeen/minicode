@@ -1,27 +1,27 @@
 import { render } from "ink-testing-library";
 import { describe, it, expect, beforeEach } from "vitest";
 import { Status } from "./Status.js";
-import { useTuiStore, initialState } from "./store.js";
+import { useTuiState, initialState } from "./state.js";
 
 describe("Status Component", () => {
   beforeEach(() => {
-    useTuiStore.setState(initialState, true);
+    useTuiState.setState(initialState, true);
   });
 
   it("renders nothing when not loading", () => {
-    useTuiStore.setState({ isLoading: false });
+    useTuiState.setState({ isLoading: false });
     const { lastFrame } = render(<Status />);
     expect(lastFrame()).toBe("");
   });
 
   it("shows 'Thinking...' when loading without pending prompt", () => {
-    useTuiStore.setState({ isLoading: true, pendingPrompt: null });
+    useTuiState.setState({ isLoading: true, pendingPrompt: null });
     const { lastFrame } = render(<Status />);
     expect(lastFrame()).toContain("Thinking...");
   });
 
   it("shows 'Waiting for user...' when loading with pending prompt", () => {
-    useTuiStore.setState({
+    useTuiState.setState({
       isLoading: true,
       pendingPrompt: {
         type: "text",

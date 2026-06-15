@@ -2,7 +2,7 @@ import React, { createRef } from "react";
 import { render } from "ink-testing-library";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { InputArea } from "./InputArea.js";
-import { useTuiStore, initialState } from "./store.js";
+import { useTuiState, initialState } from "./state.js";
 
 describe("InputArea Component", () => {
   const mockLoadingRef = (
@@ -14,13 +14,13 @@ describe("InputArea Component", () => {
   };
 
   beforeEach(() => {
-    useTuiStore.setState(initialState, true);
+    useTuiState.setState(initialState, true);
   });
 
   it("renders nothing when there is a pending prompt (isModal = true)", () => {
     const mockAgentRef = { current: {} } as any;
 
-    useTuiStore.setState({
+    useTuiState.setState({
       pendingPrompt: {
         message: "hi",
         type: "text",
@@ -46,7 +46,7 @@ describe("InputArea Component", () => {
       current: { getStore: () => ({ addStatus: vi.fn() }) },
     } as any;
 
-    useTuiStore.setState({
+    useTuiState.setState({
       pendingPrompt: null,
       input: { mode: "chat", value: "", props: {}, key: 0 },
     });
@@ -69,7 +69,7 @@ describe("InputArea Component", () => {
       current: { getStore: () => ({ addStatus: vi.fn() }) },
     } as any;
 
-    useTuiStore.setState({
+    useTuiState.setState({
       pendingPrompt: null,
       input: { mode: "chat", value: "", props: {}, key: 0 },
       isLoading: true,

@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useCallback } from "react";
 import { Box, Text, useInput } from "ink";
-import { useTuiStore } from "./store.js";
+import { useTuiState } from "./state.js";
 import { getInputComponent } from "./inputs.js";
 import { getCommandList } from "../commands/index.js";
 import { modeHandlers } from "./mode-handlers.js";
@@ -23,10 +23,9 @@ export function InputArea({
   config,
   modelSwitchService,
 }: InputAreaProps) {
-  const input = useTuiStore((s) => s.input);
-  const pendingPrompt = useTuiStore((s) => s.pendingPrompt);
-  const isLoading = useTuiStore((s) => s.isLoading);
-  const dispatch = useTuiStore((s) => s.dispatch);
+  const input = useTuiState((s) => s.input);
+  const pendingPrompt = useTuiState((s) => s.pendingPrompt);
+  const isLoading = useTuiState((s) => s.isLoading);
 
   // Command autocomplete logic
   const commandList = useMemo(
@@ -58,11 +57,13 @@ export function InputArea({
       } else if (key.downArrow) {
         setSelectedSuggestion((prev) => (prev + 1) % matchingCommands.length);
       } else if (key.tab) {
-        dispatch({
-          type: "SET_INPUT_VALUE",
-          payload: `/${matchingCommands[selectedSuggestion].name} `,
-        });
-        dispatch({ type: "INCREMENT_INPUT_KEY" });
+        useTuiState.setState((state) => ({
+          input: {
+            ...state.input,
+            value: `/${matchingCommands[selectedSuggestion].name} `,
+            key: state.input.key + 1,
+          },
+        }));
         setSelectedSuggestion(0);
       }
     },
@@ -81,19 +82,30 @@ export function InputArea({
           agentRef,
           config,
           modelSwitchService,
-          dispatch,
           handleSubmit,
         });
-        dispatch({ type: "SET_INPUT_MODE", payload: { mode: "chat" } });
-        dispatch({ type: "SET_INPUT_VALUE", payload: "" });
-        dispatch({ type: "INCREMENT_INPUT_KEY" });
+        useTuiState.setState((state) => ({
+          input: {
+            ...state.input,
+            mode: "chat",
+            props: {},
+            value: "",
+            key: state.input.key + 1,
+          },
+        }));
         setSelectedSuggestion(0);
       } else {
         // Default chat mode
         if (loadingRef.current) return;
-        dispatch({ type: "SET_INPUT_VALUE", payload: "" });
-        dispatch({ type: "INCREMENT_INPUT_KEY" });
-        dispatch({ type: "SET_INPUT_MODE", payload: { mode: "chat" } });
+        useTuiState.setState((state) => ({
+          input: {
+            ...state.input,
+            mode: "chat",
+            props: {},
+            value: "",
+            key: state.input.key + 1,
+          },
+        }));
         setSelectedSuggestion(0);
         await handleSubmit(value);
       }
@@ -103,24 +115,28 @@ export function InputArea({
       agentRef,
       config,
       modelSwitchService,
-      dispatch,
       handleSubmit,
       loadingRef,
     ],
   );
 
   const handleCancel = useCallback(() => {
-    dispatch({ type: "SET_INPUT_MODE", payload: { mode: "chat" } });
-    dispatch({ type: "SET_INPUT_VALUE", payload: "" });
+    useTuiState.setState((state) => ({
+      input: { ...state.input, mode: "chat", props: {}, value: "" },
+    }));
     setSelectedSuggestion(0);
-  }, [dispatch]);
+  }, []);
 
   const handleChange = useCallback(
     (v: string) => {
-      dispatch({ type: "SET_INPUT_VALUE", payload: v });
+      useTuiState.setState((state) =>
+        state.input.value === v
+          ? state
+          : { input: { ...state.input, value: v } },
+      );
       setSelectedSuggestion(0);
     },
-    [dispatch],
+    [],
   );
 
   const InputComponent = getInputComponent(input.mode);

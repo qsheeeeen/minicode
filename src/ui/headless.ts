@@ -45,8 +45,7 @@ export async function runHeadless(
   const renderer = new HeadlessRenderer(context);
   const unsubscribeRuntimeEvents = runtimeEvents.subscribe((event) => {
     if (event.type === "status.added") {
-      const userMessageIndex = context.getUserMessageCount();
-      renderer.addStatus({ ...event.message, userMessageIndex });
+      renderer.addStatus(event.status);
     }
   });
 

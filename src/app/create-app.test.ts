@@ -95,7 +95,7 @@ describe("createApp", () => {
 
     expect(listener).toHaveBeenCalledWith({
       type: "status.added",
-      message: expect.objectContaining({ role: "status" }),
+      status: expect.objectContaining({ role: "status" }),
     });
   });
 

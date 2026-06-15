@@ -1,15 +1,15 @@
 import { render } from "ink-testing-library";
 import { describe, it, expect, beforeEach } from "vitest";
 import { SubAgentBar } from "./SubAgentBar.js";
-import { useTuiStore, initialState } from "./store.js";
+import { useTuiState, initialState } from "./state.js";
 
 describe("SubAgentBar Component", () => {
   beforeEach(() => {
-    useTuiStore.setState(initialState, true);
+    useTuiState.setState(initialState, true);
   });
 
   it("renders nothing with single session", () => {
-    useTuiStore.setState({
+    useTuiState.setState({
       activeAgentId: "1",
       agentSessions: [
         { id: "1", type: "main", agent: {} as any, status: "idle" },
@@ -20,7 +20,7 @@ describe("SubAgentBar Component", () => {
   });
 
   it("renders multiple sessions", () => {
-    useTuiStore.setState({
+    useTuiState.setState({
       activeAgentId: "1",
       agentSessions: [
         {
@@ -48,7 +48,7 @@ describe("SubAgentBar Component", () => {
   });
 
   it("shows status icons for different statuses", () => {
-    useTuiStore.setState({
+    useTuiState.setState({
       activeAgentId: "1",
       agentSessions: [
         { id: "1", type: "main", agent: {} as any, status: "running" },
@@ -66,7 +66,7 @@ describe("SubAgentBar Component", () => {
   });
 
   it("shows token and tool stats when available", () => {
-    useTuiStore.setState({
+    useTuiState.setState({
       activeAgentId: "1",
       agentSessions: [
         {
@@ -88,7 +88,7 @@ describe("SubAgentBar Component", () => {
 
   it("truncates long task names", () => {
     const longTask = "a".repeat(60);
-    useTuiStore.setState({
+    useTuiState.setState({
       activeAgentId: "1",
       agentSessions: [
         { id: "1", type: "main", agent: {} as any, status: "idle" },

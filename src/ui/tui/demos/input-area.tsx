@@ -1,7 +1,7 @@
 // Standalone demo for InputArea component.
 // Run: bun run src/ui/tui/demos/input-area.tsx
 import { render, Box } from "ink";
-import { useTuiStore } from "../store.js";
+import { useTuiState } from "../state.js";
 import { InputArea } from "../InputArea.js";
 
 const agentRef = {
@@ -13,7 +13,7 @@ const agentRef = {
 };
 const loadingRef = { current: false };
 
-useTuiStore.setState({
+useTuiState.setState({
   input: { mode: "chat", value: "", props: {}, key: 0 },
   isLoading: false,
   pendingPrompt: null,

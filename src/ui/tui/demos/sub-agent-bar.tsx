@@ -1,7 +1,7 @@
 // Standalone demo for SubAgentBar component.
 // Run: bun run src/ui/tui/demos/sub-agent-bar.tsx
 import { render, Box } from "ink";
-import { useTuiStore } from "../store.js";
+import { useTuiState } from "../state.js";
 import { SubAgentBar } from "../SubAgentBar.js";
 
 const agentSessions = [
@@ -44,7 +44,7 @@ const agentSessions = [
   },
 ];
 
-useTuiStore.setState({ agentSessions, activeAgentId: "1" });
+useTuiState.setState({ agentSessions, activeAgentId: "1" });
 render(
   <Box flexDirection="column" padding={1}>
     <SubAgentBar />

@@ -16,7 +16,8 @@ import { PermissionService } from "../../services/permission.js";
 import { SessionPersistence } from "../../services/session-persistence.js";
 import { AgentRegistry } from "../../services/agent-registry.js";
 import { connectAgent } from "./connect-agent.js";
-import { useTuiStore, initialState } from "./store.js";
+import { useTuiState, initialState } from "./state.js";
+import { UITimeline } from "./timeline.js";
 
 function createTestAgent(responses = [defaultTextResponse("OK")]) {
   const tools = new Map<string, ToolDef>([
@@ -67,8 +68,7 @@ describe("connectAgent", () => {
   let cleanup: (() => void) | undefined;
 
   beforeEach(() => {
-    // Reset Zustand state but keep dispatch function (shallow merge, not replace)
-    useTuiStore.setState(initialState);
+    useTuiState.setState(initialState);
     vi.spyOn(SessionPersistence, "getSessionDir").mockReturnValue(
       "/tmp/minicode-connect-agent-test",
     );
@@ -80,7 +80,7 @@ describe("connectAgent", () => {
     vi.restoreAllMocks();
   });
 
-  it("should dispatch SET_MESSAGES with assistant text after agent.run()", async () => {
+  it("should update messages with assistant text after agent.run()", async () => {
     const { agent, sessionManager, contextManager, runtimeEvents } =
       createTestAgent([defaultTextResponse("Hello from assistant!")]);
     const registry = new AgentRegistry();
@@ -90,6 +90,7 @@ describe("connectAgent", () => {
       sessionManager,
       contextManager,
       runtimeEvents,
+      uiTimeline: new UITimeline(sessionManager.getContext()),
       initialSession: "test-session",
       registry,
     });
@@ -98,8 +99,8 @@ describe("connectAgent", () => {
     // Run the agent
     await agent.run("Hi there");
 
-    // Verify Zustand store received messages
-    const state = useTuiStore.getState();
+    // Verify UI state received messages.
+    const state = useTuiState.getState();
 
     // Should have at least user + assistant messages
     expect(state.messages.length).toBeGreaterThanOrEqual(2);
@@ -115,21 +116,14 @@ describe("connectAgent", () => {
     expect(textMsg!.content).toBe("Hello from assistant!");
   });
 
-  it("should dispatch SET_MESSAGES for each store change during streaming", async () => {
+  it("should update messages for context changes during streaming", async () => {
     const { agent, sessionManager, contextManager, runtimeEvents } =
       createTestAgent([defaultTextResponse("Streaming text")]);
     const registry = new AgentRegistry();
 
-    const dispatchHistory: DisplayMessage[][] = [];
-    const origDispatch = useTuiStore.getState().dispatch;
-    // Spy on dispatch to track SET_MESSAGES calls
-    useTuiStore.setState({
-      dispatch: (action: any) => {
-        if (action.type === "SET_MESSAGES") {
-          dispatchHistory.push(action.payload);
-        }
-        origDispatch(action);
-      },
+    const snapshots: DisplayMessage[][] = [];
+    const unsubscribe = useTuiState.subscribe((state) => {
+      snapshots.push(state.messages);
     });
 
     const result = connectAgent({
@@ -137,24 +131,24 @@ describe("connectAgent", () => {
       sessionManager,
       contextManager,
       runtimeEvents,
+      uiTimeline: new UITimeline(sessionManager.getContext()),
       initialSession: "test-session",
       registry,
     });
     cleanup = result.cleanup;
 
     await agent.run("Hello");
+    unsubscribe();
 
-    // Should have dispatched SET_MESSAGES while the context updates.
-    expect(dispatchHistory.length).toBeGreaterThanOrEqual(2);
+    expect(snapshots.length).toBeGreaterThanOrEqual(2);
 
-    // Last dispatch should have the final messages
-    const lastDispatch = dispatchHistory[dispatchHistory.length - 1];
-    const textMsg = lastDispatch.find((m) => m.role === "text");
+    const lastSnapshot = snapshots[snapshots.length - 1];
+    const textMsg = lastSnapshot.find((m) => m.role === "text");
     expect(textMsg).toBeDefined();
     expect(textMsg!.content).toBe("Streaming text");
   });
 
-  it("should dispatch SET_TOKEN_COUNT when agent token count changes", () => {
+  it("should update token count when agent token count changes", () => {
     const { agent, sessionManager, contextManager, runtimeEvents } =
       createTestAgent();
     const registry = new AgentRegistry();
@@ -164,6 +158,7 @@ describe("connectAgent", () => {
       sessionManager,
       contextManager,
       runtimeEvents,
+      uiTimeline: new UITimeline(sessionManager.getContext()),
       initialSession: "test-session",
       registry,
     });
@@ -171,7 +166,7 @@ describe("connectAgent", () => {
 
     runtimeEvents.emit({ type: "context.tokens_changed", tokenCount: 5000 });
 
-    const state = useTuiStore.getState();
+    const state = useTuiState.getState();
     expect(state.tokenCount).toBe(5000);
   });
 
@@ -185,6 +180,7 @@ describe("connectAgent", () => {
       sessionManager,
       contextManager,
       runtimeEvents,
+      uiTimeline: new UITimeline(sessionManager.getContext()),
       initialSession: "test-session",
       registry,
     });
@@ -208,6 +204,7 @@ describe("connectAgent", () => {
       sessionManager,
       contextManager,
       runtimeEvents,
+      uiTimeline: new UITimeline(sessionManager.getContext()),
       initialSession: "test-session",
       registry,
     });
@@ -215,17 +212,16 @@ describe("connectAgent", () => {
     // Cleanup
     result.cleanup();
 
-    // Reset store to track new dispatches
-    useTuiStore.setState({ messages: [] });
+    // Reset state to track new changes.
+    useTuiState.setState({ messages: [] });
 
     // Run agent after cleanup
     await agent.run("After cleanup");
 
-    // Messages should NOT be dispatched to Zustand (subscription removed)
-    const state = useTuiStore.getState();
+    // Messages should not update after the subscription is removed.
+    const state = useTuiState.getState();
     expect(state.messages).toEqual([]);
   });
 });
 
-// Import DisplayMessage type for dispatch spy
 import type { DisplayMessage } from "../display.js";
