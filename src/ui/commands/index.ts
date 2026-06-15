@@ -4,7 +4,6 @@ import type { Model } from "../../llm/model.js";
 import type { SessionStats } from "../../services/session-stats.js";
 import type { SessionManager } from "../../services/session-manager.js";
 import type { ChangeJournal } from "../../services/change-journal.js";
-import type { Signal } from "../../utils/signal.js";
 import type { LLMContext } from "../../llm/context.js";
 import type { AppConfig } from "../../config.js";
 import type { ModelSwitchService } from "../../services/model-switcher.js";
@@ -26,9 +25,9 @@ export interface CommandContext {
   context: LLMContext;
   sessionManager: SessionManager;
   changeJournal: ChangeJournal;
-  tokenCount$: Signal<number>;
   sessionStats: SessionStats;
   modelSwitchService: ModelSwitchService;
+  setTokenCount: (count: number) => void;
   setMessages: (msg: DisplayMessage[]) => void;
   setCurrentSession: (name: string) => void;
   setMode: (mode: "chat" | "session-list" | "effort-select") => void;

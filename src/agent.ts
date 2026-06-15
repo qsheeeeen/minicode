@@ -7,7 +7,6 @@ import {
 } from "./tools/index.js";
 import type { ToolExecutor, ToolCall } from "./tools/executor.js";
 import type { UserPrompter } from "./tools/registry.js";
-import type { Signal } from "./utils/signal.js";
 import type { AgentRegistry } from "./services/agent-registry.js";
 import type { PromptManager } from "./services/prompt-manager.js";
 import type { SessionManager } from "./services/session-manager.js";
@@ -26,7 +25,7 @@ export interface AgentOpts {
   readonly contextManager: ContextManager;
   readonly toolExecutor: ToolExecutor;
   readonly promptManager: PromptManager;
-  readonly tokenCount$: Signal<number>;
+  readonly onTokenCountChange?: (count: number) => void;
   readonly agentRegistry?: AgentRegistry;
   readonly currentAgentId?: string;
   readonly appConfig: AppConfig;
@@ -41,7 +40,7 @@ export class Agent {
   private sessionManager: SessionManager;
   private contextManager: ContextManager;
   private toolExecutor: ToolExecutor;
-  public readonly tokenCount$: Signal<number>;
+  public onTokenCountChange?: (count: number) => void;
   private promptManager: PromptManager;
   private agentRegistry?: AgentRegistry;
   private currentAgentId: string;
@@ -74,7 +73,7 @@ export class Agent {
     this.contextManager = opts.contextManager;
     this.toolExecutor = opts.toolExecutor;
     this.promptManager = opts.promptManager;
-    this.tokenCount$ = opts.tokenCount$;
+    this.onTokenCountChange = opts.onTokenCountChange;
     this.agentRegistry = opts.agentRegistry;
     this.currentAgentId = opts.currentAgentId ?? "1";
     this.appConfig = opts.appConfig;
@@ -136,13 +135,15 @@ export class Agent {
   private async processTokenUsage(result: LLMStreamResult): Promise<void> {
     if (!result.usage) return;
 
-    const shouldCompress = this.contextManager.processTokenUsage(
+    const usageResult = this.contextManager.processTokenUsage(
       this.model.getName(),
       result.usage,
     );
+    this.onTokenCountChange?.(usageResult.totalTokens);
 
-    if (shouldCompress) {
+    if (usageResult.shouldCompress) {
       await this.compress();
+      this.onTokenCountChange?.(this.contextManager.getTokenCount());
     }
   }
 
@@ -315,5 +316,6 @@ export class Agent {
   clearSession(): void {
     this.sessionManager.clearSession();
     this.contextManager.reset();
+    this.onTokenCountChange?.(0);
   }
 }

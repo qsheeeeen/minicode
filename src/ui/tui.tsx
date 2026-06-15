@@ -12,8 +12,8 @@ import type { SessionStats } from "../services/session-stats.js";
 import type { SessionManager } from "../services/session-manager.js";
 import type { PermissionService } from "../services/permission.js";
 import type { ModelSwitchService } from "../services/model-switcher.js";
+import type { ContextManager } from "../services/context-manager.js";
 import type { LLMContext } from "../llm/context.js";
-import type { Signal } from "../utils/signal.js";
 import { Receipt } from "./tui/Receipt.js";
 
 import { useTuiStore } from "./tui/store.js";
@@ -40,9 +40,9 @@ export interface AppProps {
   programStartTime: number;
   sessionStats: SessionStats;
   sessionManager: SessionManager;
+  contextManager: ContextManager;
   modelSwitchService: ModelSwitchService;
   context: LLMContext;
-  tokenCount$: Signal<number>;
   permissionService: PermissionService;
 }
 
@@ -125,9 +125,9 @@ function AppContent({
   programStartTime,
   sessionStats,
   sessionManager,
+  contextManager,
   modelSwitchService,
   context,
-  tokenCount$,
   permissionService,
   prompterRef,
 }: AppProps & { prompterRef: React.RefObject<UserPrompter | null> }) {
@@ -163,9 +163,12 @@ function AppContent({
       get changeJournal() {
         return sessionManager.getChangeJournal();
       },
-      tokenCount$,
       sessionStats,
       modelSwitchService,
+      setTokenCount: (count: number) => {
+        contextManager.setTokenCount(count);
+        dispatch({ type: "SET_TOKEN_COUNT", payload: count });
+      },
       setMessages: (msgs: DisplayMessage[]) => {
         dispatch({ type: "SET_MESSAGES", payload: msgs });
       },
@@ -180,7 +183,7 @@ function AppContent({
         dispatch({ type: "SET_SELECTED_SESSION_INDEX", payload: index }),
       exit: () => dispatch({ type: "SET_SHOW_RECEIPT", payload: true }),
     }),
-    [dispatch, sessionManager, tokenCount$, config, modelSwitchService],
+    [dispatch, sessionManager, contextManager, config, modelSwitchService],
   );
 
   const handleSubmit = useCallback(
@@ -342,7 +345,7 @@ export function App(props: AppProps) {
     const { cleanup, prompter } = connectAgent({
       agent: props.agent,
       sessionManager: props.sessionManager,
-      tokenCount$: props.tokenCount$,
+      contextManager: props.contextManager,
       initialSession: props.initialSession,
       sessionName: props.sessionName,
       resumeRecent: props.resumeRecent,

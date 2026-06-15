@@ -14,7 +14,7 @@ import type { SessionManager } from "../../services/session-manager.js";
 import type { UserPrompter, Prompt } from "../../tools/registry.js";
 import { toDisplayMessages } from "../display.js";
 import { SessionPersistence } from "../../services/session-persistence.js";
-import type { Signal } from "../../utils/signal.js";
+import type { ContextManager } from "../../services/context-manager.js";
 import { useTuiStore } from "./store.js";
 
 /** UserPrompter implementation: resolves/rejects via Zustand store state. */
@@ -28,7 +28,7 @@ class CallbackPrompter implements UserPrompter {
 export interface ConnectAgentOptions {
   agent: Agent;
   sessionManager: SessionManager;
-  tokenCount$: Signal<number>;
+  contextManager: ContextManager;
   initialSession: string;
   sessionName?: string;
   resumeRecent: boolean;
@@ -42,7 +42,7 @@ export function connectAgent(options: ConnectAgentOptions): {
   const {
     agent,
     sessionManager,
-    tokenCount$,
+    contextManager,
     initialSession,
     sessionName,
     resumeRecent,
@@ -60,10 +60,10 @@ export function connectAgent(options: ConnectAgentOptions): {
     });
   };
 
-  // 1. Subscribe to token count signal
-  const unsubToken = tokenCount$.subscribe((count) =>
-    dispatch({ type: "SET_TOKEN_COUNT", payload: count }),
-  );
+  // 1. Sync token count updates from the agent into Zustand.
+  agent.onTokenCountChange = (count) => {
+    dispatch({ type: "SET_TOKEN_COUNT", payload: count });
+  };
 
   // 2. Create CallbackPrompter — resolves/rejects via store state
   const prompter = new CallbackPrompter(
@@ -103,7 +103,7 @@ export function connectAgent(options: ConnectAgentOptions): {
         context.replaceBlocks(data.blocks);
         const totalTokens = data.totalTokens || 0;
         if (totalTokens > 0) {
-          tokenCount$.set(totalTokens);
+          contextManager.setTokenCount(totalTokens);
           dispatch({ type: "SET_TOKEN_COUNT", payload: totalTokens });
         }
       } else if (sessionName) {
@@ -120,7 +120,7 @@ export function connectAgent(options: ConnectAgentOptions): {
   // Return cleanup function and prompter for run() calls
   return {
     cleanup: () => {
-      unsubToken();
+      agent.onTokenCountChange = undefined;
       unsubStore();
     },
     prompter,

@@ -18,8 +18,8 @@ export async function runTuiApp(app: AppRuntime): Promise<void> {
       sessionStats={app.sessionStats}
       modelSwitchService={app.modelSwitchService}
       sessionManager={app.sessionManager}
+      contextManager={app.contextManager}
       context={app.sessionManager.getContext()}
-      tokenCount$={app.tokenCount$}
       permissionService={app.permissionService}
     />,
     { exitOnCtrlC: false },

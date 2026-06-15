@@ -7,7 +7,6 @@ import { PromptManager } from "./services/prompt-manager.js";
 import { ToolExecutor } from "./tools/executor.js";
 import { PermissionService } from "./services/permission.js";
 import { SessionPersistence } from "./services/session-persistence.js";
-import { Signal } from "./utils/signal.js";
 import { getAll } from "./tools/index.js";
 
 function makeTestModel() {
@@ -24,14 +23,11 @@ function makeAgent(overrides?: {
   const o = overrides ?? {};
   const client = o.client ?? ({ chatStream: mockChatStream } as any);
   const model = o.model ?? makeTestModel();
-  const tokenCount$ = new Signal(0);
   const sessionManager = new SessionManager();
   const context = sessionManager.getContext();
   const contextManager = new ContextManager({
     contextLength: model.getContextLength(),
     compressionThresholdRatio: o.compressionThresholdRatio ?? 0.8,
-    tokenCount$,
-    contextManager: context,
     statusReporter: sessionManager.reportStatus.bind(sessionManager),
   });
   const promptManager = new PromptManager(o.userPrompt);
@@ -48,9 +44,8 @@ function makeAgent(overrides?: {
     contextManager,
     toolExecutor,
     promptManager,
-    tokenCount$,
   });
-  return { agent, context, sessionManager, tokenCount$, permissionService };
+  return { agent, context, sessionManager, contextManager, permissionService };
 }
 
 class MockStream implements AsyncIterable<any> {
@@ -148,20 +143,6 @@ vi.mock("./tools/index.js", async (importOriginal) => {
   };
 });
 
-vi.mock("./services/token-tracker.js", () => ({
-  TokenTracker: vi.fn().mockImplementation(function () {
-    return {
-      getTotal: vi.fn().mockReturnValue(100),
-      processUsage: vi
-        .fn()
-        .mockReturnValue({ percentage: 10, shouldCompress: false }),
-      reset: vi.fn(),
-      setCount: vi.fn(),
-      setContextLength: vi.fn(),
-    };
-  }),
-}));
-
 vi.mock("./services/compression-service.js", () => ({
   SummaryCompressionStrategy: vi.fn().mockImplementation(function () {
     return {
@@ -218,9 +199,9 @@ describe("Agent", () => {
 
   describe("constructor", () => {
     it("initializes with default values", () => {
-      const { agent } = makeAgent();
+      const { agent, contextManager } = makeAgent();
       expect(agent.currentSession).toMatch(/^session-\d+$/);
-      expect(agent.tokenCount$.get()).toBe(0);
+      expect(contextManager.getTokenCount()).toBe(0);
       expect(agent.model).toBeDefined();
     });
 

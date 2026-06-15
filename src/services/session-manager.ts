@@ -14,7 +14,7 @@ import type { StatusMessage } from "../ui/display.js";
 /**
  * StatusReporter — callback for emitting UI status/error notifications.
  * Defined here (SessionManager) because this is the primary owner of
- * status reporting lifecycle. Other services (ContextManager, TokenTracker)
+ * status reporting lifecycle. Other services (ContextManager)
  * receive it as a dependency.
  */
 export type StatusReporter = (

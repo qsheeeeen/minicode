@@ -1,5 +1,4 @@
-// ContextManager owns compression logic, token tracking, and the reactive
-// token count signal.
+// ContextManager owns compression logic and context-window token tracking.
 //
 // The compress() method receives cross-manager deps as params (context, model,
 // changeJournal, activeUserMessageOrdinal, statusReporter) to avoid coupling to other managers.
@@ -9,8 +8,6 @@
 import type { LLMClient, TokenUsage } from "../llm/client.js";
 import type { Model } from "../llm/model.js";
 import type { SessionStats } from "./session-stats.js";
-import { Signal } from "../utils/signal.js";
-import { TokenTracker } from "./token-tracker.js";
 import {
   SummaryCompressionStrategy,
   type CompressionStrategy,
@@ -22,12 +19,34 @@ import type { StatusReporter } from "./session-manager.js";
 export interface ContextManagerOpts {
   readonly contextLength: number;
   readonly compressionThresholdRatio: number;
-  readonly tokenCount$: Signal<number>;
-  readonly contextManager: LLMContext;
   readonly statusReporter: StatusReporter;
   readonly sessionStats?: SessionStats;
   readonly compressionStrategy?: CompressionStrategy;
-  readonly thresholdPolicy?: import("./token-tracker.js").ThresholdPolicy;
+  readonly thresholdPolicy?: ThresholdPolicy;
+}
+
+export interface ThresholdPolicy {
+  readonly thresholds: readonly number[];
+  shouldCompress(total: number, contextLength: number, ratio: number): boolean;
+}
+
+export interface TokenUsageResult {
+  totalTokens: number;
+  percentage: number;
+  shouldCompress: boolean;
+}
+
+export class DefaultThresholdPolicy implements ThresholdPolicy {
+  readonly thresholds = [25, 50, 75, 90] as const;
+
+  shouldCompress(
+    total: number,
+    contextLength: number,
+    ratio: number,
+  ): boolean {
+    const threshold = Math.floor(contextLength * ratio);
+    return total > threshold;
+  }
 }
 
 export interface CompressDeps {
@@ -40,32 +59,54 @@ export interface CompressDeps {
 }
 
 export class ContextManager {
-  private tokenTracker: TokenTracker;
   private compressionService: CompressionStrategy;
   private isCompressing = false;
-  readonly tokenCount$: Signal<number>;
   private statusReporter: StatusReporter;
+  private contextLength: number;
+  private compressionThresholdRatio: number;
+  private sessionStats?: SessionStats;
+  private thresholdPolicy: ThresholdPolicy;
+  private tokenCount = 0;
+  private lastShownThreshold = 0;
 
   constructor(opts: ContextManagerOpts) {
-    this.tokenCount$ = opts.tokenCount$;
+    this.contextLength = opts.contextLength;
+    this.compressionThresholdRatio = opts.compressionThresholdRatio;
     this.statusReporter = opts.statusReporter;
+    this.sessionStats = opts.sessionStats;
+    this.thresholdPolicy = opts.thresholdPolicy ?? new DefaultThresholdPolicy();
     this.compressionService =
       opts.compressionStrategy ?? new SummaryCompressionStrategy();
-    this.tokenTracker = new TokenTracker(
-      opts.contextLength,
-      opts.compressionThresholdRatio,
-      opts.tokenCount$,
-      opts.statusReporter,
-      opts.sessionStats,
-      opts.thresholdPolicy,
-    );
   }
 
-  /** Process token usage from an LLM response. Returns whether compression is needed. */
-  processTokenUsage(model: string, usage: TokenUsage): boolean {
-    if (!usage) return false;
-    const { shouldCompress } = this.tokenTracker.processUsage(model, usage);
-    return shouldCompress;
+  /** Process token usage from an LLM result. Returns current count and compression decision. */
+  processTokenUsage(model: string, usage: TokenUsage): TokenUsageResult {
+    const totalTokens = usage.input.total + usage.output;
+    this.sessionStats?.recordUsage(model, usage);
+    this.tokenCount = totalTokens;
+
+    const ratio = totalTokens / this.contextLength;
+    const percentage = Math.floor(ratio * 100);
+
+    for (const threshold of this.thresholdPolicy.thresholds) {
+      if (percentage >= threshold && this.lastShownThreshold < threshold) {
+        this.statusReporter({
+          role: "status",
+          content: `[${percentage}% context]`,
+          timestamp: new Date(),
+        });
+        this.lastShownThreshold = threshold;
+        break;
+      }
+    }
+
+    const shouldCompress = this.thresholdPolicy.shouldCompress(
+      totalTokens,
+      this.contextLength,
+      this.compressionThresholdRatio,
+    );
+
+    return { totalTokens, percentage, shouldCompress };
   }
 
   /**
@@ -88,7 +129,7 @@ export class ContextManager {
         return deps.activeUserMessageOrdinal;
       }
 
-      const totalTokens = this.tokenTracker.getTotal();
+      const totalTokens = this.tokenCount;
       deps.statusReporter({
         role: "status",
         content: `Compressing ${userMessageCount - recentCount} user messages (${totalTokens} tokens)...`,
@@ -111,7 +152,7 @@ export class ContextManager {
       }
 
       deps.context.replaceBlocks(compressed);
-      this.tokenTracker.reset();
+      this.reset();
 
       // Recalculate activeUserMessageOrdinal
       const newActiveIdx = deps.context.getUserMessageCount();
@@ -136,19 +177,21 @@ export class ContextManager {
   }
 
   getTokenCount(): number {
-    return this.tokenTracker.getTotal();
+    return this.tokenCount;
   }
 
   setTokenCount(count: number): void {
-    this.tokenTracker.setCount(count);
+    this.tokenCount = count;
+    this.lastShownThreshold = 0;
   }
 
   reset(): void {
-    this.tokenTracker.reset();
+    this.tokenCount = 0;
+    this.lastShownThreshold = 0;
   }
 
   setContextLength(length: number): void {
-    this.tokenTracker.setContextLength(length);
+    this.contextLength = length;
   }
 
   getIsCompressing(): boolean {

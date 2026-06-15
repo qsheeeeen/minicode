@@ -16,7 +16,6 @@ import { PromptManager } from "./services/prompt-manager.js";
 import { ToolExecutor } from "./tools/executor.js";
 import { PermissionService } from "./services/permission.js";
 import { SessionPersistence } from "./services/session-persistence.js";
-import { Signal } from "./utils/signal.js";
 
 function createTestAgent(options?: {
   responses?: ScriptedResponse[];
@@ -35,15 +34,12 @@ function createTestAgent(options?: {
           (args) => `result: ${JSON.stringify(args)}`,
         ),
       ],
-    ]);
+  ]);
   const model = new Model("test-model", "test-provider", 200000);
-  const tokenCount$ = new Signal(0);
   const sessionManager = new SessionManager();
   const contextManager = new ContextManager({
     contextLength: model.getContextLength(),
     compressionThresholdRatio: 0.8,
-    tokenCount$,
-    contextManager: sessionManager.getContext(),
     statusReporter: sessionManager.reportStatus.bind(sessionManager),
   });
   const promptManager = new PromptManager();
@@ -59,7 +55,6 @@ function createTestAgent(options?: {
     contextManager,
     toolExecutor,
     promptManager,
-    tokenCount$,
   });
 
   return { agent, context: sessionManager.getContext() };
@@ -216,13 +211,10 @@ describe("Agent virtual integration", () => {
     const client = new VirtualLLMClient([
       toolUseResponse("call_1", "Dangerous", { action: "delete" }),
     ]);
-    const tokenCount$ = new Signal(0);
     const sessionManager = new SessionManager();
     const contextManager = new ContextManager({
       contextLength: model.getContextLength(),
       compressionThresholdRatio: 0.8,
-      tokenCount$,
-      contextManager: sessionManager.getContext(),
       statusReporter: sessionManager.reportStatus.bind(sessionManager),
     });
     const promptManager = new PromptManager();
@@ -238,7 +230,6 @@ describe("Agent virtual integration", () => {
       contextManager,
       toolExecutor,
       promptManager,
-      tokenCount$,
     });
     const context = sessionManager.getContext();
     const reportStatusSpy = vi.spyOn(sessionManager, "reportStatus");

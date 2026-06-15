@@ -120,22 +120,13 @@ describe("Builtin commands", () => {
     };
   }
 
-  /** Create a mock Signal<number> (ctx.tokenCount$) */
-  function makeTokenCountMock() {
-    return {
-      get: vi.fn().mockReturnValue(0),
-      set: vi.fn(),
-      subscribe: vi.fn().mockReturnValue(() => {}),
-    };
-  }
-
   /** Build a full mock CommandContext with sensible defaults */
   function makeCtx(overrides: Record<string, any> = {}) {
     const context = makeContextMock();
     const model = makeModelMock();
     const sessionManager = makeSessionManagerMock(context);
     const changeJournal = makeChangeJournalMock();
-    const tokenCount$ = makeTokenCountMock();
+    const setTokenCount = vi.fn();
 
     const agent = {
       clearSession: vi.fn(),
@@ -155,10 +146,10 @@ describe("Builtin commands", () => {
       context: context as any,
       sessionManager: sessionManager as any,
       changeJournal: changeJournal as any,
-      tokenCount$: tokenCount$ as any,
       sessionStats: {
         incrementSessionCount: vi.fn(),
       } as any,
+      setTokenCount,
       setCurrentSession: vi.fn(),
       setMessages: vi.fn(),
       setInputMode: vi.fn(),
@@ -172,7 +163,7 @@ describe("Builtin commands", () => {
       model,
       sessionManager,
       changeJournal,
-      tokenCount$,
+      setTokenCount,
       agent,
     };
   }
@@ -201,12 +192,12 @@ describe("Builtin commands", () => {
     });
 
     it("/clear clears session and reports status", async () => {
-      const { ctx, sessionManager, tokenCount$ } = makeCtx();
+      const { ctx, sessionManager, setTokenCount } = makeCtx();
 
       const result = await executeCommand("clear", [], ctx as CommandContext);
       expect(result.handled).toBe(true);
       expect(ctx.agent.clearSession).toHaveBeenCalled();
-      expect(tokenCount$.set).toHaveBeenCalledWith(0);
+      expect(setTokenCount).toHaveBeenCalledWith(0);
       expect(ctx.setCurrentSession).toHaveBeenCalledWith(
         expect.stringMatching(/^session-/),
       );
@@ -272,7 +263,7 @@ describe("Builtin commands", () => {
         blocks: [],
         totalTokens: 100,
       });
-      const { ctx, context, tokenCount$, sessionManager } = makeCtx();
+      const { ctx, context, setTokenCount, sessionManager } = makeCtx();
 
       const result = await executeCommand(
         "resume",
@@ -282,7 +273,7 @@ describe("Builtin commands", () => {
       expect(result.handled).toBe(true);
       expect(sessionPersistenceMock.load).toHaveBeenCalledWith("session-1");
       expect(context.replaceBlocks).toHaveBeenCalled();
-      expect(tokenCount$.set).toHaveBeenCalledWith(100);
+      expect(setTokenCount).toHaveBeenCalledWith(100);
       expect(ctx.setCurrentSession).toHaveBeenCalledWith("session-1");
       // switchSession reports a status message
       expect(sessionManager.reportStatus).toHaveBeenCalledWith(

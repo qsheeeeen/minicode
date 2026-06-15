@@ -8,7 +8,6 @@ import { ModelFactory } from "../../llm/model.js";
 import { ToolExecutor } from "../executor.js";
 import { PermissionService } from "../../services/permission.js";
 import { getSubAgentTools } from "../registry.js";
-import { Signal } from "../../utils/signal.js";
 import { register } from "../registry.js";
 
 export const agentTool: ToolDef = {
@@ -68,13 +67,10 @@ export const agentTool: ToolDef = {
       }
     }
 
-    const tokenCount$ = new Signal(0);
     const sessionManager = new SessionManager();
     const contextManager = new ContextManager({
       contextLength: subModel.getContextLength(),
       compressionThresholdRatio: 0.8,
-      tokenCount$,
-      contextManager: sessionManager.getContext(),
       statusReporter: () => {}, // sub-agents don't report statuses
     });
     const promptManager = new PromptManager(config.userPrompt);
@@ -90,7 +86,9 @@ export const agentTool: ToolDef = {
       contextManager,
       toolExecutor,
       promptManager,
-      tokenCount$,
+      onTokenCountChange: (count) => {
+        registry.updateProgress(subId, { tokenCount: count });
+      },
       agentRegistry: registry,
       currentAgentId: subId,
       appConfig: appConfig!,
@@ -119,9 +117,6 @@ export const agentTool: ToolDef = {
 
     // Track progress during execution
     let toolCallCount = 0;
-    subAgent.tokenCount$.subscribe((count: number) => {
-      registry.updateProgress(subId, { tokenCount: count });
-    });
     subContext.onChange(() => {
       const tc = subContext
         .getBlocks()
@@ -138,7 +133,7 @@ export const agentTool: ToolDef = {
       const finalResponse = extractFinalResponse(blocks);
       const summary = generateSummary(blocks);
       registry.updateProgress(subId, {
-        tokenCount: subAgent.tokenCount$.get(),
+        tokenCount: contextManager.getTokenCount(),
         toolCalls: toolCallCount,
       });
       registry.updateStatus(subId, "completed");

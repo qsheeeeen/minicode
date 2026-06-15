@@ -13,7 +13,6 @@ import { PromptManager } from "../../services/prompt-manager.js";
 import { ToolExecutor } from "../../tools/executor.js";
 import { PermissionService } from "../../services/permission.js";
 import { SessionPersistence } from "../../services/session-persistence.js";
-import { Signal } from "../../utils/signal.js";
 import { AgentRegistry } from "../../services/agent-registry.js";
 import { connectAgent } from "./connect-agent.js";
 import { useTuiStore, initialState } from "./store.js";
@@ -30,13 +29,11 @@ function createTestAgent(responses = [defaultTextResponse("OK")]) {
   ]);
   const client = new VirtualLLMClient(responses);
   const model = new Model("test-model", "test-provider", 200000);
-  const tokenCount$ = new Signal(0);
   const sessionManager = new SessionManager();
   const contextManager = new ContextManager({
     contextLength: model.getContextLength(),
     compressionThresholdRatio: 0.8,
-    tokenCount$,
-    context: sessionManager.getContext(),
+    statusReporter: sessionManager.reportStatus.bind(sessionManager),
   });
   const promptManager = new PromptManager();
   const toolExecutor = new ToolExecutor({
@@ -51,9 +48,8 @@ function createTestAgent(responses = [defaultTextResponse("OK")]) {
     contextManager,
     toolExecutor,
     promptManager,
-    tokenCount$,
   });
-  return { agent, sessionManager, tokenCount$ };
+  return { agent, sessionManager, contextManager };
 }
 
 describe("connectAgent", () => {
@@ -74,7 +70,7 @@ describe("connectAgent", () => {
   });
 
   it("should dispatch SET_MESSAGES with assistant text after agent.run()", async () => {
-    const { agent, sessionManager, tokenCount$ } = createTestAgent([
+    const { agent, sessionManager, contextManager } = createTestAgent([
       defaultTextResponse("Hello from assistant!"),
     ]);
     const registry = new AgentRegistry();
@@ -82,7 +78,7 @@ describe("connectAgent", () => {
     const result = connectAgent({
       agent,
       sessionManager,
-      tokenCount$,
+      contextManager,
       initialSession: "test-session",
       registry,
     });
@@ -109,7 +105,7 @@ describe("connectAgent", () => {
   });
 
   it("should dispatch SET_MESSAGES for each store change during streaming", async () => {
-    const { agent, sessionManager, tokenCount$ } = createTestAgent([
+    const { agent, sessionManager, contextManager } = createTestAgent([
       defaultTextResponse("Streaming text"),
     ]);
     const registry = new AgentRegistry();
@@ -129,7 +125,7 @@ describe("connectAgent", () => {
     const result = connectAgent({
       agent,
       sessionManager,
-      tokenCount$,
+      contextManager,
       initialSession: "test-session",
       registry,
     });
@@ -147,34 +143,33 @@ describe("connectAgent", () => {
     expect(textMsg!.content).toBe("Streaming text");
   });
 
-  it("should dispatch SET_TOKEN_COUNT when token signal changes", () => {
-    const { agent, sessionManager, tokenCount$ } = createTestAgent();
+  it("should dispatch SET_TOKEN_COUNT when agent token count changes", () => {
+    const { agent, sessionManager, contextManager } = createTestAgent();
     const registry = new AgentRegistry();
 
     const result = connectAgent({
       agent,
       sessionManager,
-      tokenCount$,
+      contextManager,
       initialSession: "test-session",
       registry,
     });
     cleanup = result.cleanup;
 
-    // Update token count
-    tokenCount$.set(5000);
+    agent.onTokenCountChange?.(5000);
 
     const state = useTuiStore.getState();
     expect(state.tokenCount).toBe(5000);
   });
 
   it("should register main agent in registry", () => {
-    const { agent, sessionManager, tokenCount$ } = createTestAgent();
+    const { agent, sessionManager, contextManager } = createTestAgent();
     const registry = new AgentRegistry();
 
     const result = connectAgent({
       agent,
       sessionManager,
-      tokenCount$,
+      contextManager,
       initialSession: "test-session",
       registry,
     });
@@ -189,7 +184,7 @@ describe("connectAgent", () => {
   });
 
   it("should unsubscribe on cleanup", async () => {
-    const { agent, sessionManager, tokenCount$ } = createTestAgent([
+    const { agent, sessionManager, contextManager } = createTestAgent([
       defaultTextResponse("After cleanup"),
     ]);
     const registry = new AgentRegistry();
@@ -197,7 +192,7 @@ describe("connectAgent", () => {
     const result = connectAgent({
       agent,
       sessionManager,
-      tokenCount$,
+      contextManager,
       initialSession: "test-session",
       registry,
     });

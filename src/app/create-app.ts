@@ -19,7 +19,6 @@ import { ToolExecutor } from "../tools/executor.js";
 import { getAll } from "../tools/index.js";
 import { createLogger } from "../utils/logger.js";
 import { loadGlobalPrompt } from "../utils/prompts.js";
-import { Signal } from "../utils/signal.js";
 import type { AppRuntime } from "./types.js";
 
 export interface CreateAppOpts {
@@ -103,13 +102,10 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
     model.displayName,
   );
 
-  const tokenCount$ = new Signal(0);
   const sessionManager = new SessionManager(undefined, sessionStats);
   const contextManager = new ContextManager({
     contextLength: initialModel.getContextLength(),
     compressionThresholdRatio: compressionThreshold,
-    tokenCount$,
-    contextManager: sessionManager.getContext(),
     statusReporter: (msg) => sessionManager.reportStatus(msg),
     sessionStats: sessionManager.getSessionStats(),
   });
@@ -149,7 +145,6 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
     contextManager,
     toolExecutor,
     promptManager,
-    tokenCount$,
     agentRegistry,
     appConfig: config,
     modelSwitchService,
@@ -168,11 +163,13 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
     get changeJournal() {
       return sessionManager.getChangeJournal();
     },
-    tokenCount$,
     sessionStats,
     modelSwitchService,
     fileSystemService,
     shellService,
+    setTokenCount: (count: number) => {
+      contextManager.setTokenCount(count);
+    },
     setMessages: () => {},
     setCurrentSession: (name: string) => {
       sessionManager.setSession(name);
@@ -199,7 +196,6 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
     sessionStats,
     sessionManager,
     contextManager,
-    tokenCount$,
     permissionService,
     modelSwitchService,
     fileSystemService,

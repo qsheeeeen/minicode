@@ -8,7 +8,6 @@ import type { PermissionService } from "../services/permission.js";
 import type { ShellService } from "../services/shell-service.js";
 import type { SessionManager } from "../services/session-manager.js";
 import type { CommandContext } from "../ui/commands/index.js";
-import type { Signal } from "../utils/signal.js";
 
 export interface AppRuntime {
   readonly agent: Agent;
@@ -25,7 +24,6 @@ export interface AppRuntime {
   readonly sessionStats: SessionStats;
   readonly sessionManager: SessionManager;
   readonly contextManager: ContextManager;
-  readonly tokenCount$: Signal<number>;
   readonly permissionService: PermissionService;
   readonly modelSwitchService: ModelSwitchService;
   readonly fileSystemService: FileSystemService;

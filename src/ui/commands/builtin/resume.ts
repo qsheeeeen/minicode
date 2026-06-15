@@ -16,7 +16,7 @@ registerCommand({
         ctx.context.replaceBlocks(data.blocks);
         const totalTokens = data.totalTokens || 0;
         if (totalTokens > 0) {
-          ctx.tokenCount$.set(totalTokens);
+          ctx.setTokenCount(totalTokens);
         }
         await switchSession({
           agent: ctx.agent,

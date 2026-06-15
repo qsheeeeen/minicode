@@ -27,9 +27,9 @@ function makeApp() {
     agentRegistry: { id: "registry" },
     programStartTime: 123,
     sessionStats: { id: "stats" },
+    contextManager: { id: "context-manager" },
     modelSwitchService: { id: "model-switcher" },
     sessionManager,
-    tokenCount$: { id: "tokens" },
     permissionService: { id: "permission" },
   } as any;
 }

@@ -6,7 +6,7 @@ export async function runHeadlessApp(app: AppRuntime): Promise<void> {
     app.agent,
     app.initialPrompt,
     app.sessionManager,
-    app.tokenCount$,
+    app.contextManager,
     app.sessionName,
     app.resumeRecent,
     app.commandContext,

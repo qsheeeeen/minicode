@@ -6,7 +6,7 @@ registerCommand({
   description: "Clear all context and start a new session",
   handler: async (_args, ctx): Promise<void> => {
     ctx.agent.clearSession();
-    ctx.tokenCount$.set(0);
+    ctx.setTokenCount(0);
     const newSession = `session-${Date.now()}`;
     await switchSession({
       agent: ctx.agent,

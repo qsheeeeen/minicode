@@ -1,12 +1,24 @@
 import { describe, it, expect, vi } from "vitest";
 import { ContextManager } from "./context-manager.js";
-import { Signal } from "../utils/signal.js";
 import { LLMContext } from "../llm/context.js";
+import type { TokenUsage } from "../llm/client.js";
+
+function usage(
+  input: number,
+  output: number,
+  cacheMiss = 0,
+  cacheHit = 0,
+): TokenUsage {
+  return {
+    input: { total: input, cache_miss: cacheMiss, cache_hit: cacheHit },
+    output,
+  };
+}
 
 function createContextManager(overrides?: {
   compressionThresholdRatio?: number;
+  contextLength?: number;
 }) {
-  const tokenCount$ = new Signal(0);
   const context = new LLMContext();
   const statusReporter = vi.fn();
   const sessionStats = {
@@ -14,14 +26,12 @@ function createContextManager(overrides?: {
     incrementSessionCount: vi.fn(),
   } as any;
   const cm = new ContextManager({
-    contextLength: 200000,
+    contextLength: overrides?.contextLength ?? 200000,
     compressionThresholdRatio: overrides?.compressionThresholdRatio ?? 0.8,
-    tokenCount$,
-    contextManager: context,
     statusReporter,
     sessionStats,
   });
-  return { cm, tokenCount$, context, statusReporter };
+  return { cm, context, statusReporter, sessionStats };
 }
 
 describe("ContextManager", () => {
@@ -32,44 +42,80 @@ describe("ContextManager", () => {
       expect(cm.getTokenCount()).toBe(0);
     });
 
-    it("exposes the tokenCount$ signal", () => {
-      const { cm, tokenCount$ } = createContextManager();
-      expect(cm.tokenCount$).toBe(tokenCount$);
-    });
   });
 
   describe("processTokenUsage", () => {
-    it("returns false for small usage", () => {
+    it("returns token totals and false for small usage", () => {
       const { cm } = createContextManager();
-      const result = cm.processTokenUsage("test-model", {
-        input: { total: 100, prompt: 100, cache_read: 0, cache_creation: 0 },
-        output: 50,
+      const result = cm.processTokenUsage("test-model", usage(100, 50));
+      expect(result).toEqual({
+        totalTokens: 150,
+        percentage: 0,
+        shouldCompress: false,
       });
-      expect(result).toBe(false);
     });
 
     it("returns true when exceeding threshold", () => {
       const { cm } = createContextManager({ compressionThresholdRatio: 0.5 });
       // contextLength=200000, threshold=0.5 → compress at 100000
-      const result = cm.processTokenUsage("test-model", {
-        input: {
-          total: 150000,
-          prompt: 150000,
-          cache_read: 0,
-          cache_creation: 0,
-        },
-        output: 50000,
-      });
-      expect(result).toBe(true);
+      const result = cm.processTokenUsage("test-model", usage(150000, 50000));
+      expect(result.shouldCompress).toBe(true);
     });
 
     it("returns false for empty usage", () => {
       const { cm } = createContextManager();
-      const result = cm.processTokenUsage("test-model", {
-        input: { total: 0, prompt: 0, cache_read: 0, cache_creation: 0 },
-        output: 0,
+      const result = cm.processTokenUsage("test-model", usage(0, 0));
+      expect(result.shouldCompress).toBe(false);
+      expect(result.percentage).toBe(0);
+    });
+
+    it("records usage in sessionStats", () => {
+      const { cm, sessionStats } = createContextManager();
+      const u = usage(1000, 200, 50, 30);
+      cm.processTokenUsage("model-a", u);
+      expect(sessionStats.recordUsage).toHaveBeenCalledWith("model-a", u);
+    });
+
+    it("updates token count", () => {
+      const { cm } = createContextManager();
+      cm.processTokenUsage("model", usage(50000, 0));
+      expect(cm.getTokenCount()).toBe(50000);
+    });
+
+    it("calls statusReporter when crossing threshold boundary", () => {
+      const { cm, statusReporter } = createContextManager({
+        contextLength: 100000,
       });
-      expect(result).toBe(false);
+      cm.processTokenUsage("model", usage(26000, 0));
+      expect(statusReporter).toHaveBeenCalledWith(
+        expect.objectContaining({ role: "status", content: "[26% context]" }),
+      );
+    });
+
+    it("does not call statusReporter below 25%", () => {
+      const { cm, statusReporter } = createContextManager({
+        contextLength: 100000,
+      });
+      cm.processTokenUsage("model", usage(24000, 0));
+      expect(statusReporter).not.toHaveBeenCalled();
+    });
+
+    it("replaces total on each call instead of accumulating", () => {
+      const { cm } = createContextManager();
+      cm.processTokenUsage("model", usage(1000, 200));
+      cm.processTokenUsage("model", usage(500, 100));
+      expect(cm.getTokenCount()).toBe(600);
+    });
+
+    it("shouldCompress uses floor for threshold", () => {
+      const { cm } = createContextManager({
+        contextLength: 100000,
+        compressionThresholdRatio: 0.75,
+      });
+      let result = cm.processTokenUsage("model", usage(74999, 0));
+      expect(result.shouldCompress).toBe(false);
+      result = cm.processTokenUsage("model", usage(75001, 0));
+      expect(result.shouldCompress).toBe(true);
     });
   });
 

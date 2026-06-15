@@ -6,14 +6,14 @@ import { routeInput } from "./routing.js";
 import { processRoute } from "./route-handler.js";
 import { SessionPersistence } from "../services/session-persistence.js";
 import type { SessionManager } from "../services/session-manager.js";
-import type { Signal } from "../utils/signal.js";
+import type { ContextManager } from "../services/context-manager.js";
 import { HeadlessRenderer } from "./headless-renderer.js";
 
 export async function runHeadless(
   agent: Agent,
   initialPrompt: string | undefined,
   sessionManager: SessionManager,
-  tokenCount$: Signal<number>,
+  contextManager: ContextManager,
   sessionName?: string,
   resumeRecent?: boolean,
   cmdContext?: CommandContext,
@@ -57,7 +57,7 @@ export async function runHeadless(
       context.replaceBlocks(data.blocks);
       const totalTokens = data.totalTokens || 0;
       if (totalTokens > 0) {
-        tokenCount$.set(totalTokens);
+        contextManager.setTokenCount(totalTokens);
       }
       const { createLogger } = await import("../utils/logger.js");
       const newLogger = await createLogger(
