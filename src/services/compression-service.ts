@@ -1,4 +1,4 @@
-import type { LLMClient, LLMResponse } from "../llm/client.js";
+import type { LLMClient, LLMStreamResult } from "../llm/client.js";
 import type { LLMBlock, LLMContext } from "../llm/context.js";
 import type { Model } from "../llm/model.js";
 
@@ -44,16 +44,16 @@ ${conversationText}`;
         { model, maxTokens: 1000 },
       );
 
-      let response: LLMResponse | undefined;
+      let result: LLMStreamResult | undefined;
       while (true) {
         const next = await stream.next();
         if (next.done) {
-          response = next.value as LLMResponse;
+          result = next.value as LLMStreamResult;
           break;
         }
       }
 
-      const summaryText = this.extractSummaryText(response!);
+      const summaryText = this.extractSummaryText(result!);
       return [
         {
           type: "user",
@@ -84,7 +84,7 @@ ${conversationText}`;
     return lines.join("\n");
   }
 
-  private extractSummaryText(summary: LLMResponse): string {
+  private extractSummaryText(summary: LLMStreamResult): string {
     for (const block of summary.content) {
       if (block.type === "text") {
         return block.text;

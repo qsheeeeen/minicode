@@ -1,16 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { StreamEvent, LLMResponse } from "../client.js";
+import type { LLMAssistantBlock, LLMStreamResult } from "../client.js";
 
 async function collectStream(
-  stream: AsyncGenerator<StreamEvent, LLMResponse, unknown>,
+  stream: AsyncGenerator<LLMAssistantBlock, LLMStreamResult, unknown>,
 ) {
-  const events: StreamEvent[] = [];
+  const events: LLMAssistantBlock[] = [];
   let result = await stream.next();
   while (!result.done) {
     events.push(result.value);
     result = await stream.next();
   }
-  return { events, response: result.value };
+  return { events, result: result.value };
 }
 
 function mockStream<T>(chunks: T[]): AsyncIterable<T> {
@@ -79,11 +79,11 @@ describe("OpenAIChatClient", () => {
         { type: "text", text: "Hello" },
         { type: "text", text: " world" },
       ]);
-      expect(collected.response.stop_reason).toBe("end_turn");
-      expect(collected.response.content).toEqual([
+      expect(collected.result.stop_reason).toBe("end_turn");
+      expect(collected.result.content).toEqual([
         { type: "text", text: "Hello world" },
       ]);
-      expect(collected.response.usage).toEqual({
+      expect(collected.result.usage).toEqual({
         input: { total: 10, cache_miss: 0, cache_hit: 0 },
         output: 5,
       });
@@ -124,11 +124,11 @@ describe("OpenAIChatClient", () => {
         type: "text",
         text: "The answer.",
       });
-      expect(collected.response.content[0]).toEqual({
+      expect(collected.result.content[0]).toEqual({
         type: "thinking",
         thinking: "Let me think...",
       });
-      expect(collected.response.content[1]).toEqual({
+      expect(collected.result.content[1]).toEqual({
         type: "text",
         text: "The answer.",
       });
@@ -182,17 +182,15 @@ describe("OpenAIChatClient", () => {
 
       const toolEvents = collected.events.filter((e) => e.type === "tool_use");
       expect(toolEvents).toHaveLength(1);
-      expect((toolEvents[0] as { type: "tool_use"; block: any }).block).toEqual(
-        {
-          type: "tool_use",
-          id: "call_1",
-          name: "Read",
-          input: { path: "test.ts" },
-        },
-      );
+      expect(toolEvents[0]).toEqual({
+        type: "tool_use",
+        id: "call_1",
+        name: "Read",
+        input: { path: "test.ts" },
+      });
 
-      expect(collected.response.stop_reason).toBe("tool_use");
-      expect(collected.response.content[0].type).toBe("tool_use");
+      expect(collected.result.stop_reason).toBe("tool_use");
+      expect(collected.result.content[0].type).toBe("tool_use");
     });
 
     it("handles multiple tool calls", async () => {
@@ -234,7 +232,7 @@ describe("OpenAIChatClient", () => {
 
       const toolEvents = collected.events.filter((e) => e.type === "tool_use");
       expect(toolEvents).toHaveLength(2);
-      expect(collected.response.content).toHaveLength(2);
+      expect(collected.result.content).toHaveLength(2);
     });
 
     it("handles JSON parse failure on tool arguments", async () => {
@@ -268,9 +266,8 @@ describe("OpenAIChatClient", () => {
       const stream = client.chatStream([], []);
       const collected = await collectStream(stream);
 
-      const toolBlock = (
-        collected.events[0] as { type: "tool_use"; block: any }
-      ).block;
+      const toolBlock = collected.events[0];
+      if (toolBlock.type !== "tool_use") throw new Error("expected tool_use");
       expect(toolBlock.input).toEqual({});
     });
 
@@ -290,7 +287,7 @@ describe("OpenAIChatClient", () => {
       const client = new OpenAIChatClient("test-key");
       const stream = client.chatStream([], []);
       const collected = await collectStream(stream);
-      expect(collected.response.stop_reason).toBe("max_tokens");
+      expect(collected.result.stop_reason).toBe("max_tokens");
     });
 
     it("handles empty usage", async () => {
@@ -307,7 +304,7 @@ describe("OpenAIChatClient", () => {
       const stream = client.chatStream([], []);
       const collected = await collectStream(stream);
 
-      expect(collected.response.usage).toEqual({
+      expect(collected.result.usage).toEqual({
         input: { total: 0, cache_miss: 0, cache_hit: 0 },
         output: 0,
       });

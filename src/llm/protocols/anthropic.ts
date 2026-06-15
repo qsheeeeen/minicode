@@ -3,14 +3,14 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import type { MessageStreamEvent } from "@anthropic-ai/sdk/resources/messages.js";
-import type { LLMStream, StreamEvent } from "../client.js";
+import type { LLMStream } from "../client.js";
 import type { MessageCreateParamsStreaming } from "@anthropic-ai/sdk/resources/messages.js";
 
 import type {
   LLMClient,
   LLMToolDef,
   ChatOptions,
-  LLMResponse,
+  LLMStreamResult,
   EffortLevel,
   LLMBlock,
 } from "../client.js";
@@ -127,7 +127,7 @@ interface AnthropicCacheUsage {
   cache_read_input_tokens?: number;
 }
 
-function toLLMResponse(msg: Anthropic.Messages.Message): LLMResponse {
+function toLLMStreamResult(msg: Anthropic.Messages.Message): LLMStreamResult {
   const cacheUsage = msg.usage as typeof msg.usage & AnthropicCacheUsage;
   const cacheMiss = cacheUsage.cache_creation_input_tokens ?? 0;
   const cacheHit = cacheUsage.cache_read_input_tokens ?? 0;
@@ -184,7 +184,11 @@ export class AnthropicClient implements LLMClient {
       signal: options.signal,
     });
 
-    async function* run(): AsyncGenerator<StreamEvent, LLMResponse, unknown> {
+    async function* run(): AsyncGenerator<
+      LLMAssistantBlock,
+      LLMStreamResult,
+      unknown
+    > {
       let currentToolCall: {
         id: string;
         name: string;
@@ -223,12 +227,9 @@ export class AnthropicClient implements LLMClient {
             } catch {}
             yield {
               type: "tool_use",
-              block: {
-                type: "tool_use",
-                id: currentToolCall.id,
-                name: currentToolCall.name,
-                input,
-              },
+              id: currentToolCall.id,
+              name: currentToolCall.name,
+              input,
             };
             currentToolCall = null;
           } else if (currentThinking) {
@@ -240,7 +241,7 @@ export class AnthropicClient implements LLMClient {
       }
 
       const finalMsg = await stream.finalMessage();
-      return toLLMResponse(finalMsg);
+      return toLLMStreamResult(finalMsg);
     }
 
     return run();

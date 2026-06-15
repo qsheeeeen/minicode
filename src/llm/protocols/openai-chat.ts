@@ -7,10 +7,9 @@ import OpenAI from "openai";
 import type {
   LLMClient,
   LLMStream,
-  StreamEvent,
   LLMToolDef,
   ChatOptions,
-  LLMResponse,
+  LLMStreamResult,
   EffortLevel,
   LLMBlock,
 } from "../client.js";
@@ -197,7 +196,11 @@ export class OpenAIChatClient implements LLMClient {
       signal: abortController.signal,
     });
 
-    async function* run(): AsyncGenerator<StreamEvent, LLMResponse, unknown> {
+    async function* run(): AsyncGenerator<
+      LLMAssistantBlock,
+      LLMStreamResult,
+      unknown
+    > {
       const stream = await streamPromise;
 
       let textContent = "";
@@ -282,7 +285,7 @@ export class OpenAIChatClient implements LLMClient {
           input,
         };
         content.push(block);
-        yield { type: "tool_use", block };
+        yield block;
       }
 
       return {

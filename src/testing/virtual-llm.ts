@@ -8,19 +8,19 @@
 import type {
   LLMClient,
   LLMStream,
-  LLMResponse,
+  LLMStreamResult,
   LLMToolDef,
   ChatOptions,
   TokenUsage,
-  StreamEvent,
+  LLMAssistantBlock,
   LLMBlock,
 } from "../llm/client.js";
 
 // Types
 
 export interface ScriptedResponse {
-  events: StreamEvent[];
-  response: LLMResponse;
+  events: LLMAssistantBlock[];
+  result: LLMStreamResult;
 }
 
 export interface VirtualLLMOptions {
@@ -79,7 +79,7 @@ export class VirtualLLMClient implements LLMClient {
       }
       yield event;
     }
-    return scripted.response;
+    return scripted.result;
   }
 
   private async *emptyStream(): LLMStream {
@@ -95,7 +95,7 @@ export class VirtualLLMClient implements LLMClient {
   static textResponse(text: string): ScriptedResponse {
     return {
       events: [{ type: "text", text }],
-      response: {
+      result: {
         content: [{ type: "text", text }],
         stop_reason: "end_turn",
         usage: DEFAULT_USAGE,
@@ -110,12 +110,9 @@ export class VirtualLLMClient implements LLMClient {
   ): ScriptedResponse {
     return {
       events: [
-        {
-          type: "tool_use",
-          block: { type: "tool_use", id: toolId, name: toolName, input },
-        },
+        { type: "tool_use", id: toolId, name: toolName, input },
       ],
-      response: {
+      result: {
         content: [{ type: "tool_use", id: toolId, name: toolName, input }],
         stop_reason: "tool_use",
         usage: DEFAULT_USAGE,

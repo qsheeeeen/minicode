@@ -75,10 +75,7 @@ class MockStream implements AsyncIterable<any> {
   }
 
   emit(event: string, payload: any) {
-    const chunk =
-      event === "tool_use"
-        ? { type: "tool_use", block: payload }
-        : { type: event, [event]: payload };
+    const chunk = event === "tool_use" ? payload : { type: event, [event]: payload };
     if (this.resolveNext) {
       this.resolveNext({ value: chunk, done: false });
       this.resolveNext = null;

@@ -1,17 +1,17 @@
 import { describe, it, expect } from "vitest";
 import { VirtualLLMClient } from "./virtual-llm.js";
 import { createClient, registerProtocol } from "../llm/client.js";
-import type { LLMStream, StreamEvent } from "../llm/client.js";
+import type { LLMAssistantBlock, LLMStream } from "../llm/client.js";
 
 // Helper: collect all events from a stream and return the final response
 async function collectStream(stream: LLMStream) {
-  const events: StreamEvent[] = [];
+  const events: LLMAssistantBlock[] = [];
   let result = await stream.next();
   while (!result.done) {
     events.push(result.value);
     result = await stream.next();
   }
-  return { events, response: result.value };
+  return { events, result: result.value };
 }
 
 describe("VirtualLLMClient", () => {
@@ -23,7 +23,7 @@ describe("VirtualLLMClient", () => {
             { type: "text", text: "Hello" },
             { type: "text", text: " world" },
           ],
-          response: {
+          result: {
             content: [{ type: "text", text: "Hello world" }],
             stop_reason: "end_turn",
             usage: {
@@ -40,8 +40,8 @@ describe("VirtualLLMClient", () => {
       expect(collected.events).toHaveLength(2);
       expect(collected.events[0]).toEqual({ type: "text", text: "Hello" });
       expect(collected.events[1]).toEqual({ type: "text", text: " world" });
-      expect(collected.response.stop_reason).toBe("end_turn");
-      expect(collected.response.content[0]).toEqual({
+      expect(collected.result.stop_reason).toBe("end_turn");
+      expect(collected.result.content[0]).toEqual({
         type: "text",
         text: "Hello world",
       });
@@ -53,7 +53,7 @@ describe("VirtualLLMClient", () => {
       ]);
 
       const stream = client.chatStream([], []);
-      const events: StreamEvent[] = [];
+      const events: LLMAssistantBlock[] = [];
       for await (const event of stream) {
         events.push(event);
       }
@@ -68,7 +68,7 @@ describe("VirtualLLMClient", () => {
             { type: "thinking", thinking: "Let me think..." },
             { type: "text", text: "The answer is 42." },
           ],
-          response: {
+          result: {
             content: [
               { type: "thinking", thinking: "Let me think..." },
               { type: "text", text: "The answer is 42." },
@@ -111,7 +111,7 @@ describe("VirtualLLMClient", () => {
         [],
       );
       const events1 = await collectStream(stream1);
-      expect(events1.response.content[0]).toEqual({
+      expect(events1.result.content[0]).toEqual({
         type: "text",
         text: "first",
       });
@@ -121,7 +121,7 @@ describe("VirtualLLMClient", () => {
         [],
       );
       const events2 = await collectStream(stream2);
-      expect(events2.response.content[0]).toEqual({
+      expect(events2.result.content[0]).toEqual({
         type: "text",
         text: "second",
       });
@@ -136,7 +136,7 @@ describe("VirtualLLMClient", () => {
             { type: "thinking", thinking: "reasoning..." },
             { type: "text", text: "answer" },
           ],
-          response: {
+          result: {
             content: [
               { type: "thinking", thinking: "reasoning..." },
               { type: "text", text: "answer" },
@@ -152,9 +152,9 @@ describe("VirtualLLMClient", () => {
 
       const stream = client.chatStream([], []);
       const collected = await collectStream(stream);
-      expect(collected.response.content).toHaveLength(2);
-      expect(collected.response.content[0].type).toBe("thinking");
-      expect(collected.response.content[1].type).toBe("text");
+      expect(collected.result.content).toHaveLength(2);
+      expect(collected.result.content[0].type).toBe("thinking");
+      expect(collected.result.content[1].type).toBe("text");
     });
   });
 
@@ -171,14 +171,14 @@ describe("VirtualLLMClient", () => {
 
       expect(collected.events).toHaveLength(1);
       expect(collected.events[0].type).toBe("tool_use");
-      const block = (collected.events[0] as { type: "tool_use"; block: any })
-        .block;
+      const block = collected.events[0];
+      if (block.type !== "tool_use") throw new Error("expected tool_use");
       expect(block.name).toBe("Read");
       expect(block.id).toBe("call_1");
       expect(block.input).toEqual({ path: "/tmp/test.ts" });
 
-      expect(collected.response.stop_reason).toBe("tool_use");
-      expect(collected.response.content[0].type).toBe("tool_use");
+      expect(collected.result.stop_reason).toBe("tool_use");
+      expect(collected.result.content[0].type).toBe("tool_use");
     });
 
     it("handles multiple tool_use events in a single response", async () => {
@@ -187,24 +187,18 @@ describe("VirtualLLMClient", () => {
           events: [
             {
               type: "tool_use",
-              block: {
-                type: "tool_use",
-                id: "a",
-                name: "Read",
-                input: { path: "a.ts" },
-              },
+              id: "a",
+              name: "Read",
+              input: { path: "a.ts" },
             },
             {
               type: "tool_use",
-              block: {
-                type: "tool_use",
-                id: "b",
-                name: "Write",
-                input: { path: "b.ts", content: "x" },
-              },
+              id: "b",
+              name: "Write",
+              input: { path: "b.ts", content: "x" },
             },
           ],
-          response: {
+          result: {
             content: [
               {
                 type: "tool_use",
@@ -231,7 +225,7 @@ describe("VirtualLLMClient", () => {
       const stream = client.chatStream([], []);
       const collected = await collectStream(stream);
       expect(collected.events).toHaveLength(2);
-      expect(collected.response.content).toHaveLength(2);
+      expect(collected.result.content).toHaveLength(2);
     });
   });
 
@@ -259,7 +253,7 @@ describe("VirtualLLMClient", () => {
               { type: "text", text: "first" },
               { type: "text", text: "second" },
             ],
-            response: {
+            result: {
               content: [{ type: "text", text: "first second" }],
               stop_reason: "end_turn",
               usage: {
@@ -311,8 +305,8 @@ describe("VirtualLLMClient", () => {
 
       const stream2 = client.chatStream([], []);
       const collected = await collectStream(stream2);
-      expect(collected.response.content).toHaveLength(0);
-      expect(collected.response.stop_reason).toBe("end_turn");
+      expect(collected.result.content).toHaveLength(0);
+      expect(collected.result.stop_reason).toBe("end_turn");
     });
 
     it("stream returns done after completion", async () => {
@@ -351,7 +345,7 @@ describe("VirtualLLMClient", () => {
       const client = createClient("virtual");
       const stream = client.chatStream([], []);
       const collected = await collectStream(stream);
-      expect(collected.response.content[0]).toEqual({
+      expect(collected.result.content[0]).toEqual({
         type: "text",
         text: "factory hello",
       });
@@ -377,7 +371,7 @@ describe("VirtualLLMClient", () => {
       const client = new VirtualLLMClient([
         {
           events: [],
-          response: {
+          result: {
             content: [],
             stop_reason: "end_turn",
             usage: {
@@ -391,7 +385,7 @@ describe("VirtualLLMClient", () => {
       const stream = client.chatStream([], []);
       const collected = await collectStream(stream);
       expect(collected.events).toHaveLength(0);
-      expect(collected.response.stop_reason).toBe("end_turn");
+      expect(collected.result.stop_reason).toBe("end_turn");
     });
   });
 });

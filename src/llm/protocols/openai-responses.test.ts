@@ -1,16 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { StreamEvent, LLMResponse } from "../client.js";
+import type { LLMAssistantBlock, LLMStreamResult } from "../client.js";
 
 async function collectStream(
-  stream: AsyncGenerator<StreamEvent, LLMResponse, unknown>,
+  stream: AsyncGenerator<LLMAssistantBlock, LLMStreamResult, unknown>,
 ) {
-  const events: StreamEvent[] = [];
+  const events: LLMAssistantBlock[] = [];
   let result = await stream.next();
   while (!result.done) {
     events.push(result.value);
     result = await stream.next();
   }
-  return { events, response: result.value };
+  return { events, result: result.value };
 }
 
 function mockStream<T>(chunks: T[]): AsyncIterable<T> {
@@ -79,11 +79,11 @@ describe("OpenAIResponsesClient", () => {
         { type: "text", text: "Hello" },
         { type: "text", text: " world" },
       ]);
-      expect(collected.response.stop_reason).toBe("end_turn");
-      expect(collected.response.content).toEqual([
+      expect(collected.result.stop_reason).toBe("end_turn");
+      expect(collected.result.content).toEqual([
         { type: "text", text: "Hello world" },
       ]);
-      expect(collected.response.usage).toEqual({
+      expect(collected.result.usage).toEqual({
         input: { total: 10, cache_miss: 0, cache_hit: 0 },
         output: 5,
       });
@@ -133,8 +133,8 @@ describe("OpenAIResponsesClient", () => {
         type: "text",
         text: "answer",
       });
-      expect(collected.response.content[0].type).toBe("thinking");
-      expect(collected.response.content[1].type).toBe("text");
+      expect(collected.result.content[0].type).toBe("thinking");
+      expect(collected.result.content[1].type).toBe("text");
     });
 
     it("yields tool_use events inline on output_item.done", async () => {
@@ -180,16 +180,14 @@ describe("OpenAIResponsesClient", () => {
 
       const toolEvents = collected.events.filter((e) => e.type === "tool_use");
       expect(toolEvents).toHaveLength(1);
-      expect((toolEvents[0] as { type: "tool_use"; block: any }).block).toEqual(
-        {
-          type: "tool_use",
-          id: "call_1",
-          name: "Read",
-          input: { path: "/tmp/test.ts" },
-        },
-      );
+      expect(toolEvents[0]).toEqual({
+        type: "tool_use",
+        id: "call_1",
+        name: "Read",
+        input: { path: "/tmp/test.ts" },
+      });
 
-      expect(collected.response.stop_reason).toBe("tool_use");
+      expect(collected.result.stop_reason).toBe("tool_use");
     });
 
     it("handles JSON parse failure with _raw fallback", async () => {
@@ -228,9 +226,8 @@ describe("OpenAIResponsesClient", () => {
       const stream = client.chatStream([], []);
       const collected = await collectStream(stream);
 
-      const toolBlock = (
-        collected.events[0] as { type: "tool_use"; block: any }
-      ).block;
+      const toolBlock = collected.events[0];
+      if (toolBlock.type !== "tool_use") throw new Error("expected tool_use");
       expect(toolBlock.input).toEqual({ _raw: "not-json" });
     });
 
@@ -249,8 +246,8 @@ describe("OpenAIResponsesClient", () => {
       const stream = client.chatStream([], []);
       const collected = await collectStream(stream);
 
-      expect(collected.response.stop_reason).toBe("error");
-      expect(collected.response.content).toEqual([]);
+      expect(collected.result.stop_reason).toBe("error");
+      expect(collected.result.content).toEqual([]);
     });
 
     it("maps stop reasons from response status", async () => {
@@ -275,7 +272,7 @@ describe("OpenAIResponsesClient", () => {
       const client = new OpenAIResponsesClient("test-key");
       const stream = client.chatStream([], []);
       const collected = await collectStream(stream);
-      expect(collected.response.stop_reason).toBe("max_tokens");
+      expect(collected.result.stop_reason).toBe("max_tokens");
     });
   });
 

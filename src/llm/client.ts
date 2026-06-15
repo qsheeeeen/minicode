@@ -90,7 +90,7 @@ export interface TokenUsage {
   output: number;
 }
 
-export interface LLMResponse {
+export interface LLMStreamResult {
   content: LLMAssistantBlock[];
   stop_reason: string;
   usage: TokenUsage;
@@ -98,12 +98,11 @@ export interface LLMResponse {
 
 // Stream interface
 
-export type StreamEvent =
-  | { type: "text"; text: string }
-  | { type: "thinking"; thinking: string }
-  | { type: "tool_use"; block: LLMToolUseBlock };
-
-export type LLMStream = AsyncGenerator<StreamEvent, LLMResponse, unknown>;
+export type LLMStream = AsyncGenerator<
+  LLMAssistantBlock,
+  LLMStreamResult,
+  unknown
+>;
 
 // Client interface
 

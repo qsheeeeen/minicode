@@ -11,17 +11,14 @@ import OpenAI from "openai";
 import type {
   LLMClient,
   LLMStream,
-  StreamEvent,
   LLMToolDef,
   ChatOptions,
-  LLMResponse,
+  LLMStreamResult,
   TokenUsage,
   EffortLevel,
   LLMBlock,
 } from "../client.js";
-import type {
-  LLMAssistantBlock,
-} from "../client.js";
+import type { LLMAssistantBlock } from "../client.js";
 
 // The OpenAI SDK's ResponseStreamEvent union doesn't cover all streaming event
 // types (delta, output_item.done, etc.). These interfaces fill the gap.
@@ -153,8 +150,8 @@ function toSdkMessages(blocks: LLMBlock[]): ResponseInputItem[] {
 
 // Response conversion (SDK → internal)
 
-// Convert an OpenAI Responses response object to LLMResponse.
-function toLLMResponse(response: OpenAI.Responses.Response): LLMResponse {
+// Convert an OpenAI Responses response object to LLMStreamResult.
+function toLLMStreamResult(response: OpenAI.Responses.Response): LLMStreamResult {
   const content: LLMAssistantBlock[] = [];
   let hasToolCalls = false;
 
@@ -288,12 +285,16 @@ export class OpenAIResponsesClient implements LLMClient {
       AsyncIterable<OpenAI.Responses.ResponseStreamEvent>
     >;
 
-    async function* run(): AsyncGenerator<StreamEvent, LLMResponse, unknown> {
+    async function* run(): AsyncGenerator<
+      LLMAssistantBlock,
+      LLMStreamResult,
+      unknown
+    > {
       const stream = await streamPromise;
 
       let currentText = "";
       let currentThinking = "";
-      let finalResult: LLMResponse | null = null;
+      let finalResult: LLMStreamResult | null = null;
 
       for await (const event of stream) {
         switch (event.type as string) {
@@ -335,12 +336,9 @@ export class OpenAIResponsesClient implements LLMClient {
               }
               yield {
                 type: "tool_use",
-                block: {
-                  type: "tool_use",
-                  id: item.id ?? item.call_id ?? "",
-                  name: item.name,
-                  input: parsedArgs,
-                },
+                id: item.id ?? item.call_id ?? "",
+                name: item.name,
+                input: parsedArgs,
               };
             }
             break;
@@ -349,7 +347,7 @@ export class OpenAIResponsesClient implements LLMClient {
             const response = (event as unknown as StreamCompletedEvent)
               .response;
             if (response) {
-              finalResult = toLLMResponse(response);
+              finalResult = toLLMStreamResult(response);
             }
             break;
           }

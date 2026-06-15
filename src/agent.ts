@@ -1,5 +1,5 @@
 import type { Model } from "./llm/model.js";
-import type { LLMClient, LLMToolDef, LLMResponse } from "./llm/client.js";
+import type { LLMClient, LLMToolDef, LLMStreamResult } from "./llm/client.js";
 import {
   type ToolDef,
   type ToolExecutionContext,
@@ -133,12 +133,12 @@ export class Agent {
   }
 
   // Track token usage and trigger auto-compression
-  private async processTokenUsage(response: LLMResponse): Promise<void> {
-    if (!response.usage) return;
+  private async processTokenUsage(result: LLMStreamResult): Promise<void> {
+    if (!result.usage) return;
 
     const shouldCompress = this.contextManager.processTokenUsage(
       this.model.getName(),
-      response.usage,
+      result.usage,
     );
 
     if (shouldCompress) {
@@ -147,7 +147,7 @@ export class Agent {
   }
 
   // Stream LLM response, updating context in real-time.
-  // Returns the final response and any tool calls the LLM requested.
+  // Returns the stream result and any tool calls the LLM requested.
   private async streamLLM(toolDefs: LLMToolDef[]) {
     const stream = this.client.chatStream(this.context.getBlocks(), toolDefs, {
       system: this.promptManager.getSystemPrompt(),
@@ -162,14 +162,14 @@ export class Agent {
       else this.context.appendAssistantText(delta);
     };
 
-    let response: LLMResponse | undefined;
+    let result: LLMStreamResult | undefined;
     try {
       while (true) {
         if (this.abortController?.signal.aborted) throw new Error("Aborted");
 
         const next = await stream.next();
         if (next.done) {
-          response = next.value as LLMResponse;
+          result = next.value as LLMStreamResult;
           break;
         }
 
@@ -178,20 +178,19 @@ export class Agent {
           // @ts-expect-error - text or thinking fields exist based on type
           handleDelta(chunk.type, chunk[chunk.type]);
         } else if (chunk.type === "tool_use") {
-          const tool = this.toolExecutor.getTools().get(chunk.block.name);
-          toolCalls.push({ block: chunk.block, tool });
+          const tool = this.toolExecutor.getTools().get(chunk.name);
+          toolCalls.push({ block: chunk, tool });
           this.context.startToolCall(
-            chunk.block.id,
-            chunk.block.name,
-            chunk.block.input,
+            chunk.id,
+            chunk.name,
+            chunk.input,
           );
           this.saveStore();
         }
       }
 
       if (this.abortController?.signal.aborted) throw new Error("Aborted");
-      if (!response)
-        throw new Error("Stream closed without returning a response");
+      if (!result) throw new Error("Stream closed without returning a result");
     } catch (e) {
       if (this.abortController?.signal.aborted) throw new Error("Aborted");
       throw e;
@@ -199,7 +198,7 @@ export class Agent {
       this.saveStore();
     }
 
-    return { response, toolCalls };
+    return { result, toolCalls };
   }
 
   async run(
@@ -232,15 +231,15 @@ export class Agent {
           }),
         ) as LLMToolDef[];
 
-        const { response, toolCalls } = await this.streamLLM(toolDefs);
+        const { result, toolCalls } = await this.streamLLM(toolDefs);
 
-        await this.processTokenUsage(response);
+        await this.processTokenUsage(result);
         this.logger?.info(
           {
             session: this.currentSession,
-            input: response.usage?.input,
-            output: response.usage?.output,
-            stopReason: response.stop_reason,
+            input: result.usage?.input,
+            output: result.usage?.output,
+            stopReason: result.stop_reason,
           },
           "LLM response",
         );

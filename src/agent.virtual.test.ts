@@ -139,24 +139,18 @@ describe("Agent virtual integration", () => {
           events: [
             {
               type: "tool_use",
-              block: {
-                type: "tool_use",
-                id: "call_a",
-                name: "ToolA",
-                input: { q: "1" },
-              },
+              id: "call_a",
+              name: "ToolA",
+              input: { q: "1" },
             },
             {
               type: "tool_use",
-              block: {
-                type: "tool_use",
-                id: "call_b",
-                name: "ToolB",
-                input: { q: "2" },
-              },
+              id: "call_b",
+              name: "ToolB",
+              input: { q: "2" },
             },
           ],
-          response: {
+          result: {
             content: [
               {
                 type: "tool_use",

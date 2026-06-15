@@ -1,5 +1,5 @@
 import type { LLMClient } from "../llm/client.js";
-import type { LLMResponse } from "../llm/client.js";
+import type { LLMStreamResult } from "../llm/client.js";
 import type { Model } from "../llm/model.js";
 import type { UserPrompter } from "../tools/registry.js";
 
@@ -90,17 +90,17 @@ Reply with exactly one of:
         [],
         { model: this.model, maxTokens: 100 },
       );
-      let response: LLMResponse | undefined;
+      let result: LLMStreamResult | undefined;
       while (true) {
         const next = await stream.next();
         if (next.done) {
-          response = next.value as LLMResponse;
+          result = next.value as LLMStreamResult;
           break;
         }
       }
       const text =
-        response?.content[0]?.type === "text"
-          ? response.content[0].text.trim()
+        result?.content[0]?.type === "text"
+          ? result.content[0].text.trim()
           : "no: unknown error";
 
       if (text.toLowerCase().startsWith("yes")) {
