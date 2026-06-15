@@ -6,7 +6,11 @@ import type { AppConfig } from "../config.js";
 import { createClient } from "../llm/client.js";
 import { Model } from "../llm/model.js";
 import { SkillManager } from "../skills/skill-manager.js";
-import { AgentRegistry, SessionStats } from "../services/index.js";
+import {
+  AgentRegistry,
+  RuntimeEvents,
+  SessionStats,
+} from "../services/index.js";
 import { ContextManager } from "../services/context-manager.js";
 import { ModelSwitchService } from "../services/model-switcher.js";
 import { PermissionService } from "../services/permission.js";
@@ -87,6 +91,7 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
   skillManager.registerAsCommands();
 
   const agentRegistry = new AgentRegistry();
+  const runtimeEvents = new RuntimeEvents();
   const sessionStats = new SessionStats();
   const initialClient = createClient(
     model.protocol,
@@ -103,7 +108,13 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
 
   const sessionManager = new SessionManager(undefined, sessionStats);
   const contextManager = new ContextManager({
-    contextLength: initialModel.getContextLength(),
+    client: initialClient,
+    model: initialModel,
+    getContext: () => sessionManager.getContext(),
+    getChangeJournal: () => sessionManager.getChangeJournal(),
+    setActiveUserMessageOrdinal: (ordinal) =>
+      sessionManager.setActiveUserMessageOrdinal(ordinal),
+    events: runtimeEvents,
     compressionThresholdRatio: compressionThreshold,
     statusReporter: (msg) => sessionManager.reportStatus(msg),
     sessionStats: sessionManager.getSessionStats(),
@@ -162,6 +173,7 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
     },
     sessionStats,
     modelSwitchService,
+    contextManager,
     shellService,
     setTokenCount: (count: number) => {
       contextManager.setTokenCount(count);
@@ -190,6 +202,7 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
     programStartTime,
     agentRegistry,
     sessionStats,
+    runtimeEvents,
     sessionManager,
     contextManager,
     permissionService,

@@ -43,7 +43,7 @@ export class ModelSwitchService {
 
     opts.agent.client = client;
     opts.agent.model = model;
-    this.contextManager.setContextLength(model.getContextLength());
+    this.contextManager.setModel(client, model);
     this.permissionService?.updateAutoGate(client, model);
 
     if (opts.tier) {

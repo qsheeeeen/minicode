@@ -12,6 +12,7 @@ import type { ScriptedResponse } from "./testing/index.js";
 import type { ToolDef, UserPrompter } from "../tools/registry.js";
 import { SessionManager } from "./services/session-manager.js";
 import { ContextManager } from "./services/context-manager.js";
+import { RuntimeEvents } from "./services/runtime-events.js";
 import { PromptManager } from "./services/prompt-manager.js";
 import { ToolExecutor } from "./tools/executor.js";
 import { PermissionService } from "./services/permission.js";
@@ -34,11 +35,18 @@ function createTestAgent(options?: {
           (args) => `result: ${JSON.stringify(args)}`,
         ),
       ],
-  ]);
+    ]);
   const model = new Model("test-model", "test-provider", 200000);
   const sessionManager = new SessionManager();
+  const runtimeEvents = new RuntimeEvents();
   const contextManager = new ContextManager({
-    contextLength: model.getContextLength(),
+    client,
+    model,
+    getContext: () => sessionManager.getContext(),
+    getChangeJournal: () => sessionManager.getChangeJournal(),
+    setActiveUserMessageOrdinal: (ordinal) =>
+      sessionManager.setActiveUserMessageOrdinal(ordinal),
+    events: runtimeEvents,
     compressionThresholdRatio: 0.8,
     statusReporter: sessionManager.reportStatus.bind(sessionManager),
   });
@@ -212,8 +220,15 @@ describe("Agent virtual integration", () => {
       toolUseResponse("call_1", "Dangerous", { action: "delete" }),
     ]);
     const sessionManager = new SessionManager();
+    const runtimeEvents = new RuntimeEvents();
     const contextManager = new ContextManager({
-      contextLength: model.getContextLength(),
+      client,
+      model,
+      getContext: () => sessionManager.getContext(),
+      getChangeJournal: () => sessionManager.getChangeJournal(),
+      setActiveUserMessageOrdinal: (ordinal) =>
+        sessionManager.setActiveUserMessageOrdinal(ordinal),
+      events: runtimeEvents,
       compressionThresholdRatio: 0.8,
       statusReporter: sessionManager.reportStatus.bind(sessionManager),
     });

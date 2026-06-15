@@ -3,6 +3,7 @@ import type { LLMBlock } from "../../llm/context.js";
 import { Agent } from "../../agent.js";
 import { SessionManager } from "../../services/session-manager.js";
 import { ContextManager } from "../../services/context-manager.js";
+import { RuntimeEvents } from "../../services/runtime-events.js";
 import { PromptManager } from "../../services/prompt-manager.js";
 import { ModelFactory } from "../../llm/model.js";
 import { ToolExecutor } from "../executor.js";
@@ -68,10 +69,22 @@ export const agentTool: ToolDef = {
     }
 
     const sessionManager = new SessionManager();
+    const runtimeEvents = new RuntimeEvents();
     const contextManager = new ContextManager({
-      contextLength: subModel.getContextLength(),
+      client: subClient,
+      model: subModel,
+      getContext: () => sessionManager.getContext(),
+      getChangeJournal: () => sessionManager.getChangeJournal(),
+      setActiveUserMessageOrdinal: (ordinal) =>
+        sessionManager.setActiveUserMessageOrdinal(ordinal),
+      events: runtimeEvents,
       compressionThresholdRatio: 0.8,
       statusReporter: () => {}, // sub-agents don't report statuses
+    });
+    const unsubscribeTokenEvents = runtimeEvents.subscribe((event) => {
+      if (event.type === "context.tokens_changed") {
+        registry.updateProgress(subId, { tokenCount: event.tokenCount });
+      }
     });
     const promptManager = new PromptManager(config.userPrompt);
     const toolExecutor = new ToolExecutor({
@@ -86,9 +99,6 @@ export const agentTool: ToolDef = {
       contextManager,
       toolExecutor,
       promptManager,
-      onTokenCountChange: (count) => {
-        registry.updateProgress(subId, { tokenCount: count });
-      },
       agentRegistry: registry,
       currentAgentId: subId,
       appConfig: appConfig!,
@@ -139,6 +149,7 @@ export const agentTool: ToolDef = {
       registry.updateStatus(subId, "completed");
       registry.updateSummary(subId, summary);
       registry.remove(subId);
+      unsubscribeTokenEvents();
 
       const output = finalResponse || `Agent #${subId} completed: ${summary}`;
       return { output };
@@ -147,6 +158,7 @@ export const agentTool: ToolDef = {
       registry.updateStatus(subId, "error");
       registry.updateSummary(subId, `Error: ${errorMsg}`);
       registry.remove(subId);
+      unsubscribeTokenEvents();
 
       return { output: `Agent #${subId} failed: ${errorMsg}` };
     }

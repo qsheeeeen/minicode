@@ -15,7 +15,7 @@ function createService() {
     },
   });
   const contextManager = {
-    setContextLength: vi.fn(),
+    setModel: vi.fn(),
     getTokenCount: vi.fn().mockReturnValue(42),
   };
   const sessionManager = {
@@ -66,7 +66,7 @@ describe("ModelSwitchService", () => {
     expect(agent.model).toBe(model);
     expect(agent.client).toBe(client);
     expect(model.getName()).toBe("next-model");
-    expect(contextManager.setContextLength).toHaveBeenCalledWith(1234);
+    expect(contextManager.setModel).toHaveBeenCalledWith(client, model);
     expect(permissionService.updateAutoGate).toHaveBeenCalledWith(
       client,
       model,

@@ -3,6 +3,7 @@ import { EventEmitter } from "events";
 import { Model } from "./llm/model.js";
 import { SessionManager } from "./services/session-manager.js";
 import { ContextManager } from "./services/context-manager.js";
+import { RuntimeEvents } from "./services/runtime-events.js";
 import { PromptManager } from "./services/prompt-manager.js";
 import { ToolExecutor } from "./tools/executor.js";
 import { PermissionService } from "./services/permission.js";
@@ -24,9 +25,16 @@ function makeAgent(overrides?: {
   const client = o.client ?? ({ chatStream: mockChatStream } as any);
   const model = o.model ?? makeTestModel();
   const sessionManager = new SessionManager();
+  const runtimeEvents = new RuntimeEvents();
   const context = sessionManager.getContext();
   const contextManager = new ContextManager({
-    contextLength: model.getContextLength(),
+    client,
+    model,
+    getContext: () => sessionManager.getContext(),
+    getChangeJournal: () => sessionManager.getChangeJournal(),
+    setActiveUserMessageOrdinal: (ordinal) =>
+      sessionManager.setActiveUserMessageOrdinal(ordinal),
+    events: runtimeEvents,
     compressionThresholdRatio: o.compressionThresholdRatio ?? 0.8,
     statusReporter: sessionManager.reportStatus.bind(sessionManager),
   });
@@ -70,7 +78,8 @@ class MockStream implements AsyncIterable<any> {
   }
 
   emit(event: string, payload: any) {
-    const chunk = event === "tool_use" ? payload : { type: event, [event]: payload };
+    const chunk =
+      event === "tool_use" ? payload : { type: event, [event]: payload };
     if (this.resolveNext) {
       this.resolveNext({ value: chunk, done: false });
       this.resolveNext = null;
@@ -224,23 +233,6 @@ describe("Agent", () => {
       const { context } = makeAgent();
       context.startUserMessage("hello");
       expect(context.getBlocks()).toEqual([{ type: "user", text: "hello" }]);
-    });
-  });
-
-  describe("compress", () => {
-    it("does not compress if not enough user messages", async () => {
-      const { agent, context, sessionManager } = makeAgent();
-      const reportStatusSpy = vi.fn();
-      sessionManager.setStatusReporter(reportStatusSpy);
-      for (let i = 0; i < 5; i++) {
-        context.startUserMessage(`msg ${i}`);
-      }
-      await agent.compress();
-      expect(reportStatusSpy).toHaveBeenCalledWith(
-        expect.objectContaining({
-          content: expect.stringContaining("Not enough"),
-        }),
-      );
     });
   });
 

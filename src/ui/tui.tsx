@@ -8,6 +8,7 @@ import type { UserPrompter } from "../tools/registry.js";
 import { routeInput } from "./routing.js";
 import { processRoute } from "./route-handler.js";
 import { AgentRegistry, type AgentSession } from "../services/index.js";
+import type { RuntimeEvents } from "../services/runtime-events.js";
 import type { SessionStats } from "../services/session-stats.js";
 import type { SessionManager } from "../services/session-manager.js";
 import type { PermissionService } from "../services/permission.js";
@@ -37,6 +38,7 @@ export interface AppProps {
   sessionName?: string;
   resumeRecent: boolean;
   agentRegistry: AgentRegistry;
+  runtimeEvents: RuntimeEvents;
   programStartTime: number;
   sessionStats: SessionStats;
   sessionManager: SessionManager;
@@ -122,6 +124,7 @@ function AppContent({
   initialSession,
   initialPrompt,
   agentRegistry,
+  runtimeEvents,
   programStartTime,
   sessionStats,
   sessionManager,
@@ -165,9 +168,9 @@ function AppContent({
       },
       sessionStats,
       modelSwitchService,
+      contextManager,
       setTokenCount: (count: number) => {
         contextManager.setTokenCount(count);
-        dispatch({ type: "SET_TOKEN_COUNT", payload: count });
       },
       setMessages: (msgs: DisplayMessage[]) => {
         dispatch({ type: "SET_MESSAGES", payload: msgs });
@@ -346,6 +349,7 @@ export function App(props: AppProps) {
       agent: props.agent,
       sessionManager: props.sessionManager,
       contextManager: props.contextManager,
+      runtimeEvents: props.runtimeEvents,
       initialSession: props.initialSession,
       sessionName: props.sessionName,
       resumeRecent: props.resumeRecent,

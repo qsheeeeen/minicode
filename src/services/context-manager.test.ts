@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { ContextManager } from "./context-manager.js";
+import { RuntimeEvents } from "./runtime-events.js";
 import { LLMContext } from "../llm/context.js";
 import type { TokenUsage } from "../llm/client.js";
 
@@ -18,20 +19,61 @@ function usage(
 function createContextManager(overrides?: {
   compressionThresholdRatio?: number;
   contextLength?: number;
+  compressionStrategy?: any;
+  modelName?: string;
 }) {
   const context = new LLMContext();
   const statusReporter = vi.fn();
+  const journal = changeJournal();
+  const events = new RuntimeEvents();
+  let activeUserMessageOrdinal = 3;
   const sessionStats = {
     recordUsage: vi.fn(),
     incrementSessionCount: vi.fn(),
   } as any;
   const cm = new ContextManager({
-    contextLength: overrides?.contextLength ?? 200000,
+    client: {} as any,
+    model: model(
+      overrides?.modelName ?? "test-model",
+      overrides?.contextLength ?? 200000,
+    ),
+    getContext: () => context,
+    getChangeJournal: () => journal,
+    setActiveUserMessageOrdinal: (ordinal) => {
+      activeUserMessageOrdinal = ordinal;
+    },
+    events,
     compressionThresholdRatio: overrides?.compressionThresholdRatio ?? 0.8,
     statusReporter,
     sessionStats,
+    compressionStrategy: overrides?.compressionStrategy,
   });
-  return { cm, context, statusReporter, sessionStats };
+  return {
+    cm,
+    context,
+    journal,
+    events,
+    statusReporter,
+    sessionStats,
+    getActiveUserMessageOrdinal: () => activeUserMessageOrdinal,
+  };
+}
+
+function model(name = "test-model", contextLength = 200000) {
+  return {
+    getName: () => name,
+    getContextLength: () => contextLength,
+  } as any;
+}
+
+function changeJournal() {
+  return {
+    pruneAndRenumberUserMessages: vi.fn().mockResolvedValue(undefined),
+  } as any;
+}
+
+function processUsage(cm: ContextManager, tokenUsage: TokenUsage) {
+  return cm.processUsage(tokenUsage);
 }
 
 describe("ContextManager", () => {
@@ -41,81 +83,129 @@ describe("ContextManager", () => {
       expect(cm).toBeDefined();
       expect(cm.getTokenCount()).toBe(0);
     });
-
   });
 
-  describe("processTokenUsage", () => {
-    it("returns token totals and false for small usage", () => {
+  describe("processUsage", () => {
+    it("returns token totals and false for small usage", async () => {
       const { cm } = createContextManager();
-      const result = cm.processTokenUsage("test-model", usage(100, 50));
-      expect(result).toEqual({
+      const result = await processUsage(cm, usage(100, 50));
+      expect(result).toMatchObject({
         totalTokens: 150,
         percentage: 0,
         shouldCompress: false,
+        compressed: false,
       });
     });
 
-    it("returns true when exceeding threshold", () => {
-      const { cm } = createContextManager({ compressionThresholdRatio: 0.5 });
+    it("returns true when exceeding threshold", async () => {
+      const { cm } = createContextManager({
+        compressionThresholdRatio: 0.5,
+      });
       // contextLength=200000, threshold=0.5 → compress at 100000
-      const result = cm.processTokenUsage("test-model", usage(150000, 50000));
+      const result = await processUsage(cm, usage(150000, 50000));
       expect(result.shouldCompress).toBe(true);
     });
 
-    it("returns false for empty usage", () => {
+    it("returns false for empty usage", async () => {
       const { cm } = createContextManager();
-      const result = cm.processTokenUsage("test-model", usage(0, 0));
+      const result = await processUsage(cm, usage(0, 0));
       expect(result.shouldCompress).toBe(false);
       expect(result.percentage).toBe(0);
     });
 
-    it("records usage in sessionStats", () => {
-      const { cm, sessionStats } = createContextManager();
+    it("records usage in sessionStats", async () => {
+      const { cm, sessionStats } = createContextManager({
+        modelName: "model-a",
+      });
       const u = usage(1000, 200, 50, 30);
-      cm.processTokenUsage("model-a", u);
+      await processUsage(cm, u);
       expect(sessionStats.recordUsage).toHaveBeenCalledWith("model-a", u);
     });
 
-    it("updates token count", () => {
+    it("updates token count", async () => {
       const { cm } = createContextManager();
-      cm.processTokenUsage("model", usage(50000, 0));
+      await processUsage(cm, usage(50000, 0));
       expect(cm.getTokenCount()).toBe(50000);
     });
 
-    it("calls statusReporter when crossing threshold boundary", () => {
+    it("emits token change events", async () => {
+      const { cm, events } = createContextManager();
+      const listener = vi.fn();
+      events.subscribe(listener);
+
+      await processUsage(cm, usage(50000, 0));
+
+      expect(listener).toHaveBeenCalledWith({
+        type: "context.tokens_changed",
+        tokenCount: 50000,
+      });
+    });
+
+    it("calls statusReporter when crossing threshold boundary", async () => {
       const { cm, statusReporter } = createContextManager({
         contextLength: 100000,
       });
-      cm.processTokenUsage("model", usage(26000, 0));
+      await processUsage(cm, usage(26000, 0));
       expect(statusReporter).toHaveBeenCalledWith(
         expect.objectContaining({ role: "status", content: "[26% context]" }),
       );
     });
 
-    it("does not call statusReporter below 25%", () => {
+    it("does not call statusReporter below 25%", async () => {
       const { cm, statusReporter } = createContextManager({
         contextLength: 100000,
       });
-      cm.processTokenUsage("model", usage(24000, 0));
+      await processUsage(cm, usage(24000, 0));
       expect(statusReporter).not.toHaveBeenCalled();
     });
 
-    it("replaces total on each call instead of accumulating", () => {
+    it("replaces total on each call instead of accumulating", async () => {
       const { cm } = createContextManager();
-      cm.processTokenUsage("model", usage(1000, 200));
-      cm.processTokenUsage("model", usage(500, 100));
+      await processUsage(cm, usage(1000, 200));
+      await processUsage(cm, usage(500, 100));
       expect(cm.getTokenCount()).toBe(600);
     });
 
-    it("shouldCompress uses floor for threshold", () => {
+    it("shouldCompress uses floor for threshold", async () => {
       const { cm } = createContextManager({
         contextLength: 100000,
         compressionThresholdRatio: 0.75,
       });
-      let result = cm.processTokenUsage("model", usage(74999, 0));
+      let result = await processUsage(cm, usage(74999, 0));
       expect(result.shouldCompress).toBe(false);
-      result = cm.processTokenUsage("model", usage(75001, 0));
+      result = await processUsage(cm, usage(75001, 0));
       expect(result.shouldCompress).toBe(true);
+    });
+
+    it("compresses internally when usage exceeds threshold", async () => {
+      const compressedBlocks = [
+        { type: "user" as const, text: "summary" },
+        { type: "text" as const, text: "kept" },
+      ];
+      const compressionStrategy = {
+        compress: vi.fn().mockResolvedValue(compressedBlocks),
+      };
+      const { cm, context, journal, getActiveUserMessageOrdinal } =
+        createContextManager({
+          contextLength: 100,
+          compressionThresholdRatio: 0.5,
+          compressionStrategy,
+        });
+      for (let i = 0; i < 13; i += 1) {
+        context.startUserMessage(`message ${i}`);
+      }
+
+      const result = await processUsage(cm, usage(80, 0));
+
+      expect(compressionStrategy.compress).toHaveBeenCalled();
+      expect(journal.pruneAndRenumberUserMessages).toHaveBeenCalledWith(2, 1);
+      expect(context.getBlocks()).toEqual(compressedBlocks);
+      expect(result).toMatchObject({
+        totalTokens: 0,
+        shouldCompress: true,
+        compressed: true,
+      });
+      expect(getActiveUserMessageOrdinal()).toBe(1);
     });
   });
 
@@ -142,16 +232,13 @@ describe("ContextManager", () => {
   });
 
   describe("compress", () => {
-    it("returns activeUserMessageOrdinal unchanged when not enough user messages", async () => {
-      const { cm, context, statusReporter } = createContextManager();
-      const newIdx = await cm.compress({
-        context,
-        model: {} as any,
-        changeJournal: {} as any,
-        activeUserMessageOrdinal: 3,
-        statusReporter,
-      });
-      expect(newIdx).toBe(3);
+    it("returns false when not enough user messages", async () => {
+      const { cm, statusReporter, getActiveUserMessageOrdinal } =
+        createContextManager();
+      const compressed = await cm.compress();
+      expect(compressed).toBe(false);
+      expect(getActiveUserMessageOrdinal()).toBe(3);
+      expect(statusReporter).toHaveBeenCalled();
     });
   });
 });

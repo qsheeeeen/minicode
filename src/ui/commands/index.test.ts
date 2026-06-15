@@ -130,13 +130,16 @@ describe("Builtin commands", () => {
 
     const agent = {
       clearSession: vi.fn(),
-      compress: vi.fn().mockResolvedValue(undefined),
       setSession: vi.fn(),
       setLogger: vi.fn(),
       currentSession: "test-session",
       logger: { info: vi.fn(), error: vi.fn() },
       isRunning: false,
       ...overrides.agent,
+    };
+    const contextManager = {
+      compress: vi.fn().mockResolvedValue(false),
+      ...overrides.contextManager,
     };
 
     const ctx: Partial<CommandContext> = {
@@ -149,6 +152,7 @@ describe("Builtin commands", () => {
       sessionStats: {
         incrementSessionCount: vi.fn(),
       } as any,
+      contextManager: contextManager as any,
       setTokenCount,
       setCurrentSession: vi.fn(),
       setMessages: vi.fn(),
@@ -165,6 +169,7 @@ describe("Builtin commands", () => {
       changeJournal,
       setTokenCount,
       agent,
+      contextManager,
     };
   }
 
@@ -176,8 +181,8 @@ describe("Builtin commands", () => {
       expect(ctx.exit).toHaveBeenCalled();
     });
 
-    it("/compress calls ctx.agent.compress() and reports status", async () => {
-      const { ctx, sessionManager } = makeCtx();
+    it("/compress calls ctx.contextManager.compress() and reports status", async () => {
+      const { ctx, sessionManager, contextManager } = makeCtx();
 
       const result = await executeCommand(
         "compress",
@@ -185,7 +190,7 @@ describe("Builtin commands", () => {
         ctx as CommandContext,
       );
       expect(result.handled).toBe(true);
-      expect(ctx.agent.compress).toHaveBeenCalled();
+      expect(contextManager.compress).toHaveBeenCalled();
       expect(sessionManager.reportStatus).toHaveBeenCalledWith(
         expect.objectContaining({ role: "status" }),
       );

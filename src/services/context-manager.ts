@@ -1,9 +1,4 @@
-// ContextManager owns compression logic and context-window token tracking.
-//
-// The compress() method receives cross-manager deps as params (context, model,
-// changeJournal, activeUserMessageOrdinal, statusReporter) to avoid coupling to other managers.
-// It returns the new activeUserMessageOrdinal so the caller (Agent) can update
-// SessionManager.
+// ContextManager owns context-window token tracking and compression.
 
 import type { LLMClient, TokenUsage } from "../llm/client.js";
 import type { Model } from "../llm/model.js";
@@ -15,9 +10,15 @@ import {
 import { ChangeJournal } from "./change-journal.js";
 import type { LLMContext } from "../llm/context.js";
 import type { StatusReporter } from "./session-manager.js";
+import type { RuntimeEvents } from "./runtime-events.js";
 
 export interface ContextManagerOpts {
-  readonly contextLength: number;
+  readonly client: LLMClient;
+  readonly model: Model;
+  readonly getContext: () => LLMContext;
+  readonly getChangeJournal: () => ChangeJournal;
+  readonly setActiveUserMessageOrdinal: (ordinal: number) => void;
+  readonly events: RuntimeEvents;
   readonly compressionThresholdRatio: number;
   readonly statusReporter: StatusReporter;
   readonly sessionStats?: SessionStats;
@@ -36,31 +37,28 @@ export interface TokenUsageResult {
   shouldCompress: boolean;
 }
 
+export interface ProcessUsageResult extends TokenUsageResult {
+  compressed: boolean;
+}
+
 export class DefaultThresholdPolicy implements ThresholdPolicy {
   readonly thresholds = [25, 50, 75, 90] as const;
 
-  shouldCompress(
-    total: number,
-    contextLength: number,
-    ratio: number,
-  ): boolean {
+  shouldCompress(total: number, contextLength: number, ratio: number): boolean {
     const threshold = Math.floor(contextLength * ratio);
     return total > threshold;
   }
 }
 
-export interface CompressDeps {
-  context: LLMContext;
-  client: LLMClient;
-  model: Model;
-  changeJournal: ChangeJournal;
-  activeUserMessageOrdinal: number;
-  statusReporter: StatusReporter;
-}
-
 export class ContextManager {
   private compressionService: CompressionStrategy;
   private isCompressing = false;
+  private client: LLMClient;
+  private model: Model;
+  private getContext: () => LLMContext;
+  private getChangeJournal: () => ChangeJournal;
+  private setActiveUserMessageOrdinal: (ordinal: number) => void;
+  private events: RuntimeEvents;
   private statusReporter: StatusReporter;
   private contextLength: number;
   private compressionThresholdRatio: number;
@@ -70,7 +68,13 @@ export class ContextManager {
   private lastShownThreshold = 0;
 
   constructor(opts: ContextManagerOpts) {
-    this.contextLength = opts.contextLength;
+    this.client = opts.client;
+    this.model = opts.model;
+    this.getContext = opts.getContext;
+    this.getChangeJournal = opts.getChangeJournal;
+    this.setActiveUserMessageOrdinal = opts.setActiveUserMessageOrdinal;
+    this.events = opts.events;
+    this.contextLength = opts.model.getContextLength();
     this.compressionThresholdRatio = opts.compressionThresholdRatio;
     this.statusReporter = opts.statusReporter;
     this.sessionStats = opts.sessionStats;
@@ -79,11 +83,29 @@ export class ContextManager {
       opts.compressionStrategy ?? new SummaryCompressionStrategy();
   }
 
-  /** Process token usage from an LLM result. Returns current count and compression decision. */
-  processTokenUsage(model: string, usage: TokenUsage): TokenUsageResult {
+  /** Process token usage and compress context if the configured threshold is exceeded. */
+  async processUsage(usage: TokenUsage): Promise<ProcessUsageResult> {
+    const usageResult = this.updateTokenUsage(this.model.getName(), usage);
+    if (!usageResult.shouldCompress) {
+      return {
+        ...usageResult,
+        compressed: false,
+      };
+    }
+
+    const compressed = await this.compress();
+    return {
+      ...usageResult,
+      totalTokens: this.tokenCount,
+      compressed,
+    };
+  }
+
+  private updateTokenUsage(model: string, usage: TokenUsage): TokenUsageResult {
     const totalTokens = usage.input.total + usage.output;
     this.sessionStats?.recordUsage(model, usage);
     this.tokenCount = totalTokens;
+    this.emitTokenCount();
 
     const ratio = totalTokens / this.contextLength;
     const percentage = Math.floor(ratio * 100);
@@ -109,28 +131,26 @@ export class ContextManager {
     return { totalTokens, percentage, shouldCompress };
   }
 
-  /**
-   * Compress conversation context when context window threshold is exceeded.
-   * Receives cross-manager deps as params. Returns the new activeUserMessageOrdinal.
-   */
-  async compress(deps: CompressDeps): Promise<number> {
-    if (this.isCompressing) return deps.activeUserMessageOrdinal;
+  /** Compress conversation context when context window threshold is exceeded. */
+  async compress(): Promise<boolean> {
+    if (this.isCompressing) return false;
     this.isCompressing = true;
 
     try {
       const recentCount = 10;
-      const userMessageCount = deps.context.getUserMessageCount();
+      const context = this.getContext();
+      const userMessageCount = context.getUserMessageCount();
       if (userMessageCount <= recentCount + 2) {
-        deps.statusReporter({
+        this.statusReporter({
           role: "status",
           content: "Not enough conversation to compress.",
           timestamp: new Date(),
         });
-        return deps.activeUserMessageOrdinal;
+        return false;
       }
 
       const totalTokens = this.tokenCount;
-      deps.statusReporter({
+      this.statusReporter({
         role: "status",
         content: `Compressing ${userMessageCount - recentCount} user messages (${totalTokens} tokens)...`,
         timestamp: new Date(),
@@ -139,38 +159,41 @@ export class ContextManager {
       const originalUserPrompts = userMessageCount;
 
       const compressed = await this.compressionService.compress(
-        deps.context,
-        deps.client,
-        deps.model,
+        context,
+        this.client,
+        this.model,
       );
 
       const originalKept = recentCount + 1; // compression adds 1 summary user message
       const prunedCount = originalUserPrompts - originalKept;
 
       if (prunedCount > 0) {
-        await deps.changeJournal.pruneAndRenumberUserMessages(prunedCount, 1);
+        await this.getChangeJournal().pruneAndRenumberUserMessages(
+          prunedCount,
+          1,
+        );
       }
 
-      deps.context.replaceBlocks(compressed);
+      context.replaceBlocks(compressed);
       this.reset();
 
-      // Recalculate activeUserMessageOrdinal
-      const newActiveIdx = deps.context.getUserMessageCount();
+      const newActiveIdx = context.getUserMessageCount();
+      this.setActiveUserMessageOrdinal(newActiveIdx);
 
-      deps.statusReporter({
+      this.statusReporter({
         role: "status",
         content: `Compressed: ${prunedCount} user messages removed, ${newActiveIdx} remaining.`,
         timestamp: new Date(),
       });
 
-      return newActiveIdx;
+      return true;
     } catch (error) {
-      deps.statusReporter({
+      this.statusReporter({
         role: "error",
         content: `Compression failed: ${error instanceof Error ? error.message : String(error)}`,
         timestamp: new Date(),
       });
-      return deps.activeUserMessageOrdinal;
+      return false;
     } finally {
       this.isCompressing = false;
     }
@@ -183,18 +206,29 @@ export class ContextManager {
   setTokenCount(count: number): void {
     this.tokenCount = count;
     this.lastShownThreshold = 0;
+    this.emitTokenCount();
   }
 
   reset(): void {
     this.tokenCount = 0;
     this.lastShownThreshold = 0;
+    this.emitTokenCount();
   }
 
-  setContextLength(length: number): void {
-    this.contextLength = length;
+  setModel(client: LLMClient, model: Model): void {
+    this.client = client;
+    this.model = model;
+    this.contextLength = model.getContextLength();
   }
 
   getIsCompressing(): boolean {
     return this.isCompressing;
+  }
+
+  private emitTokenCount(): void {
+    this.events.emit({
+      type: "context.tokens_changed",
+      tokenCount: this.tokenCount,
+    });
   }
 }

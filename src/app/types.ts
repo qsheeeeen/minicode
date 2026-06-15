@@ -1,6 +1,7 @@
 import type { Agent } from "../agent.js";
 import type { AppConfig } from "../config.js";
 import type { AgentRegistry, SessionStats } from "../services/index.js";
+import type { RuntimeEvents } from "../services/runtime-events.js";
 import type { ContextManager } from "../services/context-manager.js";
 import type { ModelSwitchService } from "../services/model-switcher.js";
 import type { PermissionService } from "../services/permission.js";
@@ -21,6 +22,7 @@ export interface AppRuntime {
   readonly programStartTime: number;
   readonly agentRegistry: AgentRegistry;
   readonly sessionStats: SessionStats;
+  readonly runtimeEvents: RuntimeEvents;
   readonly sessionManager: SessionManager;
   readonly contextManager: ContextManager;
   readonly permissionService: PermissionService;

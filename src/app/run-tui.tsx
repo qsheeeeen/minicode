@@ -14,6 +14,7 @@ export async function runTuiApp(app: AppRuntime): Promise<void> {
       sessionName={app.sessionName}
       resumeRecent={app.resumeRecent}
       agentRegistry={app.agentRegistry}
+      runtimeEvents={app.runtimeEvents}
       programStartTime={app.programStartTime}
       sessionStats={app.sessionStats}
       modelSwitchService={app.modelSwitchService}

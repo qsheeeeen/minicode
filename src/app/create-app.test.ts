@@ -88,7 +88,7 @@ describe("createApp", () => {
     const reporter = vi.fn();
     runtime.sessionManager.setStatusReporter(reporter);
 
-    runtime.contextManager.processTokenUsage("test-model", {
+    await runtime.contextManager.processUsage({
       input: { total: 600, cache_hit: 0, cache_miss: 600 },
       output: 0,
     });

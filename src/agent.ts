@@ -24,7 +24,6 @@ export interface AgentOpts {
   readonly contextManager: ContextManager;
   readonly toolExecutor: ToolExecutor;
   readonly promptManager: PromptManager;
-  readonly onTokenCountChange?: (count: number) => void;
   readonly agentRegistry?: AgentRegistry;
   readonly currentAgentId?: string;
   readonly appConfig: AppConfig;
@@ -38,7 +37,6 @@ export class Agent {
   private sessionManager: SessionManager;
   private contextManager: ContextManager;
   private toolExecutor: ToolExecutor;
-  public onTokenCountChange?: (count: number) => void;
   private promptManager: PromptManager;
   private agentRegistry?: AgentRegistry;
   private currentAgentId: string;
@@ -70,7 +68,6 @@ export class Agent {
     this.contextManager = opts.contextManager;
     this.toolExecutor = opts.toolExecutor;
     this.promptManager = opts.promptManager;
-    this.onTokenCountChange = opts.onTokenCountChange;
     this.agentRegistry = opts.agentRegistry;
     this.currentAgentId = opts.currentAgentId ?? "1";
     this.appConfig = opts.appConfig;
@@ -114,33 +111,11 @@ export class Agent {
     }
   }
 
-  async compress(): Promise<void> {
-    const newUserMessageOrdinal = await this.contextManager.compress({
-      context: this.context,
-      client: this.client,
-      model: this.model,
-      changeJournal: this.sessionManager.getChangeJournal(),
-      activeUserMessageOrdinal:
-        this.sessionManager.getActiveUserMessageOrdinal(),
-      statusReporter: this.sessionManager.getStatusReporter(),
-    });
-    this.sessionManager.setActiveUserMessageOrdinal(newUserMessageOrdinal);
-  }
-
   // Track token usage and trigger auto-compression
-  private async processTokenUsage(result: LLMStreamResult): Promise<void> {
+  private async processUsage(result: LLMStreamResult): Promise<void> {
     if (!result.usage) return;
 
-    const usageResult = this.contextManager.processTokenUsage(
-      this.model.getName(),
-      result.usage,
-    );
-    this.onTokenCountChange?.(usageResult.totalTokens);
-
-    if (usageResult.shouldCompress) {
-      await this.compress();
-      this.onTokenCountChange?.(this.contextManager.getTokenCount());
-    }
+    await this.contextManager.processUsage(result.usage);
   }
 
   // Stream LLM response, updating context in real-time.
@@ -177,11 +152,7 @@ export class Agent {
         } else if (chunk.type === "tool_use") {
           const tool = this.toolExecutor.getTools().get(chunk.name);
           toolCalls.push({ block: chunk, tool });
-          this.context.startToolCall(
-            chunk.id,
-            chunk.name,
-            chunk.input,
-          );
+          this.context.startToolCall(chunk.id, chunk.name, chunk.input);
           this.saveStore();
         }
       }
@@ -230,7 +201,7 @@ export class Agent {
 
         const { result, toolCalls } = await this.streamLLM(toolDefs);
 
-        await this.processTokenUsage(result);
+        await this.processUsage(result);
         this.logger?.info(
           {
             session: this.currentSession,
@@ -311,6 +282,5 @@ export class Agent {
   clearSession(): void {
     this.sessionManager.clearSession();
     this.contextManager.reset();
-    this.onTokenCountChange?.(0);
   }
 }
