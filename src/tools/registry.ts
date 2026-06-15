@@ -5,6 +5,7 @@ import type { AppConfig } from "../config.js";
 import type { FileSystemService } from "../services/filesystem.js";
 import type { ModelSwitchService } from "../services/model-switcher.js";
 import type { ShellService } from "../services/shell-service.js";
+import type { ChangeJournal } from "../services/change-journal.js";
 
 /**
  * UI interaction interfaces defined by the tool execution layer.
@@ -43,6 +44,8 @@ export interface ToolExecutionContext {
   appConfig: AppConfig;
   currentAgentId: string;
   signal: AbortSignal | undefined;
+  changeJournal?: ChangeJournal;
+  activeUserMessageOrdinal?: number;
   prompter?: UserPrompter;
   services?: {
     fs?: FileSystemService;
@@ -64,8 +67,6 @@ export interface ToolDef<TArgs = Record<string, unknown>> {
   requiresPermission?: boolean;
   readOnly?: boolean;
   interactive?: boolean;
-  trackChanges?: boolean;
-  changeOp?: "edit" | "write";
 }
 
 const defaultTools = new Map<string, ToolDef<any>>();

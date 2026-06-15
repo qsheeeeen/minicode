@@ -257,6 +257,9 @@ export class Agent {
           },
           appConfig: this.appConfig,
           currentAgentId: this.currentAgentId,
+          changeJournal: this.sessionManager.getChangeJournal(),
+          activeUserMessageOrdinal:
+            this.sessionManager.getActiveUserMessageOrdinal(),
           prompter: opts?.prompter,
           services: {
             fs: this.fileSystemService,

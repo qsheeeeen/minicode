@@ -74,7 +74,14 @@ function Demo() {
             {
               userMessageOrdinal: 1,
               entries: [
-                { path: "src/auth.ts", op: "edit", before: "..." } as any,
+                {
+                  userMessageOrdinal: 1,
+                  path: "src/auth.ts",
+                  op: "edit",
+                  beforeExists: true,
+                  ranges: [{ start: 0, oldText: "old", newText: "new" }],
+                  ts: Date.now(),
+                },
               ],
             },
           ]}

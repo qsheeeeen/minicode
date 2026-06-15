@@ -5,8 +5,18 @@ function makeContext() {
   return {
     services: {
       fs: {
-        writeText: vi.fn().mockResolvedValue("/workspace/test.txt"),
+        writeText: vi.fn().mockResolvedValue({
+          path: "/workspace/test.txt",
+          beforeExists: false,
+          oldText: "",
+          newText: "hello world",
+          ranges: [{ start: 0, oldText: "", newText: "hello world" }],
+        }),
       },
+    },
+    activeUserMessageOrdinal: 2,
+    changeJournal: {
+      recordChange: vi.fn().mockResolvedValue(undefined),
     },
   } as any;
 }
@@ -33,6 +43,13 @@ describe("writeTool", () => {
         "test.txt",
         "hello world",
       );
+      expect(context.changeJournal.recordChange).toHaveBeenCalledWith(
+        2,
+        "/workspace/test.txt",
+        "write",
+        false,
+        [{ start: 0, oldText: "", newText: "hello world" }],
+      );
     });
 
     it("returns error on failure", async () => {
@@ -48,6 +65,7 @@ describe("writeTool", () => {
       );
 
       expect(result.output).toContain("EACCES");
+      expect(context.changeJournal.recordChange).not.toHaveBeenCalled();
     });
   });
 });

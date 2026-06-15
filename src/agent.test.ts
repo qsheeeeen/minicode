@@ -39,7 +39,6 @@ function makeAgent(overrides?: {
   const toolExecutor = new ToolExecutor({
     tools: getAll(),
     permissionService,
-    getChangeJournal: () => sessionManager.getChangeJournal(),
     context,
   });
   const agent = new Agent({

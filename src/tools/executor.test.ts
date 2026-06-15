@@ -2,7 +2,6 @@ import { describe, it, expect, vi } from "vitest";
 import { ToolExecutor, type ToolCall } from "./executor.js";
 import { PermissionService } from "../services/permission.js";
 import { LLMContext } from "../llm/context.js";
-import { ChangeJournal } from "../services/change-journal.js";
 import type { ToolDef, ToolExecutionContext } from "./registry.js";
 import { ToolDeniedError } from "./registry.js";
 
@@ -22,21 +21,18 @@ function makeExecutor(overrides?: {
   permissionMode?: PermissionService["getMode"] extends () => infer R
     ? R
     : never;
-  getChangeJournal?: () => ChangeJournal;
 }) {
   const tools = overrides?.tools ?? new Map([["testTool", makeTool()]]);
   const permissionService = new PermissionService(
     overrides?.permissionMode ?? "yolo",
   );
   const context = new LLMContext();
-  const changeJournal = new ChangeJournal();
   const executor = new ToolExecutor({
     tools,
     permissionService,
-    getChangeJournal: overrides?.getChangeJournal ?? (() => changeJournal),
     context,
   });
-  return { executor, tools, permissionService, context, changeJournal };
+  return { executor, tools, permissionService, context };
 }
 
 function makeContext(): ToolExecutionContext {
@@ -229,34 +225,5 @@ describe("ToolExecutor", () => {
       expect(spy).toHaveBeenCalledWith("call_2", "ok");
     });
 
-    it("records tracked changes through the latest change journal getter", async () => {
-      const tool = makeTool({
-        readOnly: false,
-        trackChanges: true,
-        changeOp: "write",
-      });
-      const firstJournal = new ChangeJournal();
-      const secondJournal = new ChangeJournal();
-      const firstSpy = vi.spyOn(firstJournal, "recordBefore");
-      const secondSpy = vi.spyOn(secondJournal, "recordBefore");
-      let currentJournal = firstJournal;
-      const { executor, context } = makeExecutor({
-        tools: new Map([["testTool", tool]]),
-        getChangeJournal: () => currentJournal,
-      });
-
-      currentJournal = secondJournal;
-      const call = makeToolCall(tool, { path: "/tmp/minicode-missing-file" });
-      prepareToolCalls(context, [call]);
-      await executor.execute([call], makeContext(), 1);
-
-      expect(firstSpy).not.toHaveBeenCalled();
-      expect(secondSpy).toHaveBeenCalledWith(
-        1,
-        "/tmp/minicode-missing-file",
-        "write",
-        "",
-      );
-    });
   });
 });

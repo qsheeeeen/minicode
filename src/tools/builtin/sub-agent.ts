@@ -81,7 +81,6 @@ export const agentTool: ToolDef = {
     const toolExecutor = new ToolExecutor({
       tools: getSubAgentTools(),
       permissionService: new PermissionService("manual"),
-      getChangeJournal: () => sessionManager.getChangeJournal(),
       context: sessionManager.getContext(),
     });
     const subAgent = new Agent({

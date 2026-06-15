@@ -2,7 +2,6 @@ import type { ToolDef, ToolExecutionContext } from "./registry.js";
 import { ToolDeniedError } from "./registry.js";
 import type { LLMToolUseBlock } from "../llm/client.js";
 import type { LLMContext } from "../llm/context.js";
-import type { ChangeJournal } from "../services/change-journal.js";
 import {
   PermissionService,
   type PermissionMode,
@@ -18,26 +17,23 @@ export interface ToolCall {
 export interface ToolExecutorOpts {
   readonly tools: Map<string, ToolDef>;
   readonly permissionService: PermissionService;
-  readonly getChangeJournal: () => ChangeJournal;
   readonly context: LLMContext;
   readonly logger?: pino.Logger;
 }
 
 /**
- * Executes tool calls with permission checks, change journaling,
- * and error handling. Decoupled from the Agent's core LLM loop.
+ * Executes tool calls with permission checks and error handling.
+ * Decoupled from the Agent's core LLM loop.
  */
 export class ToolExecutor {
   private tools: Map<string, ToolDef>;
   private permissionService: PermissionService;
-  private getChangeJournal: () => ChangeJournal;
   private context: LLMContext;
   private logger?: pino.Logger;
 
   constructor(opts: ToolExecutorOpts) {
     this.tools = opts.tools;
     this.permissionService = opts.permissionService;
-    this.getChangeJournal = opts.getChangeJournal;
     this.context = opts.context;
     this.logger = opts.logger;
   }
@@ -49,7 +45,6 @@ export class ToolExecutor {
     tool: ToolDef,
     args: Record<string, unknown>,
     context: ToolExecutionContext,
-    activeUserMessageOrdinal: number,
   ): Promise<{ output: string }> {
     if (!(tool.readOnly ?? !tool.requiresPermission)) {
       const displayText = callContent(tool.name, args);
@@ -69,23 +64,6 @@ export class ToolExecutor {
       }
     }
 
-    if (tool.trackChanges && args.path && activeUserMessageOrdinal > 0) {
-      const filePath = args.path as string;
-      let before = "";
-      try {
-        const fs = await import("fs/promises");
-        before = await fs.readFile(filePath, "utf-8");
-      } catch {
-        // File doesn't exist yet — before stays ""
-      }
-      this.getChangeJournal().recordBefore(
-        activeUserMessageOrdinal,
-        filePath,
-        tool.changeOp ?? "write",
-        before,
-      );
-    }
-
     return tool.execute(args, context);
   }
 
@@ -95,7 +73,7 @@ export class ToolExecutor {
   async execute(
     toolCalls: ToolCall[],
     context: ToolExecutionContext,
-    activeUserMessageOrdinal: number,
+    _activeUserMessageOrdinal: number,
   ): Promise<void> {
     if (toolCalls.length === 0) return;
 
@@ -128,7 +106,6 @@ export class ToolExecutor {
           tool,
           block.input as Record<string, unknown>,
           context,
-          activeUserMessageOrdinal,
         );
         results.push({ toolUseId: block.id, content: result.output });
         this.logger?.info(

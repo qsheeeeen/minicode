@@ -11,8 +11,13 @@ function makeContext() {
           newText: "minicode",
           content: "hello minicode",
           count: 1,
+          ranges: [{ start: 6, oldText: "world", newText: "minicode" }],
         }),
       },
+    },
+    activeUserMessageOrdinal: 2,
+    changeJournal: {
+      recordChange: vi.fn().mockResolvedValue(undefined),
     },
   } as any;
 }
@@ -41,6 +46,13 @@ describe("editTool", () => {
         "world",
         "minicode",
         undefined,
+      );
+      expect(context.changeJournal.recordChange).toHaveBeenCalledWith(
+        2,
+        "/workspace/test.txt",
+        "edit",
+        true,
+        [{ start: 6, oldText: "world", newText: "minicode" }],
       );
     });
 
@@ -81,6 +93,7 @@ describe("editTool", () => {
       );
 
       expect(result.output).toContain("oldText not found");
+      expect(context.changeJournal.recordChange).not.toHaveBeenCalled();
     });
   });
 });

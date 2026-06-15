@@ -1,91 +1,94 @@
 import fs from "fs/promises";
-import fsSync from "fs";
 import path from "path";
 
+export interface ChangeRange {
+  start: number;
+  oldText: string;
+  newText: string;
+}
+
 export interface ChangeEntry {
-  turnIdx: number;
+  userMessageOrdinal: number;
   path: string;
   op: "edit" | "write";
-  before: string;
+  beforeExists: boolean;
+  ranges: ChangeRange[];
   ts: number;
 }
 
 export class ChangeJournal {
   private filePath = "";
-  private writeStream: fsSync.WriteStream | null = null;
-  private cache: ChangeEntry[] | null = null;
+  private entries: ChangeEntry[] = [];
 
   async startSession(sessionDir: string, sessionName: string): Promise<void> {
     this.close();
     await fs.mkdir(sessionDir, { recursive: true });
     this.filePath = path.join(sessionDir, `${sessionName}.changes.jsonl`);
-    this.cache = null;
-    this.writeStream = fsSync.createWriteStream(this.filePath, {
-      flags: "a",
-      encoding: "utf-8",
-    });
+    this.entries = await this.loadEntries();
   }
 
-  recordBefore(
-    turnIdx: number,
+  async recordChange(
+    userMessageOrdinal: number,
     filePath: string,
     op: "edit" | "write",
-    content: string,
-  ): void {
-    if (!this.writeStream) return;
+    beforeExists: boolean,
+    ranges: readonly ChangeRange[],
+  ): Promise<void> {
+    if (!this.filePath) return;
     const entry: ChangeEntry = {
-      turnIdx,
+      userMessageOrdinal,
       path: filePath,
       op,
-      before: content,
+      beforeExists,
+      ranges: ranges.map((range) => ({ ...range })),
       ts: Date.now(),
     };
-    this.writeStream.write(JSON.stringify(entry) + "\n");
-    if (this.cache) this.cache.push(entry);
+    this.entries.push(entry);
+    await fs.appendFile(this.filePath, JSON.stringify(entry) + "\n", "utf-8");
   }
 
   async getEntries(): Promise<ChangeEntry[]> {
-    if (this.cache) return [...this.cache];
-    this.cache = await this.loadEntries();
-    return [...this.cache];
+    return this.entries.map((entry) => ({
+      ...entry,
+      ranges: entry.ranges.map((range) => ({ ...range })),
+    }));
   }
 
-  async getEntriesByTurn(): Promise<Map<number, ChangeEntry[]>> {
+  async getEntriesByUserMessage(): Promise<Map<number, ChangeEntry[]>> {
     const entries = await this.getEntries();
     const map = new Map<number, ChangeEntry[]>();
     for (const e of entries) {
-      const list = map.get(e.turnIdx) ?? [];
+      const list = map.get(e.userMessageOrdinal) ?? [];
       list.push(e);
-      map.set(e.turnIdx, list);
+      map.set(e.userMessageOrdinal, list);
     }
     return map;
   }
 
-  async pruneFrom(turnIdx: number): Promise<void> {
-    const entries = await this.loadEntries();
-    const kept = entries.filter((e) => e.turnIdx < turnIdx);
+  async pruneFromUserMessage(userMessageOrdinal: number): Promise<void> {
+    const kept = this.entries.filter(
+      (e) => e.userMessageOrdinal < userMessageOrdinal,
+    );
     await this.writeFile(kept);
-    this.cache = kept;
+    this.entries = kept;
   }
 
-  async pruneAndRenumber(
+  async pruneAndRenumberUserMessages(
     prunedCount: number,
     offsetAdded: number,
   ): Promise<void> {
-    const entries = await this.loadEntries();
-    const kept = entries
-      .filter((e) => e.turnIdx > prunedCount)
-      .map((e) => ({ ...e, turnIdx: e.turnIdx - prunedCount + offsetAdded }));
+    const kept = this.entries
+      .filter((e) => e.userMessageOrdinal > prunedCount)
+      .map((e) => ({
+        ...e,
+        userMessageOrdinal:
+          e.userMessageOrdinal - prunedCount + offsetAdded,
+      }));
     await this.writeFile(kept);
-    this.cache = kept;
+    this.entries = kept;
   }
 
-  close(): void {
-    if (this.writeStream) {
-      this.writeStream.end();
-      this.writeStream = null;
-    }
-  }
+  close(): void {}
 
   private async loadEntries(): Promise<ChangeEntry[]> {
     try {
@@ -107,14 +110,9 @@ export class ChangeJournal {
 
   private async writeFile(entries: ChangeEntry[]): Promise<void> {
     if (!this.filePath) return;
-    this.close();
     const tmpPath = this.filePath + ".tmp";
     const lines = entries.map((e) => JSON.stringify(e));
     await fs.writeFile(tmpPath, lines.join("\n") + (lines.length ? "\n" : ""));
     await fs.rename(tmpPath, this.filePath);
-    this.writeStream = fsSync.createWriteStream(this.filePath, {
-      flags: "a",
-      encoding: "utf-8",
-    });
   }
 }

@@ -24,7 +24,8 @@ registerCommand({
       return;
     }
 
-    const entriesByUserMessageMap = await ctx.changeJournal.getEntriesByTurn();
+    const entriesByUserMessageMap =
+      await ctx.changeJournal.getEntriesByUserMessage();
     const entriesByUserMessage = Array.from(
       entriesByUserMessageMap.entries(),
     ).map(([userMessageOrdinal, entries]) => ({ userMessageOrdinal, entries }));

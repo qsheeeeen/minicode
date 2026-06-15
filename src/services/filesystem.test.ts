@@ -13,9 +13,13 @@ describe("FileSystemService", () => {
     const root = await makeWorkspace();
     const service = new FileSystemService({ workspaceRoot: root });
 
-    const writtenPath = await service.writeText("dir/file.txt", "hello");
+    const result = await service.writeText("dir/file.txt", "hello");
 
-    expect(writtenPath).toBe(path.join(root, "dir/file.txt"));
+    expect(result.path).toBe(path.join(root, "dir/file.txt"));
+    expect(result.beforeExists).toBe(false);
+    expect(result.ranges).toEqual([
+      { start: 0, oldText: "", newText: "hello" },
+    ]);
     await expect(service.readText("dir/file.txt")).resolves.toBe("hello");
   });
 
@@ -39,6 +43,24 @@ describe("FileSystemService", () => {
 
     const result = await service.editText("file.txt", "foo", "baz", true);
     expect(result.content).toBe("baz bar baz");
+    expect(result.ranges).toEqual([
+      { start: 0, oldText: "foo", newText: "baz" },
+      { start: 8, oldText: "foo", newText: "baz" },
+    ]);
     await expect(service.readText("file.txt")).resolves.toBe("baz bar baz");
+  });
+
+  it("records existing file content for write as a full replacement", async () => {
+    const root = await makeWorkspace();
+    const service = new FileSystemService({ workspaceRoot: root });
+    await service.writeText("file.txt", "");
+
+    const result = await service.writeText("file.txt", "next");
+
+    expect(result.beforeExists).toBe(true);
+    expect(result.ranges).toEqual([
+      { start: 0, oldText: "", newText: "next" },
+    ]);
+    await expect(service.readText("file.txt")).resolves.toBe("next");
   });
 });

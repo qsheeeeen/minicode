@@ -116,7 +116,7 @@ describe("Builtin commands", () => {
   /** Create a mock ChangeJournal (ctx.changeJournal) */
   function makeChangeJournalMock() {
     return {
-      getEntriesByTurn: vi.fn().mockResolvedValue(new Map()),
+      getEntriesByUserMessage: vi.fn().mockResolvedValue(new Map()),
     };
   }
 

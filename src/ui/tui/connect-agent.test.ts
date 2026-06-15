@@ -42,7 +42,6 @@ function createTestAgent(responses = [defaultTextResponse("OK")]) {
   const toolExecutor = new ToolExecutor({
     tools,
     permissionService: new PermissionService("yolo"),
-    getChangeJournal: () => sessionManager.getChangeJournal(),
     context: sessionManager.getContext(),
   });
   const agent = new Agent({

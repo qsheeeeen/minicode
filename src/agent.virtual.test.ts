@@ -50,7 +50,6 @@ function createTestAgent(options?: {
   const toolExecutor = new ToolExecutor({
     tools,
     permissionService: new PermissionService(options?.permissionMode ?? "yolo"),
-    getChangeJournal: () => sessionManager.getChangeJournal(),
     context: sessionManager.getContext(),
   });
   const agent = new Agent({
@@ -236,7 +235,6 @@ describe("Agent virtual integration", () => {
     const toolExecutor = new ToolExecutor({
       tools,
       permissionService: new PermissionService("manual"),
-      getChangeJournal: () => sessionManager.getChangeJournal(),
       context: sessionManager.getContext(),
     });
     const agent = new Agent({

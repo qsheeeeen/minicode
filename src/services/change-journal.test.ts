@@ -1,20 +1,12 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("fs/promises", () => ({
   default: {
+    appendFile: vi.fn().mockResolvedValue(undefined),
     mkdir: vi.fn().mockResolvedValue(undefined),
     readFile: vi.fn(),
     writeFile: vi.fn().mockResolvedValue(undefined),
     rename: vi.fn().mockResolvedValue(undefined),
-  },
-}));
-
-vi.mock("fs", () => ({
-  default: {
-    createWriteStream: vi.fn().mockReturnValue({
-      write: vi.fn(),
-      end: vi.fn(),
-    }),
   },
 }));
 
@@ -23,69 +15,76 @@ describe("ChangeJournal", () => {
     vi.clearAllMocks();
   });
 
-  it("startSession creates directory and opens write stream", async () => {
+  it("startSession creates directory and loads existing entries", async () => {
     const fs = (await import("fs/promises")).default;
-    const fsSync = (await import("fs")).default;
+    (fs.readFile as ReturnType<typeof vi.fn>).mockResolvedValue("");
     const { ChangeJournal } = await import("./change-journal.js");
 
     const journal = new ChangeJournal();
     await journal.startSession("/tmp/sess", "test");
 
     expect(fs.mkdir).toHaveBeenCalledWith("/tmp/sess", { recursive: true });
-    expect(fsSync.createWriteStream).toHaveBeenCalledWith(
+    expect(fs.readFile).toHaveBeenCalledWith(
       "/tmp/sess/test.changes.jsonl",
-      { flags: "a", encoding: "utf-8" },
+      "utf-8",
     );
   });
 
-  it("recordBefore writes JSON line to stream", async () => {
-    const fsSync = (await import("fs")).default;
-    const mockWrite = vi.fn();
-    (fsSync.createWriteStream as ReturnType<typeof vi.fn>).mockReturnValue({
-      write: mockWrite,
-      end: vi.fn(),
-    });
-
+  it("recordChange appends JSONL and updates in-memory entries", async () => {
+    const fs = (await import("fs/promises")).default;
+    (fs.readFile as ReturnType<typeof vi.fn>).mockResolvedValue("");
     const { ChangeJournal } = await import("./change-journal.js");
     const journal = new ChangeJournal();
     await journal.startSession("/tmp/sess", "test");
 
     vi.spyOn(Date, "now").mockReturnValue(1000);
-    journal.recordBefore(1, "file.ts", "edit", "old content");
+    await journal.recordChange(1, "file.ts", "edit", true, [
+      { start: 5, oldText: "old", newText: "new" },
+    ]);
 
-    expect(mockWrite).toHaveBeenCalledWith(
-      JSON.stringify({
-        turnIdx: 1,
-        path: "file.ts",
-        op: "edit",
-        before: "old content",
-        ts: 1000,
-      }) + "\n",
+    const entry = {
+      userMessageOrdinal: 1,
+      path: "file.ts",
+      op: "edit",
+      beforeExists: true,
+      ranges: [{ start: 5, oldText: "old", newText: "new" }],
+      ts: 1000,
+    };
+    expect(fs.appendFile).toHaveBeenCalledWith(
+      "/tmp/sess/test.changes.jsonl",
+      JSON.stringify(entry) + "\n",
+      "utf-8",
     );
+    await expect(journal.getEntries()).resolves.toEqual([entry]);
   });
 
-  it("recordBefore is no-op when no write stream", async () => {
-    // Should not throw
+  it("recordChange is a no-op before startSession", async () => {
+    const fs = (await import("fs/promises")).default;
     const { ChangeJournal } = await import("./change-journal.js");
     const journal = new ChangeJournal();
-    journal.recordBefore(1, "file.ts", "edit", "content");
+
+    await journal.recordChange(1, "file.ts", "edit", true, []);
+
+    expect(fs.appendFile).not.toHaveBeenCalled();
   });
 
-  it("getEntries loads from file when no cache", async () => {
+  it("getEntries loads existing JSONL entries", async () => {
     const fs = (await import("fs/promises")).default;
     const lines = [
       JSON.stringify({
-        turnIdx: 1,
+        userMessageOrdinal: 1,
         path: "a.ts",
         op: "edit",
-        before: "old",
+        beforeExists: true,
+        ranges: [{ start: 0, oldText: "old", newText: "new" }],
         ts: 100,
       }),
       JSON.stringify({
-        turnIdx: 2,
+        userMessageOrdinal: 2,
         path: "b.ts",
         op: "write",
-        before: "",
+        beforeExists: false,
+        ranges: [{ start: 0, oldText: "", newText: "created" }],
         ts: 200,
       }),
     ];
@@ -95,69 +94,39 @@ describe("ChangeJournal", () => {
 
     const { ChangeJournal } = await import("./change-journal.js");
     const journal = new ChangeJournal();
-    // Set filePath via startSession
-    const fsSync = (await import("fs")).default;
-    (fsSync.createWriteStream as ReturnType<typeof vi.fn>).mockReturnValue({
-      write: vi.fn(),
-      end: vi.fn(),
-    });
     await journal.startSession("/tmp/sess", "test");
 
     const entries = await journal.getEntries();
     expect(entries).toHaveLength(2);
     expect(entries[0].path).toBe("a.ts");
-    expect(entries[1].path).toBe("b.ts");
+    expect(entries[1].beforeExists).toBe(false);
   });
 
-  it("getEntries returns cache on second call", async () => {
-    const fs = (await import("fs/promises")).default;
-    const line = JSON.stringify({
-      turnIdx: 1,
-      path: "a.ts",
-      op: "edit",
-      before: "old",
-      ts: 100,
-    });
-    (fs.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(line);
-
-    const { ChangeJournal } = await import("./change-journal.js");
-    const journal = new ChangeJournal();
-    const fsSync = (await import("fs")).default;
-    (fsSync.createWriteStream as ReturnType<typeof vi.fn>).mockReturnValue({
-      write: vi.fn(),
-      end: vi.fn(),
-    });
-    await journal.startSession("/tmp/sess", "test");
-
-    await journal.getEntries();
-    await journal.getEntries();
-
-    // readFile should only be called once (cache hit on second call)
-    expect(fs.readFile).toHaveBeenCalledTimes(1);
-  });
-
-  it("getEntriesByTurn groups entries by turnIdx", async () => {
+  it("getEntriesByUserMessage groups entries by userMessageOrdinal", async () => {
     const fs = (await import("fs/promises")).default;
     const lines = [
       JSON.stringify({
-        turnIdx: 1,
+        userMessageOrdinal: 1,
         path: "a.ts",
         op: "edit",
-        before: "old",
+        beforeExists: true,
+        ranges: [],
         ts: 100,
       }),
       JSON.stringify({
-        turnIdx: 1,
+        userMessageOrdinal: 1,
         path: "b.ts",
         op: "write",
-        before: "",
+        beforeExists: false,
+        ranges: [],
         ts: 200,
       }),
       JSON.stringify({
-        turnIdx: 2,
+        userMessageOrdinal: 2,
         path: "c.ts",
         op: "edit",
-        before: "x",
+        beforeExists: true,
+        ranges: [],
         ts: 300,
       }),
     ];
@@ -167,41 +136,31 @@ describe("ChangeJournal", () => {
 
     const { ChangeJournal } = await import("./change-journal.js");
     const journal = new ChangeJournal();
-    const fsSync = (await import("fs")).default;
-    (fsSync.createWriteStream as ReturnType<typeof vi.fn>).mockReturnValue({
-      write: vi.fn(),
-      end: vi.fn(),
-    });
     await journal.startSession("/tmp/sess", "test");
 
-    const map = await journal.getEntriesByTurn();
+    const map = await journal.getEntriesByUserMessage();
     expect(map.get(1)).toHaveLength(2);
     expect(map.get(2)).toHaveLength(1);
   });
 
-  it("pruneFrom removes entries at or after turnIdx", async () => {
+  it("pruneFromUserMessage removes entries at or after user message", async () => {
     const fs = (await import("fs/promises")).default;
     const lines = [
       JSON.stringify({
-        turnIdx: 1,
+        userMessageOrdinal: 1,
         path: "a.ts",
         op: "edit",
-        before: "old",
+        beforeExists: true,
+        ranges: [],
         ts: 100,
       }),
       JSON.stringify({
-        turnIdx: 2,
+        userMessageOrdinal: 2,
         path: "b.ts",
         op: "edit",
-        before: "x",
+        beforeExists: true,
+        ranges: [],
         ts: 200,
-      }),
-      JSON.stringify({
-        turnIdx: 3,
-        path: "c.ts",
-        op: "edit",
-        before: "y",
-        ts: 300,
       }),
     ];
     (fs.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(
@@ -210,93 +169,42 @@ describe("ChangeJournal", () => {
 
     const { ChangeJournal } = await import("./change-journal.js");
     const journal = new ChangeJournal();
-    const fsSync = (await import("fs")).default;
-    (fsSync.createWriteStream as ReturnType<typeof vi.fn>).mockReturnValue({
-      write: vi.fn(),
-      end: vi.fn(),
-    });
     await journal.startSession("/tmp/sess", "test");
+    await journal.pruneFromUserMessage(2);
 
-    await journal.pruneFrom(2);
-
-    // Should write only entry with turnIdx 1
     expect(fs.writeFile).toHaveBeenCalledWith(
       expect.stringContaining(".tmp"),
-      expect.stringContaining('"turnIdx":1'),
+      expect.stringContaining('"userMessageOrdinal":1'),
     );
+    await expect(journal.getEntries()).resolves.toHaveLength(1);
   });
 
-  it("pruneAndRenumber filters and renumbers entries", async () => {
+  it("pruneAndRenumberUserMessages filters and renumbers entries", async () => {
     const fs = (await import("fs/promises")).default;
-    const lines = [
+    const lines = [1, 2, 3].map((userMessageOrdinal) =>
       JSON.stringify({
-        turnIdx: 1,
-        path: "a.ts",
+        userMessageOrdinal,
+        path: `${userMessageOrdinal}.ts`,
         op: "edit",
-        before: "old",
-        ts: 100,
+        beforeExists: true,
+        ranges: [],
+        ts: userMessageOrdinal,
       }),
-      JSON.stringify({
-        turnIdx: 2,
-        path: "b.ts",
-        op: "edit",
-        before: "x",
-        ts: 200,
-      }),
-      JSON.stringify({
-        turnIdx: 3,
-        path: "c.ts",
-        op: "edit",
-        before: "y",
-        ts: 300,
-      }),
-    ];
+    );
     (fs.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(
       lines.join("\n"),
     );
 
     const { ChangeJournal } = await import("./change-journal.js");
     const journal = new ChangeJournal();
-    const fsSync = (await import("fs")).default;
-    (fsSync.createWriteStream as ReturnType<typeof vi.fn>).mockReturnValue({
-      write: vi.fn(),
-      end: vi.fn(),
-    });
     await journal.startSession("/tmp/sess", "test");
+    await journal.pruneAndRenumberUserMessages(1, 0);
 
-    await journal.pruneAndRenumber(1, 0);
-
-    const written = (fs.writeFile as ReturnType<typeof vi.fn>).mock
-      .calls[0][1] as string;
-    const kept = written
-      .trim()
-      .split("\n")
-      .map((l: string) => JSON.parse(l));
-    expect(kept).toHaveLength(2);
-    expect(kept[0].turnIdx).toBe(1); // was 2, renumbered: 2 - 1 + 0 = 1
-    expect(kept[1].turnIdx).toBe(2); // was 3, renumbered: 3 - 1 + 0 = 2
-  });
-
-  it("close ends the write stream", async () => {
-    const fsSync = (await import("fs")).default;
-    const mockEnd = vi.fn();
-    (fsSync.createWriteStream as ReturnType<typeof vi.fn>).mockReturnValue({
-      write: vi.fn(),
-      end: mockEnd,
-    });
-
-    const { ChangeJournal } = await import("./change-journal.js");
-    const journal = new ChangeJournal();
-    await journal.startSession("/tmp/sess", "test");
-    journal.close();
-
-    expect(mockEnd).toHaveBeenCalled();
-  });
-
-  it("close is safe to call multiple times", async () => {
-    const { ChangeJournal } = await import("./change-journal.js");
-    const journal = new ChangeJournal();
-    journal.close(); // no stream
-    journal.close(); // still no stream — should not throw
+    const kept = await journal.getEntries();
+    expect(kept.map((entry) => entry.userMessageOrdinal)).toEqual([1, 2]);
+    expect(fs.rename).toHaveBeenCalledWith(
+      "/tmp/sess/test.changes.jsonl.tmp",
+      "/tmp/sess/test.changes.jsonl",
+    );
   });
 });

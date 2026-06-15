@@ -10,14 +10,27 @@ function getFileSystem(context?: ToolExecutionContext): FileSystemService {
   return context?.services?.fs ?? createDefaultFileSystemService();
 }
 
+async function recordEditChange(
+  context: ToolExecutionContext | undefined,
+  result: Awaited<ReturnType<FileSystemService["editText"]>>,
+): Promise<void> {
+  const userMessageOrdinal = context?.activeUserMessageOrdinal ?? 0;
+  if (!context?.changeJournal || userMessageOrdinal <= 0) return;
+  await context.changeJournal.recordChange(
+    userMessageOrdinal,
+    result.path,
+    "edit",
+    true,
+    result.ranges,
+  );
+}
+
 export const editTool: ToolDef = {
   name: "Edit",
   description:
     "Edit a file by replacing exact text. The oldText must match exactly (including whitespace). Use this for precise, surgical edits.",
   requiresPermission: true,
   readOnly: false,
-  trackChanges: true,
-  changeOp: "edit",
   input_schema: {
     type: "object" as const,
     properties: {
@@ -41,7 +54,13 @@ export const editTool: ToolDef = {
       const oldText = args.oldText as string;
       const newText = args.newText as string;
       const replaceAll = args.replaceAll as boolean | undefined;
-      await getFileSystem(context).editText(path, oldText, newText, replaceAll);
+      const result = await getFileSystem(context).editText(
+        path,
+        oldText,
+        newText,
+        replaceAll,
+      );
+      await recordEditChange(context, result);
       const diffLines = generateDiffSummary(path, oldText, newText);
       const headerLine = diffLines.find((l) => l.type === "header");
       const diffText = diffLines

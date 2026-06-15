@@ -14,7 +14,7 @@ export class RollbackExecutor {
     fromUserMessageOrdinal: number,
   ): Promise<RollbackResult> {
     this.truncateConversation(context, fromUserMessageOrdinal);
-    await changeJournal.pruneFrom(fromUserMessageOrdinal);
+    await changeJournal.pruneFromUserMessage(fromUserMessageOrdinal);
     return { filesRestored: [], filesDeleted: [] };
   }
 
@@ -31,7 +31,7 @@ export class RollbackExecutor {
     // Step 2: Truncate conversation
     this.truncateConversation(context, fromUserMessageOrdinal);
     // Step 3: Prune journal (last — only after everything else succeeds)
-    await changeJournal.pruneFrom(fromUserMessageOrdinal);
+    await changeJournal.pruneFromUserMessage(fromUserMessageOrdinal);
     return result;
   }
 
@@ -40,40 +40,60 @@ export class RollbackExecutor {
     fromUserMessageOrdinal: number,
   ): Promise<RollbackResult> {
     const entries = await changeJournal.getEntries();
-    const affected = entries.filter((e) => e.turnIdx >= fromUserMessageOrdinal);
+    const affected = entries.filter(
+      (e) => e.userMessageOrdinal >= fromUserMessageOrdinal,
+    );
 
     if (affected.length === 0) {
       return { filesRestored: [], filesDeleted: [] };
     }
 
-    // For each unique path, use the earliest entry to get the before state
-    const pathMap = new Map<string, ChangeEntry>();
-    for (const e of affected) {
-      if (!pathMap.has(e.path)) {
-        pathMap.set(e.path, e);
+    const filesRestored = new Set<string>();
+    const filesDeleted = new Set<string>();
+
+    for (const entry of [...affected].reverse()) {
+      if (entry.op === "write" && !entry.beforeExists) {
+        await this.deleteCreatedFile(entry.path);
+        filesDeleted.add(entry.path);
+        continue;
       }
+
+      await this.revertEntry(entry);
+      filesRestored.add(entry.path);
     }
 
-    const result: RollbackResult = {
-      filesRestored: [],
-      filesDeleted: [],
+    return {
+      filesRestored: [...filesRestored],
+      filesDeleted: [...filesDeleted],
     };
+  }
 
-    for (const [filePath, entry] of pathMap) {
-      if (entry.before === "") {
-        try {
-          await fs.unlink(filePath);
-          result.filesDeleted.push(filePath);
-        } catch {
-          // Already deleted
-        }
-      } else {
-        await fs.writeFile(filePath, entry.before, "utf-8");
-        result.filesRestored.push(filePath);
+  private async revertEntry(entry: ChangeEntry): Promise<void> {
+    let content = await fs.readFile(entry.path, "utf-8");
+    for (const range of [...entry.ranges].reverse()) {
+      const actual = content.slice(
+        range.start,
+        range.start + range.newText.length,
+      );
+      if (actual !== range.newText) {
+        throw new Error(
+          `Rollback conflict in ${entry.path}: expected current text at offset ${range.start} to match journal entry`,
+        );
       }
+      content =
+        content.slice(0, range.start) +
+        range.oldText +
+        content.slice(range.start + range.newText.length);
     }
+    await fs.writeFile(entry.path, content, "utf-8");
+  }
 
-    return result;
+  private async deleteCreatedFile(filePath: string): Promise<void> {
+    try {
+      await fs.unlink(filePath);
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+    }
   }
 
   private truncateConversation(

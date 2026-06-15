@@ -139,7 +139,6 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
   const toolExecutor = new ToolExecutor({
     tools,
     permissionService,
-    getChangeJournal: () => sessionManager.getChangeJournal(),
     context: sessionManager.getContext(),
   });
 

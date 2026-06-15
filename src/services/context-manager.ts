@@ -107,7 +107,7 @@ export class ContextManager {
       const prunedCount = originalUserPrompts - originalKept;
 
       if (prunedCount > 0) {
-        deps.changeJournal.pruneAndRenumber(prunedCount, 1);
+        await deps.changeJournal.pruneAndRenumberUserMessages(prunedCount, 1);
       }
 
       deps.context.replaceBlocks(compressed);
