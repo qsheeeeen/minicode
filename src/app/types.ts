@@ -2,7 +2,6 @@ import type { Agent } from "../agent.js";
 import type { AppConfig } from "../config.js";
 import type { AgentRegistry, SessionStats } from "../services/index.js";
 import type { ContextManager } from "../services/context-manager.js";
-import type { FileSystemService } from "../services/filesystem.js";
 import type { ModelSwitchService } from "../services/model-switcher.js";
 import type { PermissionService } from "../services/permission.js";
 import type { ShellService } from "../services/shell-service.js";
@@ -26,7 +25,6 @@ export interface AppRuntime {
   readonly contextManager: ContextManager;
   readonly permissionService: PermissionService;
   readonly modelSwitchService: ModelSwitchService;
-  readonly fileSystemService: FileSystemService;
   readonly shellService: ShellService;
   readonly commandContext: CommandContext;
 }

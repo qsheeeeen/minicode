@@ -2,7 +2,6 @@ import type { AgentRegistry } from "../services/agent-registry.js";
 import type { LLMClient } from "../llm/client.js";
 import type { Model } from "../llm/model.js";
 import type { AppConfig } from "../config.js";
-import type { FileSystemService } from "../services/filesystem.js";
 import type { ModelSwitchService } from "../services/model-switcher.js";
 import type { ShellService } from "../services/shell-service.js";
 import type { ChangeJournal } from "../services/change-journal.js";
@@ -48,7 +47,6 @@ export interface ToolExecutionContext {
   activeUserMessageOrdinal?: number;
   prompter?: UserPrompter;
   services?: {
-    fs?: FileSystemService;
     modelSwitcher?: ModelSwitchService;
     shell?: ShellService;
   };

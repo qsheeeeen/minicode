@@ -1,18 +1,85 @@
-import {
-  createDefaultFileSystemService,
-  type FileSystemService,
-} from "../../services/filesystem.js";
+import fs from "fs/promises";
 import { generateDiffSummary } from "../../utils/diff.js";
 import type { ToolDef, ToolExecutionContext, ToolResult } from "../registry.js";
 import { register } from "../registry.js";
 
-function getFileSystem(context?: ToolExecutionContext): FileSystemService {
-  return context?.services?.fs ?? createDefaultFileSystemService();
+interface TextReplacementRange {
+  readonly start: number;
+  readonly oldText: string;
+  readonly newText: string;
+}
+
+interface EditTextResult {
+  readonly path: string;
+  readonly oldText: string;
+  readonly newText: string;
+  readonly content: string;
+  readonly count: number;
+  readonly ranges: TextReplacementRange[];
+}
+
+function findReplacementRanges(
+  content: string,
+  oldText: string,
+  newText: string,
+): TextReplacementRange[] {
+  const ranges: TextReplacementRange[] = [];
+  let start = content.indexOf(oldText);
+  if (start === -1) return ranges;
+
+  ranges.push({ start, oldText, newText });
+  let nextSearchStart = start + oldText.length;
+  while ((start = content.indexOf(oldText, nextSearchStart)) !== -1) {
+    ranges.push({ start, oldText, newText });
+    nextSearchStart = start + oldText.length;
+  }
+  return ranges;
+}
+
+function applyReplacementRanges(
+  content: string,
+  ranges: readonly TextReplacementRange[],
+): string {
+  let next = content;
+  for (const range of [...ranges].reverse()) {
+    next =
+      next.slice(0, range.start) +
+      range.newText +
+      next.slice(range.start + range.oldText.length);
+  }
+  return next;
+}
+
+async function editText(
+  inputPath: string,
+  oldText: string,
+  newText: string,
+  replaceAll?: boolean,
+): Promise<EditTextResult> {
+  let content = await fs.readFile(inputPath, "utf-8");
+  if (oldText === "") {
+    throw new Error("oldText must not be empty");
+  }
+
+  const allRanges = findReplacementRanges(content, oldText, newText);
+  const count = allRanges.length;
+  if (count === 0) {
+    throw new Error("oldText not found in file");
+  }
+  if (!replaceAll && count > 1) {
+    throw new Error(
+      `oldText found ${count} times. Set replaceAll=true to replace all occurrences, or make oldText more specific to match exactly once.`,
+    );
+  }
+  const ranges = replaceAll ? allRanges : allRanges.slice(0, 1);
+  content = applyReplacementRanges(content, ranges);
+  await fs.writeFile(inputPath, content, "utf-8");
+  return { path: inputPath, oldText, newText, content, count, ranges };
 }
 
 async function recordEditChange(
   context: ToolExecutionContext | undefined,
-  result: Awaited<ReturnType<FileSystemService["editText"]>>,
+  result: EditTextResult,
 ): Promise<void> {
   const userMessageOrdinal = context?.activeUserMessageOrdinal ?? 0;
   if (!context?.changeJournal || userMessageOrdinal <= 0) return;
@@ -54,12 +121,7 @@ export const editTool: ToolDef = {
       const oldText = args.oldText as string;
       const newText = args.newText as string;
       const replaceAll = args.replaceAll as boolean | undefined;
-      const result = await getFileSystem(context).editText(
-        path,
-        oldText,
-        newText,
-        replaceAll,
-      );
+      const result = await editText(path, oldText, newText, replaceAll);
       await recordEditChange(context, result);
       const diffLines = generateDiffSummary(path, oldText, newText);
       const headerLine = diffLines.find((l) => l.type === "header");

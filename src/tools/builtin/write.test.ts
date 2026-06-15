@@ -1,19 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { writeTool } from "./write.js";
 
+vi.mock("fs/promises", () => ({
+  default: {
+    mkdir: vi.fn().mockResolvedValue(undefined),
+    readFile: vi.fn(),
+    writeFile: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+
 function makeContext() {
   return {
-    services: {
-      fs: {
-        writeText: vi.fn().mockResolvedValue({
-          path: "/workspace/test.txt",
-          beforeExists: false,
-          oldText: "",
-          newText: "hello world",
-          ranges: [{ start: 0, oldText: "", newText: "hello world" }],
-        }),
-      },
-    },
     activeUserMessageOrdinal: 2,
     changeJournal: {
       recordChange: vi.fn().mockResolvedValue(undefined),
@@ -27,7 +24,11 @@ describe("writeTool", () => {
   });
 
   describe("execute", () => {
-    it("writes content to file", async () => {
+    it("writes content to file and records a created file", async () => {
+      const fs = (await import("fs/promises")).default;
+      (fs.readFile as ReturnType<typeof vi.fn>).mockRejectedValue(
+        Object.assign(new Error("not found"), { code: "ENOENT" }),
+      );
       const context = makeContext();
 
       const result = await writeTool.execute(
@@ -39,22 +40,50 @@ describe("writeTool", () => {
       );
 
       expect(result.output).toBe("Wrote test.txt");
-      expect(context.services.fs.writeText).toHaveBeenCalledWith(
+      expect(fs.mkdir).toHaveBeenCalledWith(".", { recursive: true });
+      expect(fs.writeFile).toHaveBeenCalledWith(
         "test.txt",
         "hello world",
+        "utf-8",
       );
       expect(context.changeJournal.recordChange).toHaveBeenCalledWith(
         2,
-        "/workspace/test.txt",
+        "test.txt",
         "write",
         false,
         [{ start: 0, oldText: "", newText: "hello world" }],
       );
     });
 
-    it("returns error on failure", async () => {
+    it("records existing file content for overwrite", async () => {
+      const fs = (await import("fs/promises")).default;
+      (fs.readFile as ReturnType<typeof vi.fn>).mockResolvedValue("old");
       const context = makeContext();
-      context.services.fs.writeText.mockRejectedValue(new Error("EACCES"));
+
+      await writeTool.execute(
+        {
+          path: "dir/test.txt",
+          content: "new",
+        },
+        context,
+      );
+
+      expect(fs.mkdir).toHaveBeenCalledWith("dir", { recursive: true });
+      expect(context.changeJournal.recordChange).toHaveBeenCalledWith(
+        2,
+        "dir/test.txt",
+        "write",
+        true,
+        [{ start: 0, oldText: "old", newText: "new" }],
+      );
+    });
+
+    it("returns error on failure", async () => {
+      const fs = (await import("fs/promises")).default;
+      (fs.readFile as ReturnType<typeof vi.fn>).mockRejectedValue(
+        new Error("EACCES"),
+      );
+      const context = makeContext();
 
       const result = await writeTool.execute(
         {

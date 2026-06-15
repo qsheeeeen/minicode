@@ -1,13 +1,6 @@
-import {
-  createDefaultFileSystemService,
-  type FileSystemService,
-} from "../../services/filesystem.js";
+import fs from "fs/promises";
 import type { ToolDef, ToolExecutionContext, ToolResult } from "../registry.js";
 import { register } from "../registry.js";
-
-function getFileSystem(context?: ToolExecutionContext): FileSystemService {
-  return context?.services?.fs ?? createDefaultFileSystemService();
-}
 
 export const readTool: ToolDef = {
   name: "Read",
@@ -34,7 +27,7 @@ export const readTool: ToolDef = {
       const path = args.path as string;
       const offset = args.offset as number | undefined;
       const limit = args.limit as number | undefined;
-      const content = await getFileSystem(context).readText(path);
+      const content = await fs.readFile(path, "utf-8");
       const lines = content.split("\n");
       const start = (offset || 1) - 1;
       const end = limit ? start + limit : lines.length;

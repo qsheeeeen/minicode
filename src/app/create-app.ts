@@ -8,7 +8,6 @@ import { Model } from "../llm/model.js";
 import { SkillManager } from "../skills/skill-manager.js";
 import { AgentRegistry, SessionStats } from "../services/index.js";
 import { ContextManager } from "../services/context-manager.js";
-import { FileSystemService } from "../services/filesystem.js";
 import { ModelSwitchService } from "../services/model-switcher.js";
 import { PermissionService } from "../services/permission.js";
 import { PromptManager } from "../services/prompt-manager.js";
@@ -120,7 +119,6 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
     sessionManager,
     permissionService,
   });
-  const fileSystemService = new FileSystemService({ workspaceRoot: cwd });
   const shellService = new ShellService({ cwd });
   const promptManager = new PromptManager(userPrompt, projectPromptFile);
   promptManager.refreshEnvironment();
@@ -148,7 +146,6 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
     agentRegistry,
     appConfig: config,
     modelSwitchService,
-    fileSystemService,
     shellService,
   });
   sessionManager.setSession(initialSession);
@@ -165,7 +162,6 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
     },
     sessionStats,
     modelSwitchService,
-    fileSystemService,
     shellService,
     setTokenCount: (count: number) => {
       contextManager.setTokenCount(count);
@@ -198,7 +194,6 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
     contextManager,
     permissionService,
     modelSwitchService,
-    fileSystemService,
     shellService,
     commandContext,
   };

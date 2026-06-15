@@ -1,17 +1,44 @@
-import {
-  createDefaultFileSystemService,
-  type FileSystemService,
-} from "../../services/filesystem.js";
+import fs from "fs/promises";
+import path from "path";
 import type { ToolDef, ToolExecutionContext, ToolResult } from "../registry.js";
 import { register } from "../registry.js";
 
-function getFileSystem(context?: ToolExecutionContext): FileSystemService {
-  return context?.services?.fs ?? createDefaultFileSystemService();
+interface TextReplacementRange {
+  readonly start: number;
+  readonly oldText: string;
+  readonly newText: string;
+}
+
+interface WriteTextResult {
+  readonly path: string;
+  readonly beforeExists: boolean;
+  readonly ranges: TextReplacementRange[];
+}
+
+async function writeText(
+  inputPath: string,
+  content: string,
+): Promise<WriteTextResult> {
+  let beforeExists = true;
+  let oldText = "";
+  try {
+    oldText = await fs.readFile(inputPath, "utf-8");
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+    beforeExists = false;
+  }
+  await fs.mkdir(path.dirname(inputPath), { recursive: true });
+  await fs.writeFile(inputPath, content, "utf-8");
+  return {
+    path: inputPath,
+    beforeExists,
+    ranges: [{ start: 0, oldText, newText: content }],
+  };
 }
 
 async function recordWriteChange(
   context: ToolExecutionContext | undefined,
-  result: Awaited<ReturnType<FileSystemService["writeText"]>>,
+  result: WriteTextResult,
 ): Promise<void> {
   const userMessageOrdinal = context?.activeUserMessageOrdinal ?? 0;
   if (!context?.changeJournal || userMessageOrdinal <= 0) return;
@@ -45,7 +72,7 @@ export const writeTool: ToolDef = {
     try {
       const filePath = args.path as string;
       const content = args.content as string;
-      const result = await getFileSystem(context).writeText(filePath, content);
+      const result = await writeText(filePath, content);
       await recordWriteChange(context, result);
       return { output: `Wrote ${filePath}` };
     } catch (err) {

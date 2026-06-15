@@ -1,20 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { editTool } from "./edit.js";
 
+vi.mock("fs/promises", () => ({
+  default: {
+    readFile: vi.fn(),
+    writeFile: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+
 function makeContext() {
   return {
-    services: {
-      fs: {
-        editText: vi.fn().mockResolvedValue({
-          path: "/workspace/test.txt",
-          oldText: "world",
-          newText: "minicode",
-          content: "hello minicode",
-          count: 1,
-          ranges: [{ start: 6, oldText: "world", newText: "minicode" }],
-        }),
-      },
-    },
     activeUserMessageOrdinal: 2,
     changeJournal: {
       recordChange: vi.fn().mockResolvedValue(undefined),
@@ -29,6 +24,10 @@ describe("editTool", () => {
 
   describe("execute", () => {
     it("replaces oldText with newText", async () => {
+      const fs = (await import("fs/promises")).default;
+      (fs.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(
+        "hello world",
+      );
       const context = makeContext();
 
       const result = await editTool.execute(
@@ -41,22 +40,25 @@ describe("editTool", () => {
       );
 
       expect(result.output).toContain("Edited test.txt");
-      expect(context.services.fs.editText).toHaveBeenCalledWith(
+      expect(fs.writeFile).toHaveBeenCalledWith(
         "test.txt",
-        "world",
-        "minicode",
-        undefined,
+        "hello minicode",
+        "utf-8",
       );
       expect(context.changeJournal.recordChange).toHaveBeenCalledWith(
         2,
-        "/workspace/test.txt",
+        "test.txt",
         "edit",
         true,
         [{ start: 6, oldText: "world", newText: "minicode" }],
       );
     });
 
-    it("passes replaceAll to the file system service", async () => {
+    it("replaces all occurrences when replaceAll is true", async () => {
+      const fs = (await import("fs/promises")).default;
+      (fs.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(
+        "foo bar foo",
+      );
       const context = makeContext();
 
       await editTool.execute(
@@ -69,19 +71,29 @@ describe("editTool", () => {
         context,
       );
 
-      expect(context.services.fs.editText).toHaveBeenCalledWith(
+      expect(fs.writeFile).toHaveBeenCalledWith(
         "test.txt",
-        "foo",
-        "baz",
+        "baz bar baz",
+        "utf-8",
+      );
+      expect(context.changeJournal.recordChange).toHaveBeenCalledWith(
+        2,
+        "test.txt",
+        "edit",
         true,
+        [
+          { start: 0, oldText: "foo", newText: "baz" },
+          { start: 8, oldText: "foo", newText: "baz" },
+        ],
       );
     });
 
     it("returns edit errors", async () => {
-      const context = makeContext();
-      context.services.fs.editText.mockRejectedValue(
-        new Error("oldText not found in file"),
+      const fs = (await import("fs/promises")).default;
+      (fs.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(
+        "hello world",
       );
+      const context = makeContext();
 
       const result = await editTool.execute(
         {
