@@ -30,8 +30,12 @@ function createTestAgent(responses = [defaultTextResponse("OK")]) {
   ]);
   const client = new VirtualLLMClient(responses);
   const model = new Model("test-model", "test-provider", 200000);
-  const sessionManager = new SessionManager();
   const runtimeEvents = new RuntimeEvents();
+  const sessionManager = new SessionManager(
+    undefined,
+    undefined,
+    runtimeEvents,
+  );
   const contextManager = new ContextManager({
     client,
     model,
@@ -41,7 +45,6 @@ function createTestAgent(responses = [defaultTextResponse("OK")]) {
       sessionManager.setActiveUserMessageOrdinal(ordinal),
     events: runtimeEvents,
     compressionThresholdRatio: 0.8,
-    statusReporter: sessionManager.reportStatus.bind(sessionManager),
   });
   const promptManager = new PromptManager();
   const toolExecutor = new ToolExecutor({

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const mockRun = vi.fn();
 const mockOnChange = vi.fn().mockReturnValue(() => {});
+const mockSubscribe = vi.fn().mockReturnValue(() => {});
 
 const mockContext = {
   onChange: mockOnChange,
@@ -9,11 +10,9 @@ const mockContext = {
 };
 
 const mockSetSession = vi.fn();
-const mockSetStatusReporter = vi.fn();
 const mockSessionManager = {
   getContext: vi.fn().mockReturnValue(mockContext),
   setSession: mockSetSession,
-  setStatusReporter: mockSetStatusReporter,
   reportStatus: vi.fn(),
 };
 
@@ -27,6 +26,10 @@ const mockAgent = {
   run: mockRun,
   model: undefined as any,
   logger: undefined as any,
+};
+
+const mockRuntimeEvents = {
+  subscribe: mockSubscribe,
 };
 
 import { runHeadless } from "./headless.js";
@@ -56,6 +59,7 @@ describe("runHeadless", () => {
       "test prompt",
       mockSessionManager as any,
       mockTokenCount$ as any,
+      mockRuntimeEvents as any,
     );
 
     expect(mockRun).toHaveBeenCalledWith("test prompt", {
@@ -78,6 +82,7 @@ describe("runHeadless", () => {
       "test prompt",
       mockSessionManager as any,
       mockTokenCount$ as any,
+      mockRuntimeEvents as any,
     );
     expect(mockRun).toHaveBeenCalledWith("test prompt", expect.any(Object));
   });
@@ -90,6 +95,7 @@ describe("runHeadless", () => {
       "test prompt",
       mockSessionManager as any,
       mockTokenCount$ as any,
+      mockRuntimeEvents as any,
     );
     expect(logSpy).toHaveBeenCalledWith("(Aborted)");
     logSpy.mockRestore();
@@ -103,6 +109,7 @@ describe("runHeadless", () => {
       "test prompt",
       mockSessionManager as any,
       mockTokenCount$ as any,
+      mockRuntimeEvents as any,
     );
     expect(errSpy).toHaveBeenCalledWith("(Error: test error)");
     errSpy.mockRestore();
@@ -116,6 +123,7 @@ describe("runHeadless", () => {
         "test prompt",
         mockSessionManager as any,
         mockTokenCount$ as any,
+        mockRuntimeEvents as any,
       ),
     ).rejects.toBe("string error");
   });

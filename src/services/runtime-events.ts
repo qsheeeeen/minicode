@@ -1,7 +1,11 @@
-export type RuntimeEvent = {
-  type: "context.tokens_changed";
-  tokenCount: number;
-};
+import type { StatusMessage } from "../ui/display.js";
+
+export type RuntimeEvent =
+  | { type: "context.tokens_changed"; tokenCount: number }
+  | {
+      type: "status.added";
+      message: Omit<StatusMessage, "userMessageIndex">;
+    };
 
 export type RuntimeEventListener = (event: RuntimeEvent) => void;
 

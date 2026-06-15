@@ -9,8 +9,8 @@ import {
 } from "./compression-service.js";
 import { ChangeJournal } from "./change-journal.js";
 import type { LLMContext } from "../llm/context.js";
-import type { StatusReporter } from "./session-manager.js";
 import type { RuntimeEvents } from "./runtime-events.js";
+import type { StatusMessage } from "../ui/display.js";
 
 export interface ContextManagerOpts {
   readonly client: LLMClient;
@@ -20,7 +20,6 @@ export interface ContextManagerOpts {
   readonly setActiveUserMessageOrdinal: (ordinal: number) => void;
   readonly events: RuntimeEvents;
   readonly compressionThresholdRatio: number;
-  readonly statusReporter: StatusReporter;
   readonly sessionStats?: SessionStats;
   readonly compressionStrategy?: CompressionStrategy;
   readonly thresholdPolicy?: ThresholdPolicy;
@@ -59,7 +58,6 @@ export class ContextManager {
   private getChangeJournal: () => ChangeJournal;
   private setActiveUserMessageOrdinal: (ordinal: number) => void;
   private events: RuntimeEvents;
-  private statusReporter: StatusReporter;
   private contextLength: number;
   private compressionThresholdRatio: number;
   private sessionStats?: SessionStats;
@@ -76,7 +74,6 @@ export class ContextManager {
     this.events = opts.events;
     this.contextLength = opts.model.getContextLength();
     this.compressionThresholdRatio = opts.compressionThresholdRatio;
-    this.statusReporter = opts.statusReporter;
     this.sessionStats = opts.sessionStats;
     this.thresholdPolicy = opts.thresholdPolicy ?? new DefaultThresholdPolicy();
     this.compressionService =
@@ -112,7 +109,7 @@ export class ContextManager {
 
     for (const threshold of this.thresholdPolicy.thresholds) {
       if (percentage >= threshold && this.lastShownThreshold < threshold) {
-        this.statusReporter({
+        this.reportStatus({
           role: "status",
           content: `[${percentage}% context]`,
           timestamp: new Date(),
@@ -141,7 +138,7 @@ export class ContextManager {
       const context = this.getContext();
       const userMessageCount = context.getUserMessageCount();
       if (userMessageCount <= recentCount + 2) {
-        this.statusReporter({
+        this.reportStatus({
           role: "status",
           content: "Not enough conversation to compress.",
           timestamp: new Date(),
@@ -150,7 +147,7 @@ export class ContextManager {
       }
 
       const totalTokens = this.tokenCount;
-      this.statusReporter({
+      this.reportStatus({
         role: "status",
         content: `Compressing ${userMessageCount - recentCount} user messages (${totalTokens} tokens)...`,
         timestamp: new Date(),
@@ -180,7 +177,7 @@ export class ContextManager {
       const newActiveIdx = context.getUserMessageCount();
       this.setActiveUserMessageOrdinal(newActiveIdx);
 
-      this.statusReporter({
+      this.reportStatus({
         role: "status",
         content: `Compressed: ${prunedCount} user messages removed, ${newActiveIdx} remaining.`,
         timestamp: new Date(),
@@ -188,7 +185,7 @@ export class ContextManager {
 
       return true;
     } catch (error) {
-      this.statusReporter({
+      this.reportStatus({
         role: "error",
         content: `Compression failed: ${error instanceof Error ? error.message : String(error)}`,
         timestamp: new Date(),
@@ -230,5 +227,9 @@ export class ContextManager {
       type: "context.tokens_changed",
       tokenCount: this.tokenCount,
     });
+  }
+
+  private reportStatus(message: Omit<StatusMessage, "userMessageIndex">): void {
+    this.events.emit({ type: "status.added", message });
   }
 }

@@ -23,7 +23,6 @@ function createContextManager(overrides?: {
   modelName?: string;
 }) {
   const context = new LLMContext();
-  const statusReporter = vi.fn();
   const journal = changeJournal();
   const events = new RuntimeEvents();
   let activeUserMessageOrdinal = 3;
@@ -44,7 +43,6 @@ function createContextManager(overrides?: {
     },
     events,
     compressionThresholdRatio: overrides?.compressionThresholdRatio ?? 0.8,
-    statusReporter,
     sessionStats,
     compressionStrategy: overrides?.compressionStrategy,
   });
@@ -53,7 +51,6 @@ function createContextManager(overrides?: {
     context,
     journal,
     events,
-    statusReporter,
     sessionStats,
     getActiveUserMessageOrdinal: () => activeUserMessageOrdinal,
   };
@@ -141,22 +138,36 @@ describe("ContextManager", () => {
       });
     });
 
-    it("calls statusReporter when crossing threshold boundary", async () => {
-      const { cm, statusReporter } = createContextManager({
+    it("emits status event when crossing threshold boundary", async () => {
+      const { cm, events } = createContextManager({
         contextLength: 100000,
       });
+      const listener = vi.fn();
+      events.subscribe(listener);
+
       await processUsage(cm, usage(26000, 0));
-      expect(statusReporter).toHaveBeenCalledWith(
-        expect.objectContaining({ role: "status", content: "[26% context]" }),
-      );
+
+      expect(listener).toHaveBeenCalledWith({
+        type: "status.added",
+        message: expect.objectContaining({
+          role: "status",
+          content: "[26% context]",
+        }),
+      });
     });
 
-    it("does not call statusReporter below 25%", async () => {
-      const { cm, statusReporter } = createContextManager({
+    it("does not emit status event below 25%", async () => {
+      const { cm, events } = createContextManager({
         contextLength: 100000,
       });
+      const listener = vi.fn();
+      events.subscribe(listener);
+
       await processUsage(cm, usage(24000, 0));
-      expect(statusReporter).not.toHaveBeenCalled();
+
+      expect(listener).not.toHaveBeenCalledWith(
+        expect.objectContaining({ type: "status.added" }),
+      );
     });
 
     it("replaces total on each call instead of accumulating", async () => {
@@ -233,12 +244,21 @@ describe("ContextManager", () => {
 
   describe("compress", () => {
     it("returns false when not enough user messages", async () => {
-      const { cm, statusReporter, getActiveUserMessageOrdinal } =
+      const { cm, events, getActiveUserMessageOrdinal } =
         createContextManager();
+      const listener = vi.fn();
+      events.subscribe(listener);
+
       const compressed = await cm.compress();
       expect(compressed).toBe(false);
       expect(getActiveUserMessageOrdinal()).toBe(3);
-      expect(statusReporter).toHaveBeenCalled();
+      expect(listener).toHaveBeenCalledWith({
+        type: "status.added",
+        message: expect.objectContaining({
+          role: "status",
+          content: "Not enough conversation to compress.",
+        }),
+      });
     });
   });
 });

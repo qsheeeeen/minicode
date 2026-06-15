@@ -76,7 +76,7 @@ describe("createApp", () => {
     expect(runtime.commandContext.model.getName()).toBe("test-model");
   });
 
-  it("uses a live status reporter callback for token threshold messages", async () => {
+  it("emits runtime status events for token threshold messages", async () => {
     const runtime = await createApp({
       args: makeArgs(),
       config: new AppConfig({}),
@@ -85,15 +85,18 @@ describe("createApp", () => {
       programStartTime: 123,
       stdinIsTTY: false,
     });
-    const reporter = vi.fn();
-    runtime.sessionManager.setStatusReporter(reporter);
+    const listener = vi.fn();
+    runtime.runtimeEvents.subscribe(listener);
 
     await runtime.contextManager.processUsage({
       input: { total: 600, cache_hit: 0, cache_miss: 600 },
       output: 0,
     });
 
-    expect(reporter).toHaveBeenCalled();
+    expect(listener).toHaveBeenCalledWith({
+      type: "status.added",
+      message: expect.objectContaining({ role: "status" }),
+    });
   });
 
   it("exposes the latest change journal through command context", async () => {

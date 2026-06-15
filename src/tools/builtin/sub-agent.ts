@@ -79,7 +79,6 @@ export const agentTool: ToolDef = {
         sessionManager.setActiveUserMessageOrdinal(ordinal),
       events: runtimeEvents,
       compressionThresholdRatio: 0.8,
-      statusReporter: () => {}, // sub-agents don't report statuses
     });
     const unsubscribeTokenEvents = runtimeEvents.subscribe((event) => {
       if (event.type === "context.tokens_changed") {

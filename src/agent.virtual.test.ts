@@ -37,8 +37,12 @@ function createTestAgent(options?: {
       ],
     ]);
   const model = new Model("test-model", "test-provider", 200000);
-  const sessionManager = new SessionManager();
   const runtimeEvents = new RuntimeEvents();
+  const sessionManager = new SessionManager(
+    undefined,
+    undefined,
+    runtimeEvents,
+  );
   const contextManager = new ContextManager({
     client,
     model,
@@ -48,7 +52,6 @@ function createTestAgent(options?: {
       sessionManager.setActiveUserMessageOrdinal(ordinal),
     events: runtimeEvents,
     compressionThresholdRatio: 0.8,
-    statusReporter: sessionManager.reportStatus.bind(sessionManager),
   });
   const promptManager = new PromptManager();
   const toolExecutor = new ToolExecutor({
@@ -219,8 +222,12 @@ describe("Agent virtual integration", () => {
     const client = new VirtualLLMClient([
       toolUseResponse("call_1", "Dangerous", { action: "delete" }),
     ]);
-    const sessionManager = new SessionManager();
     const runtimeEvents = new RuntimeEvents();
+    const sessionManager = new SessionManager(
+      undefined,
+      undefined,
+      runtimeEvents,
+    );
     const contextManager = new ContextManager({
       client,
       model,
@@ -230,7 +237,6 @@ describe("Agent virtual integration", () => {
         sessionManager.setActiveUserMessageOrdinal(ordinal),
       events: runtimeEvents,
       compressionThresholdRatio: 0.8,
-      statusReporter: sessionManager.reportStatus.bind(sessionManager),
     });
     const promptManager = new PromptManager();
     const toolExecutor = new ToolExecutor({

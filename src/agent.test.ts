@@ -24,8 +24,12 @@ function makeAgent(overrides?: {
   const o = overrides ?? {};
   const client = o.client ?? ({ chatStream: mockChatStream } as any);
   const model = o.model ?? makeTestModel();
-  const sessionManager = new SessionManager();
   const runtimeEvents = new RuntimeEvents();
+  const sessionManager = new SessionManager(
+    undefined,
+    undefined,
+    runtimeEvents,
+  );
   const context = sessionManager.getContext();
   const contextManager = new ContextManager({
     client,
@@ -36,7 +40,6 @@ function makeAgent(overrides?: {
       sessionManager.setActiveUserMessageOrdinal(ordinal),
     events: runtimeEvents,
     compressionThresholdRatio: o.compressionThresholdRatio ?? 0.8,
-    statusReporter: sessionManager.reportStatus.bind(sessionManager),
   });
   const promptManager = new PromptManager(o.userPrompt);
   const permissionService = new PermissionService(o.permissionMode ?? "manual");

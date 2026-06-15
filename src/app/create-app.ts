@@ -106,7 +106,11 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
     model.displayName,
   );
 
-  const sessionManager = new SessionManager(undefined, sessionStats);
+  const sessionManager = new SessionManager(
+    undefined,
+    sessionStats,
+    runtimeEvents,
+  );
   const contextManager = new ContextManager({
     client: initialClient,
     model: initialModel,
@@ -116,7 +120,6 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
       sessionManager.setActiveUserMessageOrdinal(ordinal),
     events: runtimeEvents,
     compressionThresholdRatio: compressionThreshold,
-    statusReporter: (msg) => sessionManager.reportStatus(msg),
     sessionStats: sessionManager.getSessionStats(),
   });
   const permissionService = new PermissionService(

@@ -67,6 +67,16 @@ export function connectAgent(options: ConnectAgentOptions): {
   const unsubRuntimeEvents = runtimeEvents.subscribe((event) => {
     if (event.type === "context.tokens_changed") {
       dispatch({ type: "SET_TOKEN_COUNT", payload: event.tokenCount });
+      return;
+    }
+
+    if (event.type === "status.added") {
+      const userMessageIndex = context.getUserMessageCount();
+      dispatch({
+        type: "ADD_STATUS",
+        payload: { ...event.message, userMessageIndex },
+      });
+      syncMessages();
     }
   });
 
@@ -81,24 +91,17 @@ export function connectAgent(options: ConnectAgentOptions): {
       }),
   );
 
-  // 3. Wire StatusReporter: statuses → Zustand + re-sync display messages
-  sessionManager.setStatusReporter((msg) => {
-    const userMessageIndex = context.getUserMessageCount();
-    dispatch({ type: "ADD_STATUS", payload: { ...msg, userMessageIndex } });
-    syncMessages();
-  });
-
-  // 4. Subscribe to LLMContext changes → re-sync display messages
+  // 3. Subscribe to LLMContext changes → re-sync display messages
   const unsubStore = context.onChange(syncMessages);
 
-  // 5. Register main agent in the registry
+  // 4. Register main agent in the registry
   registry.register({ id: "1", type: "main", agent, context, status: "idle" });
   dispatch({
     type: "SET_AGENT_SESSIONS",
     payload: [{ id: "1", type: "main", agent, context, status: "idle" }],
   });
 
-  // 6. Load initial session (async — onChange subscription will push updates)
+  // 5. Load initial session (async — onChange subscription will push updates)
   const loadInitial = async () => {
     sessionManager.setSession(initialSession);
     dispatch({ type: "SET_CURRENT_SESSION", payload: initialSession });

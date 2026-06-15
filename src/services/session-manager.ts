@@ -2,7 +2,6 @@
 // session name, user message ordinal, and session stats.
 //
 // Coordinates context + changeJournal on session switch.
-// Provides StatusReporter callback for services to emit UI notifications.
 // Agent delegates session operations here.
 
 import { LLMContext } from "../llm/context.js";
@@ -11,12 +10,8 @@ import { SessionPersistence } from "./session-persistence.js";
 import type { SessionStats } from "./session-stats.js";
 import type { LLMBlock } from "../llm/context.js";
 import type { StatusMessage } from "../ui/display.js";
-/**
- * StatusReporter — callback for emitting UI status/error notifications.
- * Defined here (SessionManager) because this is the primary owner of
- * status reporting lifecycle. Other services (ContextManager)
- * receive it as a dependency.
- */
+import { RuntimeEvents } from "./runtime-events.js";
+
 export type StatusReporter = (
   msg: Omit<StatusMessage, "userMessageIndex">,
 ) => void;
@@ -28,26 +23,21 @@ export class SessionManager {
   private activeUserMessageOrdinal = 0;
   private sessionStats?: SessionStats;
   private _meta = { model: "unknown", totalTokens: 0 };
-  private _statusReporter: StatusReporter = () => {};
+  private events: RuntimeEvents;
 
-  constructor(sessionName?: string, sessionStats?: SessionStats) {
+  constructor(
+    sessionName?: string,
+    sessionStats?: SessionStats,
+    events = new RuntimeEvents(),
+  ) {
     this._currentSession = sessionName ?? `session-${Date.now()}`;
     this.sessionStats = sessionStats;
+    this.events = events;
   }
 
-  /** Set the status reporter callback (called by UI layer during wiring). */
-  setStatusReporter(reporter: StatusReporter): void {
-    this._statusReporter = reporter;
-  }
-
-  /** Get the status reporter for services to emit UI notifications. */
-  getStatusReporter(): StatusReporter {
-    return this._statusReporter;
-  }
-
-  /** Convenience: report a status via the configured reporter. */
+  /** Report a status event. */
   reportStatus(msg: Omit<StatusMessage, "userMessageIndex">): void {
-    this._statusReporter(msg);
+    this.events.emit({ type: "status.added", message: msg });
   }
 
   /** Switch to a new session. Coordinates context + journal. */

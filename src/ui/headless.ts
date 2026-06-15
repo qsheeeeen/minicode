@@ -7,6 +7,7 @@ import { processRoute } from "./route-handler.js";
 import { SessionPersistence } from "../services/session-persistence.js";
 import type { SessionManager } from "../services/session-manager.js";
 import type { ContextManager } from "../services/context-manager.js";
+import type { RuntimeEvents } from "../services/runtime-events.js";
 import { HeadlessRenderer } from "./headless-renderer.js";
 
 export async function runHeadless(
@@ -14,6 +15,7 @@ export async function runHeadless(
   initialPrompt: string | undefined,
   sessionManager: SessionManager,
   contextManager: ContextManager,
+  runtimeEvents: RuntimeEvents,
   sessionName?: string,
   resumeRecent?: boolean,
   cmdContext?: CommandContext,
@@ -41,9 +43,11 @@ export async function runHeadless(
 
   // Set up renderer with status forwarding
   const renderer = new HeadlessRenderer(context);
-  sessionManager.setStatusReporter((msg) => {
-    const userMessageIndex = context.getUserMessageCount();
-    renderer.addStatus({ ...msg, userMessageIndex });
+  const unsubscribeRuntimeEvents = runtimeEvents.subscribe((event) => {
+    if (event.type === "status.added") {
+      const userMessageIndex = context.getUserMessageCount();
+      renderer.addStatus({ ...event.message, userMessageIndex });
+    }
   });
 
   // Load session if requested
@@ -117,6 +121,7 @@ export async function runHeadless(
       throw e;
     }
   } finally {
+    unsubscribeRuntimeEvents();
     renderer.stop();
   }
 }
