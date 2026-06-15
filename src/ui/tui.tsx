@@ -158,7 +158,6 @@ function AppContent({
 
   const cmdContext = useCallback(
     () => ({
-      agent: agentRef.current,
       model: agentRef.current.model,
       config,
       context,
@@ -169,6 +168,10 @@ function AppContent({
       sessionStats,
       modelSwitchService,
       contextManager,
+      isAgentRunning: () => agentRef.current.isRunning,
+      setLogger: (logger: typeof agentRef.current.logger) => {
+        agentRef.current.logger = logger;
+      },
       setTokenCount: (count: number) => {
         contextManager.setTokenCount(count);
       },

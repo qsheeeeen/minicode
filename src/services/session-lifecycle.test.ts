@@ -7,27 +7,26 @@ vi.mock("../utils/logger.js", () => ({
 
 describe("switchSession", () => {
   it("wires session, logger, stats, and status message", async () => {
-    const agent = {
-      set logger(_val: any) {},
-    };
     const reportStatus = vi.fn();
     const sessionManager = {
       setSession: vi.fn(),
       reportStatus,
     };
     const setCurrentSession = vi.fn();
+    const setLogger = vi.fn();
     const sessionStats = { incrementSessionCount: vi.fn() };
 
     await switchSession({
-      agent: agent as any,
       sessionManager: sessionManager as any,
       sessionName: "test-session",
       setCurrentSession,
+      setLogger,
       sessionStats: sessionStats as any,
       statusMessage: "Created session",
     });
 
     expect(sessionManager.setSession).toHaveBeenCalledWith("test-session");
+    expect(setLogger).toHaveBeenCalled();
     expect(setCurrentSession).toHaveBeenCalledWith("test-session");
     expect(sessionStats.incrementSessionCount).toHaveBeenCalledWith(
       "test-session",
@@ -39,19 +38,16 @@ describe("switchSession", () => {
 
   it("skips status message when not provided", async () => {
     const reportStatus = vi.fn();
-    const agent = {
-      set logger(_val: any) {},
-    };
     const sessionManager = {
       setSession: vi.fn(),
       reportStatus,
     };
 
     await switchSession({
-      agent: agent as any,
       sessionManager: sessionManager as any,
       sessionName: "s2",
       setCurrentSession: vi.fn(),
+      setLogger: vi.fn(),
       sessionStats: { incrementSessionCount: vi.fn() } as any,
     });
 

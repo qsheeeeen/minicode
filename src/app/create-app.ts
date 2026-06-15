@@ -124,10 +124,15 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
     initialClient,
     initialModel,
   );
+  let agent: Agent;
   const modelSwitchService = new ModelSwitchService({
     appConfig: config,
     contextManager,
     sessionManager,
+    setModel: (client, model) => {
+      agent.client = client;
+      agent.model = model;
+    },
     permissionService,
   });
   const shellService = new ShellService({ cwd });
@@ -147,7 +152,7 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
     context: sessionManager.getContext(),
   });
 
-  const agent = new Agent({
+  agent = new Agent({
     client: initialClient,
     model: initialModel,
     sessionManager,
@@ -163,7 +168,6 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
   agent.logger = logger;
 
   const commandContext = {
-    agent,
     model: initialModel,
     config,
     context: sessionManager.getContext(),
@@ -175,6 +179,10 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
     modelSwitchService,
     contextManager,
     shellService,
+    isAgentRunning: () => agent.isRunning,
+    setLogger: (newLogger: typeof logger) => {
+      agent.logger = newLogger;
+    },
     setTokenCount: (count: number) => {
       contextManager.setTokenCount(count);
     },

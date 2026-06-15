@@ -19,10 +19,10 @@ registerCommand({
           ctx.setTokenCount(totalTokens);
         }
         await switchSession({
-          agent: ctx.agent,
           sessionManager: ctx.sessionManager,
           sessionName: name,
           setCurrentSession: ctx.setCurrentSession,
+          setLogger: ctx.setLogger,
           sessionStats: ctx.sessionStats,
           statusMessage: `Loaded session: ${name}`,
         });

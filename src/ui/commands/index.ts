@@ -1,4 +1,3 @@
-import type { Agent } from "../../agent.js";
 import type { DisplayMessage } from "../display.js";
 import type { Model } from "../../llm/model.js";
 import type { SessionStats } from "../../services/session-stats.js";
@@ -8,6 +7,7 @@ import type { LLMContext } from "../../llm/context.js";
 import type { AppConfig } from "../../config.js";
 import type { ModelSwitchService } from "../../services/model-switcher.js";
 import type { ContextManager } from "../../services/context-manager.js";
+import type pino from "pino";
 import { getSkillBody, getAvailableSkills } from "../../skills/index.js";
 import {
   registerCommand,
@@ -20,7 +20,6 @@ export type { CommandHandler } from "./registry.js";
 export { registerCommand, getCommandNames } from "./registry.js";
 
 export interface CommandContext {
-  agent: Agent;
   model: Model;
   config: AppConfig;
   context: LLMContext;
@@ -29,6 +28,8 @@ export interface CommandContext {
   sessionStats: SessionStats;
   modelSwitchService: ModelSwitchService;
   contextManager: ContextManager;
+  isAgentRunning: () => boolean;
+  setLogger: (logger: pino.Logger) => void;
   setTokenCount: (count: number) => void;
   setMessages: (msg: DisplayMessage[]) => void;
   setCurrentSession: (name: string) => void;

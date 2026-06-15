@@ -55,7 +55,6 @@ async function modelSelectHandler(
     if (modelSpec) {
       try {
         await modelSwitchService.switchAgentModel({
-          agent: agentRef.current,
           modelSpec,
           tier: tierMatch[2] ? tier : undefined,
         });

@@ -2,16 +2,12 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { AppConfig } from "../../config.js";
 import { setModelTool } from "./set-model.js";
 
-const mockAgent = { model: undefined as any };
-
 function makeContext(
   appConfig: AppConfig,
   overrides?: Record<string, unknown>,
 ) {
   return {
-    registry: {
-      get: vi.fn().mockReturnValue({ agent: mockAgent }),
-    },
+    registry: undefined,
     config: {} as any,
     appConfig,
     currentAgentId: "1",
@@ -27,7 +23,6 @@ function makeContext(
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockAgent.model = undefined;
 });
 
 describe("setModelTool", () => {
@@ -43,7 +38,6 @@ describe("setModelTool", () => {
     expect(
       context.services.modelSwitcher.switchAgentModel,
     ).toHaveBeenCalledWith({
-      agent: mockAgent,
       modelSpec: "claude-sonnet-4-5@anthropic",
       persistDefault: true,
       reportStatus: false,
@@ -98,7 +92,6 @@ describe("setModelTool", () => {
     expect(
       context.services.modelSwitcher.switchAgentModel,
     ).toHaveBeenCalledWith({
-      agent: mockAgent,
       modelSpec: "gpt-4o-mini@openai",
       persistDefault: false,
       reportStatus: false,

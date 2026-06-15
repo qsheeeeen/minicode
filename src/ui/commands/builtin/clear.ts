@@ -5,14 +5,14 @@ registerCommand({
   name: "clear",
   description: "Clear all context and start a new session",
   handler: async (_args, ctx): Promise<void> => {
-    ctx.agent.clearSession();
-    ctx.setTokenCount(0);
+    ctx.sessionManager.clearSession();
+    ctx.contextManager.reset();
     const newSession = `session-${Date.now()}`;
     await switchSession({
-      agent: ctx.agent,
       sessionManager: ctx.sessionManager,
       sessionName: newSession,
       setCurrentSession: ctx.setCurrentSession,
+      setLogger: ctx.setLogger,
       sessionStats: ctx.sessionStats,
       statusMessage: "(Cleared)",
     });

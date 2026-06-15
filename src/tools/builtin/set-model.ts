@@ -30,15 +30,13 @@ export const setModelTool: ToolDef = {
       return { output: `Error: No model mapped to tier ${tier}.` };
     }
 
-    const agent = context?.registry?.get(context.currentAgentId || "1")?.agent;
     const modelSwitcher = context?.services?.modelSwitcher;
-    if (!agent || !modelSwitcher) {
+    if (!modelSwitcher) {
       return { output: "Error: model switch service not available." };
     }
 
     try {
       await modelSwitcher.switchAgentModel({
-        agent,
         modelSpec,
         persistDefault: context.currentAgentId === "1",
         reportStatus: false,

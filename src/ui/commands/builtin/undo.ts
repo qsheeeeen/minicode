@@ -4,7 +4,7 @@ registerCommand({
   name: "undo",
   description: "Rollback to a previous user message",
   handler: async (_args, ctx): Promise<void> => {
-    if (ctx.agent.isRunning) {
+    if (ctx.isAgentRunning()) {
       ctx.sessionManager.reportStatus({
         role: "status",
         content: "(Agent is running, please wait)",

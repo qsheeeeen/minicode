@@ -72,7 +72,7 @@ describe("createApp", () => {
     expect(runtime.headless).toBe(true);
     expect(runtime.initialSession).toBe("test-session");
     expect(runtime.promptFiles).toContain("~/.minicode/AGENTS.md");
-    expect(runtime.commandContext.agent).toBe(runtime.agent);
+    expect("agent" in runtime.commandContext).toBe(false);
     expect(runtime.commandContext.model.getName()).toBe("test-model");
   });
 

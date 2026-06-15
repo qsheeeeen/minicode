@@ -25,6 +25,7 @@ function createService() {
   const permissionService = {
     updateAutoGate: vi.fn(),
   };
+  const setModel = vi.fn();
   vi.spyOn(appConfig, "setModel").mockResolvedValue();
   vi.spyOn(appConfig, "setTier").mockResolvedValue();
 
@@ -32,9 +33,9 @@ function createService() {
     appConfig,
     contextManager: contextManager as any,
     sessionManager: sessionManager as any,
+    setModel,
     permissionService: permissionService as any,
   });
-  const agent = { client: undefined, model: undefined } as any;
 
   return {
     service,
@@ -42,29 +43,27 @@ function createService() {
     contextManager,
     sessionManager,
     permissionService,
-    agent,
+    setModel,
   };
 }
 
 describe("ModelSwitchService", () => {
-  it("switches the agent model and updates dependent runtime state", async () => {
+  it("switches the active model and updates dependent runtime state", async () => {
     const {
       service,
       appConfig,
       contextManager,
       sessionManager,
       permissionService,
-      agent,
+      setModel,
     } = createService();
 
     const selection = await service.switchAgentModel({
-      agent,
       modelSpec: "next-model@test",
     });
     const { client, model } = selection;
 
-    expect(agent.model).toBe(model);
-    expect(agent.client).toBe(client);
+    expect(setModel).toHaveBeenCalledWith(client, model);
     expect(model.getName()).toBe("next-model");
     expect(contextManager.setModel).toHaveBeenCalledWith(client, model);
     expect(permissionService.updateAutoGate).toHaveBeenCalledWith(
@@ -80,10 +79,9 @@ describe("ModelSwitchService", () => {
   });
 
   it("can update a tier mapping while switching", async () => {
-    const { service, appConfig, agent } = createService();
+    const { service, appConfig } = createService();
 
     await service.switchAgentModel({
-      agent,
       modelSpec: "next-model@test",
       tier: "flash",
     });
@@ -92,10 +90,9 @@ describe("ModelSwitchService", () => {
   });
 
   it("can avoid persisting the default model", async () => {
-    const { service, appConfig, agent } = createService();
+    const { service, appConfig } = createService();
 
     await service.switchAgentModel({
-      agent,
       modelSpec: "next-model@test",
       persistDefault: false,
     });
@@ -104,11 +101,10 @@ describe("ModelSwitchService", () => {
   });
 
   it("throws when the model spec cannot be resolved", async () => {
-    const { service, agent } = createService();
+    const { service } = createService();
 
     await expect(
       service.switchAgentModel({
-        agent,
         modelSpec: "missing@unknown",
       }),
     ).rejects.toThrow('Could not resolve "missing@unknown".');

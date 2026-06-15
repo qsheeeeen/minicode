@@ -8,14 +8,14 @@ registerCommand({
   handler: async (args, ctx): Promise<void> => {
     const newName = args.join(" ");
     if (newName) {
-      const oldName = ctx.agent.currentSession;
+      const oldName = ctx.sessionManager.getSessionName();
       await SessionPersistence.rename(oldName, newName);
       const newLogger = await createLogger(
         SessionPersistence.getProjectHash(),
         newName,
       );
       ctx.sessionManager.setSession(newName);
-      ctx.agent.logger = newLogger;
+      ctx.setLogger(newLogger);
       ctx.setCurrentSession(newName);
       ctx.sessionManager.reportStatus({
         role: "status",

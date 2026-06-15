@@ -107,6 +107,8 @@ describe("Builtin commands", () => {
   ) {
     return {
       setSession: vi.fn(),
+      getSessionName: vi.fn().mockReturnValue("test-session"),
+      clearSession: vi.fn(),
       getStore: vi.fn().mockReturnValue(contextMock),
       getChangeJournal: vi.fn(),
       reportStatus: vi.fn(),
@@ -128,22 +130,13 @@ describe("Builtin commands", () => {
     const changeJournal = makeChangeJournalMock();
     const setTokenCount = vi.fn();
 
-    const agent = {
-      clearSession: vi.fn(),
-      setSession: vi.fn(),
-      setLogger: vi.fn(),
-      currentSession: "test-session",
-      logger: { info: vi.fn(), error: vi.fn() },
-      isRunning: false,
-      ...overrides.agent,
-    };
     const contextManager = {
       compress: vi.fn().mockResolvedValue(false),
+      reset: vi.fn(),
       ...overrides.contextManager,
     };
 
     const ctx: Partial<CommandContext> = {
-      agent: agent as any,
       model: model as any,
       config: configMock as any,
       context: context as any,
@@ -153,6 +146,8 @@ describe("Builtin commands", () => {
         incrementSessionCount: vi.fn(),
       } as any,
       contextManager: contextManager as any,
+      isAgentRunning: vi.fn().mockReturnValue(false),
+      setLogger: vi.fn(),
       setTokenCount,
       setCurrentSession: vi.fn(),
       setMessages: vi.fn(),
@@ -168,7 +163,6 @@ describe("Builtin commands", () => {
       sessionManager,
       changeJournal,
       setTokenCount,
-      agent,
       contextManager,
     };
   }
@@ -197,12 +191,13 @@ describe("Builtin commands", () => {
     });
 
     it("/clear clears session and reports status", async () => {
-      const { ctx, sessionManager, setTokenCount } = makeCtx();
+      const { ctx, sessionManager, setTokenCount, contextManager } = makeCtx();
 
       const result = await executeCommand("clear", [], ctx as CommandContext);
       expect(result.handled).toBe(true);
-      expect(ctx.agent.clearSession).toHaveBeenCalled();
-      expect(setTokenCount).toHaveBeenCalledWith(0);
+      expect(sessionManager.clearSession).toHaveBeenCalled();
+      expect(contextManager.reset).toHaveBeenCalled();
+      expect(setTokenCount).not.toHaveBeenCalled();
       expect(ctx.setCurrentSession).toHaveBeenCalledWith(
         expect.stringMatching(/^session-/),
       );
@@ -213,7 +208,7 @@ describe("Builtin commands", () => {
     });
 
     it("/new creates new session and reports status", async () => {
-      const { ctx, sessionManager } = makeCtx();
+      const { ctx, sessionManager, contextManager } = makeCtx();
 
       const result = await executeCommand(
         "new",
@@ -221,7 +216,8 @@ describe("Builtin commands", () => {
         ctx as CommandContext,
       );
       expect(result.handled).toBe(true);
-      expect(ctx.agent.clearSession).toHaveBeenCalled();
+      expect(sessionManager.clearSession).toHaveBeenCalled();
+      expect(contextManager.reset).toHaveBeenCalled();
       expect(ctx.setCurrentSession).toHaveBeenCalledWith("my new session");
       // switchSession calls sessionManager.reportStatus()
       expect(sessionManager.reportStatus).toHaveBeenCalledWith(

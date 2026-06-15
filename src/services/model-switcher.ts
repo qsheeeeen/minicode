@@ -1,6 +1,7 @@
-import type { Agent } from "../agent.js";
 import type { AppConfig } from "../config.js";
 import { ModelFactory, type ModelSelection } from "../llm/model.js";
+import type { LLMClient } from "../llm/client.js";
+import type { Model } from "../llm/model.js";
 import type { ContextManager } from "./context-manager.js";
 import type { PermissionService } from "./permission.js";
 import type { SessionManager } from "./session-manager.js";
@@ -9,11 +10,11 @@ export interface ModelSwitchServiceOpts {
   readonly appConfig: AppConfig;
   readonly contextManager: ContextManager;
   readonly sessionManager: SessionManager;
+  readonly setModel: (client: LLMClient, model: Model) => void;
   readonly permissionService?: PermissionService;
 }
 
 export interface SwitchAgentModelOpts {
-  readonly agent: Agent;
   readonly modelSpec: string;
   readonly persistDefault?: boolean;
   readonly tier?: string;
@@ -24,12 +25,14 @@ export class ModelSwitchService {
   private appConfig: AppConfig;
   private contextManager: ContextManager;
   private sessionManager: SessionManager;
+  private setModel: (client: LLMClient, model: Model) => void;
   private permissionService?: PermissionService;
 
   constructor(opts: ModelSwitchServiceOpts) {
     this.appConfig = opts.appConfig;
     this.contextManager = opts.contextManager;
     this.sessionManager = opts.sessionManager;
+    this.setModel = opts.setModel;
     this.permissionService = opts.permissionService;
   }
 
@@ -41,8 +44,7 @@ export class ModelSwitchService {
     }
     const { client, model } = selection;
 
-    opts.agent.client = client;
-    opts.agent.model = model;
+    this.setModel(client, model);
     this.contextManager.setModel(client, model);
     this.permissionService?.updateAutoGate(client, model);
 
