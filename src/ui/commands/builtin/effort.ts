@@ -8,8 +8,7 @@ registerCommand({
     const value = args[0]?.toLowerCase();
     const valid = ["low", "medium", "high", "xhigh", "max"] as const;
     if (!value || !(valid as readonly string[]).includes(value)) {
-      // Show effort selection UI
-      ctx.setInputMode("effort-select");
+      ctx.presentInput({ type: "effort-picker" });
       return;
     }
     ctx.model.setEffort(value as EffortLevel);

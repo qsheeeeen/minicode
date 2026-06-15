@@ -10,15 +10,9 @@ export interface InputState {
   key: number;
 }
 
-export interface SessionListState {
-  sessions: Array<{ name: string }>;
-  selectedIndex: number;
-}
-
 export interface TuiState {
   messages: DisplayMessage[];
   input: InputState;
-  sessionList: SessionListState;
   agentSessions: AgentSession[];
   activeAgentId: string;
   tokenCount: number;
@@ -37,10 +31,6 @@ export const initialState: TuiState = {
     value: "",
     props: {},
     key: 0,
-  },
-  sessionList: {
-    sessions: [],
-    selectedIndex: 0,
   },
   agentSessions: [],
   activeAgentId: "1",

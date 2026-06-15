@@ -1,12 +1,13 @@
-import type { DisplayMessage } from "../display.js";
 import type { Model } from "../../llm/model.js";
 import type { SessionStats } from "../../services/session-stats.js";
 import type { SessionManager } from "../../services/session-manager.js";
 import type { ChangeJournal } from "../../services/change-journal.js";
 import type { LLMContext } from "../../llm/context.js";
-import type { AppConfig } from "../../config.js";
+import type { AppConfig, Providers } from "../../config.js";
 import type { ModelSwitchService } from "../../services/model-switcher.js";
 import type { ContextManager } from "../../services/context-manager.js";
+import type { ChangeEntry } from "../../services/change-journal.js";
+import type { StatusReporter } from "../../services/session-manager.js";
 import type pino from "pino";
 import { getSkillBody, getAvailableSkills } from "../../skills/index.js";
 import {
@@ -18,6 +19,61 @@ import {
 
 export type { CommandHandler } from "./registry.js";
 export { registerCommand, getCommandNames } from "./registry.js";
+
+export type InputRequest =
+  | { type: "effort-picker" }
+  | {
+      type: "session-picker";
+      sessions: Array<{ name: string }>;
+    }
+  | {
+      type: "model-picker";
+      providers: Providers;
+      tiers: Record<string, string>;
+    }
+  | {
+      type: "rollback-picker";
+      totalUserMessages: number;
+      entriesByUserMessage: Array<{
+        userMessageOrdinal: number;
+        entries: ChangeEntry[];
+      }>;
+      userMessages: string[];
+      changeJournal: ChangeJournal;
+      context: LLMContext;
+      reportStatus: StatusReporter;
+    };
+
+export function inputRequestToState(
+  request: InputRequest,
+): { mode: string; props: Record<string, unknown> } {
+  switch (request.type) {
+    case "effort-picker":
+      return { mode: "effort-select", props: {} };
+    case "session-picker":
+      return {
+        mode: "session-list",
+        props: { sessions: request.sessions },
+      };
+    case "model-picker":
+      return {
+        mode: "model-select",
+        props: { providers: request.providers, tiers: request.tiers },
+      };
+    case "rollback-picker":
+      return {
+        mode: "undo",
+        props: {
+          totalUserMessages: request.totalUserMessages,
+          entriesByUserMessage: request.entriesByUserMessage,
+          userMessages: request.userMessages,
+          changeJournal: request.changeJournal,
+          context: request.context,
+          reportStatus: request.reportStatus,
+        },
+      };
+  }
+}
 
 export interface CommandContext {
   model: Model;
@@ -31,12 +87,8 @@ export interface CommandContext {
   isAgentRunning: () => boolean;
   setLogger: (logger: pino.Logger) => void;
   setTokenCount: (count: number) => void;
-  setMessages: (msg: DisplayMessage[]) => void;
   setCurrentSession: (name: string) => void;
-  setMode: (mode: "chat" | "session-list" | "effort-select") => void;
-  setInputMode: (mode: string, props?: Record<string, unknown>) => void;
-  setSessionList: (sessions: Array<{ name: string }>) => void;
-  setSelectedIndex: (index: number) => void;
+  presentInput: (request: InputRequest) => void;
   exit: () => void;
 }
 

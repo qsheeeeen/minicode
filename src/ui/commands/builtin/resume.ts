@@ -8,7 +8,7 @@ registerCommand({
   handler: async (args, ctx): Promise<void> => {
     if (args.length === 0) {
       const sessions = await SessionPersistence.list();
-      ctx.setInputMode("session-list", { sessions });
+      ctx.presentInput({ type: "session-picker", sessions });
     } else {
       const name = args[0];
       const data = await SessionPersistence.load(name);

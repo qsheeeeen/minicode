@@ -189,14 +189,10 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
     setTokenCount: (count: number) => {
       contextManager.setTokenCount(count);
     },
-    setMessages: () => {},
     setCurrentSession: (name: string) => {
       sessionManager.setSession(name);
     },
-    setMode: () => {},
-    setInputMode: () => {},
-    setSessionList: () => {},
-    setSelectedIndex: () => {},
+    presentInput: () => {},
     exit: () => process.exit(0),
   };
 

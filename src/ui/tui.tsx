@@ -2,10 +2,13 @@ import React, { useCallback, useRef, useEffect } from "react";
 import { Box, useInput, useApp } from "ink";
 import { Agent } from "../agent.js";
 import type { AppConfig } from "../config.js";
-import type { DisplayMessage } from "./display.js";
 import type { UserPrompter } from "../tools/registry.js";
 import { routeInput } from "./routing.js";
 import { processRoute } from "./route-handler.js";
+import {
+  inputRequestToState,
+  type CommandContext,
+} from "./commands/index.js";
 import { AgentRegistry, type AgentSession } from "../services/index.js";
 import type { RuntimeEvents } from "../services/runtime-events.js";
 import type { SessionStats } from "../services/session-stats.js";
@@ -156,7 +159,7 @@ function AppContent({
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const cmdContext = useCallback(
-    () => ({
+    (): CommandContext => ({
       model: agentRef.current.model,
       config,
       context,
@@ -174,24 +177,20 @@ function AppContent({
       setTokenCount: (count: number) => {
         contextManager.setTokenCount(count);
       },
-      setMessages: (msgs: DisplayMessage[]) => {
-        useTuiState.setState({ messages: msgs });
-      },
       setCurrentSession: (session: string) =>
         useTuiState.setState({ currentSession: session }),
-      setMode: () => {},
-      setInputMode: (mode: string, props?: Record<string, unknown>) =>
+      presentInput: (request) => {
+        const inputState = inputRequestToState(request);
         useTuiState.setState((state) => ({
-          input: { ...state.input, mode, props: props ?? {} },
-        })),
-      setSessionList: (sessions: Array<{ name: string }>) =>
-        useTuiState.setState((state) => ({
-          sessionList: { ...state.sessionList, sessions },
-        })),
-      setSelectedIndex: (index: number) =>
-        useTuiState.setState((state) => ({
-          sessionList: { ...state.sessionList, selectedIndex: index },
-        })),
+          input: {
+            ...state.input,
+            mode: inputState.mode,
+            props: inputState.props,
+            value: "",
+            key: state.input.key + 1,
+          },
+        }));
+      },
       exit: () => useTuiState.setState({ showReceipt: true }),
     }),
     [sessionManager, contextManager, config, modelSwitchService],

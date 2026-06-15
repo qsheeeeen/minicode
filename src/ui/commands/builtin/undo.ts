@@ -30,7 +30,8 @@ registerCommand({
       entriesByUserMessageMap.entries(),
     ).map(([userMessageOrdinal, entries]) => ({ userMessageOrdinal, entries }));
 
-    ctx.setInputMode("undo", {
+    ctx.presentInput({
+      type: "rollback-picker",
       totalUserMessages: userMessages.length,
       entriesByUserMessage,
       userMessages,

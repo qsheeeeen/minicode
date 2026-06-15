@@ -4,7 +4,8 @@ registerCommand({
   name: "model",
   description: "Switch model/provider",
   handler: async (_args, ctx): Promise<void> => {
-    ctx.setInputMode("model-select", {
+    ctx.presentInput({
+      type: "model-picker",
       providers: ctx.config.providers,
       tiers: ctx.config.tiers,
     });

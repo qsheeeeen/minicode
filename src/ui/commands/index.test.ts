@@ -150,8 +150,7 @@ describe("Builtin commands", () => {
       setLogger: vi.fn(),
       setTokenCount,
       setCurrentSession: vi.fn(),
-      setMessages: vi.fn(),
-      setInputMode: vi.fn(),
+      presentInput: vi.fn(),
       exit: vi.fn(),
       ...overrides,
     };
@@ -254,7 +253,8 @@ describe("Builtin commands", () => {
       const result = await executeCommand("resume", [], ctx as CommandContext);
       expect(result.handled).toBe(true);
       expect(sessionPersistenceMock.list).toHaveBeenCalled();
-      expect(ctx.setInputMode).toHaveBeenCalledWith("session-list", {
+      expect(ctx.presentInput).toHaveBeenCalledWith({
+        type: "session-picker",
         sessions: [{ name: "session-1" }, { name: "session-2" }],
       });
     });
@@ -315,7 +315,7 @@ describe("Builtin commands", () => {
       const { ctx } = makeCtx();
       const result = await executeCommand("effort", [], ctx as CommandContext);
       expect(result.handled).toBe(true);
-      expect(ctx.setInputMode).toHaveBeenCalledWith("effort-select");
+      expect(ctx.presentInput).toHaveBeenCalledWith({ type: "effort-picker" });
     });
 
     it("/effort with invalid value shows effort select UI", async () => {
@@ -326,7 +326,7 @@ describe("Builtin commands", () => {
         ctx as CommandContext,
       );
       expect(result.handled).toBe(true);
-      expect(ctx.setInputMode).toHaveBeenCalledWith("effort-select");
+      expect(ctx.presentInput).toHaveBeenCalledWith({ type: "effort-picker" });
     });
 
     it("/effort with valid value sets effort and reports status", async () => {
@@ -385,7 +385,8 @@ describe("Builtin commands", () => {
       const { ctx } = makeCtx();
       const result = await executeCommand("model", [], ctx as CommandContext);
       expect(result.handled).toBe(true);
-      expect(ctx.setInputMode).toHaveBeenCalledWith("model-select", {
+      expect(ctx.presentInput).toHaveBeenCalledWith({
+        type: "model-picker",
         providers: { anthropic: {}, openai: {} },
         tiers: {},
       });
