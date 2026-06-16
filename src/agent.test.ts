@@ -211,16 +211,16 @@ describe("Agent", () => {
 
   describe("constructor", () => {
     it("initializes with default values", () => {
-      const { agent, contextManager } = makeAgent();
-      expect(agent.currentSession).toMatch(/^session-\d+$/);
+      const { agent, sessionManager, contextManager } = makeAgent();
+      expect(sessionManager.getSessionName()).toMatch(/^session-\d+$/);
       expect(contextManager.getTokenCount()).toBe(0);
       expect(agent.model).toBeDefined();
     });
 
     it("initializes with config values", () => {
-      const { agent, sessionManager } = makeAgent({ userPrompt: "custom" });
+      const { sessionManager } = makeAgent({ userPrompt: "custom" });
       sessionManager.setSession("test-session");
-      expect(agent.currentSession).toBe("test-session");
+      expect(sessionManager.getSessionName()).toBe("test-session");
     });
   });
 
@@ -236,15 +236,6 @@ describe("Agent", () => {
       const { context } = makeAgent();
       context.startUserMessage("hello");
       expect(context.getBlocks()).toEqual([{ type: "user", text: "hello" }]);
-    });
-  });
-
-  describe("clearSession", () => {
-    it("clears the context", () => {
-      const { agent, context } = makeAgent();
-      context.startUserMessage("hi");
-      agent.clearSession();
-      expect(context.getBlocks()).toHaveLength(0);
     });
   });
 

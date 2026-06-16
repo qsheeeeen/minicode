@@ -11,7 +11,6 @@ import type { AgentRegistry } from "./services/agent-registry.js";
 import type { PromptManager } from "./services/prompt-manager.js";
 import type { SessionManager } from "./services/session-manager.js";
 import type { ContextManager } from "./services/context-manager.js";
-import type { LLMContext } from "./llm/context.js";
 import type { AppConfig } from "./config.js";
 import type { ModelSwitchService } from "./services/model-switcher.js";
 import type { ShellService } from "./services/shell-service.js";
@@ -48,15 +47,6 @@ export class Agent {
 
   private _isRunning: boolean = false;
 
-  /** Cached access to the context manager. */
-  private get context(): LLMContext {
-    return this.sessionManager.getContext();
-  }
-
-  get currentSession(): string {
-    return this.sessionManager.getSessionName();
-  }
-
   get isRunning(): boolean {
     return this._isRunning;
   }
@@ -86,21 +76,6 @@ export class Agent {
       });
   }
 
-  /** Report a status message via the session's StatusReporter. */
-  private reportStatus(msg: {
-    role: "status" | "error";
-    content: string;
-    timestamp: Date;
-    element?: unknown;
-    toolDisplay?: {
-      name: string;
-      input: Record<string, unknown>;
-      output?: string;
-    };
-  }): void {
-    this.sessionManager.reportStatus(msg);
-  }
-
   abort(): void {
     this.abortController?.abort();
   }
@@ -111,17 +86,11 @@ export class Agent {
     }
   }
 
-  // Track token usage and trigger auto-compression
-  private async processUsage(result: LLMStreamResult): Promise<void> {
-    if (!result.usage) return;
-
-    await this.contextManager.processUsage(result.usage);
-  }
-
   // Stream LLM response, updating context in real-time.
   // Returns the stream result and any tool calls the LLM requested.
   private async streamLLM(toolDefs: LLMToolDef[]) {
-    const stream = this.client.chatStream(this.context.getBlocks(), toolDefs, {
+    const context = this.sessionManager.getContext();
+    const stream = this.client.chatStream(context.getBlocks(), toolDefs, {
       system: this.promptManager.getSystemPrompt(),
       model: this.model,
       signal: this.abortController?.signal,
@@ -130,8 +99,8 @@ export class Agent {
     const toolCalls: ToolCall[] = [];
 
     const handleDelta = (field: "text" | "thinking", delta: string) => {
-      if (field === "thinking") this.context.appendThinking(delta);
-      else this.context.appendAssistantText(delta);
+      if (field === "thinking") context.appendThinking(delta);
+      else context.appendAssistantText(delta);
     };
 
     let result: LLMStreamResult | undefined;
@@ -152,7 +121,7 @@ export class Agent {
         } else if (chunk.type === "tool_use") {
           const tool = this.toolExecutor.getTools().get(chunk.name);
           toolCalls.push({ block: chunk, tool });
-          this.context.startToolCall(chunk.id, chunk.name, chunk.input);
+          context.startToolCall(chunk.id, chunk.name, chunk.input);
           this.saveStore();
         }
       }
@@ -175,15 +144,16 @@ export class Agent {
   ): Promise<boolean> {
     if (this._isRunning) return false;
 
+    const context = this.sessionManager.getContext();
     this._isRunning = true;
-    this.context.startUserMessage(userMessage);
+    context.startUserMessage(userMessage);
     this.sessionManager.setActiveUserMessageOrdinal(
-      this.context.getUserMessageCount(),
+      context.getUserMessageCount(),
     );
 
     this.abortController = new AbortController();
     this.logger?.info(
-      { session: this.currentSession, userMessage },
+      { session: this.sessionManager.getSessionName(), userMessage },
       "Session started",
     );
 
@@ -201,10 +171,12 @@ export class Agent {
 
         const { result, toolCalls } = await this.streamLLM(toolDefs);
 
-        await this.processUsage(result);
+        if (result.usage) {
+          await this.contextManager.processUsage(result.usage);
+        }
         this.logger?.info(
           {
-            session: this.currentSession,
+            session: this.sessionManager.getSessionName(),
             input: result.usage?.input,
             output: result.usage?.output,
             stopReason: result.stop_reason,
@@ -242,7 +214,7 @@ export class Agent {
           );
         } catch (e) {
           if (e instanceof ToolDeniedError) {
-            this.reportStatus({
+            this.sessionManager.reportStatus({
               role: "error",
               content: `Tool "${e.toolName}" was denied by user`,
               timestamp: new Date(),
@@ -262,14 +234,14 @@ export class Agent {
       this._isRunning = false;
       if (this.abortController?.signal.aborted) {
         // Remove the last user message that triggered this aborted run
-        this.context.removeFromLastUserMessage(
+        context.removeFromLastUserMessage(
           (last) => last[0]?.type === "user" && last[0].text === userMessage,
         );
       }
       this.abortController = null;
       this.logger?.info(
         {
-          session: this.currentSession,
+          session: this.sessionManager.getSessionName(),
           totalTokens: this.contextManager.getTokenCount(),
         },
         "Session ended",
@@ -277,10 +249,5 @@ export class Agent {
       await this.saveStore();
     }
     return true;
-  }
-
-  clearSession(): void {
-    this.sessionManager.clearSession();
-    this.contextManager.reset();
   }
 }
