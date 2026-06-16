@@ -124,14 +124,15 @@ export async function runAgent(
   );
 
   try {
+    // Tool set is fixed for the run — build once outside the loop.
+    const toolDefs = [...deps.toolExecutor.getTools().values()].map((t) => ({
+      name: t.name,
+      description: t.description,
+      input_schema: t.input_schema,
+    })) as LLMToolDef[];
+
     while (true) {
       signal.throwIfAborted();
-
-      const toolDefs = [...deps.toolExecutor.getTools().values()].map((t) => ({
-        name: t.name,
-        description: t.description,
-        input_schema: t.input_schema,
-      })) as LLMToolDef[];
 
       const { result, toolCalls } = await streamLLM(deps, toolDefs, signal);
 
