@@ -117,7 +117,7 @@ export async function runAgent(
   userMessage: string,
   signal: AbortSignal,
   opts?: RunAgentOpts,
-): Promise<boolean> {
+): Promise<void> {
   const context = deps.sessionManager.getContext();
   context.startUserMessage(userMessage);
   deps.sessionManager.setActiveUserMessageOrdinal(
@@ -216,5 +216,4 @@ export async function runAgent(
     );
     await saveStore(deps);
   }
-  return true;
 }

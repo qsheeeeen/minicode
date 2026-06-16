@@ -190,14 +190,10 @@ function AppContent({
       const ctrl = new AbortController();
       abortRef.current = ctrl;
       try {
-        const sent = await runAgent(deps, processed.promptText, ctrl.signal, {
+        await runAgent(deps, processed.promptText, ctrl.signal, {
           displayContent: processed.displayContent,
           prompter: prompterRef.current ?? undefined,
         });
-        if (!sent) {
-          useTuiState.setState({ isLoading: false });
-          return false;
-        }
         return true;
       } catch (e) {
         if (e instanceof Error && e.message === "Aborted") {

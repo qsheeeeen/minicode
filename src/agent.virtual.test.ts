@@ -83,12 +83,11 @@ describe("runAgent virtual integration", () => {
       responses: [defaultTextResponse("Hello, I am the agent.")],
     });
 
-    const completed = await runAgent(
+    await runAgent(
       deps,
       "Hi there",
       new AbortController().signal,
     );
-    expect(completed).toBe(true);
 
     expect(context.getBlocks()).toEqual([
       { type: "user", text: "Hi there" },
@@ -111,12 +110,11 @@ describe("runAgent virtual integration", () => {
       tools,
     });
 
-    const completed = await runAgent(
+    await runAgent(
       deps,
       "Use the Echo tool",
       new AbortController().signal,
     );
-    expect(completed).toBe(true);
 
     expect(context.getBlocks()).toEqual([
       { type: "user", text: "Use the Echo tool" },
@@ -191,12 +189,11 @@ describe("runAgent virtual integration", () => {
       tools,
     });
 
-    const completed = await runAgent(
+    await runAgent(
       deps,
       "Run both tools",
       new AbortController().signal,
     );
-    expect(completed).toBe(true);
 
     // Verify tool execution order
     expect(callOrder).toEqual(["A", "B"]);
@@ -267,13 +264,12 @@ describe("runAgent virtual integration", () => {
     const context = sessionManager.getContext();
     const reportStatusSpy = vi.spyOn(sessionManager, "reportStatus");
 
-    const completed = await runAgent(
+    await runAgent(
       deps,
       "Do something dangerous",
       new AbortController().signal,
       { prompter },
     );
-    expect(completed).toBe(true);
 
     expect(context.getBlocks()).toEqual([
       { type: "user", text: "Do something dangerous" },
