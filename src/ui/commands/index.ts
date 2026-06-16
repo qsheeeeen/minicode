@@ -2,13 +2,12 @@ import type { Model } from "../../llm/model.js";
 import type { SessionStats } from "../../services/session-stats.js";
 import type { SessionManager } from "../../services/session-manager.js";
 import type { ChangeJournal } from "../../services/change-journal.js";
-import type { LLMContext } from "../../llm/context.js";
+import type { LLMBlock, LLMContext } from "../../llm/context.js";
 import type { AppConfig, Providers } from "../../config.js";
 import type { ModelSwitchService } from "../../services/model-switcher.js";
 import type { ContextManager } from "../../services/context-manager.js";
 import type { ChangeEntry } from "../../services/change-journal.js";
 import type { StatusReporter } from "../../services/session-manager.js";
-import type pino from "pino";
 import { getSkillBody, getAvailableSkills } from "../../skills/index.js";
 import {
   registerCommand,
@@ -85,9 +84,12 @@ export interface CommandContext {
   modelSwitchService: ModelSwitchService;
   contextManager: ContextManager;
   isAgentRunning: () => boolean;
-  setLogger: (logger: pino.Logger) => void;
-  setTokenCount: (count: number) => void;
-  setCurrentSession: (name: string) => void;
+  loadContext: (blocks: LLMBlock[], totalTokens?: number) => void;
+  switchSession: (
+    name: string,
+    opts?: { statusMessage?: string },
+  ) => Promise<void>;
+  renameCurrentSession: (newName: string) => Promise<void>;
   presentInput: (request: InputRequest) => void;
   exit: () => void;
 }

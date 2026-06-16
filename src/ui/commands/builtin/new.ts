@@ -1,6 +1,4 @@
 import { registerCommand } from "../registry.js";
-import { switchSession } from "../../../services/session-lifecycle.js";
-
 registerCommand({
   name: "new",
   description: "Create a new session",
@@ -9,12 +7,7 @@ registerCommand({
     if (name) {
       ctx.sessionManager.clearSession();
       ctx.contextManager.reset();
-      await switchSession({
-        sessionManager: ctx.sessionManager,
-        sessionName: name,
-        setCurrentSession: ctx.setCurrentSession,
-        setLogger: ctx.setLogger,
-        sessionStats: ctx.sessionStats,
+      await ctx.switchSession(name, {
         statusMessage: `Created session: ${name}`,
       });
     }

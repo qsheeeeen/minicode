@@ -128,7 +128,6 @@ describe("Builtin commands", () => {
     const model = makeModelMock();
     const sessionManager = makeSessionManagerMock(context);
     const changeJournal = makeChangeJournalMock();
-    const setTokenCount = vi.fn();
 
     const contextManager = {
       compress: vi.fn().mockResolvedValue(false),
@@ -147,9 +146,9 @@ describe("Builtin commands", () => {
       } as any,
       contextManager: contextManager as any,
       isAgentRunning: vi.fn().mockReturnValue(false),
-      setLogger: vi.fn(),
-      setTokenCount,
-      setCurrentSession: vi.fn(),
+      loadContext: vi.fn(),
+      switchSession: vi.fn().mockResolvedValue(undefined),
+      renameCurrentSession: vi.fn().mockResolvedValue(undefined),
       presentInput: vi.fn(),
       exit: vi.fn(),
       ...overrides,
@@ -161,7 +160,6 @@ describe("Builtin commands", () => {
       model,
       sessionManager,
       changeJournal,
-      setTokenCount,
       contextManager,
     };
   }
@@ -190,19 +188,15 @@ describe("Builtin commands", () => {
     });
 
     it("/clear clears session and reports status", async () => {
-      const { ctx, sessionManager, setTokenCount, contextManager } = makeCtx();
+      const { ctx, sessionManager, contextManager } = makeCtx();
 
       const result = await executeCommand("clear", [], ctx as CommandContext);
       expect(result.handled).toBe(true);
       expect(sessionManager.clearSession).toHaveBeenCalled();
       expect(contextManager.reset).toHaveBeenCalled();
-      expect(setTokenCount).not.toHaveBeenCalled();
-      expect(ctx.setCurrentSession).toHaveBeenCalledWith(
+      expect(ctx.switchSession).toHaveBeenCalledWith(
         expect.stringMatching(/^session-/),
-      );
-      // switchSession calls sessionManager.reportStatus()
-      expect(sessionManager.reportStatus).toHaveBeenCalledWith(
-        expect.objectContaining({ role: "status" }),
+        { statusMessage: "(Cleared)" },
       );
     });
 
@@ -217,11 +211,9 @@ describe("Builtin commands", () => {
       expect(result.handled).toBe(true);
       expect(sessionManager.clearSession).toHaveBeenCalled();
       expect(contextManager.reset).toHaveBeenCalled();
-      expect(ctx.setCurrentSession).toHaveBeenCalledWith("my new session");
-      // switchSession calls sessionManager.reportStatus()
-      expect(sessionManager.reportStatus).toHaveBeenCalledWith(
-        expect.objectContaining({ role: "status" }),
-      );
+      expect(ctx.switchSession).toHaveBeenCalledWith("my new session", {
+        statusMessage: "Created session: my new session",
+      });
     });
 
     it("/rename renames session and reports status", async () => {
@@ -233,14 +225,7 @@ describe("Builtin commands", () => {
         ctx as CommandContext,
       );
       expect(result.handled).toBe(true);
-      expect(sessionPersistenceMock.rename).toHaveBeenCalledWith(
-        "test-session",
-        "new-session",
-      );
-      expect(ctx.setCurrentSession).toHaveBeenCalledWith("new-session");
-      expect(sessionManager.reportStatus).toHaveBeenCalledWith(
-        expect.objectContaining({ role: "status" }),
-      );
+      expect(ctx.renameCurrentSession).toHaveBeenCalledWith("new-session");
     });
 
     it("/resume with no args lists sessions", async () => {
@@ -264,7 +249,7 @@ describe("Builtin commands", () => {
         blocks: [],
         totalTokens: 100,
       });
-      const { ctx, context, setTokenCount, sessionManager } = makeCtx();
+      const { ctx } = makeCtx();
 
       const result = await executeCommand(
         "resume",
@@ -273,13 +258,10 @@ describe("Builtin commands", () => {
       );
       expect(result.handled).toBe(true);
       expect(sessionPersistenceMock.load).toHaveBeenCalledWith("session-1");
-      expect(context.replaceBlocks).toHaveBeenCalled();
-      expect(setTokenCount).toHaveBeenCalledWith(100);
-      expect(ctx.setCurrentSession).toHaveBeenCalledWith("session-1");
-      // switchSession reports a status message
-      expect(sessionManager.reportStatus).toHaveBeenCalledWith(
-        expect.objectContaining({ role: "status" }),
-      );
+      expect(ctx.loadContext).toHaveBeenCalledWith([], 100);
+      expect(ctx.switchSession).toHaveBeenCalledWith("session-1", {
+        statusMessage: "Loaded session: session-1",
+      });
     });
 
     it("/resume with unknown session shows error", async () => {

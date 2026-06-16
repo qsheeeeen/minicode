@@ -19,6 +19,9 @@ import type { ContextManager } from "../services/context-manager.js";
 import type { LLMContext } from "../llm/context.js";
 import { Receipt } from "./tui/Receipt.js";
 import { UITimeline } from "./tui/timeline.js";
+import { switchSession } from "../services/session-lifecycle.js";
+import { SessionPersistence } from "../services/session-persistence.js";
+import { createLogger } from "../utils/logger.js";
 
 import { useTuiState } from "./tui/state.js";
 import { connectAgent } from "./tui/connect-agent.js";
@@ -171,14 +174,39 @@ function AppContent({
       modelSwitchService,
       contextManager,
       isAgentRunning: () => agentRef.current.isRunning,
-      setLogger: (logger: typeof agentRef.current.logger) => {
-        agentRef.current.logger = logger;
+      loadContext: (blocks, totalTokens = 0) => {
+        context.replaceBlocks(blocks);
+        contextManager.setTokenCount(totalTokens);
       },
-      setTokenCount: (count: number) => {
-        contextManager.setTokenCount(count);
+      switchSession: async (name, opts) => {
+        await switchSession({
+          sessionManager,
+          sessionName: name,
+          setLogger: (logger) => {
+            agentRef.current.logger = logger;
+          },
+          setCurrentSession: (session) =>
+            useTuiState.setState({ currentSession: session }),
+          sessionStats,
+          statusMessage: opts?.statusMessage,
+        });
       },
-      setCurrentSession: (session: string) =>
-        useTuiState.setState({ currentSession: session }),
+      renameCurrentSession: async (newName) => {
+        const oldName = sessionManager.getSessionName();
+        await SessionPersistence.rename(oldName, newName);
+        const newLogger = await createLogger(
+          SessionPersistence.getProjectHash(),
+          newName,
+        );
+        sessionManager.setSession(newName);
+        agentRef.current.logger = newLogger;
+        useTuiState.setState({ currentSession: newName });
+        sessionManager.reportStatus({
+          role: "status",
+          content: `Renamed: ${oldName} -> ${newName}`,
+          timestamp: new Date(),
+        });
+      },
       presentInput: (request) => {
         const inputState = inputRequestToState(request);
         useTuiState.setState((state) => ({

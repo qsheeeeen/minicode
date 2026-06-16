@@ -17,12 +17,14 @@ import { PermissionService } from "../services/permission.js";
 import { PromptManager } from "../services/prompt-manager.js";
 import { SessionManager } from "../services/session-manager.js";
 import { SessionPersistence } from "../services/session-persistence.js";
+import { switchSession } from "../services/session-lifecycle.js";
 import { ShellService } from "../services/shell-service.js";
 import { ToolExecutor } from "../tools/executor.js";
 import { getAll } from "../tools/index.js";
 import { createLogger } from "../utils/logger.js";
 import { loadGlobalPrompt } from "../utils/prompts.js";
 import type { AppRuntime } from "./types.js";
+import type { CommandContext } from "../ui/commands/index.js";
 
 export interface CreateAppOpts {
   readonly args: Args;
@@ -170,7 +172,7 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
   sessionManager.setSession(initialSession);
   agent.logger = logger;
 
-  const commandContext = {
+  const commandContext: CommandContext = {
     model: initialModel,
     config,
     context: sessionManager.getContext(),
@@ -181,16 +183,37 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
     sessionStats,
     modelSwitchService,
     contextManager,
-    shellService,
     isAgentRunning: () => agent.isRunning,
-    setLogger: (newLogger: typeof logger) => {
+    loadContext: (blocks, totalTokens = 0) => {
+      sessionManager.getContext().replaceBlocks(blocks);
+      contextManager.setTokenCount(totalTokens);
+    },
+    switchSession: async (name: string, opts?: { statusMessage?: string }) => {
+      await switchSession({
+        sessionManager,
+        sessionName: name,
+        setLogger: (newLogger) => {
+          agent.logger = newLogger;
+        },
+        setCurrentSession: () => {},
+        sessionStats,
+        statusMessage: opts?.statusMessage,
+      });
+    },
+    renameCurrentSession: async (newName: string) => {
+      const oldName = sessionManager.getSessionName();
+      await SessionPersistence.rename(oldName, newName);
+      const newLogger = await createLogger(
+        SessionPersistence.getProjectHash(),
+        newName,
+      );
+      sessionManager.setSession(newName);
       agent.logger = newLogger;
-    },
-    setTokenCount: (count: number) => {
-      contextManager.setTokenCount(count);
-    },
-    setCurrentSession: (name: string) => {
-      sessionManager.setSession(name);
+      sessionManager.reportStatus({
+        role: "status",
+        content: `Renamed: ${oldName} -> ${newName}`,
+        timestamp: new Date(),
+      });
     },
     presentInput: () => {},
     exit: () => process.exit(0),
