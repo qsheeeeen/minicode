@@ -1,6 +1,6 @@
 import type { ToolDef, ToolResult, ToolExecutionContext } from "../registry.js";
 import type { LLMBlock } from "../../llm/context.js";
-import { Agent } from "../../agent.js";
+import { runAgent, type AgentDeps } from "../../agent.js";
 import { SessionManager } from "../../services/session-manager.js";
 import { ContextManager } from "../../services/context-manager.js";
 import { RuntimeEvents } from "../../services/runtime-events.js";
@@ -91,7 +91,7 @@ export const agentTool: ToolDef = {
       permissionService: new PermissionService("manual"),
       context: sessionManager.getContext(),
     });
-    const subAgent = new Agent({
+    const subDeps: AgentDeps = {
       client: subClient,
       model: subModel,
       sessionManager,
@@ -101,28 +101,27 @@ export const agentTool: ToolDef = {
       agentRegistry: registry,
       currentAgentId: subId,
       appConfig: appConfig!,
-    });
+    };
 
+    const subController = new AbortController();
     context?.signal?.addEventListener("abort", () => {
-      subAgent.abort();
+      subController.abort();
     });
 
     const subContext = sessionManager.getContext();
 
+    // Notify via parent agent's status reporter (if available through registry)
+    // Parent status notification is handled by the registry update below;
+    // sub-agent start/stop is tracked via registry.updateStatus().
+
     registry.register({
       id: subId,
       type: "sub",
-      agent: subAgent,
       context: subContext,
       status: "running",
       task,
       parentId,
     });
-
-    // Notify via parent agent's status reporter (if available through registry)
-    const parentSession = registry.get(parentId);
-    // Note: parent status notification is now handled by the registry update above
-    // Sub-agent start/stop is tracked via registry.updateStatus()
 
     // Track progress during execution
     let toolCallCount = 0;
@@ -137,7 +136,7 @@ export const agentTool: ToolDef = {
     });
 
     try {
-      await subAgent.run(task);
+      await runAgent(subDeps, task, subController.signal);
       const blocks = subContext.getBlocks();
       const finalResponse = extractFinalResponse(blocks);
       const summary = generateSummary(blocks);

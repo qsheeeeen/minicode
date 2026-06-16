@@ -8,10 +8,8 @@ vi.mock("../ui/headless.js", () => ({
 
 function makeApp() {
   return {
-    agent: { id: "agent" },
+    deps: { id: "deps" },
     initialPrompt: "hello",
-    sessionManager: { id: "session" },
-    contextManager: { id: "context-manager" },
     runtimeEvents: { id: "runtime-events" },
     sessionName: "session-name",
     resumeRecent: false,
@@ -26,10 +24,8 @@ describe("runHeadlessApp", () => {
     await runHeadlessApp(app);
 
     expect(runHeadless).toHaveBeenCalledWith(
-      app.agent,
+      app.deps,
       app.initialPrompt,
-      app.sessionManager,
-      app.contextManager,
       app.runtimeEvents,
       app.sessionName,
       app.resumeRecent,

@@ -3,10 +3,8 @@ import { runHeadless } from "../ui/headless.js";
 
 export async function runHeadlessApp(app: AppRuntime): Promise<void> {
   await runHeadless(
-    app.agent,
+    app.deps,
     app.initialPrompt,
-    app.sessionManager,
-    app.contextManager,
     app.runtimeEvents,
     app.sessionName,
     app.resumeRecent,

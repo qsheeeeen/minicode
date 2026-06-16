@@ -66,7 +66,7 @@ describe("createApp", () => {
       stdinIsTTY: false,
     });
 
-    expect(runtime.agent).toBeDefined();
+    expect(runtime.deps).toBeDefined();
     expect(runtime.config).toBe(config);
     expect(runtime.version).toBe("1.0.0");
     expect(runtime.headless).toBe(true);

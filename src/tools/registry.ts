@@ -40,7 +40,7 @@ export interface ToolConfig {
 export interface ToolExecutionContext {
   registry: AgentRegistry | undefined;
   config: ToolConfig;
-  appConfig: AppConfig;
+  appConfig?: AppConfig;
   currentAgentId: string;
   signal: AbortSignal | undefined;
   changeJournal?: ChangeJournal;

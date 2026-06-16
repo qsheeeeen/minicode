@@ -1,16 +1,11 @@
 // Standalone demo for InputArea component.
 // Run: bun run src/ui/tui/demos/input-area.tsx
 import { render, Box } from "ink";
+import { Model } from "../../../llm/model.js";
 import { useTuiState } from "../state.js";
 import { InputArea } from "../InputArea.js";
 
-const agentRef = {
-  current: {
-    setEffort: () => {},
-    setModel: () => {},
-    getStore: () => ({ addStatus: () => {} }),
-  } as any,
-};
+const model = new Model("test", "test", 200000);
 const loadingRef = { current: false };
 
 useTuiState.setState({
@@ -21,7 +16,7 @@ useTuiState.setState({
 render(
   <Box flexDirection="column" padding={1}>
     <InputArea
-      agentRef={agentRef}
+      model={model}
       handleSubmit={async (v) => {
         console.log(v);
         return true;

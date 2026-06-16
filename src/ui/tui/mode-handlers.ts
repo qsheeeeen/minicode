@@ -1,11 +1,11 @@
-import type { Agent } from "../../agent.js";
+import type { Model } from "../../llm/model.js";
 import type { EffortLevel } from "../../llm/client.js";
 import type { AppConfig } from "../../config.js";
 import type { ModelSwitchService } from "../../services/model-switcher.js";
 import { useTuiState } from "./state.js";
 
 export interface ModeHandlerDeps {
-  agentRef: React.MutableRefObject<Agent>;
+  model: Model;
   config: AppConfig;
   modelSwitchService: ModelSwitchService;
   handleSubmit: (value: string) => Promise<boolean>;
@@ -18,9 +18,9 @@ export type ModeHandler = (
 
 async function effortSelectHandler(
   value: string,
-  { agentRef, config }: ModeHandlerDeps,
+  { model, config }: ModeHandlerDeps,
 ): Promise<void> {
-  agentRef.current.model.setEffort(value as EffortLevel);
+  model.setEffort(value as EffortLevel);
   config.setEffort(value as EffortLevel);
   useTuiState.setState((state) => ({
     messages: [

@@ -1,7 +1,7 @@
 import path from "path";
 import os from "os";
 import type { Args } from "../args.js";
-import { Agent } from "../agent.js";
+import type { AgentDeps } from "../agent.js";
 import type { AppConfig } from "../config.js";
 import { createClient } from "../llm/client.js";
 import { Model } from "../llm/model.js";
@@ -129,17 +129,6 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
     initialClient,
     initialModel,
   );
-  let agent: Agent;
-  const modelSwitchService = new ModelSwitchService({
-    appConfig: config,
-    contextManager,
-    sessionManager,
-    setModel: (client, model) => {
-      agent.client = client;
-      agent.model = model;
-    },
-    permissionService,
-  });
   const shellService = new ShellService({ cwd });
   const promptManager = new PromptManager(userPrompt, projectPromptFile);
   promptManager.refreshEnvironment();
@@ -157,20 +146,34 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
     context: sessionManager.getContext(),
   });
 
-  agent = new Agent({
+  // deps is a shared mutable bag: modelSwitchService writes client/model,
+  // session switches write logger, and runAgent reads the latest each loop.
+  const deps: AgentDeps = {
     client: initialClient,
     model: initialModel,
+    logger,
     sessionManager,
     contextManager,
     toolExecutor,
     promptManager,
-    agentRegistry,
     appConfig: config,
-    modelSwitchService,
-    shellService,
+    agentRegistry,
+  };
+
+  const modelSwitchService = new ModelSwitchService({
+    appConfig: config,
+    contextManager,
+    sessionManager,
+    setModel: (client, model) => {
+      deps.client = client;
+      deps.model = model;
+    },
+    permissionService,
   });
+  deps.modelSwitchService = modelSwitchService;
+  deps.shellService = shellService;
+
   sessionManager.setSession(initialSession);
-  agent.logger = logger;
 
   const commandContext: CommandContext = {
     model: initialModel,
@@ -183,7 +186,7 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
     sessionStats,
     modelSwitchService,
     contextManager,
-    isAgentRunning: () => agent.isRunning,
+    isAgentRunning: () => false,
     loadContext: (blocks, totalTokens = 0) => {
       sessionManager.getContext().replaceBlocks(blocks);
       contextManager.setTokenCount(totalTokens);
@@ -193,7 +196,7 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
         sessionManager,
         sessionName: name,
         setLogger: (newLogger) => {
-          agent.logger = newLogger;
+          deps.logger = newLogger;
         },
         setCurrentSession: () => {},
         sessionStats,
@@ -208,7 +211,7 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
         newName,
       );
       sessionManager.setSession(newName);
-      agent.logger = newLogger;
+      deps.logger = newLogger;
       sessionManager.reportStatus({
         role: "status",
         content: `Renamed: ${oldName} -> ${newName}`,
@@ -220,7 +223,7 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
   };
 
   return {
-    agent,
+    deps,
     config,
     version,
     promptFiles,

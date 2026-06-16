@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { Agent } from "./agent.js";
+import { runAgent, type AgentDeps } from "./agent.js";
 import { Model } from "./llm/model.js";
 import {
   VirtualLLMClient,
@@ -9,7 +9,7 @@ import {
 } from "./testing/index.js";
 import type { ScriptedResponse } from "./testing/index.js";
 
-import type { ToolDef, UserPrompter } from "../tools/registry.js";
+import type { ToolDef, UserPrompter } from "./tools/registry.js";
 import { SessionManager } from "./services/session-manager.js";
 import { ContextManager } from "./services/context-manager.js";
 import { RuntimeEvents } from "./services/runtime-events.js";
@@ -18,7 +18,7 @@ import { ToolExecutor } from "./tools/executor.js";
 import { PermissionService } from "./services/permission.js";
 import { SessionPersistence } from "./services/session-persistence.js";
 
-function createTestAgent(options?: {
+function createTestDeps(options?: {
   responses?: ScriptedResponse[];
   tools?: Map<string, ToolDef>;
   permissionMode?: "manual" | "yolo" | "auto";
@@ -59,19 +59,19 @@ function createTestAgent(options?: {
     permissionService: new PermissionService(options?.permissionMode ?? "yolo"),
     context: sessionManager.getContext(),
   });
-  const agent = new Agent({
+  const deps: AgentDeps = {
     client,
     model,
     sessionManager,
     contextManager,
     toolExecutor,
     promptManager,
-  });
+  };
 
-  return { agent, context: sessionManager.getContext() };
+  return { deps, context: sessionManager.getContext() };
 }
 
-describe("Agent virtual integration", () => {
+describe("runAgent virtual integration", () => {
   beforeEach(() => {
     vi.spyOn(SessionPersistence, "getSessionDir").mockReturnValue(
       "/tmp/minicode-agent-virtual-test",
@@ -79,11 +79,15 @@ describe("Agent virtual integration", () => {
   });
 
   it("scenario 1: pure text — LLM returns text, run ends, context has correct messages", async () => {
-    const { agent, context } = createTestAgent({
+    const { deps, context } = createTestDeps({
       responses: [defaultTextResponse("Hello, I am the agent.")],
     });
 
-    const completed = await agent.run("Hi there");
+    const completed = await runAgent(
+      deps,
+      "Hi there",
+      new AbortController().signal,
+    );
     expect(completed).toBe(true);
 
     expect(context.getBlocks()).toEqual([
@@ -99,7 +103,7 @@ describe("Agent virtual integration", () => {
     );
     const tools = new Map([["Echo", virtualTool]]);
 
-    const { agent, context } = createTestAgent({
+    const { deps, context } = createTestDeps({
       responses: [
         toolUseResponse("call_1", "Echo", { input: "hello" }),
         defaultTextResponse("The tool said: echoed: hello"),
@@ -107,7 +111,11 @@ describe("Agent virtual integration", () => {
       tools,
     });
 
-    const completed = await agent.run("Use the Echo tool");
+    const completed = await runAgent(
+      deps,
+      "Use the Echo tool",
+      new AbortController().signal,
+    );
     expect(completed).toBe(true);
 
     expect(context.getBlocks()).toEqual([
@@ -138,7 +146,7 @@ describe("Agent virtual integration", () => {
       ["ToolB", toolB],
     ]);
 
-    const { agent, context } = createTestAgent({
+    const { deps, context } = createTestDeps({
       responses: [
         // LLM requests both tools in one response
         {
@@ -183,7 +191,11 @@ describe("Agent virtual integration", () => {
       tools,
     });
 
-    const completed = await agent.run("Run both tools");
+    const completed = await runAgent(
+      deps,
+      "Run both tools",
+      new AbortController().signal,
+    );
     expect(completed).toBe(true);
 
     // Verify tool execution order
@@ -244,18 +256,23 @@ describe("Agent virtual integration", () => {
       permissionService: new PermissionService("manual"),
       context: sessionManager.getContext(),
     });
-    const agent = new Agent({
+    const deps: AgentDeps = {
       client,
       model,
       sessionManager,
       contextManager,
       toolExecutor,
       promptManager,
-    });
+    };
     const context = sessionManager.getContext();
     const reportStatusSpy = vi.spyOn(sessionManager, "reportStatus");
 
-    const completed = await agent.run("Do something dangerous", { prompter });
+    const completed = await runAgent(
+      deps,
+      "Do something dangerous",
+      new AbortController().signal,
+      { prompter },
+    );
     expect(completed).toBe(true);
 
     expect(context.getBlocks()).toEqual([

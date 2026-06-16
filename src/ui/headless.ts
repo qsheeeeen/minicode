@@ -1,25 +1,24 @@
 import fs from "fs";
-import type { Agent } from "../agent.js";
+import type { AgentDeps } from "../agent.js";
+import { runAgent } from "../agent.js";
 import type { UserPrompter, Prompt } from "../tools/registry.js";
 import type { CommandContext } from "./commands/index.js";
 import { routeInput } from "./routing.js";
 import { processRoute } from "./route-handler.js";
 import { SessionPersistence } from "../services/session-persistence.js";
-import type { SessionManager } from "../services/session-manager.js";
-import type { ContextManager } from "../services/context-manager.js";
 import type { RuntimeEvents } from "../services/runtime-events.js";
 import { HeadlessRenderer } from "./headless-renderer.js";
 
 export async function runHeadless(
-  agent: Agent,
+  deps: AgentDeps,
   initialPrompt: string | undefined,
-  sessionManager: SessionManager,
-  contextManager: ContextManager,
   runtimeEvents: RuntimeEvents,
   sessionName?: string,
   resumeRecent?: boolean,
   cmdContext?: CommandContext,
 ): Promise<void> {
+  const { sessionManager, contextManager } = deps;
+
   // Read piped stdin (non-TTY) and append to the prompt
   if (!process.stdin.isTTY) {
     try {
@@ -68,7 +67,7 @@ export async function runHeadless(
         name,
       );
       sessionManager.setSession(name);
-      agent.logger = newLogger;
+      deps.logger = newLogger;
     }
   }
 
@@ -84,9 +83,12 @@ export async function runHeadless(
   renderer.start();
 
   try {
+    const ctrl = new AbortController();
     // Route input: without cmdContext, run agent directly
     if (!cmdContext) {
-      await agent.run(initialPrompt, { prompter: headlessPrompter });
+      await runAgent(deps, initialPrompt, ctrl.signal, {
+        prompter: headlessPrompter,
+      });
       renderer.renderFinal();
       return;
     }
@@ -109,7 +111,9 @@ export async function runHeadless(
       return;
     }
 
-    await agent.run(processed.promptText, { prompter: headlessPrompter });
+    await runAgent(deps, processed.promptText, ctrl.signal, {
+      prompter: headlessPrompter,
+    });
     renderer.renderFinal();
   } catch (e) {
     if (e instanceof Error && e.message === "Aborted") {

@@ -2,6 +2,7 @@
 // Run: bun run src/ui/tui/demos/index.tsx
 import { useState } from "react";
 import { render, Box, useInput } from "ink";
+import { Model } from "../../../llm/model.js";
 import { useTuiState } from "../state.js";
 import { Header } from "../Header.js";
 import { Help } from "../Help.js";
@@ -85,16 +86,7 @@ const agentSessions = [
   },
 ];
 
-const agentRef = {
-  current: {
-    model: {
-      getProvider: () => "anthropic",
-      getDisplayName: () => "claude-sonnet-4-5",
-      getContextLength: () => 200000,
-      setEffort: () => {},
-    },
-  } as any,
-};
+const model = new Model("claude-sonnet-4-5", "anthropic", 200000);
 
 const receiptData = {
   projectName: "express-ts-app",
@@ -144,7 +136,7 @@ function Demo() {
       <Status />
       {mode === "chat" ? (
         <InputArea
-          agentRef={agentRef}
+          model={model}
           handleSubmit={async (v) => {
             console.log(v);
             return true;
@@ -183,7 +175,7 @@ function Demo() {
         </Box>
       )}
       <SubAgentBar />
-      <Panel agentRef={agentRef} />
+      <Panel model={model} />
       <Help />
       <Receipt data={receiptData} onDismiss={() => {}} />
     </Box>

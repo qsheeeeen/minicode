@@ -1,6 +1,6 @@
 import React, { useCallback, useRef, useEffect } from "react";
 import { Box, useInput, useApp } from "ink";
-import { Agent } from "../agent.js";
+import { runAgent, type AgentDeps } from "../agent.js";
 import type { AppConfig } from "../config.js";
 import type { UserPrompter } from "../tools/registry.js";
 import { routeInput } from "./routing.js";
@@ -9,7 +9,7 @@ import {
   inputRequestToState,
   type CommandContext,
 } from "./commands/index.js";
-import { AgentRegistry, type AgentSession } from "../services/index.js";
+import { AgentRegistry } from "../services/index.js";
 import type { RuntimeEvents } from "../services/runtime-events.js";
 import type { SessionStats } from "../services/session-stats.js";
 import type { SessionManager } from "../services/session-manager.js";
@@ -35,7 +35,7 @@ import { Panel } from "./tui/Panel.js";
 import { Help } from "./tui/Help.js";
 
 export interface AppProps {
-  agent: Agent;
+  deps: AgentDeps;
   config: AppConfig;
   version: string;
   promptFiles: string[];
@@ -54,79 +54,14 @@ export interface AppProps {
   permissionService: PermissionService;
 }
 
-// Hook: multi-agent coordination and switching using Global Store
-function useMultiAgent(
-  registry: AgentRegistry,
-  agentRef: React.MutableRefObject<Agent>,
-  uiTimeline: UITimeline,
-) {
-  const activeAgentId = useTuiState((s) => s.activeAgentId);
-  const activeAgentIdRef = useRef(activeAgentId);
-
-  useEffect(() => {
-    registry.setUpdateCallback((sessions) => {
-      useTuiState.setState({ agentSessions: sessions });
-      if (
-        activeAgentIdRef.current !== "1" &&
-        !sessions.find((s) => s.id === activeAgentIdRef.current)
-      ) {
-        activeAgentIdRef.current = "1";
-        useTuiState.setState({ activeAgentId: "1" });
-      }
-    });
-  }, [registry]);
-
-  const switchToSession = useCallback(
-    (session: AgentSession) => {
-      activeAgentIdRef.current = session.id;
-      useTuiState.setState({ activeAgentId: session.id });
-      uiTimeline.setContext(session.context);
-      agentRef.current = session.agent;
-    },
-    [agentRef, uiTimeline],
-  );
-
-  useInput((input, key) => {
-    const sessions = registry.getAll() || [];
-    if (sessions.length <= 1) return;
-
-    if (key.ctrl && input === "o") {
-      const currentIndex = sessions.findIndex(
-        (s) => s.id === activeAgentIdRef.current,
-      );
-      const nextIndex = (currentIndex + 1) % sessions.length;
-      switchToSession(sessions[nextIndex]);
-    }
-
-    if (key.upArrow) {
-      const currentIndex = sessions.findIndex(
-        (s) => s.id === activeAgentIdRef.current,
-      );
-      const prevIndex = (currentIndex - 1 + sessions.length) % sessions.length;
-      switchToSession(sessions[prevIndex]);
-    }
-
-    if (key.downArrow) {
-      const currentIndex = sessions.findIndex(
-        (s) => s.id === activeAgentIdRef.current,
-      );
-      const nextIndex = (currentIndex + 1) % sessions.length;
-      switchToSession(sessions[nextIndex]);
-    }
-  });
-
-  return { activeAgentIdRef };
-}
-
 function AppContent({
-  agent,
+  deps,
   config,
   version,
   promptFiles,
   initialSession,
   initialPrompt,
   agentRegistry,
-  runtimeEvents,
   programStartTime,
   sessionStats,
   sessionManager,
@@ -145,13 +80,18 @@ function AppContent({
   const pendingPrompt = useTuiState((s) => s.pendingPrompt);
   const isLoading = useTuiState((s) => s.isLoading);
   const showReceipt = useTuiState((s) => s.showReceipt);
-  const agentRef = useRef<Agent>(agent);
+  const abortRef = useRef<AbortController | null>(null);
 
   const [autoSubmitPending, setAutoSubmitPending] =
     React.useState(!!initialPrompt);
   const loadingRef = useRef(false);
 
-  useMultiAgent(agentRegistry, agentRef, uiTimeline);
+  // Sync registry updates (sub-agent progress) into UI state.
+  useEffect(() => {
+    agentRegistry.setUpdateCallback((sessions) => {
+      useTuiState.setState({ agentSessions: sessions });
+    });
+  }, [agentRegistry]);
 
   useEffect(() => {
     sessionStats.init(
@@ -163,7 +103,7 @@ function AppContent({
 
   const cmdContext = useCallback(
     (): CommandContext => ({
-      model: agentRef.current.model,
+      model: deps.model,
       config,
       context,
       sessionManager,
@@ -173,7 +113,7 @@ function AppContent({
       sessionStats,
       modelSwitchService,
       contextManager,
-      isAgentRunning: () => agentRef.current.isRunning,
+      isAgentRunning: () => loadingRef.current,
       loadContext: (blocks, totalTokens = 0) => {
         context.replaceBlocks(blocks);
         contextManager.setTokenCount(totalTokens);
@@ -183,7 +123,7 @@ function AppContent({
           sessionManager,
           sessionName: name,
           setLogger: (logger) => {
-            agentRef.current.logger = logger;
+            deps.logger = logger;
           },
           setCurrentSession: (session) =>
             useTuiState.setState({ currentSession: session }),
@@ -199,7 +139,7 @@ function AppContent({
           newName,
         );
         sessionManager.setSession(newName);
-        agentRef.current.logger = newLogger;
+        deps.logger = newLogger;
         useTuiState.setState({ currentSession: newName });
         sessionManager.reportStatus({
           role: "status",
@@ -221,15 +161,14 @@ function AppContent({
       },
       exit: () => useTuiState.setState({ showReceipt: true }),
     }),
-    [sessionManager, contextManager, config, modelSwitchService],
+    [deps, sessionManager, contextManager, config, modelSwitchService],
   );
 
   const handleSubmit = useCallback(
     async (value: string): Promise<boolean> => {
-      if (!value.trim() || !agentRef.current) return false;
+      if (!value.trim()) return false;
       if (loadingRef.current) return false;
 
-      const agent = agentRef.current;
       const route = await routeInput(value, cmdContext());
       const processed = processRoute(
         route,
@@ -248,8 +187,10 @@ function AppContent({
       // "run" — command with prompt or plain LLM input
       loadingRef.current = true;
       useTuiState.setState({ isLoading: true });
+      const ctrl = new AbortController();
+      abortRef.current = ctrl;
       try {
-        const sent = await agent.run(processed.promptText, {
+        const sent = await runAgent(deps, processed.promptText, ctrl.signal, {
           displayContent: processed.displayContent,
           prompter: prompterRef.current ?? undefined,
         });
@@ -277,16 +218,17 @@ function AppContent({
         return false;
       } finally {
         loadingRef.current = false;
+        abortRef.current = null;
         // Ensure final messages are always synced to UI state after run.
         uiTimeline.sync();
         useTuiState.setState({ isLoading: false, status: "" });
       }
     },
-    [cmdContext],
+    [cmdContext, deps, context, sessionManager, uiTimeline, prompterRef],
   );
 
   useEffect(() => {
-    if (autoSubmitPending && agentRef.current && initialPrompt) {
+    if (autoSubmitPending && initialPrompt) {
       setAutoSubmitPending(false);
       handleSubmit(initialPrompt);
     }
@@ -298,7 +240,7 @@ function AppContent({
     (keyInput, key) => {
       if (key.ctrl && keyInput === "c") {
         if (isLoading) {
-          agentRef.current?.abort();
+          abortRef.current?.abort();
           if (pendingPrompt) {
             pendingPrompt.resolve("");
             useTuiState.setState({ pendingPrompt: null });
@@ -314,7 +256,7 @@ function AppContent({
         return;
       }
       if (key.escape && isLoading) {
-        agentRef.current?.abort();
+        abortRef.current?.abort();
         if (pendingPrompt) {
           pendingPrompt.resolve("");
           useTuiState.setState({ pendingPrompt: null });
@@ -343,7 +285,7 @@ function AppContent({
       <ModalPrompter />
       {!showReceipt && (
         <InputArea
-          agentRef={agentRef}
+          model={deps.model}
           handleSubmit={handleSubmit}
           loadingRef={loadingRef}
           config={config}
@@ -351,7 +293,7 @@ function AppContent({
         />
       )}
       <SubAgentBar />
-      <Panel agentRef={agentRef} promptFiles={promptFiles} />
+      <Panel model={deps.model} promptFiles={promptFiles} />
       <Help />
       {showReceipt && (
         <Receipt data={sessionStats.getStats()} onDismiss={() => exit()} />
@@ -377,7 +319,6 @@ export function App(props: AppProps) {
 
   useEffect(() => {
     const { cleanup, prompter } = connectAgent({
-      agent: props.agent,
       sessionManager: props.sessionManager,
       contextManager: props.contextManager,
       runtimeEvents: props.runtimeEvents,

@@ -1,20 +1,9 @@
 // Standalone demo for Panel component.
 // Run: bun run src/ui/tui/demos/panel.tsx
 import { render, Box } from "ink";
+import { Model } from "../../../llm/model.js";
 import { useTuiState } from "../state.js";
 import { Panel } from "../Panel.js";
-
-function mkAgent(model: string, provider: string, ctx: number) {
-  return {
-    current: {
-      getModel: () => ({
-        getProvider: () => provider,
-        getDisplayName: () => model,
-        getContextLength: () => ctx,
-      }),
-    } as any,
-  };
-}
 
 useTuiState.setState({
   tokenCount: 24000,
@@ -25,7 +14,7 @@ useTuiState.setState({
 render(
   <Box flexDirection="column" padding={1}>
     <Panel
-      agentRef={mkAgent("claude-sonnet-4-5", "anthropic", 200000)}
+      model={new Model("claude-sonnet-4-5", "anthropic", 200000)}
       promptFiles={["AGENTS.md"]}
     />
   </Box>,
@@ -36,15 +25,11 @@ useTuiState.setState({
   permissionMode: "yolo",
   status: "",
 });
-render(
-  <Panel agentRef={mkAgent("claude-opus-4-7", "anthropic", 200000)} />,
-);
+render(<Panel model={new Model("claude-opus-4-7", "anthropic", 200000)} />);
 useTuiState.setState({
   tokenCount: 178000,
   currentSession: "feature-x",
   permissionMode: "auto",
   status: "Compressing...",
 });
-render(
-  <Panel agentRef={mkAgent("gpt-4o", "openai", 200000)} />,
-);
+render(<Panel model={new Model("gpt-4o", "openai", 200000)} />);

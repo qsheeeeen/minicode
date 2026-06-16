@@ -4,12 +4,12 @@ import { useTuiState } from "./state.js";
 import { getInputComponent } from "./inputs.js";
 import { getCommandList } from "../commands/index.js";
 import { modeHandlers } from "./mode-handlers.js";
-import type { Agent } from "../../agent.js";
+import type { Model } from "../../llm/model.js";
 import type { AppConfig } from "../../config.js";
 import type { ModelSwitchService } from "../../services/model-switcher.js";
 
 interface InputAreaProps {
-  agentRef: React.MutableRefObject<Agent>;
+  model: Model;
   handleSubmit: (value: string) => Promise<boolean>;
   loadingRef: React.MutableRefObject<boolean>;
   config: AppConfig;
@@ -17,7 +17,7 @@ interface InputAreaProps {
 }
 
 export function InputArea({
-  agentRef,
+  model,
   handleSubmit,
   loadingRef,
   config,
@@ -79,7 +79,7 @@ export function InputArea({
       const handler = modeHandlers[input.mode];
       if (handler) {
         await handler(value, {
-          agentRef,
+          model,
           config,
           modelSwitchService,
           handleSubmit,
@@ -112,7 +112,7 @@ export function InputArea({
     },
     [
       input.mode,
-      agentRef,
+      model,
       config,
       modelSwitchService,
       handleSubmit,

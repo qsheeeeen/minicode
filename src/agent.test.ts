@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { EventEmitter } from "events";
 import { Model } from "./llm/model.js";
 import { SessionManager } from "./services/session-manager.js";
 import { ContextManager } from "./services/context-manager.js";
@@ -14,7 +13,7 @@ function makeTestModel() {
   return new Model("test-model", "test-provider", 200000);
 }
 
-function makeAgent(overrides?: {
+function makeDeps(overrides?: {
   client?: any;
   model?: Model;
   userPrompt?: string;
@@ -48,15 +47,15 @@ function makeAgent(overrides?: {
     permissionService,
     context,
   });
-  const agent = new Agent({
+  const deps: AgentDeps = {
     client,
     model,
     sessionManager,
     contextManager,
     toolExecutor,
     promptManager,
-  });
-  return { agent, context, sessionManager, contextManager, permissionService };
+  };
+  return { deps, context, sessionManager, contextManager, permissionService };
 }
 
 class MockStream implements AsyncIterable<any> {
@@ -198,9 +197,9 @@ vi.mock("./cli/skills/index.js", () => ({
   },
 }));
 
-import { Agent } from "./agent.js";
+import { runAgent, type AgentDeps } from "./agent.js";
 
-describe("Agent", () => {
+describe("runAgent", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(SessionPersistence, "getSessionDir").mockReturnValue("/tmp");
@@ -209,16 +208,16 @@ describe("Agent", () => {
     vi.restoreAllMocks();
   });
 
-  describe("constructor", () => {
+  describe("deps assembly", () => {
     it("initializes with default values", () => {
-      const { agent, sessionManager, contextManager } = makeAgent();
+      const { sessionManager, contextManager, deps } = makeDeps();
       expect(sessionManager.getSessionName()).toMatch(/^session-\d+$/);
       expect(contextManager.getTokenCount()).toBe(0);
-      expect(agent.model).toBeDefined();
+      expect(deps.model).toBeDefined();
     });
 
     it("initializes with config values", () => {
-      const { sessionManager } = makeAgent({ userPrompt: "custom" });
+      const { sessionManager } = makeDeps({ userPrompt: "custom" });
       sessionManager.setSession("test-session");
       expect(sessionManager.getSessionName()).toBe("test-session");
     });
@@ -226,14 +225,14 @@ describe("Agent", () => {
 
   describe("getMessages and setMessages", () => {
     it("setMessages stores blocks directly", () => {
-      const { context, sessionManager } = makeAgent();
+      const { context, sessionManager } = makeDeps();
       const messages: any[] = [{ type: "user", text: "hello" }];
       sessionManager.setMessages(messages);
       expect(context.getBlocks()).toEqual(messages);
     });
 
     it("getMessages returns context blocks", () => {
-      const { context } = makeAgent();
+      const { context } = makeDeps();
       context.startUserMessage("hello");
       expect(context.getBlocks()).toEqual([{ type: "user", text: "hello" }]);
     });
@@ -243,8 +242,9 @@ describe("Agent", () => {
     it("handles a basic text interaction", async () => {
       const stream = new MockStream();
       mockChatStream.mockReturnValueOnce(stream);
-      const { agent, context } = makeAgent();
-      const runPromise = agent.run("Hello agent");
+      const { deps, context } = makeDeps();
+      const ctrl = new AbortController();
+      const runPromise = runAgent(deps, "Hello agent", ctrl.signal);
       await new Promise((r) => setTimeout(r, 10));
 
       stream.emit("text", "Hi ");
@@ -269,8 +269,9 @@ describe("Agent", () => {
       const stream = new MockStream();
       mockChatStream.mockReturnValueOnce(stream);
       const thinkingModel = new Model("test-model", "test-provider", 200000);
-      const { agent, context } = makeAgent({ model: thinkingModel });
-      const runPromise = agent.run("Solve this");
+      const { deps, context } = makeDeps({ model: thinkingModel });
+      const ctrl = new AbortController();
+      const runPromise = runAgent(deps, "Solve this", ctrl.signal);
       await new Promise((r) => setTimeout(r, 10));
 
       stream.emit("thinking", "Hmm...");
@@ -295,8 +296,9 @@ describe("Agent", () => {
       const stream2 = new MockStream();
       mockChatStream.mockReturnValueOnce(stream1).mockReturnValueOnce(stream2);
 
-      const { agent, context } = makeAgent();
-      const runPromise = agent.run("Use tool");
+      const { deps, context } = makeDeps();
+      const ctrl = new AbortController();
+      const runPromise = runAgent(deps, "Use tool", ctrl.signal);
       await new Promise((r) => setTimeout(r, 10));
 
       stream1.emit("tool_use", {
@@ -338,39 +340,8 @@ describe("Agent", () => {
     });
   });
 
-  describe("isRunning guard", () => {
-    it("rejects concurrent run() calls, returns false", async () => {
-      const stream = new MockStream();
-      mockChatStream.mockReturnValueOnce(stream);
-      const { agent } = makeAgent();
-      const run1 = agent.run("First message");
-      const run2 = agent.run("Second message");
-      await expect(run2).resolves.toBe(false);
-      stream.resolveFinal({
-        usage: {
-          input: { total: 10, cache_miss: 0, cache_hit: 0 },
-          output: 20,
-        },
-        stop_reason: "end_turn",
-      });
-      await run1;
-      // After completion, new runs should work
-      const stream2 = new MockStream();
-      mockChatStream.mockReturnValueOnce(stream2);
-      const run3 = agent.run("Third message");
-      stream2.resolveFinal({
-        usage: {
-          input: { total: 10, cache_miss: 0, cache_hit: 0 },
-          output: 20,
-        },
-        stop_reason: "end_turn",
-      });
-      await expect(run3).resolves.toBe(true);
-    });
-  });
-
   describe("abort", () => {
-    it("aborts the current run", async () => {
+    it("aborts the current run via the passed signal", async () => {
       const stream = new MockStream();
       mockChatStream.mockImplementationOnce(
         (_msgs: any, _tools: any, opts: any) => {
@@ -379,17 +350,18 @@ describe("Agent", () => {
           return stream;
         },
       );
-      const { agent } = makeAgent();
-      const runPromise = agent.run("Hello");
+      const { deps } = makeDeps();
+      const ctrl = new AbortController();
+      const runPromise = runAgent(deps, "Hello", ctrl.signal);
       await new Promise((r) => setTimeout(r, 10));
-      agent.abort();
+      ctrl.abort();
       await expect(runPromise).rejects.toThrow("Aborted");
     });
   });
 
   describe("rejection", () => {
     it("in manual mode, rejection stops the conversation", async () => {
-      const { agent, context, sessionManager, permissionService } = makeAgent();
+      const { deps, context, sessionManager, permissionService } = makeDeps();
       const reportStatusSpy = vi.spyOn(sessionManager, "reportStatus");
       permissionService.setMode("manual");
 
@@ -401,7 +373,8 @@ describe("Agent", () => {
       const stream = new MockStream();
       mockChatStream.mockReturnValueOnce(stream);
 
-      const runPromise = agent.run("do something");
+      const ctrl = new AbortController();
+      const runPromise = runAgent(deps, "do something", ctrl.signal);
       await new Promise((r) => setTimeout(r, 10));
 
       stream.emit("tool_use", {
@@ -445,7 +418,7 @@ describe("Agent", () => {
     });
 
     it("in auto mode, rejection continues the conversation", async () => {
-      const { agent, context, permissionService } = makeAgent();
+      const { deps, context, permissionService } = makeDeps();
       permissionService.setMode("auto");
 
       vi.mocked(permissionService.check).mockResolvedValue({
@@ -476,7 +449,8 @@ describe("Agent", () => {
         return new MockStream();
       });
 
-      const runPromise = agent.run("do something risky");
+      const ctrl = new AbortController();
+      const runPromise = runAgent(deps, "do something risky", ctrl.signal);
       await new Promise((r) => setTimeout(r, 10));
 
       stream1.emit("tool_use", {

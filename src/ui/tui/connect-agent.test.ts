@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Agent } from "../../agent.js";
+import { runAgent, type AgentDeps } from "../../agent.js";
 import { Model } from "../../llm/model.js";
 import {
   VirtualLLMClient,
@@ -19,7 +19,7 @@ import { connectAgent } from "./connect-agent.js";
 import { useTuiState, initialState } from "./state.js";
 import { UITimeline } from "./timeline.js";
 
-function createTestAgent(responses = [defaultTextResponse("OK")]) {
+function createTestDeps(responses = [defaultTextResponse("OK")]) {
   const tools = new Map<string, ToolDef>([
     [
       "VirtualTool",
@@ -53,15 +53,15 @@ function createTestAgent(responses = [defaultTextResponse("OK")]) {
     permissionService: new PermissionService("yolo"),
     context: sessionManager.getContext(),
   });
-  const agent = new Agent({
+  const deps: AgentDeps = {
     client,
     model,
     sessionManager,
     contextManager,
     toolExecutor,
     promptManager,
-  });
-  return { agent, sessionManager, contextManager, runtimeEvents };
+  };
+  return { deps, sessionManager, contextManager, runtimeEvents };
 }
 
 describe("connectAgent", () => {
@@ -80,13 +80,12 @@ describe("connectAgent", () => {
     vi.restoreAllMocks();
   });
 
-  it("should update messages with assistant text after agent.run()", async () => {
-    const { agent, sessionManager, contextManager, runtimeEvents } =
-      createTestAgent([defaultTextResponse("Hello from assistant!")]);
+  it("should update messages with assistant text after runAgent()", async () => {
+    const { deps, sessionManager, contextManager, runtimeEvents } =
+      createTestDeps([defaultTextResponse("Hello from assistant!")]);
     const registry = new AgentRegistry();
 
     const result = connectAgent({
-      agent,
       sessionManager,
       contextManager,
       runtimeEvents,
@@ -97,7 +96,7 @@ describe("connectAgent", () => {
     cleanup = result.cleanup;
 
     // Run the agent
-    await agent.run("Hi there");
+    await runAgent(deps, "Hi there", new AbortController().signal);
 
     // Verify UI state received messages.
     const state = useTuiState.getState();
@@ -117,8 +116,8 @@ describe("connectAgent", () => {
   });
 
   it("should update messages for context changes during streaming", async () => {
-    const { agent, sessionManager, contextManager, runtimeEvents } =
-      createTestAgent([defaultTextResponse("Streaming text")]);
+    const { deps, sessionManager, contextManager, runtimeEvents } =
+      createTestDeps([defaultTextResponse("Streaming text")]);
     const registry = new AgentRegistry();
 
     const snapshots: DisplayMessage[][] = [];
@@ -127,7 +126,6 @@ describe("connectAgent", () => {
     });
 
     const result = connectAgent({
-      agent,
       sessionManager,
       contextManager,
       runtimeEvents,
@@ -137,7 +135,7 @@ describe("connectAgent", () => {
     });
     cleanup = result.cleanup;
 
-    await agent.run("Hello");
+    await runAgent(deps, "Hello", new AbortController().signal);
     unsubscribe();
 
     expect(snapshots.length).toBeGreaterThanOrEqual(2);
@@ -149,12 +147,10 @@ describe("connectAgent", () => {
   });
 
   it("should update token count when agent token count changes", () => {
-    const { agent, sessionManager, contextManager, runtimeEvents } =
-      createTestAgent();
+    const { sessionManager, contextManager, runtimeEvents } = createTestDeps();
     const registry = new AgentRegistry();
 
     const result = connectAgent({
-      agent,
       sessionManager,
       contextManager,
       runtimeEvents,
@@ -171,12 +167,10 @@ describe("connectAgent", () => {
   });
 
   it("should register main agent in registry", () => {
-    const { agent, sessionManager, contextManager, runtimeEvents } =
-      createTestAgent();
+    const { sessionManager, contextManager, runtimeEvents } = createTestDeps();
     const registry = new AgentRegistry();
 
     const result = connectAgent({
-      agent,
       sessionManager,
       contextManager,
       runtimeEvents,
@@ -190,17 +184,15 @@ describe("connectAgent", () => {
     expect(sessions).toHaveLength(1);
     expect(sessions[0].id).toBe("1");
     expect(sessions[0].type).toBe("main");
-    expect(sessions[0].agent).toBe(agent);
     expect(sessions[0].context).toBe(sessionManager.getContext());
   });
 
   it("should unsubscribe on cleanup", async () => {
-    const { agent, sessionManager, contextManager, runtimeEvents } =
-      createTestAgent([defaultTextResponse("After cleanup")]);
+    const { deps, sessionManager, contextManager, runtimeEvents } =
+      createTestDeps([defaultTextResponse("After cleanup")]);
     const registry = new AgentRegistry();
 
     const result = connectAgent({
-      agent,
       sessionManager,
       contextManager,
       runtimeEvents,
@@ -216,7 +208,7 @@ describe("connectAgent", () => {
     useTuiState.setState({ messages: [] });
 
     // Run agent after cleanup
-    await agent.run("After cleanup");
+    await runAgent(deps, "After cleanup", new AbortController().signal);
 
     // Messages should not update after the subscription is removed.
     const state = useTuiState.getState();

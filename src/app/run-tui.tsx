@@ -5,7 +5,7 @@ import { App } from "../ui/tui.js";
 export async function runTuiApp(app: AppRuntime): Promise<void> {
   render(
     <App
-      agent={app.agent}
+      deps={app.deps}
       config={app.config}
       version={app.version}
       promptFiles={app.promptFiles}

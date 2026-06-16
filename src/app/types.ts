@@ -1,4 +1,4 @@
-import type { Agent } from "../agent.js";
+import type { AgentDeps } from "../agent.js";
 import type { AppConfig } from "../config.js";
 import type { AgentRegistry, SessionStats } from "../services/index.js";
 import type { RuntimeEvents } from "../services/runtime-events.js";
@@ -10,7 +10,7 @@ import type { SessionManager } from "../services/session-manager.js";
 import type { CommandContext } from "../ui/commands/index.js";
 
 export interface AppRuntime {
-  readonly agent: Agent;
+  readonly deps: AgentDeps;
   readonly config: AppConfig;
   readonly version: string;
   readonly promptFiles: string[];

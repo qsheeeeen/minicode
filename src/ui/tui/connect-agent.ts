@@ -8,7 +8,6 @@
  * Called once from the App component's useEffect. Returns a cleanup
  * function for unsubscription.
  */
-import type { Agent } from "../../agent.js";
 import type { AgentRegistry } from "../../services/index.js";
 import type { SessionManager } from "../../services/session-manager.js";
 import type { UserPrompter, Prompt } from "../../tools/registry.js";
@@ -27,7 +26,6 @@ class CallbackPrompter implements UserPrompter {
 }
 
 export interface ConnectAgentOptions {
-  agent: Agent;
   sessionManager: SessionManager;
   contextManager: ContextManager;
   runtimeEvents: RuntimeEvents;
@@ -43,7 +41,6 @@ export function connectAgent(options: ConnectAgentOptions): {
   prompter: UserPrompter;
 } {
   const {
-    agent,
     sessionManager,
     contextManager,
     runtimeEvents,
@@ -79,9 +76,9 @@ export function connectAgent(options: ConnectAgentOptions): {
   const unsubStore = context.onChange(() => uiTimeline.sync());
 
   // 4. Register main agent in the registry
-  registry.register({ id: "1", type: "main", agent, context, status: "idle" });
+  registry.register({ id: "1", type: "main", context, status: "idle" });
   useTuiState.setState({
-    agentSessions: [{ id: "1", type: "main", agent, context, status: "idle" }],
+    agentSessions: [{ id: "1", type: "main", context, status: "idle" }],
   });
 
   // 5. Load initial session (async — onChange subscription will push updates)
