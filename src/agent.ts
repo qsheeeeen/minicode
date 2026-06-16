@@ -41,8 +41,14 @@ export interface RunAgentOpts {
   prompter?: UserPrompter;
 }
 
-function throwIfAborted(signal: AbortSignal): void {
-  if (signal.aborted) throw new Error("Aborted");
+/** True for the AbortError raised by signal.throwIfAborted(). */
+export function isAbortError(e: unknown): boolean {
+  return (
+    typeof e === "object" &&
+    e !== null &&
+    "name" in e &&
+    (e as { name: unknown }).name === "AbortError"
+  );
 }
 
 async function saveStore(deps: AgentDeps): Promise<void> {
@@ -80,7 +86,7 @@ async function streamLLM(
   let result: LLMStreamResult | undefined;
   try {
     while (true) {
-      if (signal.aborted) throw new Error("Aborted");
+      signal.throwIfAborted();
 
       const next = await stream.next();
       if (next.done) {
@@ -100,10 +106,10 @@ async function streamLLM(
       }
     }
 
-    if (signal.aborted) throw new Error("Aborted");
+    signal.throwIfAborted();
     if (!result) throw new Error("Stream closed without returning a result");
   } catch (e) {
-    if (signal.aborted) throw new Error("Aborted");
+    signal.throwIfAborted();
     throw e;
   } finally {
     saveStore(deps);
@@ -131,7 +137,7 @@ export async function runAgent(
 
   try {
     while (true) {
-      throwIfAborted(signal);
+      signal.throwIfAborted();
 
       const toolDefs = [...deps.toolExecutor.getTools().values()].map((t) => ({
         name: t.name,
@@ -154,7 +160,7 @@ export async function runAgent(
         "LLM response",
       );
 
-      throwIfAborted(signal);
+      signal.throwIfAborted();
 
       const toolContext: ToolExecutionContext = {
         registry: deps.agentRegistry,

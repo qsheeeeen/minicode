@@ -1,6 +1,6 @@
 import React, { useCallback, useRef, useEffect } from "react";
 import { Box, useInput, useApp } from "ink";
-import { runAgent, type AgentDeps } from "../agent.js";
+import { runAgent, isAbortError, type AgentDeps } from "../agent.js";
 import type { AppConfig } from "../config.js";
 import type { UserPrompter } from "../tools/registry.js";
 import { routeInput } from "./routing.js";
@@ -196,7 +196,7 @@ function AppContent({
         });
         return true;
       } catch (e) {
-        if (e instanceof Error && e.message === "Aborted") {
+        if (isAbortError(e)) {
           sessionManager.reportStatus({
             role: "status",
             content: "(Aborted)",

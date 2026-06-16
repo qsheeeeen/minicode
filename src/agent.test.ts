@@ -355,7 +355,7 @@ describe("runAgent", () => {
       const runPromise = runAgent(deps, "Hello", ctrl.signal);
       await new Promise((r) => setTimeout(r, 10));
       ctrl.abort();
-      await expect(runPromise).rejects.toThrow("Aborted");
+      await expect(runPromise).rejects.toMatchObject({ name: "AbortError" });
     });
   });
 

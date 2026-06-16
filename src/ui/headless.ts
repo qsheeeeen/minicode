@@ -1,6 +1,5 @@
 import fs from "fs";
-import type { AgentDeps } from "../agent.js";
-import { runAgent } from "../agent.js";
+import { runAgent, isAbortError, type AgentDeps } from "../agent.js";
 import type { UserPrompter, Prompt } from "../tools/registry.js";
 import type { CommandContext } from "./commands/index.js";
 import { routeInput } from "./routing.js";
@@ -116,7 +115,7 @@ export async function runHeadless(
     });
     renderer.renderFinal();
   } catch (e) {
-    if (e instanceof Error && e.message === "Aborted") {
+    if (isAbortError(e)) {
       console.log("(Aborted)");
     } else if (e instanceof Error) {
       console.error(`(Error: ${e.message})`);

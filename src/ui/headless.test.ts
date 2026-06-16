@@ -2,9 +2,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const { mockRun } = vi.hoisted(() => ({ mockRun: vi.fn() }));
 
-vi.mock("../agent.js", () => ({
-  runAgent: mockRun,
-}));
+vi.mock("../agent.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../agent.js")>();
+  return { ...actual, runAgent: mockRun };
+});
 
 const mockOnChange = vi.fn().mockReturnValue(() => {});
 const mockSubscribe = vi.fn().mockReturnValue(() => {});
@@ -89,7 +90,9 @@ describe("runHeadless", () => {
   });
 
   it("handles Aborted error", async () => {
-    mockRun.mockRejectedValueOnce(new Error("Aborted"));
+    const abortErr = new Error("aborted");
+    abortErr.name = "AbortError";
+    mockRun.mockRejectedValueOnce(abortErr);
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     await runHeadless(mockDeps, "test prompt", mockRuntimeEvents as any);
     expect(logSpy).toHaveBeenCalledWith("(Aborted)");
