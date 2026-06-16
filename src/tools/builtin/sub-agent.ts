@@ -90,6 +90,9 @@ export const agentTool: ToolDef = {
       tools: getSubAgentTools(),
       permissionService: new PermissionService("manual"),
       context: sessionManager.getContext(),
+      registry,
+      appConfig,
+      currentAgentId: subId,
     });
     const subDeps: AgentDeps = {
       client: subClient,
@@ -98,9 +101,6 @@ export const agentTool: ToolDef = {
       contextManager,
       toolExecutor,
       promptManager,
-      agentRegistry: registry,
-      currentAgentId: subId,
-      appConfig: appConfig!,
     };
 
     const subController = new AbortController();

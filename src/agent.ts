@@ -1,18 +1,11 @@
 import type { Model } from "./llm/model.js";
 import type { LLMClient, LLMToolDef, LLMStreamResult } from "./llm/client.js";
-import {
-  type ToolExecutionContext,
-  ToolDeniedError,
-} from "./tools/index.js";
+import { ToolDeniedError } from "./tools/index.js";
 import type { ToolExecutor, ToolCall } from "./tools/executor.js";
 import type { UserPrompter } from "./tools/registry.js";
-import type { AgentRegistry } from "./services/agent-registry.js";
 import type { PromptManager } from "./services/prompt-manager.js";
 import type { SessionManager } from "./services/session-manager.js";
 import type { ContextManager } from "./services/context-manager.js";
-import type { AppConfig } from "./config.js";
-import type { ModelSwitchService } from "./services/model-switcher.js";
-import type { ShellService } from "./services/shell-service.js";
 import type pino from "pino";
 
 /**
@@ -29,11 +22,6 @@ export interface AgentDeps {
   contextManager: ContextManager;
   toolExecutor: ToolExecutor;
   promptManager: PromptManager;
-  appConfig?: AppConfig;
-  agentRegistry?: AgentRegistry;
-  currentAgentId?: string;
-  modelSwitchService?: ModelSwitchService;
-  shellService?: ShellService;
 }
 
 export interface RunAgentOpts {
@@ -162,32 +150,19 @@ export async function runAgent(
 
       signal.throwIfAborted();
 
-      const toolContext: ToolExecutionContext = {
-        registry: deps.agentRegistry,
-        signal,
-        config: {
-          client: deps.client,
-          model: deps.model,
-          userPrompt: deps.promptManager.getUserPrompt(),
-        },
-        appConfig: deps.appConfig,
-        currentAgentId: deps.currentAgentId ?? "1",
-        changeJournal: deps.sessionManager.getChangeJournal(),
-        activeUserMessageOrdinal:
-          deps.sessionManager.getActiveUserMessageOrdinal(),
-        prompter: opts?.prompter,
-        services: {
-          modelSwitcher: deps.modelSwitchService,
-          shell: deps.shellService,
-        },
-      };
-
       try {
-        await deps.toolExecutor.execute(
-          toolCalls,
-          toolContext,
-          deps.sessionManager.getActiveUserMessageOrdinal(),
-        );
+        await deps.toolExecutor.execute(toolCalls, {
+          signal,
+          config: {
+            client: deps.client,
+            model: deps.model,
+            userPrompt: deps.promptManager.getUserPrompt(),
+          },
+          prompter: opts?.prompter,
+          activeUserMessageOrdinal:
+            deps.sessionManager.getActiveUserMessageOrdinal(),
+          changeJournal: deps.sessionManager.getChangeJournal(),
+        });
       } catch (e) {
         if (e instanceof ToolDeniedError) {
           deps.sessionManager.reportStatus({

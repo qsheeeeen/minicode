@@ -19,7 +19,7 @@ import { SessionManager } from "../services/session-manager.js";
 import { SessionPersistence } from "../services/session-persistence.js";
 import { switchSession } from "../services/session-lifecycle.js";
 import { ShellService } from "../services/shell-service.js";
-import { ToolExecutor } from "../tools/executor.js";
+import { ToolExecutor, type ToolExecutorServices } from "../tools/executor.js";
 import { getAll } from "../tools/index.js";
 import { createLogger } from "../utils/logger.js";
 import { loadGlobalPrompt } from "../utils/prompts.js";
@@ -140,10 +140,17 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
       tools.delete(name);
     }
   }
+  // services is a shared mutable object so modelSwitcher can be filled in
+  // after the executor is constructed (it has a circular dep on deps).
+  const services: ToolExecutorServices = { shell: shellService };
   const toolExecutor = new ToolExecutor({
     tools,
     permissionService,
     context: sessionManager.getContext(),
+    registry: agentRegistry,
+    appConfig: config,
+    currentAgentId: "1",
+    services,
   });
 
   // deps is a shared mutable bag: modelSwitchService writes client/model,
@@ -156,8 +163,6 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
     contextManager,
     toolExecutor,
     promptManager,
-    appConfig: config,
-    agentRegistry,
   };
 
   const modelSwitchService = new ModelSwitchService({
@@ -170,8 +175,7 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
     },
     permissionService,
   });
-  deps.modelSwitchService = modelSwitchService;
-  deps.shellService = shellService;
+  services.modelSwitcher = modelSwitchService;
 
   sessionManager.setSession(initialSession);
 

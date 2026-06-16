@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
-import { ToolExecutor, type ToolCall } from "./executor.js";
+import { ToolExecutor, type ToolCall, type ToolExecutionDynamic } from "./executor.js";
 import { PermissionService } from "../services/permission.js";
 import { LLMContext } from "../llm/context.js";
-import type { ToolDef, ToolExecutionContext } from "./registry.js";
+import type { ToolDef } from "./registry.js";
 import { ToolDeniedError } from "./registry.js";
 
 function makeTool(overrides?: Partial<ToolDef>): ToolDef {
@@ -35,10 +35,11 @@ function makeExecutor(overrides?: {
   return { executor, tools, permissionService, context };
 }
 
-function makeContext(): ToolExecutionContext {
+function makeDynamic(): ToolExecutionDynamic {
   return {
-    registry: undefined,
+    signal: new AbortController().signal,
     config: {
+      client: {} as any,
       model: {
         getName: () => "test-model",
         getProvider: () => "test",
@@ -50,9 +51,6 @@ function makeContext(): ToolExecutionContext {
       } as any,
       userPrompt: "",
     },
-    currentAgentId: "1",
-    signal: undefined,
-    prompter: undefined,
   };
 }
 
@@ -102,7 +100,7 @@ describe("ToolExecutor", () => {
     it("does nothing with empty tool calls", async () => {
       const { executor, context } = makeExecutor();
       const spy = vi.spyOn(context, "completeToolCall");
-      await executor.execute([], makeContext(), 1);
+      await executor.execute([], makeDynamic());
       expect(spy).not.toHaveBeenCalled();
     });
 
@@ -115,7 +113,7 @@ describe("ToolExecutor", () => {
       prepareToolCalls(context, [call]);
       const spy = vi.spyOn(context, "completeToolCall");
 
-      await executor.execute([call], makeContext(), 1);
+      await executor.execute([call], makeDynamic());
 
       expect(tool.execute).toHaveBeenCalled();
       expect(spy).toHaveBeenCalledWith("call_1", "ok");
@@ -127,7 +125,7 @@ describe("ToolExecutor", () => {
       prepareToolCalls(context, [call]);
       const spy = vi.spyOn(context, "completeToolCall");
 
-      await executor.execute([call], makeContext(), 1);
+      await executor.execute([call], makeDynamic());
 
       expect(spy).toHaveBeenCalledWith(
         "call_1",
@@ -153,7 +151,7 @@ describe("ToolExecutor", () => {
       const call = makeToolCall(tool);
       prepareToolCalls(context, [call]);
 
-      await expect(executor.execute([call], makeContext(), 1)).rejects.toThrow(
+      await expect(executor.execute([call], makeDynamic())).rejects.toThrow(
         ToolDeniedError,
       );
     });
@@ -176,7 +174,7 @@ describe("ToolExecutor", () => {
         reason: "too risky",
       });
 
-      await executor.execute([call], makeContext(), 1);
+      await executor.execute([call], makeDynamic());
 
       expect(spy).toHaveBeenCalledWith(
         "call_1",
@@ -196,7 +194,7 @@ describe("ToolExecutor", () => {
       prepareToolCalls(context, [call]);
       const spy = vi.spyOn(context, "completeToolCall");
 
-      await executor.execute([call], makeContext(), 1);
+      await executor.execute([call], makeDynamic());
 
       expect(spy).toHaveBeenCalledWith("call_1", "Error: boom");
     });
@@ -217,7 +215,7 @@ describe("ToolExecutor", () => {
       prepareToolCalls(context, calls);
       const spy = vi.spyOn(context, "completeToolCall");
 
-      await executor.execute(calls, makeContext(), 1);
+      await executor.execute(calls, makeDynamic());
 
       expect(tool1.execute).toHaveBeenCalled();
       expect(tool2.execute).toHaveBeenCalled();

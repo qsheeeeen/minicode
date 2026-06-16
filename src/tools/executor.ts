@@ -1,7 +1,17 @@
-import type { ToolDef, ToolExecutionContext } from "./registry.js";
+import type {
+  ToolDef,
+  ToolExecutionContext,
+  ToolConfig,
+  UserPrompter,
+} from "./registry.js";
 import { ToolDeniedError } from "./registry.js";
 import type { LLMToolUseBlock } from "../llm/client.js";
 import type { LLMContext } from "../llm/context.js";
+import type { ChangeJournal } from "../services/change-journal.js";
+import type { AgentRegistry } from "../services/agent-registry.js";
+import type { AppConfig } from "../config.js";
+import type { ModelSwitchService } from "../services/model-switcher.js";
+import type { ShellService } from "../services/shell-service.js";
 import {
   PermissionService,
   type PermissionMode,
@@ -14,11 +24,32 @@ export interface ToolCall {
   tool?: ToolDef;
 }
 
+export interface ToolExecutorServices {
+  modelSwitcher?: ModelSwitchService;
+  shell?: ShellService;
+}
+
 export interface ToolExecutorOpts {
   readonly tools: Map<string, ToolDef>;
   readonly permissionService: PermissionService;
   readonly context: LLMContext;
   readonly logger?: pino.Logger;
+  // Stable execution environment — constant for the executor's lifetime.
+  // `services` is a shared mutable object so the caller can fill in
+  // `modelSwitcher` after construction (it has a circular dep on deps).
+  readonly registry?: AgentRegistry;
+  readonly appConfig?: AppConfig;
+  readonly currentAgentId?: string;
+  readonly services?: ToolExecutorServices;
+}
+
+/** Per-invocation inputs that can change between execute() calls. */
+export interface ToolExecutionDynamic {
+  signal: AbortSignal;
+  config: ToolConfig;
+  prompter?: UserPrompter;
+  activeUserMessageOrdinal?: number;
+  changeJournal?: ChangeJournal;
 }
 
 /**
@@ -30,12 +61,20 @@ export class ToolExecutor {
   private permissionService: PermissionService;
   private context: LLMContext;
   private logger?: pino.Logger;
+  private registry?: AgentRegistry;
+  private appConfig?: AppConfig;
+  private currentAgentId?: string;
+  private services?: ToolExecutorServices;
 
   constructor(opts: ToolExecutorOpts) {
     this.tools = opts.tools;
     this.permissionService = opts.permissionService;
     this.context = opts.context;
     this.logger = opts.logger;
+    this.registry = opts.registry;
+    this.appConfig = opts.appConfig;
+    this.currentAgentId = opts.currentAgentId;
+    this.services = opts.services;
   }
 
   /**
@@ -72,10 +111,21 @@ export class ToolExecutor {
    */
   async execute(
     toolCalls: ToolCall[],
-    context: ToolExecutionContext,
-    _activeUserMessageOrdinal: number,
+    dynamic: ToolExecutionDynamic,
   ): Promise<void> {
     if (toolCalls.length === 0) return;
+
+    const context: ToolExecutionContext = {
+      registry: this.registry,
+      appConfig: this.appConfig,
+      currentAgentId: this.currentAgentId ?? "1",
+      services: this.services,
+      signal: dynamic.signal,
+      config: dynamic.config,
+      prompter: dynamic.prompter,
+      activeUserMessageOrdinal: dynamic.activeUserMessageOrdinal,
+      changeJournal: dynamic.changeJournal,
+    };
 
     this.logger?.info(
       {
