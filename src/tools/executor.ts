@@ -10,7 +10,6 @@ import type { LLMContext } from "../llm/context.js";
 import type { ChangeJournal } from "../services/change-journal.js";
 import type { AgentRegistry } from "../services/agent-registry.js";
 import type { AppConfig } from "../config.js";
-import type { ModelSwitchService } from "../services/model-switcher.js";
 import type { ShellService } from "../services/shell-service.js";
 import {
   PermissionService,
@@ -25,7 +24,6 @@ export interface ToolCall {
 }
 
 export interface ToolExecutorServices {
-  modelSwitcher?: ModelSwitchService;
   shell?: ShellService;
 }
 
@@ -35,8 +33,6 @@ export interface ToolExecutorOpts {
   readonly context: LLMContext;
   readonly logger?: pino.Logger;
   // Stable execution environment — constant for the executor's lifetime.
-  // `services` is a shared mutable object so the caller can fill in
-  // `modelSwitcher` after construction (it has a circular dep on deps).
   readonly registry?: AgentRegistry;
   readonly appConfig?: AppConfig;
   readonly currentAgentId?: string;

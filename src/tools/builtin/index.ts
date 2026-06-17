@@ -8,4 +8,3 @@ import "./grep.js";
 import "./sub-agent.js";
 import "./load-skill.js";
 import "./ask-user.js";
-import "./set-model.js";

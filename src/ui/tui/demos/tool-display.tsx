@@ -47,7 +47,6 @@ function Demo() {
         name="AskUser"
         input={{ question: "Which database should we use?" }}
       />
-      <ToolDisplay name="SetModel" input={{ tier: "flash" }} />
     </Box>
   );
 }
