@@ -1,13 +1,5 @@
-import {
-  createDefaultShellService,
-  type ShellService,
-} from "../../services/shell-service.js";
 import type { ToolDef, ToolResult, ToolExecutionContext } from "../registry.js";
 import { register } from "../registry.js";
-
-function getShell(context?: ToolExecutionContext): ShellService {
-  return context?.services?.shell ?? createDefaultShellService();
-}
 
 export const shellTool: ToolDef = {
   name: "Shell",
@@ -27,10 +19,13 @@ export const shellTool: ToolDef = {
     args: Record<string, unknown>,
     context?: ToolExecutionContext,
   ): Promise<ToolResult> => {
+    const shell = context?.shell;
+    if (!shell) {
+      return { output: "Error: shell service not available" };
+    }
     try {
       const command = args.command as string;
       const timeout = args.timeout as number | undefined;
-      const shell = getShell(context);
       const result = await shell.run(command, {
         timeoutMs: timeout ? timeout * 1000 : undefined,
         signal: context?.signal,

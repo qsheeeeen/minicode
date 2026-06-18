@@ -14,6 +14,7 @@ import type { RuntimeEvents } from "../services/runtime-events.js";
 import type { SessionStats } from "../services/session-stats.js";
 import type { SessionManager } from "../services/session-manager.js";
 import type { PermissionService } from "../services/permission.js";
+import type { ShellService } from "../services/shell-service.js";
 import type { ModelSwitchService } from "../services/model-switcher.js";
 import type { ContextManager } from "../services/context-manager.js";
 import type { LLMContext } from "../llm/context.js";
@@ -52,6 +53,7 @@ export interface AppProps {
   modelSwitchService: ModelSwitchService;
   context: LLMContext;
   permissionService: PermissionService;
+  shellService: ShellService;
 }
 
 function AppContent({
@@ -69,6 +71,7 @@ function AppContent({
   modelSwitchService,
   context,
   permissionService,
+  shellService,
   prompterRef,
   uiTimeline,
 }: AppProps & {
@@ -172,8 +175,8 @@ function AppContent({
       const route = await routeInput(value, cmdContext());
       const processed = processRoute(
         route,
-        value,
         context,
+        shellService,
         sessionManager.reportStatus.bind(sessionManager),
       );
 

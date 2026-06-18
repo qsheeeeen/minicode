@@ -45,9 +45,7 @@ export interface ToolExecutionContext {
   changeJournal?: ChangeJournal;
   activeUserMessageOrdinal?: number;
   prompter?: UserPrompter;
-  services?: {
-    shell?: ShellService;
-  };
+  shell?: ShellService;
 }
 
 export interface ToolResult {

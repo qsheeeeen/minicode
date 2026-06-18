@@ -14,6 +14,7 @@ function makeApp() {
     sessionName: "session-name",
     resumeRecent: false,
     commandContext: { id: "command-context" },
+    shellService: { id: "shell-service" },
   } as any;
 }
 
@@ -27,6 +28,7 @@ describe("runHeadlessApp", () => {
       app.deps,
       app.initialPrompt,
       app.runtimeEvents,
+      app.shellService,
       app.sessionName,
       app.resumeRecent,
       app.commandContext,

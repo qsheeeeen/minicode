@@ -1,9 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("../services/index.js", () => ({
-  runShell: vi.fn().mockReturnValue("shell output"),
-}));
-
 vi.mock("./commands/index.js", () => ({
   executeCommand: vi.fn(),
 }));

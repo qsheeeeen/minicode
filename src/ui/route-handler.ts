@@ -1,7 +1,7 @@
 import type { RouteResult } from "./routing.js";
 import type { LLMContext } from "../llm/context.js";
 import type { StatusReporter } from "../services/session-manager.js";
-import { runShell } from "../services/index.js";
+import type { ShellService } from "../services/shell-service.js";
 
 export interface ShellOutput {
   command: string;
@@ -21,8 +21,8 @@ export type ProcessedRoute =
  */
 export function processRoute(
   route: RouteResult,
-  rawInput: string,
   context: LLMContext,
+  shellService: ShellService,
   reportStatus?: StatusReporter,
 ): ProcessedRoute {
   if (route.action === "none") {
@@ -31,7 +31,7 @@ export function processRoute(
 
   if (route.action === "shell") {
     const command = route.promptText!;
-    const output = runShell(command);
+    const output = shellService.runSync(command);
 
     // Inject into LLM context so the agent sees the command + result
     context.startUserMessage(`Ran: ${command}\n\n\`\`\`\n${output}\n\`\`\``);

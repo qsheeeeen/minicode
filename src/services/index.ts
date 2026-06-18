@@ -4,4 +4,3 @@ export { ModelSwitchService } from "./model-switcher.js";
 export { SessionStats } from "./session-stats.js";
 export { ShellService } from "./shell-service.js";
 export { RuntimeEvents, type RuntimeEvent } from "./runtime-events.js";
-export { runShell } from "./shell.js";

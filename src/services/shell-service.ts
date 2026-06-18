@@ -102,7 +102,3 @@ export class ShellService {
     return `${output.slice(0, this.maxOutputBytes)}\n[output truncated]`;
   }
 }
-
-export function createDefaultShellService(): ShellService {
-  return new ShellService({ cwd: process.cwd() });
-}

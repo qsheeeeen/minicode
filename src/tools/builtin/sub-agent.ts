@@ -93,6 +93,7 @@ export const agentTool: ToolDef = {
       registry,
       appConfig,
       currentAgentId: subId,
+      shell: context?.shell,
     });
     const subDeps: AgentDeps = {
       client: subClient,

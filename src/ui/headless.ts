@@ -5,6 +5,7 @@ import type { CommandContext } from "./commands/index.js";
 import { routeInput } from "./routing.js";
 import { processRoute } from "./route-handler.js";
 import { SessionPersistence } from "../services/session-persistence.js";
+import type { ShellService } from "../services/shell-service.js";
 import type { RuntimeEvents } from "../services/runtime-events.js";
 import { HeadlessRenderer } from "./headless-renderer.js";
 
@@ -12,6 +13,7 @@ export async function runHeadless(
   deps: AgentDeps,
   initialPrompt: string | undefined,
   runtimeEvents: RuntimeEvents,
+  shellService: ShellService,
   sessionName?: string,
   resumeRecent?: boolean,
   cmdContext?: CommandContext,
@@ -95,8 +97,8 @@ export async function runHeadless(
     const route = await routeInput(initialPrompt, cmdContext);
     const processed = processRoute(
       route,
-      initialPrompt,
       context,
+      shellService,
       sessionManager.reportStatus.bind(sessionManager),
     );
 

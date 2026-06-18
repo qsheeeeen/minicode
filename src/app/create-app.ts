@@ -147,7 +147,7 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
     registry: agentRegistry,
     appConfig: config,
     currentAgentId: "1",
-    services: { shell: shellService },
+    shell: shellService,
   });
 
   // deps is a shared mutable bag: modelSwitchService writes client/model,

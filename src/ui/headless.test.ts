@@ -38,6 +38,8 @@ const mockDeps = {
   promptManager: {},
 } as any;
 
+const mockShellService = { runSync: vi.fn().mockReturnValue("output") };
+
 import { runHeadless } from "./headless.js";
 
 describe("runHeadless", () => {
@@ -60,7 +62,7 @@ describe("runHeadless", () => {
 
   it("calls runAgent with prompter that returns empty string", async () => {
     mockRun.mockResolvedValueOnce(true);
-    await runHeadless(mockDeps, "test prompt", mockRuntimeEvents as any);
+    await runHeadless(mockDeps, "test prompt", mockRuntimeEvents as any, mockShellService);
 
     expect(mockRun).toHaveBeenCalledWith(
       mockDeps,
@@ -80,7 +82,7 @@ describe("runHeadless", () => {
 
   it("calls runAgent with initial prompt", async () => {
     mockRun.mockResolvedValueOnce(true);
-    await runHeadless(mockDeps, "test prompt", mockRuntimeEvents as any);
+    await runHeadless(mockDeps, "test prompt", mockRuntimeEvents as any, mockShellService);
     expect(mockRun).toHaveBeenCalledWith(
       mockDeps,
       "test prompt",
@@ -94,7 +96,7 @@ describe("runHeadless", () => {
     abortErr.name = "AbortError";
     mockRun.mockRejectedValueOnce(abortErr);
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-    await runHeadless(mockDeps, "test prompt", mockRuntimeEvents as any);
+    await runHeadless(mockDeps, "test prompt", mockRuntimeEvents as any, mockShellService);
     expect(logSpy).toHaveBeenCalledWith("(Aborted)");
     logSpy.mockRestore();
   });
@@ -102,7 +104,7 @@ describe("runHeadless", () => {
   it("handles generic error", async () => {
     mockRun.mockRejectedValueOnce(new Error("test error"));
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    await runHeadless(mockDeps, "test prompt", mockRuntimeEvents as any);
+    await runHeadless(mockDeps, "test prompt", mockRuntimeEvents as any, mockShellService);
     expect(errSpy).toHaveBeenCalledWith("(Error: test error)");
     errSpy.mockRestore();
   });
@@ -110,7 +112,7 @@ describe("runHeadless", () => {
   it("throws non-Error objects", async () => {
     mockRun.mockRejectedValueOnce("string error");
     await expect(
-      runHeadless(mockDeps, "test prompt", mockRuntimeEvents as any),
+      runHeadless(mockDeps, "test prompt", mockRuntimeEvents as any, mockShellService),
     ).rejects.toBe("string error");
   });
 });

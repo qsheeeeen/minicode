@@ -23,10 +23,6 @@ export interface ToolCall {
   tool?: ToolDef;
 }
 
-export interface ToolExecutorServices {
-  shell?: ShellService;
-}
-
 export interface ToolExecutorOpts {
   readonly tools: Map<string, ToolDef>;
   readonly permissionService: PermissionService;
@@ -36,7 +32,7 @@ export interface ToolExecutorOpts {
   readonly registry?: AgentRegistry;
   readonly appConfig?: AppConfig;
   readonly currentAgentId?: string;
-  readonly services?: ToolExecutorServices;
+  readonly shell?: ShellService;
 }
 
 /** Per-invocation inputs that can change between execute() calls. */
@@ -60,7 +56,7 @@ export class ToolExecutor {
   private registry?: AgentRegistry;
   private appConfig?: AppConfig;
   private currentAgentId?: string;
-  private services?: ToolExecutorServices;
+  private shell?: ShellService;
 
   constructor(opts: ToolExecutorOpts) {
     this.tools = opts.tools;
@@ -70,7 +66,7 @@ export class ToolExecutor {
     this.registry = opts.registry;
     this.appConfig = opts.appConfig;
     this.currentAgentId = opts.currentAgentId;
-    this.services = opts.services;
+    this.shell = opts.shell;
   }
 
   /**
@@ -115,7 +111,7 @@ export class ToolExecutor {
       registry: this.registry,
       appConfig: this.appConfig,
       currentAgentId: this.currentAgentId ?? "1",
-      services: this.services,
+      shell: this.shell,
       signal: dynamic.signal,
       config: dynamic.config,
       prompter: dynamic.prompter,

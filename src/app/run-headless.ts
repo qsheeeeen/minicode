@@ -6,6 +6,7 @@ export async function runHeadlessApp(app: AppRuntime): Promise<void> {
     app.deps,
     app.initialPrompt,
     app.runtimeEvents,
+    app.shellService,
     app.sessionName,
     app.resumeRecent,
     app.commandContext,

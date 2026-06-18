@@ -22,6 +22,7 @@ export async function runTuiApp(app: AppRuntime): Promise<void> {
       contextManager={app.contextManager}
       context={app.sessionManager.getContext()}
       permissionService={app.permissionService}
+      shellService={app.shellService}
     />,
     { exitOnCtrlC: false },
   );

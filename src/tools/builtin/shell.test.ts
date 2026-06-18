@@ -3,17 +3,15 @@ import { shellTool } from "./shell.js";
 
 function makeContext(output = "output") {
   return {
-    services: {
-      shell: {
-        run: vi.fn().mockResolvedValue({
-          stdout: output,
-          stderr: "",
-          exitCode: 0,
-          timedOut: false,
-          aborted: false,
-        }),
-        formatResult: vi.fn().mockReturnValue(output),
-      },
+    shell: {
+      run: vi.fn().mockResolvedValue({
+        stdout: output,
+        stderr: "",
+        exitCode: 0,
+        timedOut: false,
+        aborted: false,
+      }),
+      formatResult: vi.fn().mockReturnValue(output),
     },
     signal: undefined,
   } as any;
@@ -34,7 +32,7 @@ describe("shellTool", () => {
       );
 
       expect(result.output).toBe("output");
-      expect(context.services.shell.run).toHaveBeenCalledWith("echo hello", {
+      expect(context.shell.run).toHaveBeenCalledWith("echo hello", {
         timeoutMs: undefined,
         signal: undefined,
       });
@@ -45,7 +43,7 @@ describe("shellTool", () => {
 
       await shellTool.execute({ command: "sleep 1", timeout: 2 }, context);
 
-      expect(context.services.shell.run).toHaveBeenCalledWith("sleep 1", {
+      expect(context.shell.run).toHaveBeenCalledWith("sleep 1", {
         timeoutMs: 2000,
         signal: undefined,
       });
@@ -53,7 +51,7 @@ describe("shellTool", () => {
 
     it("returns errors from the shell service", async () => {
       const context = makeContext();
-      context.services.shell.run.mockRejectedValue(new Error("boom"));
+      context.shell.run.mockRejectedValue(new Error("boom"));
 
       const result = await shellTool.execute({ command: "bad" }, context);
 
