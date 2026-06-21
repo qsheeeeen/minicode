@@ -361,8 +361,7 @@ describe("runAgent", () => {
 
   describe("rejection", () => {
     it("in manual mode, rejection stops the conversation", async () => {
-      const { deps, context, sessionManager, permissionService } = makeDeps();
-      const reportStatusSpy = vi.spyOn(sessionManager, "reportStatus");
+      const { deps, context, permissionService } = makeDeps();
       permissionService.setMode("manual");
 
       vi.mocked(permissionService.check).mockResolvedValue({
@@ -408,13 +407,6 @@ describe("runAgent", () => {
           content: "User rejected",
         },
       ]);
-
-      expect(reportStatusSpy).toHaveBeenCalledWith(
-        expect.objectContaining({
-          role: "error",
-          content: expect.stringContaining("denied by user"),
-        }),
-      );
     });
 
     it("in auto mode, rejection continues the conversation", async () => {

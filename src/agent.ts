@@ -163,11 +163,6 @@ export async function runAgent(
         changeJournal: deps.sessionManager.getChangeJournal(),
       });
       if (outcome && !outcome.success) {
-        deps.sessionManager.reportStatus({
-          role: "error",
-          content: "Tool denied by user",
-          timestamp: new Date(),
-        });
         break;
       }
 

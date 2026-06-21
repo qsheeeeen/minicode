@@ -262,7 +262,6 @@ describe("runAgent virtual integration", () => {
       promptManager,
     };
     const context = sessionManager.getContext();
-    const reportStatusSpy = vi.spyOn(sessionManager, "reportStatus");
 
     await runAgent(
       deps,
@@ -281,13 +280,5 @@ describe("runAgent virtual integration", () => {
       },
       { type: "tool_result", tool_use_id: "call_1", content: "User rejected" },
     ]);
-
-    // Status message should indicate denial
-    expect(reportStatusSpy).toHaveBeenCalledWith(
-      expect.objectContaining({
-        role: "error",
-        content: expect.stringContaining("denied by user"),
-      }),
-    );
   });
 });
