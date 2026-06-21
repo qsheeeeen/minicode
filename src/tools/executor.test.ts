@@ -3,14 +3,13 @@ import { ToolExecutor, type ToolCall, type ToolExecutionDynamic } from "./execut
 import { PermissionService } from "../services/permission.js";
 import { LLMContext } from "../llm/context.js";
 import type { ToolDef } from "./registry.js";
-import { ToolDeniedError } from "./registry.js";
 
 function makeTool(overrides?: Partial<ToolDef>): ToolDef {
   return {
     name: "testTool",
     description: "A test tool",
     input_schema: { type: "object" as const, properties: {} },
-    execute: vi.fn().mockResolvedValue({ output: "ok" }),
+    execute: vi.fn().mockResolvedValue({ success: true, result: "ok" }),
     readOnly: true,
     ...overrides,
   };
@@ -133,7 +132,7 @@ describe("ToolExecutor", () => {
       );
     });
 
-    it("throws ToolDeniedError when permission denied in manual mode", async () => {
+    it("returns a denial when permission denied in manual mode", async () => {
       const tool = makeTool({
         readOnly: false,
         requiresPermission: true,
@@ -151,9 +150,43 @@ describe("ToolExecutor", () => {
       const call = makeToolCall(tool);
       prepareToolCalls(context, [call]);
 
-      await expect(executor.execute([call], makeDynamic())).rejects.toThrow(
-        ToolDeniedError,
-      );
+      const result = await executor.execute([call], makeDynamic());
+
+      expect(result).toEqual({ success: false });
+    });
+
+    it("denies the rest of the batch when one tool is denied", async () => {
+      const tool1 = makeTool({
+        name: "tool1",
+        readOnly: false,
+        requiresPermission: true,
+      });
+      const tool2 = makeTool({ name: "tool2" });
+      const { executor, context } = makeExecutor({
+        tools: new Map([
+          ["tool1", tool1],
+          ["tool2", tool2],
+        ]),
+        permissionMode: "manual",
+      });
+
+      vi.spyOn(executor.getPermissionService(), "check").mockResolvedValue({
+        allowed: false,
+        reason: "User rejected",
+      });
+      const calls = [
+        makeToolCall(tool1, {}, "call_1"),
+        makeToolCall(tool2, {}, "call_2"),
+      ];
+      prepareToolCalls(context, calls);
+      const spy = vi.spyOn(context, "completeToolCall");
+
+      const result = await executor.execute(calls, makeDynamic());
+
+      expect(result).toEqual({ success: false });
+      expect(tool2.execute).not.toHaveBeenCalled();
+      expect(spy).toHaveBeenCalledWith("call_1", "User rejected");
+      expect(spy).toHaveBeenCalledWith("call_2", "User rejected");
     });
 
     it("returns auto-gate denial message in auto mode", async () => {

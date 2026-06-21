@@ -1,6 +1,6 @@
 import fs from "fs/promises";
 import { generateDiffSummary } from "../../utils/diff.js";
-import type { ToolDef, ToolExecutionContext, ToolResult } from "../registry.js";
+import type { ToolDef, ToolExecutionContext, ToolRunResult } from "../registry.js";
 import { register } from "../registry.js";
 
 interface TextReplacementRange {
@@ -115,7 +115,7 @@ export const editTool: ToolDef = {
   execute: async (
     args: Record<string, unknown>,
     context?: ToolExecutionContext,
-  ): Promise<ToolResult> => {
+  ): Promise<ToolRunResult> => {
     try {
       const path = args.path as string;
       const oldText = args.oldText as string;
@@ -134,10 +134,10 @@ export const editTool: ToolDef = {
         })
         .join("\n");
       const stats = headerLine ? ` (${headerLine.content})` : "";
-      return { output: `Edited ${path}${stats}\n${diffText}` };
+      return { success: true, result: `Edited ${path}${stats}\n${diffText}` };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      return { output: msg };
+      return { success: true, result: msg };
     }
   },
 };

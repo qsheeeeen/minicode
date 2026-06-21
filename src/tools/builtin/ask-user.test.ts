@@ -1,6 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
 import { askUserTool } from "./ask-user.js";
-import { ToolDeniedError } from "../registry.js";
 
 describe("askUserTool", () => {
   describe("execute", () => {
@@ -17,7 +16,10 @@ describe("askUserTool", () => {
         { prompter: { prompt: mockPrompt } } as any,
       );
 
-      expect(result.output).toBe('User selected: "Option A"');
+      expect(result).toEqual({
+        success: true,
+        result: 'User selected: "Option A"',
+      });
       expect(mockPrompt).toHaveBeenCalledWith({
         message: "Which approach?",
         options: [
@@ -36,20 +38,22 @@ describe("askUserTool", () => {
       });
     });
 
-    it("throws ToolDeniedError when user cancels", async () => {
+    it("returns a denial when user cancels", async () => {
       const mockPrompt = vi.fn().mockResolvedValue(null);
-      await expect(
-        askUserTool.execute(
-          {
-            question: "Pick one",
-            options: [
-              { label: "X", description: "x" },
-              { label: "Y", description: "y" },
-            ],
-          },
-          { prompter: { prompt: mockPrompt } } as any,
-        ),
-      ).rejects.toThrow(ToolDeniedError);
+      const result = await askUserTool.execute(
+        {
+          question: "Pick one",
+          options: [
+            { label: "X", description: "x" },
+            { label: "Y", description: "y" },
+          ],
+        },
+        { prompter: { prompt: mockPrompt } } as any,
+      );
+      expect(result).toEqual({
+        success: false,
+        reason: "User cancelled the question",
+      });
     });
 
     it("passes multiSelect when true", async () => {
@@ -76,9 +80,12 @@ describe("askUserTool", () => {
         { question: "What?", options: null } as any,
         {} as any,
       );
-      expect(result.output).toContain(
-        "Error: AskUser tool requires 'options' to be an array",
-      );
+      expect(result).toMatchObject({
+        success: true,
+        result: expect.stringContaining(
+          "Error: AskUser tool requires 'options' to be an array",
+        ),
+      });
     });
 
     it("defaults multiSelect to false when omitted", async () => {

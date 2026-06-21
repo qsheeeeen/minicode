@@ -3,7 +3,7 @@
 // Re-usable helpers for creating test doubles (virtual tools, etc).
 // Test files import directly from here instead of polluting production modules.
 
-import type { ToolDef, ToolResult } from "../tools/registry.js";
+import type { ToolDef, ToolRunResult } from "../tools/registry.js";
 
 export {
   VirtualLLMClient,
@@ -31,9 +31,9 @@ export function createVirtualTool(
     input_schema: { type: "object" as const, properties: {} },
     requiresPermission: options?.requiresPermission ?? false,
     readOnly: options?.readOnly ?? true,
-    execute: async (args: Record<string, unknown>): Promise<ToolResult> => {
+    execute: async (args: Record<string, unknown>): Promise<ToolRunResult> => {
       const output = await handler(args);
-      return { output };
+      return { success: true, result: output };
     },
   };
 }

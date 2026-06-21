@@ -2,9 +2,9 @@ import type {
   ToolDef,
   ToolExecutionContext,
   ToolConfig,
+  ToolRunResult,
   UserPrompter,
 } from "./registry.js";
-import { ToolDeniedError } from "./registry.js";
 import type { LLMToolUseBlock } from "../llm/client.js";
 import type { LLMContext } from "../llm/context.js";
 import type { ChangeJournal } from "../services/change-journal.js";
@@ -76,7 +76,7 @@ export class ToolExecutor {
     tool: ToolDef,
     args: Record<string, unknown>,
     context: ToolExecutionContext,
-  ): Promise<{ output: string }> {
+  ): Promise<ToolRunResult> {
     if (!(tool.readOnly ?? !tool.requiresPermission)) {
       const displayText = callContent(tool.name, args);
       const { allowed, reason } = await this.permissionService.check(
@@ -88,10 +88,14 @@ export class ToolExecutor {
       if (!allowed) {
         if (this.permissionService.getMode() === "auto") {
           return {
-            output: `Tool execution denied by auto-gate: ${reason || "unknown reason"}`,
+            success: true,
+            result: `Tool execution denied by auto-gate: ${reason || "unknown reason"}`,
           };
         }
-        throw new ToolDeniedError(tool.name, displayText, reason);
+        return {
+          success: false,
+          reason: reason || "User rejected",
+        };
       }
     }
 
@@ -104,8 +108,8 @@ export class ToolExecutor {
   async execute(
     toolCalls: ToolCall[],
     dynamic: ToolExecutionDynamic,
-  ): Promise<void> {
-    if (toolCalls.length === 0) return;
+  ): Promise<ToolRunResult | null> {
+    if (toolCalls.length === 0) return null;
 
     const context: ToolExecutionContext = {
       registry: this.registry,
@@ -143,31 +147,36 @@ export class ToolExecutor {
         );
         continue;
       }
+      // Mark this tool and every remaining tool in the batch as denied,
+      // flush their results, then surface the denial (no throw).
+      const deny = (reason: string): ToolRunResult => {
+        results.push({ toolUseId: block.id, content: reason });
+        for (let j = i + 1; j < toolCalls.length; j++) {
+          results.push({
+            toolUseId: toolCalls[j].block.id,
+            content: reason,
+          });
+        }
+        for (const result of results) {
+          this.context.completeToolCall(result.toolUseId, result.content);
+        }
+        return { success: false };
+      };
       try {
         const result = await this.runTool(
           tool,
           block.input as Record<string, unknown>,
           context,
         );
-        results.push({ toolUseId: block.id, content: result.output });
+        if (!result.success) {
+          return deny(result.reason ?? "Denied");
+        }
+        results.push({ toolUseId: block.id, content: result.result ?? "" });
         this.logger?.info(
           { toolName: tool.name, toolInput: block.input },
           "Tool result",
         );
       } catch (reason) {
-        if (reason instanceof ToolDeniedError) {
-          results.push({ toolUseId: block.id, content: reason.reason });
-          for (let j = i + 1; j < toolCalls.length; j++) {
-            results.push({
-              toolUseId: toolCalls[j].block.id,
-              content: reason.reason,
-            });
-          }
-          for (const result of results) {
-            this.context.completeToolCall(result.toolUseId, result.content);
-          }
-          throw reason;
-        }
         const error = `Error: ${reason instanceof Error ? reason.message : String(reason)}`;
         results.push({ toolUseId: block.id, content: error });
         this.logger?.error(
@@ -180,6 +189,7 @@ export class ToolExecutor {
     for (const result of results) {
       this.context.completeToolCall(result.toolUseId, result.content);
     }
+    return null;
   }
 
   // -- Accessors for Agent to use in the LLM loop --

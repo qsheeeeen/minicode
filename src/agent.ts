@@ -1,6 +1,5 @@
 import type { Model } from "./llm/model.js";
 import type { LLMClient, LLMToolDef, LLMStreamResult } from "./llm/client.js";
-import { ToolDeniedError } from "./tools/index.js";
 import type { ToolExecutor, ToolCall } from "./tools/executor.js";
 import type { UserPrompter } from "./tools/registry.js";
 import type { PromptManager } from "./services/prompt-manager.js";
@@ -151,29 +150,25 @@ export async function runAgent(
 
       signal.throwIfAborted();
 
-      try {
-        await deps.toolExecutor.execute(toolCalls, {
-          signal,
-          config: {
-            client: deps.client,
-            model: deps.model,
-            userPrompt: deps.promptManager.getUserPrompt(),
-          },
-          prompter: opts?.prompter,
-          activeUserMessageOrdinal:
-            deps.sessionManager.getActiveUserMessageOrdinal(),
-          changeJournal: deps.sessionManager.getChangeJournal(),
+      const outcome = await deps.toolExecutor.execute(toolCalls, {
+        signal,
+        config: {
+          client: deps.client,
+          model: deps.model,
+          userPrompt: deps.promptManager.getUserPrompt(),
+        },
+        prompter: opts?.prompter,
+        activeUserMessageOrdinal:
+          deps.sessionManager.getActiveUserMessageOrdinal(),
+        changeJournal: deps.sessionManager.getChangeJournal(),
+      });
+      if (outcome && !outcome.success) {
+        deps.sessionManager.reportStatus({
+          role: "error",
+          content: "Tool denied by user",
+          timestamp: new Date(),
         });
-      } catch (e) {
-        if (e instanceof ToolDeniedError) {
-          deps.sessionManager.reportStatus({
-            role: "error",
-            content: `Tool "${e.toolName}" was denied by user`,
-            timestamp: new Date(),
-          });
-          break;
-        }
-        throw e;
+        break;
       }
 
       if (toolCalls.length > 0) {

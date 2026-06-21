@@ -1,12 +1,7 @@
-export {
-  ToolDeniedError,
-  register,
-  getAll,
-  getSubAgentTools,
-} from "./registry.js";
+export { register, getAll, getSubAgentTools } from "./registry.js";
 export type {
   ToolDef,
-  ToolResult,
+  ToolRunResult,
   ToolExecutionContext,
   ToolRequirement,
   UserPrompter,

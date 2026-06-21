@@ -1,4 +1,4 @@
-import type { ToolDef, ToolResult, ToolExecutionContext } from "../registry.js";
+import type { ToolDef, ToolRunResult, ToolExecutionContext } from "../registry.js";
 import type { LLMBlock } from "../../llm/context.js";
 import { runAgent, type AgentDeps } from "../../agent.js";
 import { SessionManager } from "../../services/session-manager.js";
@@ -35,7 +35,7 @@ export const agentTool: ToolDef = {
   execute: async (
     args: Record<string, unknown>,
     context?: ToolExecutionContext,
-  ): Promise<ToolResult> => {
+  ): Promise<ToolRunResult> => {
     const task = args.task as string;
     const tier = args.tier as string | undefined;
     const registry = context?.registry;
@@ -43,11 +43,11 @@ export const agentTool: ToolDef = {
     const parentId = context?.currentAgentId || "1";
 
     if (!registry) {
-      return { output: "Error: AgentRegistry not available" };
+      return { success: true, result: "Error: AgentRegistry not available" };
     }
 
     if (!config) {
-      return { output: "Error: Agent config not available" };
+      return { success: true, result: "Error: Agent config not available" };
     }
 
     const subId = registry.allocateSubId();
@@ -151,7 +151,7 @@ export const agentTool: ToolDef = {
       unsubscribeTokenEvents();
 
       const output = finalResponse || `Agent #${subId} completed: ${summary}`;
-      return { output };
+      return { success: true, result: output };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       registry.updateStatus(subId, "error");
@@ -159,7 +159,7 @@ export const agentTool: ToolDef = {
       registry.remove(subId);
       unsubscribeTokenEvents();
 
-      return { output: `Agent #${subId} failed: ${errorMsg}` };
+      return { success: true, result: `Agent #${subId} failed: ${errorMsg}` };
     }
   },
 };

@@ -48,15 +48,18 @@ export interface ToolExecutionContext {
   shell?: ShellService;
 }
 
-export interface ToolResult {
-  output: string;
+/** Outcome of running a tool: success carries the result, failure carries a reason. */
+export interface ToolRunResult {
+  success: boolean;
+  result?: string;
+  reason?: string;
 }
 
 export interface ToolDef<TArgs = Record<string, unknown>> {
   name: string;
   description: string;
   input_schema: Record<string, unknown>;
-  execute: (args: TArgs, context?: ToolExecutionContext) => Promise<ToolResult>;
+  execute: (args: TArgs, context?: ToolExecutionContext) => Promise<ToolRunResult>;
   requires?: ToolRequirement[];
   requiresPermission?: boolean;
   readOnly?: boolean;
@@ -71,17 +74,6 @@ export function register(tool: ToolDef<any>): void {
 
 export function getAll(): Map<string, ToolDef<any>> {
   return new Map(defaultTools);
-}
-
-export class ToolDeniedError extends Error {
-  constructor(
-    public readonly toolName: string,
-    public readonly displayText: string,
-    public readonly reason: string = "User rejected",
-  ) {
-    super(`Tool execution denied: ${toolName} (${reason})`);
-    this.name = "ToolDeniedError";
-  }
 }
 
 export function getSubAgentTools(): Map<string, ToolDef<any>> {

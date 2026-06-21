@@ -31,7 +31,7 @@ describe("shellTool", () => {
         context,
       );
 
-      expect(result.output).toBe("output");
+      expect(result.result).toBe("output");
       expect(context.shell.run).toHaveBeenCalledWith("echo hello", {
         timeoutMs: undefined,
         signal: undefined,
@@ -55,7 +55,7 @@ describe("shellTool", () => {
 
       const result = await shellTool.execute({ command: "bad" }, context);
 
-      expect(result.output).toContain("boom");
+      expect(result.result).toContain("boom");
     });
   });
 });

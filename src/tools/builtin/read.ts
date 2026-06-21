@@ -1,5 +1,5 @@
 import fs from "fs/promises";
-import type { ToolDef, ToolExecutionContext, ToolResult } from "../registry.js";
+import type { ToolDef, ToolExecutionContext, ToolRunResult } from "../registry.js";
 import { register } from "../registry.js";
 
 export const readTool: ToolDef = {
@@ -22,7 +22,7 @@ export const readTool: ToolDef = {
   execute: async (
     args: Record<string, unknown>,
     context?: ToolExecutionContext,
-  ): Promise<ToolResult> => {
+  ): Promise<ToolRunResult> => {
     try {
       const path = args.path as string;
       const offset = args.offset as number | undefined;
@@ -32,10 +32,10 @@ export const readTool: ToolDef = {
       const start = (offset || 1) - 1;
       const end = limit ? start + limit : lines.length;
       const result = lines.slice(start, end).join("\n");
-      return { output: result };
+      return { success: true, result: result };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      return { output: msg };
+      return { success: true, result: msg };
     }
   },
 };

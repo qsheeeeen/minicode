@@ -39,7 +39,7 @@ describe("editTool", () => {
         context,
       );
 
-      expect(result.output).toContain("Edited test.txt");
+      expect(result.result).toContain("Edited test.txt");
       expect(fs.writeFile).toHaveBeenCalledWith(
         "test.txt",
         "hello minicode",
@@ -104,7 +104,7 @@ describe("editTool", () => {
         context,
       );
 
-      expect(result.output).toContain("oldText not found");
+      expect(result.result).toContain("oldText not found");
       expect(context.changeJournal.recordChange).not.toHaveBeenCalled();
     });
   });

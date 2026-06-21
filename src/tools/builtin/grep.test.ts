@@ -12,7 +12,7 @@ describe("grepTool", () => {
 
   it("returns error when pattern is missing", async () => {
     const result = await grepTool.execute({});
-    expect(result.output).toBe("Error: pattern is required");
+    expect(result.result).toBe("Error: pattern is required");
   });
 
   it("returns matches on success", async () => {
@@ -32,7 +32,7 @@ describe("grepTool", () => {
     (spawn as ReturnType<typeof vi.fn>).mockReturnValue(mockProc as any);
 
     const result = await grepTool.execute({ pattern: "TODO" });
-    expect(result.output).toBe("file.ts:1:match");
+    expect(result.result).toBe("file.ts:1:match");
   });
 
   it("returns 'No matches found' when grep finds nothing", async () => {
@@ -48,7 +48,7 @@ describe("grepTool", () => {
     (spawn as ReturnType<typeof vi.fn>).mockReturnValue(mockProc as any);
 
     const result = await grepTool.execute({ pattern: "nonexistent" });
-    expect(result.output).toBe("No matches found");
+    expect(result.result).toBe("No matches found");
   });
 
   it("passes correct args for case-insensitive search", async () => {

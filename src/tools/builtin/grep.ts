@@ -1,5 +1,5 @@
 import { spawn } from "child_process";
-import type { ToolDef, ToolResult, ToolExecutionContext } from "../registry.js";
+import type { ToolDef, ToolRunResult, ToolExecutionContext } from "../registry.js";
 import { register } from "../registry.js";
 
 export const grepTool: ToolDef = {
@@ -35,9 +35,9 @@ export const grepTool: ToolDef = {
   execute: async (
     args: Record<string, unknown>,
     context?: ToolExecutionContext,
-  ): Promise<ToolResult> => {
+  ): Promise<ToolRunResult> => {
     const pattern = args.pattern as string;
-    if (!pattern) return { output: "Error: pattern is required" };
+    if (!pattern) return { success: true, result: "Error: pattern is required" };
 
     const searchPath = (args.path as string) || ".";
     const recursive = args.recursive !== false;
@@ -68,10 +68,10 @@ export const grepTool: ToolDef = {
           resolve(trimmed || "No matches found");
         });
       });
-      return { output };
+      return { success: true, result: output };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      return { output: msg };
+      return { success: true, result: msg };
     }
   },
 };

@@ -1,4 +1,4 @@
-import type { ToolDef, ToolResult, ToolExecutionContext } from "../registry.js";
+import type { ToolDef, ToolRunResult, ToolExecutionContext } from "../registry.js";
 import { register } from "../registry.js";
 import { getSkillBody } from "../../skills/index.js";
 
@@ -20,16 +20,16 @@ export const loadSkillTool: ToolDef = {
   execute: async (
     args: Record<string, unknown>,
     _context?: ToolExecutionContext,
-  ): Promise<ToolResult> => {
+  ): Promise<ToolRunResult> => {
     const skillName = String(args.name);
     const skillBody = getSkillBody(skillName);
 
     if (!skillBody) {
-      return { output: `Error: Skill '${skillName}' not found.` };
+      return { success: true, result: `Error: Skill '${skillName}' not found.` };
     }
 
     const output = `<loaded_skill name="${skillName}">\n<instructions>\n${skillBody}\n</instructions>\n</loaded_skill>`;
-    return { output };
+    return { success: true, result: output };
   },
 };
 register(loadSkillTool);

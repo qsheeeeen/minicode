@@ -145,7 +145,7 @@ vi.mock("./tools/index.js", async (importOriginal) => {
     description: "Test Tool",
     input_schema: { type: "object", properties: {} },
     requiresPermission: true,
-    execute: vi.fn().mockResolvedValue({ output: "success" }),
+    execute: vi.fn().mockResolvedValue({ success: true, result: "success" }),
   };
   return {
     ...original,

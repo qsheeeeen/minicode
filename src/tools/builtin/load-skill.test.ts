@@ -14,7 +14,7 @@ describe("loadSkillTool", () => {
     mockGetSkillBody.mockReturnValue("do the thing");
 
     const result = await loadSkillTool.execute({ name: "my-skill" });
-    expect(result.output).toBe(
+    expect(result.result).toBe(
       '<loaded_skill name="my-skill">\n<instructions>\ndo the thing\n</instructions>\n</loaded_skill>',
     );
   });
@@ -23,6 +23,6 @@ describe("loadSkillTool", () => {
     mockGetSkillBody.mockReturnValue(undefined);
 
     const result = await loadSkillTool.execute({ name: "nonexistent" });
-    expect(result.output).toBe("Error: Skill 'nonexistent' not found.");
+    expect(result.result).toBe("Error: Skill 'nonexistent' not found.");
   });
 });

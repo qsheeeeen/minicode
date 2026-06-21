@@ -39,7 +39,7 @@ describe("writeTool", () => {
         context,
       );
 
-      expect(result.output).toBe("Wrote test.txt");
+      expect(result.result).toBe("Wrote test.txt");
       expect(fs.mkdir).toHaveBeenCalledWith(".", { recursive: true });
       expect(fs.writeFile).toHaveBeenCalledWith(
         "test.txt",
@@ -93,7 +93,7 @@ describe("writeTool", () => {
         context,
       );
 
-      expect(result.output).toContain("EACCES");
+      expect(result.result).toContain("EACCES");
       expect(context.changeJournal.recordChange).not.toHaveBeenCalled();
     });
   });

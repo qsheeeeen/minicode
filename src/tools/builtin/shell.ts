@@ -1,4 +1,4 @@
-import type { ToolDef, ToolResult, ToolExecutionContext } from "../registry.js";
+import type { ToolDef, ToolRunResult, ToolExecutionContext } from "../registry.js";
 import { register } from "../registry.js";
 
 export const shellTool: ToolDef = {
@@ -18,10 +18,10 @@ export const shellTool: ToolDef = {
   execute: async (
     args: Record<string, unknown>,
     context?: ToolExecutionContext,
-  ): Promise<ToolResult> => {
+  ): Promise<ToolRunResult> => {
     const shell = context?.shell;
     if (!shell) {
-      return { output: "Error: shell service not available" };
+      return { success: true, result: "Error: shell service not available" };
     }
     try {
       const command = args.command as string;
@@ -30,10 +30,10 @@ export const shellTool: ToolDef = {
         timeoutMs: timeout ? timeout * 1000 : undefined,
         signal: context?.signal,
       });
-      return { output: shell.formatResult(result) };
+      return { success: true, result: shell.formatResult(result) };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      return { output: msg };
+      return { success: true, result: msg };
     }
   },
 };

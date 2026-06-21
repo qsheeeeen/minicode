@@ -1,5 +1,4 @@
-import type { ToolDef, ToolResult, ToolExecutionContext } from "../registry.js";
-import { ToolDeniedError } from "../registry.js";
+import type { ToolDef, ToolRunResult, ToolExecutionContext } from "../registry.js";
 import { register } from "../registry.js";
 
 interface AskUserArgs {
@@ -56,12 +55,13 @@ export const askUserTool: ToolDef<AskUserArgs> = {
   execute: async (
     args: AskUserArgs,
     context?: ToolExecutionContext,
-  ): Promise<ToolResult> => {
+  ): Promise<ToolRunResult> => {
     const question = args.question;
     const options = args.options;
     if (!Array.isArray(options)) {
       return {
-        output: `Error: AskUser tool requires 'options' to be an array, received: ${JSON.stringify(args.options)}`,
+        success: true,
+        result: `Error: AskUser tool requires 'options' to be an array, received: ${JSON.stringify(args.options)}`,
       };
     }
     const multiSelect = args.multiSelect ?? false;
@@ -73,13 +73,12 @@ export const askUserTool: ToolDef<AskUserArgs> = {
     });
 
     if (!answer) {
-      throw new ToolDeniedError(
-        "AskUser",
-        question,
-        "User cancelled the question",
-      );
+      return {
+        success: false,
+        reason: "User cancelled the question",
+      };
     }
-    return { output: `User selected: "${answer}"` };
+    return { success: true, result: `User selected: "${answer}"` };
   },
 };
 register(askUserTool);

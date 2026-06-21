@@ -1,6 +1,6 @@
 import fs from "fs/promises";
 import path from "path";
-import type { ToolDef, ToolExecutionContext, ToolResult } from "../registry.js";
+import type { ToolDef, ToolExecutionContext, ToolRunResult } from "../registry.js";
 import { register } from "../registry.js";
 
 interface TextReplacementRange {
@@ -68,16 +68,16 @@ export const writeTool: ToolDef = {
   execute: async (
     args: Record<string, unknown>,
     context?: ToolExecutionContext,
-  ): Promise<ToolResult> => {
+  ): Promise<ToolRunResult> => {
     try {
       const filePath = args.path as string;
       const content = args.content as string;
       const result = await writeText(filePath, content);
       await recordWriteChange(context, result);
-      return { output: `Wrote ${filePath}` };
+      return { success: true, result: `Wrote ${filePath}` };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      return { output: msg };
+      return { success: true, result: msg };
     }
   },
 };
