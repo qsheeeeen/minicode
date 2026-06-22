@@ -54,6 +54,37 @@ Headless mode exposes bugs that TUI doesn't. Always verify output is correct.
 
 External skills live in `.agents/skills/` (gitignored except this directory). Each skill is a directory with a `SKILL.md` file containing YAML frontmatter + body. Built-in skills (`skill-creator`, `init`) are in `src/skills/`.
 
+## Module Design (first principles)
+
+The architecture is forced by a few root constraints, not by convention. Before adding code or a new module, confirm it satisfies these — don't just put it "where it's currently used."
+
+**Root constraints:**
+1. **LLM / file / shell / terminal are uncontrollable side effects** — expensive, non-deterministic, irreversible, vendor-specific.
+2. **The conversation (blocks) is the core asset**, produced by the agent and consumed by the UI.
+3. **Tests must not depend on a real LLM/API.**
+4. **New tools / commands / protocols / strategies must be addable without touching existing ones.**
+
+**Principles derived from them:**
+- **Push the uncontrollable behind a boundary.** Side effects (LLM, IO, shell, rendering) live in boundary modules with swappable implementations; core logic stays pure (unit-testable, injectable).
+- **Policy vs. mechanism, one-way deps.** Orchestration (`agent`) is policy — it states *what/when*; mechanisms (`LLMClient`, `ToolExecutor`, UI) are interchangeable implementations. Policy depends on abstractions.
+- **Single source of truth, append-only.** `LLMContext`'s blocks are the conversation truth; derived views (tokens / display / stats / journal) compute or subscribe from it — never a second copy.
+- **Cross-cutting concerns become narrow-interface services.** Persistence, tokens, change-tracking, permission, prompts are not the agent's job — each is a single-responsibility service.
+- **Declaration vs. execution split.** Extensible things (tools, commands, protocols, strategies) separate the descriptor (`registry`) from the imperative handler (`executor`) — adding one doesn't modify the other.
+- **Errors are values, not control flow.** Tool denial/failure is a business outcome, returned as `ToolRunResult`, never thrown across a boundary; only genuinely unexpected failures (abort, IO crash) throw.
+
+**How each layer is designed (derived from the above):**
+
+- **Entry (`main`/`args`/`config`/`messages`)** — parse the uncontrollable outside (CLI, disk) into deterministic data and stop. No runtime state, no business decisions. `messages` is just a type barrel.
+- **`app/` (composition root)** — the *only* place allowed to know concrete implementations: bind protocol/UI/services onto the `AgentDeps`/`AppRuntime` abstractions. Everything else depends on abstractions. Pure wiring, no logic.
+- **`agent.ts` (orchestration = policy)** — only the loop order (fetch blocks → ask LLM → run tools → write blocks → repeat), reaching everything via `deps`/`context`. It must not know how the LLM is implemented, how a tool runs, or how the UI paints. Inject doubles → the whole loop is unit-testable.
+- **`llm/` (boundary)** — hide the most uncontrollable side effect. `client` is the abstraction, `protocols` are swappable, `context` is the vendor-neutral append-only block stream (pure data). Blocks are protocol data — *no* UI intent (display overrides, extra fields) may grow onto `LLMUserBlock`.
+- **`tools/` (declaration vs. execution)** — `registry` holds declarative `ToolDef`s; `executor` is the cross-cutting handler (permission, batching, result flushing). Adding a tool touches only `builtin/`. **Outcomes return as `ToolRunResult`; denial/failure never throws across the boundary.**
+- **`services/` (cross-cutting, one concern per file)** — each stateful/side-effecting concern is its own service behind a narrow interface. State lives where it belongs: session state in `session-manager`, blocks in `LLMContext`, file changes in `change-journal` — never duplicated across. `permission` decides only (enforcement is `ToolExecutor`); `context-manager` watches tokens but stores no blocks; `session-persistence` is pure IO.
+- **`ui/` (observer + input router)** — only reads blocks to render and routes input in; it never participates in agent policy. Rendering splits "pure transform" (`display`) from "side-effect boundary" (`renderer`/`timeline`). **Never calls back into the agent; display is purely a UI concern (overrides live on the renderer, not on `LLMUserBlock`).** `routing` classifies input, `route-handler` acts — judgment and action stay separate.
+- **`skills` / `testing` / `utils`** — `utils` is stateless, side-effect-free, and depends on no domain layer (or cycles form); `testing` provides `VirtualLLMClient`/`createVirtualTool` so constraint #3 holds; `skills` is a hot-loadable extension point (declarative, registered as commands).
+
+Dependency direction (a violation is a bug): `main → app → agent → (tools, services, llm)`; `ui → (agent, services)`; `llm`/`tools` never import `ui`; `utils` depends on nothing but the standard library.
+
 ## Module Convention
 
 - All imports use `.js` extensions with relative paths (Node16 ESM resolution)
