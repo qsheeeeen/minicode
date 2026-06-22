@@ -41,6 +41,16 @@ bun run src/main.ts -H "<prompt that exercises the change>"
 
 Headless mode exposes bugs that TUI doesn't. Always verify output is correct.
 
+## Implementation Discipline
+
+Don't stop at "it works." While implementing a change:
+
+1. **Editing the same logic in several places is a smell.** If the change forces duplicate edits, consolidate it (single source of truth) as part of the change — don't just propagate the edit across call sites.
+2. **Survey coupled code while the context is loaded:** conflicts to resolve, things to merge, a local refactor that falls out. Do it now, not later.
+3. **Pick the most elegant implementation**, not the first one that runs.
+
+Feature work is the best moment to refactor — you understand the code most deeply right then, and deferred cleanup compounds into debt. (Example: adding a "no output" hint to `ShellService` surfaced that `runSync` and `formatResult` each held formatting logic — the right move was to route `runSync` through `formatResult`, which also fixed `runSync` losing the exit code on non-zero exits.)
+
 ## Testing Patterns
 
 - Tests use Vitest with `ink-testing-library` for TUI components
