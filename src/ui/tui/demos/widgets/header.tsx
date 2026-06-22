@@ -1,7 +1,7 @@
 // Standalone demo for Header component.
-// Run: bun run src/ui/tui/demos/header.tsx
+// Run: bun run src/ui/tui/demos/widgets/header.tsx
 import { render, Box } from "ink";
-import { Header } from "../Header.js";
+import { Header } from "../../Header.js";
 
 function Demo() {
   return (

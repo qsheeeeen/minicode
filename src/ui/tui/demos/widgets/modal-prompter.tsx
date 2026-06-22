@@ -1,9 +1,9 @@
 // Standalone demo for ModalPrompter.
-// Run: bun run src/ui/tui/demos/modal-prompter.tsx
+// Run: bun run src/ui/tui/demos/widgets/modal-prompter.tsx
 import { useState } from "react";
 import { render, Box, Text, useInput } from "ink";
-import { useTuiState } from "../state.js";
-import { ModalPrompter } from "../ModalPrompter.js";
+import { useTuiState } from "../../state.js";
+import { ModalPrompter } from "../../ModalPrompter.js";
 
 function Demo() {
   const [multi, setMulti] = useState(false);

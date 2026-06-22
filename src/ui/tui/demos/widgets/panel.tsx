@@ -1,9 +1,9 @@
 // Standalone demo for Panel component.
-// Run: bun run src/ui/tui/demos/panel.tsx
+// Run: bun run src/ui/tui/demos/widgets/panel.tsx
 import { render, Box } from "ink";
-import { Model } from "../../../llm/model.js";
-import { useTuiState } from "../state.js";
-import { Panel } from "../Panel.js";
+import { Model } from "../../../../llm/model.js";
+import { useTuiState } from "../../state.js";
+import { Panel } from "../../Panel.js";
 
 useTuiState.setState({
   tokenCount: 24000,

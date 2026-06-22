@@ -1,9 +1,9 @@
 // Standalone demo for InputArea component.
-// Run: bun run src/ui/tui/demos/input-area.tsx
+// Run: bun run src/ui/tui/demos/widgets/input-area.tsx
 import { render, Box } from "ink";
-import { Model } from "../../../llm/model.js";
-import { useTuiState } from "../state.js";
-import { InputArea } from "../InputArea.js";
+import { Model } from "../../../../llm/model.js";
+import { useTuiState } from "../../state.js";
+import { InputArea } from "../../InputArea.js";
 
 const model = new Model("test", "test", 200000);
 const loadingRef = { current: false };

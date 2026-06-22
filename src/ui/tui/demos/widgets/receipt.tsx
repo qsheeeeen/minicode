@@ -1,7 +1,7 @@
 // Standalone demo for Receipt component.
-// Run: bun run src/ui/tui/demos/receipt.tsx
+// Run: bun run src/ui/tui/demos/widgets/receipt.tsx
 import { render, Box } from "ink";
-import { Receipt } from "../Receipt.js";
+import { Receipt } from "../../Receipt.js";
 
 const receiptData = {
   projectName: "my-awesome-app",

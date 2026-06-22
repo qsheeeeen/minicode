@@ -1,5 +1,5 @@
 // Composite demo showing all TUI components.
-// Run: bun run src/ui/tui/demos/index.tsx
+// Run: bun run src/ui/tui/demos/composite.tsx
 import { useState } from "react";
 import { render, Box, useInput } from "ink";
 import { Model } from "../../../llm/model.js";
@@ -13,78 +13,7 @@ import { SubAgentBar } from "../SubAgentBar.js";
 import { MessageList } from "../MessageList.js";
 import { InputArea } from "../InputArea.js";
 import { EffortSelectInput, SessionListInput } from "../inputs.js";
-
-const messages = [
-  {
-    role: "user" as const,
-    content:
-      "Help me set up Express with TypeScript and show a markdown example.",
-  },
-  {
-    role: "thinking" as const,
-    content:
-      "The user wants an Express scaffolding and a markdown demo. I'll start by initializing the project, reading the entry point, and modifying the port.",
-  },
-  {
-    role: "tool" as const,
-    name: "Shell",
-    input: { command: "npm init -y" },
-    output: "Wrote to package.json",
-    slotId: "s1",
-  },
-  {
-    role: "tool" as const,
-    name: "Read",
-    input: { path: "src/index.ts" },
-    output: "10 lines, 256 chars",
-    slotId: "s2",
-  },
-  {
-    role: "tool" as const,
-    name: "Edit",
-    input: { path: "src/app.ts" },
-    output:
-      "--- src/app.ts\n+++ src/app.ts\n  3 - const port = 3000;\n  3 + const port = 8080;",
-    slotId: "s3",
-  },
-  {
-    role: "thinking" as const,
-    content:
-      "The basic setup is done. Now I should generate a comprehensive showcase of supported markdown features like tables, code blocks, and blockquotes to demonstrate the new `ink-markdown-es` renderer.",
-  },
-  {
-    role: "text" as const,
-    content:
-      "Done! Project is scaffolded. Here is a comprehensive overview of the Markdown features we now support in the terminal:\n\n# Markdown Feature Showcase\n\nThis paragraph demonstrates **bold text**, *italic text*, ~~strikethrough~~, and `inline code`.\n\n## 1. Lists & Hierarchy\n- Unordered item 1\n  - Nested unordered item\n- Unordered item 2\n\n1. Ordered item 1\n2. Ordered item 2\n\n## 2. Blockquotes\n> \"The terminal is the developer's canvas.\"\n> \n> — It can span multiple lines and contain other elements.\n\n## 3. Code Blocks\nHere is some syntax-highlighted TypeScript:\n\n```typescript\ninterface User {\n  name: string;\n  role: 'admin' | 'user';\n}\n\nconst greet = (user: User) => console.log(`Hello ${user.name}`);\n```\n\n## 4. Tables\n| Framework | Language | Status |\n|:----------|:---------|:-------|\n| Express   | TS / JS  | Active |\n| FastAPI   | Python   | Active |\n",
-  },
-  {
-    role: "status" as const,
-    content: "Project scaffolded",
-    timestamp: new Date(),
-  },
-];
-
-const agentSessions = [
-  {
-    id: "1",
-    type: "main" as const,
-    agent: {} as any,
-    context: {} as any,
-    status: "running" as const,
-    tokenCount: 12000,
-    toolCalls: 5,
-  },
-  {
-    id: "2",
-    type: "sub" as const,
-    agent: {} as any,
-    context: {} as any,
-    status: "completed" as const,
-    task: "Install dependencies",
-    tokenCount: 3200,
-    toolCalls: 2,
-  },
-];
+import { sampleMessages, sampleSessions } from "./fixtures.js";
 
 const model = new Model("claude-sonnet-4-5", "anthropic", 200000);
 
@@ -117,8 +46,8 @@ function Demo() {
   const mode = inputModes[inputIdx];
 
   useTuiState.setState({
-    messages,
-    agentSessions,
+    messages: sampleMessages,
+    agentSessions: sampleSessions,
     activeAgentId: "1",
     tokenCount: 34700,
     currentSession: "session-1231231123123",

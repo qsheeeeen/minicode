@@ -1,5 +1,5 @@
 // Standalone demo for all input components.
-// Run: bun run src/ui/tui/demos/inputs.tsx
+// Run: bun run src/ui/tui/demos/widgets/inputs.tsx
 import { useState } from "react";
 import { render, Box, Text, useInput } from "ink";
 import {
@@ -8,7 +8,7 @@ import {
   SessionListInput,
   ModelSelectInput,
   UndoInput,
-} from "../inputs.js";
+} from "../../inputs.js";
 
 const demos = ["chat", "effort", "session", "model", "undo"] as const;
 

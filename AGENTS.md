@@ -102,13 +102,21 @@ Dependency direction (a violation is a bug): `main → app → agent → (tools,
 - JSX via `react-jsx` automatic runtime (Ink v7 + React 19)
 - TypeScript strict mode enabled
 
-## TUI Development
+## TUI Demos
 
-Demo components in `src/ui/tui/demos/` render individual TUI components in isolation. Run them with:
+Standalone visual harnesses rendered in a real terminal — they cover what `ink-testing-library` can't assert (colors, layout, borders, state transitions). Each is its own file run in its own process; all share `fixtures.ts` for sample data.
+
 ```bash
-bun run src/ui/tui/demos/index.tsx
+bun run src/ui/tui/demos/widgets/<name>.tsx   # single component (L1)
+bun run src/ui/tui/demos/scenes/<name>.tsx     # scripted interaction flow (L3)
+bun run src/ui/tui/demos/composite.tsx         # every widget on one screen (L2)
 ```
-Useful for visual testing when modifying UI components.
+
+- **`widgets/`** — one component in isolation; fast iteration on appearance and per-state rendering.
+- **`scenes/`** — scripted UI state transitions (`tool-flow`, `subagent`, `denial`, `abort`) driven by `useTuiState.setState` sequences; verifies cross-component wiring that single-widget demos can't show.
+- **`composite.tsx`** — every widget on one screen; checks layout coordination.
+
+When adding a TUI component, add a `widgets/<name>.tsx`. When adding/changing a cross-component flow (e.g. a new agent state transition), add a `scenes/<name>.tsx` that scripts it end-to-end.
 
 ## SOLID Principles
 
