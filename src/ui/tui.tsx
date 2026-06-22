@@ -180,6 +180,13 @@ function AppContent({
         sessionManager.reportStatus.bind(sessionManager),
       );
 
+      if (processed.type === "run" && processed.displayContent) {
+        uiTimeline.setDisplay(
+          context.getUserMessageCount(),
+          processed.displayContent,
+        );
+      }
+
       if (processed.type === "done") {
         if (processed.shellOutput) {
           uiTimeline.sync();
@@ -194,7 +201,6 @@ function AppContent({
       abortRef.current = ctrl;
       try {
         await runAgent(deps, processed.promptText, ctrl.signal, {
-          displayContent: processed.displayContent,
           prompter: prompterRef.current ?? undefined,
         });
         return true;

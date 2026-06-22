@@ -38,6 +38,7 @@ export type DisplayMessage =
 export function toDisplayMessages(
   blocks: LLMBlock[],
   statuses: StatusMessage[],
+  displays?: Map<number, string>,
 ): DisplayMessage[] {
   const userMessageCount = blocks.filter(
     (block) => block.type === "user",
@@ -80,9 +81,12 @@ export function toDisplayMessages(
           });
         }
       }
+      result.push({
+        role: "user",
+        content: displays?.get(userMessagesSeen) ?? block.text,
+      });
       userMessagesSeen++;
       toolMessages = new Map();
-      result.push({ role: "user", content: block.text });
     } else if (block.type === "text") {
       result.push({ role: "text", content: block.text });
     } else if (block.type === "thinking") {

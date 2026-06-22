@@ -9,6 +9,8 @@ import type { LLMBlock, LLMContext } from "../llm/context.js";
 export class HeadlessRenderer {
   private context: LLMContext;
   private statuses: StatusMessage[] = [];
+  private displays = new Map<number, string>();
+  private userCount = 0;
   private printedBlocks = 0;
   private streamedChars = new Map<number, number>();
   private finalizedBlocks = new Set<number>();
@@ -23,6 +25,11 @@ export class HeadlessRenderer {
 
   addStatus(msg: StatusMessage): void {
     this.statuses.push(msg);
+  }
+
+  /** Override the displayed text for the user message at `userIndex` (0-based). */
+  setDisplay(userIndex: number, display: string): void {
+    this.displays.set(userIndex, display);
   }
 
   start(): void {
@@ -65,7 +72,9 @@ export class HeadlessRenderer {
     isFinal: boolean,
   ): void {
     if (block.type === "user") {
-      process.stdout.write(`[user]\n${block.text.trim()}\n\n`);
+      const display = this.displays.get(this.userCount);
+      this.userCount++;
+      process.stdout.write(`[user]\n${(display ?? block.text).trim()}\n\n`);
     } else if (block.type === "thinking") {
       this.renderStreamingText(
         index,

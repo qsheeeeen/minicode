@@ -24,7 +24,6 @@ export interface AgentDeps {
 }
 
 export interface RunAgentOpts {
-  displayContent?: string;
   prompter?: UserPrompter;
 }
 

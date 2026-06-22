@@ -102,6 +102,10 @@ export async function runHeadless(
       sessionManager.reportStatus.bind(sessionManager),
     );
 
+    if (processed.type === "run" && processed.displayContent) {
+      renderer.setDisplay(context.getUserMessageCount(), processed.displayContent);
+    }
+
     if (processed.type === "done") {
       if (processed.shellOutput) {
         console.log(
