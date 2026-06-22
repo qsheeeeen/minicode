@@ -61,8 +61,9 @@ describe("callContent", () => {
     );
   });
 
-  it("formats unknown tool with JSON summary", () => {
-    const result = callContent("Unknown", { foo: "bar" });
-    expect(result).toBe('Unknown({"foo":"bar"})');
+  it("throws for a tool with no formatter implemented", () => {
+    expect(() => callContent("Unknown", { foo: "bar" })).toThrow(
+      /no formatter implemented/,
+    );
   });
 });

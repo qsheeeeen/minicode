@@ -1,45 +1,45 @@
-function summary(input: Record<string, unknown>): string {
-  return JSON.stringify(input);
-}
-
 export function callContent(
   name: string,
   input: Record<string, unknown>,
 ): string {
+  // Optional params render only when explicitly set: unset optionals are
+  // omitted, and a set `0`/`false` still shows (guarded by `!== undefined`).
+  const opt = (key: string): string | undefined => {
+    const v = input[key];
+    return v === undefined ? undefined : `${key}: ${JSON.stringify(v)}`;
+  };
+  const opts = (keys: string[]): string[] =>
+    keys.map(opt).filter((s): s is string => s !== undefined);
+
   switch (name) {
-    case "Read": {
-      const path = input.path as string;
-      const offset = input.offset as number | undefined;
-      const limit = input.limit as number | undefined;
-      const parts = [path];
-      if (offset) parts.push(`offset: ${offset}`);
-      if (limit) parts.push(`limit: ${limit}`);
-      return `${name}(${parts.join(", ")})`;
-    }
+    case "Read":
+      return `Read(${[input.path as string, ...opts(["offset", "limit"])].join(", ")})`;
     case "Write": {
-      const path = input.path as string;
       const content = input.content as string;
       const lines = content ? content.split("\n").length : 0;
-      return `${name}(${path}, ${lines} lines)`;
+      return `Write(${input.path as string}, ${lines} lines)`;
     }
-    case "Edit": {
-      return `${name}(${input.path as string})`;
-    }
-    case "Shell": {
-      return `${name}(${input.command as string})`;
-    }
+    case "Edit":
+      return `Edit(${[input.path as string, ...opts(["replaceAll"])].join(", ")})`;
+    case "Shell":
+      return `Shell(${[input.command as string, ...opts(["timeout"])].join(", ")})`;
     case "SubAgent": {
       const task = input.task as string;
       const preview = task.length > 30 ? task.slice(0, 30) + "..." : task;
-      return `${name}(${preview})`;
+      return `SubAgent(${[preview, ...opts(["tier"])].join(", ")})`;
     }
-    case "LoadSkill": {
-      return `${name}(${input.name as string})`;
-    }
-    case "AskUser": {
-      return `${name}("${input.question as string}")`;
-    }
+    case "LoadSkill":
+      return `LoadSkill(${input.name as string})`;
+    case "AskUser":
+      return `AskUser(${[`"${input.question as string}"`, ...opts(["multiSelect"])].join(", ")})`;
+    case "Grep":
+      return `Grep(${[
+        input.pattern as string,
+        ...opts(["path", "recursive", "ignore_case", "include"]),
+      ].join(", ")})`;
     default:
-      return `${name}(${summary(input)})`;
+      throw new Error(
+        `callContent: no formatter implemented for tool "${name}". Add a case in src/utils/tool-format.ts.`,
+      );
   }
 }

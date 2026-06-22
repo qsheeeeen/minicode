@@ -179,6 +179,9 @@ vi.mock("./services/permission.js", () => ({
 }));
 
 vi.mock("./utils/session.js", () => ({}));
+vi.mock("./utils/tool-format.js", () => ({
+  callContent: vi.fn((name: string) => `${name}()`),
+}));
 vi.mock("fs/promises", () => ({
   default: {
     mkdir: vi.fn().mockResolvedValue(undefined),

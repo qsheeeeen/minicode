@@ -1,5 +1,6 @@
 import type { StatusMessage } from "./display.js";
 import type { LLMBlock, LLMContext } from "../llm/context.js";
+import { callContent } from "../utils/tool-format.js";
 
 /**
  * HeadlessRenderer — incremental stdout renderer for non-TUI mode.
@@ -94,7 +95,7 @@ export class HeadlessRenderer {
     } else if (block.type === "tool_use") {
       if (!this.printedToolUses.has(block.id)) {
         this.printedToolUses.add(block.id);
-        const callText = `${block.name}(${JSON.stringify(block.input)})`;
+        const callText = callContent(block.name, block.input);
         process.stdout.write(`[tool] ${callText}\n`);
       }
     } else if (block.type === "tool_result") {
@@ -136,7 +137,7 @@ export class HeadlessRenderer {
       else if (s.toolDisplay) {
         const td = s.toolDisplay;
         console.log(
-          `(${td.name}(${JSON.stringify(td.input)}) -> ${td.output ?? ""})`,
+          `(${callContent(td.name, td.input)} -> ${td.output ?? ""})`,
         );
       } else if (s.content) {
         console.log(s.content);

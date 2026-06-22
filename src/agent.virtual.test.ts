@@ -18,6 +18,10 @@ import { ToolExecutor } from "./tools/executor.js";
 import { PermissionService } from "./services/permission.js";
 import { SessionPersistence } from "./services/session-persistence.js";
 
+vi.mock("./utils/tool-format.js", () => ({
+  callContent: vi.fn((name: string) => `${name}()`),
+}));
+
 function createTestDeps(options?: {
   responses?: ScriptedResponse[];
   tools?: Map<string, ToolDef>;

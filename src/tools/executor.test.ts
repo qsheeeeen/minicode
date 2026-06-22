@@ -4,6 +4,10 @@ import { PermissionService } from "../services/permission.js";
 import { LLMContext } from "../llm/context.js";
 import type { ToolDef } from "./registry.js";
 
+vi.mock("../utils/tool-format.js", () => ({
+  callContent: vi.fn((name: string) => `${name}()`),
+}));
+
 function makeTool(overrides?: Partial<ToolDef>): ToolDef {
   return {
     name: "testTool",
