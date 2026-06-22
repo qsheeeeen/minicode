@@ -76,24 +76,56 @@ export class ShellService {
   }
 
   runSync(command: string, timeoutMs?: number): string {
+    const clean = (s: unknown): string =>
+      this.truncate(stripAnsiCodes(String(s ?? ""))).trim();
     try {
-      const output = execSync(command, {
-        encoding: "utf-8",
-        timeout: timeoutMs ?? this.defaultTimeoutMs,
-        cwd: this.cwd,
+      const output = clean(
+        execSync(command, {
+          encoding: "utf-8",
+          timeout: timeoutMs ?? this.defaultTimeoutMs,
+          cwd: this.cwd,
+        }),
+      );
+      return this.formatResult({
+        stdout: output,
+        stderr: "",
+        exitCode: 0,
+        timedOut: false,
+        aborted: false,
       });
-      return this.truncate(stripAnsiCodes(output)).trim() || "(no output)";
     } catch (error) {
-      return `Error: ${error instanceof Error ? error.message : String(error)}`;
+      // execSync throws on non-zero exit with { status, stdout, stderr }.
+      const e = error as {
+        status?: number;
+        stdout?: string;
+        stderr?: string;
+        message?: string;
+      };
+      if (typeof e.status === "number") {
+        return this.formatResult({
+          stdout: clean(e.stdout),
+          stderr: clean(e.stderr),
+          exitCode: e.status,
+          timedOut: false,
+          aborted: false,
+        });
+      }
+      return `Error: ${e.message ?? String(error)}`;
     }
   }
 
   formatResult(result: ShellResult): string {
     if (result.aborted) return "Aborted";
     const output = result.stdout || result.stderr;
-    if (result.timedOut) return `Timed out\n${output}`.trim();
-    if (result.exitCode === 0) return output;
-    return `Exit code ${result.exitCode}: ${output}`;
+    if (result.timedOut) {
+      return output ? `Timed out\n${output}` : "(timed out, no output)";
+    }
+    if (output) {
+      return result.exitCode === 0
+        ? output
+        : `Exit code ${result.exitCode}: ${output}`;
+    }
+    return `(no output, exit code ${result.exitCode})`;
   }
 
   private truncate(output: string): string {
