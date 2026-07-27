@@ -1,128 +1,91 @@
 # AGENTS.md
 
-This file provides guidance to the CLI agent when working with code in this repository.
+Guidance for the CLI agent working in this repository.
 
 ## Build & Run
 
 ```bash
-bun run dev           # Development mode (Bun native TS/TSX)
+bun run dev           # Dev (Bun native TS/TSX)
 bun run build         # tsc → dist/
-bun run start         # Run compiled output
-bun run typecheck     # tsc --noEmit (type check only)
-bun test              # Vitest in watch mode
-bun run test:run      # Run tests once
-bunx vitest run src/agent.test.ts  # Single test file (use bunx, not npx)
-bun run format        # Prettier formatting on src/
+bun run typecheck     # tsc --noEmit
+bun test              # Vitest watch
+bun run test:run      # Tests once
+bunx vitest run src/foo.test.ts   # Single file (bunx, not npx)
+bun run format        # Prettier on src/
 ```
 
-**Headless mode** (non-TUI, for scripting and verification):
+Headless mode (non-TUI; for scripting and verification):
 ```bash
-bun run src/main.ts -H "<prompt>"           # Basic headless
-bun run src/main.ts -H --perm yolo "<prompt>" # Headless with permission mode
+bun run src/main.ts -H "<prompt>"
+bun run src/main.ts -H --perm yolo "<prompt>"   # with permission mode
 ```
 
 ## Config
 
-Default config location: `~/.minicode/config.json`.
+`~/.minicode/config.json`. Model specifier is `model@provider` (e.g. `claude-sonnet-4-5@anthropic`); resolution: CLI `-m` > `MODEL` env > config `model`. Tiers `"pro"`/`"flash"` each map to a `model@provider`. Providers support arbitrary keys — any `model@provider` resolves via `createClient()` protocol registry or falls back to Anthropic-compatible. See `config.example.json`.
 
-Model specifier format: `model@provider` (e.g., `claude-sonnet-4-5@anthropic`, `deepseek-chat@deepseek`). Resolution order: CLI `-m` > `MODEL` env > config `model` field. Supports tiers: `"pro"` and `"flash"`, each mapping to a `model@provider`.
+Tests must not depend on real config files — mock or inject.
 
-Providers config supports arbitrary keys — any `model@provider` resolves via `createClient()` protocol registry or falls back to Anthropic-compatible (e.g., `deepseek-chat@deepseek` with a custom `baseURL`). See `config.example.json` for a concrete provider/tier setup.
+## Verification
 
-**Testing:** Tests must not depend on real config files. Mock or inject config in tests.
-
-## Verification Protocol
-
-After implementing any feature or fix, self-test in headless mode:
-
+After any feature/fix, self-test in headless mode — it surfaces bugs the TUI doesn't:
 ```bash
-bun run src/main.ts -H "<prompt that exercises the change>"
+bun run src/main.ts -H "<prompt exercising the change>"
 ```
 
-Headless mode exposes bugs that TUI doesn't. Always verify output is correct.
+## Conventions
+
+- Node16 ESM, `.js` extensions on relative imports, TS strict, JSX via `react-jsx` (Ink v7 + React 19).
+- Tests colocated (`foo.ts` → `foo.test.ts`), Vitest + `ink-testing-library`. Mock with `vi.spyOn`/`vi.fn`/`vi.mock`; TUI tests use `render()` / `lastFrame()` / `stdin.write()`.
+- **No real LLM/API in tests** — use `VirtualLLMClient` (`llm/virtual.ts`) + `createVirtualTool` (`testing.ts`); see `agent.virtual.test.ts`.
+- External skills in `.agents/skills/` (gitignored except itself); built-ins (`skill-creator`, `init`) in `src/skills/`.
+
+## TUI Demos
+
+Standalone harnesses in a real terminal — cover what `ink-testing-library` can't (colors, layout, transitions). Shared `fixtures.ts`.
+
+```bash
+bun run src/ui/tui/demos/widgets/<name>.tsx   # one component (L1)
+bun run src/ui/tui/demos/scenes/<name>.tsx     # scripted flow (L3)
+bun run src/ui/tui/demos/composite.tsx         # all widgets (L2)
+```
+
+New component → add a `widgets/<name>.tsx`. New cross-component flow → add a `scenes/<name>.tsx` that scripts it end-to-end.
+
+## Architecture
+
+Forced by root constraints, not convention. Before adding code or a module, confirm it satisfies them — don't just put it "where it's currently used."
+
+**Root constraints:**
+1. LLM / file / shell / terminal are **uncontrollable side effects** — expensive, non-deterministic, irreversible, vendor-specific.
+2. The **conversation (blocks) is the core asset**, produced by the agent, consumed by the UI.
+3. **Tests must not depend on a real LLM/API.**
+4. **New tools / commands / protocols / strategies must be addable without touching existing ones.**
+
+**Derived principles:**
+- Push the uncontrollable behind a boundary; keep core logic pure (unit-testable, injectable).
+- Policy (orchestration) vs. mechanism (swappable implementations); one-way deps.
+- `LLMContext` blocks are the **single source of truth**; derived views (tokens / display / stats / journal) compute or subscribe — never a second copy.
+- Cross-cutting concerns (persistence, tokens, change-tracking, permission, prompts) are narrow-interface services, each with state where it belongs.
+- Declaration (`registry`) vs. execution (`executor`) for extensible things.
+- **Errors are values, not control flow** — tool denial/failure returns as `ToolRunResult`, never throws across a boundary; only abort/IO-crash throws.
+
+**Dependency direction (a violation is a bug):**
+```
+main → app → agent → (tools, services, llm)
+ui → (agent, services)
+llm / tools never import ui
+utils depends on nothing but stdlib
+```
+
+`app/` is the only composition root that knows concrete implementations — pure wiring onto `AgentDeps`/`AppRuntime` abstractions, no logic. `agent.ts` is pure policy: the loop order (fetch blocks → ask LLM → run tools → write blocks → repeat), reaching everything via `deps`/`context`. `ui/` is an observer + input router — it never calls back into the agent, and display overrides live on the renderer, not on `LLMUserBlock`.
 
 ## Implementation Discipline
 
 Don't stop at "it works." While implementing a change:
 
-1. **Editing the same logic in several places is a smell.** If the change forces duplicate edits, consolidate it (single source of truth) as part of the change — don't just propagate the edit across call sites.
-2. **Survey coupled code while the context is loaded:** conflicts to resolve, things to merge, a local refactor that falls out. Do it now, not later.
-3. **Pick the most elegant implementation**, not the first one that runs.
+- **Duplicate edits are a smell.** If the change forces the same logic in N places, consolidate to one source of truth as part of the change — don't just propagate the edit.
+- **Survey coupled code now**, while context is loaded: conflicts to resolve, things to merge, refactors that fall out. Do it now, not later.
+- **Pick the most elegant implementation**, not the first that runs.
 
-Feature work is the best moment to refactor — you understand the code most deeply right then, and deferred cleanup compounds into debt. (Example: adding a "no output" hint to `ShellService` surfaced that `runSync` and `formatResult` each held formatting logic — the right move was to route `runSync` through `formatResult`, which also fixed `runSync` losing the exit code on non-zero exits.)
-
-## Testing Patterns
-
-- Tests use Vitest with `ink-testing-library` for TUI components
-- Test files colocated with source: `foo.ts` → `foo.test.ts`
-- Mock patterns: `vi.spyOn()`, `vi.fn()`, module mocking with `vi.mock()`
-- TUI component tests: render with `render()`, query with `lastFrame()`, simulate input with `stdin.write()`
-- Demo components in `src/ui/tui/demos/` for visual testing during development
-- **Virtual LLM testing:** `new VirtualLLMClient(responses)` (from `llm/virtual.ts`) + `createVirtualTool(name, handler)` (from `testing.ts`) enable testing Agent's tool loop without real API calls. See `agent.virtual.test.ts` for examples.
-
-## Skills Directory
-
-External skills live in `.agents/skills/` (gitignored except this directory). Each skill is a directory with a `SKILL.md` file containing YAML frontmatter + body. Built-in skills (`skill-creator`, `init`) are in `src/skills/`.
-
-## Module Design (first principles)
-
-The architecture is forced by a few root constraints, not by convention. Before adding code or a new module, confirm it satisfies these — don't just put it "where it's currently used."
-
-**Root constraints:**
-1. **LLM / file / shell / terminal are uncontrollable side effects** — expensive, non-deterministic, irreversible, vendor-specific.
-2. **The conversation (blocks) is the core asset**, produced by the agent and consumed by the UI.
-3. **Tests must not depend on a real LLM/API.**
-4. **New tools / commands / protocols / strategies must be addable without touching existing ones.**
-
-**Principles derived from them:**
-- **Push the uncontrollable behind a boundary.** Side effects (LLM, IO, shell, rendering) live in boundary modules with swappable implementations; core logic stays pure (unit-testable, injectable).
-- **Policy vs. mechanism, one-way deps.** Orchestration (`agent`) is policy — it states *what/when*; mechanisms (`LLMClient`, `ToolExecutor`, UI) are interchangeable implementations. Policy depends on abstractions.
-- **Single source of truth, append-only.** `LLMContext`'s blocks are the conversation truth; derived views (tokens / display / stats / journal) compute or subscribe from it — never a second copy.
-- **Cross-cutting concerns become narrow-interface services.** Persistence, tokens, change-tracking, permission, prompts are not the agent's job — each is a single-responsibility service.
-- **Declaration vs. execution split.** Extensible things (tools, commands, protocols, strategies) separate the descriptor (`registry`) from the imperative handler (`executor`) — adding one doesn't modify the other.
-- **Errors are values, not control flow.** Tool denial/failure is a business outcome, returned as `ToolRunResult`, never thrown across a boundary; only genuinely unexpected failures (abort, IO crash) throw.
-
-**How each layer is designed (derived from the above):**
-
-- **Entry (`main`/`args`/`config`/`messages`)** — parse the uncontrollable outside (CLI, disk) into deterministic data and stop. No runtime state, no business decisions. `messages` is just a type barrel.
-- **`app/` (composition root)** — the *only* place allowed to know concrete implementations: bind protocol/UI/services onto the `AgentDeps`/`AppRuntime` abstractions. Everything else depends on abstractions. Pure wiring, no logic.
-- **`agent.ts` (orchestration = policy)** — only the loop order (fetch blocks → ask LLM → run tools → write blocks → repeat), reaching everything via `deps`/`context`. It must not know how the LLM is implemented, how a tool runs, or how the UI paints. Inject doubles → the whole loop is unit-testable.
-- **`llm/` (boundary)** — hide the most uncontrollable side effect. `client` is the abstraction, `protocols` are swappable, `context` is the vendor-neutral append-only block stream (pure data). Blocks are protocol data — *no* UI intent (display overrides, extra fields) may grow onto `LLMUserBlock`.
-- **`tools/` (declaration vs. execution)** — `registry` holds declarative `ToolDef`s; `executor` is the cross-cutting handler (permission, batching, result flushing). Adding a tool touches only `builtin/`. **Outcomes return as `ToolRunResult`; denial/failure never throws across the boundary.**
-- **`services/` (cross-cutting, one concern per file)** — each stateful/side-effecting concern is its own service behind a narrow interface. State lives where it belongs: session state in `session-manager`, blocks in `LLMContext`, file changes in `change-journal` — never duplicated across. `permission` decides only (enforcement is `ToolExecutor`); `context-manager` watches tokens but stores no blocks; `session-persistence` is pure IO.
-- **`ui/` (observer + input router)** — only reads blocks to render and routes input in; it never participates in agent policy. Rendering splits "pure transform" (`display`) from "side-effect boundary" (`renderer`/`timeline`). **Never calls back into the agent; display is purely a UI concern (overrides live on the renderer, not on `LLMUserBlock`).** `routing` classifies input, `route-handler` acts — judgment and action stay separate.
-- **`skills` / `testing` / `utils`** — `utils` is stateless, side-effect-free, and depends on no domain layer (or cycles form); `testing` provides `VirtualLLMClient`/`createVirtualTool` so constraint #3 holds; `skills` is a hot-loadable extension point (declarative, registered as commands).
-
-Dependency direction (a violation is a bug): `main → app → agent → (tools, services, llm)`; `ui → (agent, services)`; `llm`/`tools` never import `ui`; `utils` depends on nothing but the standard library.
-
-## Module Convention
-
-- All imports use `.js` extensions with relative paths (Node16 ESM resolution)
-- Pure ESM (`"type": "module"`), no CommonJS
-- JSX via `react-jsx` automatic runtime (Ink v7 + React 19)
-- TypeScript strict mode enabled
-
-## TUI Demos
-
-Standalone visual harnesses rendered in a real terminal — they cover what `ink-testing-library` can't assert (colors, layout, borders, state transitions). Each is its own file run in its own process; all share `fixtures.ts` for sample data.
-
-```bash
-bun run src/ui/tui/demos/widgets/<name>.tsx   # single component (L1)
-bun run src/ui/tui/demos/scenes/<name>.tsx     # scripted interaction flow (L3)
-bun run src/ui/tui/demos/composite.tsx         # every widget on one screen (L2)
-```
-
-- **`widgets/`** — one component in isolation; fast iteration on appearance and per-state rendering.
-- **`scenes/`** — scripted UI state transitions (`tool-flow`, `subagent`, `denial`, `abort`) driven by `useTuiState.setState` sequences; verifies cross-component wiring that single-widget demos can't show.
-- **`composite.tsx`** — every widget on one screen; checks layout coordination.
-
-When adding a TUI component, add a `widgets/<name>.tsx`. When adding/changing a cross-component flow (e.g. a new agent state transition), add a `scenes/<name>.tsx` that scripts it end-to-end.
-
-## SOLID Principles
-
-- **Single Responsibility Principle (SRP):** Each module/class/function should have only one reason to change.
-- **Open/Closed Principle (OCP):** Software entities should be open for extension, closed for modification.
-- **Liskov Substitution Principle (LSP):** Subtypes must be substitutable for their base types without altering program correctness.
-- **Interface Segregation Principle (ISP):** Clients should not be forced to depend on interfaces th
-ey don't use.
-- **Dependency Inversion Principle (DIP):** High-level modules should not depend on low-level modules; both should depend on abstractions.
+Feature work is the best moment to refactor — you understand the code most deeply right then, and deferred cleanup compounds into debt.
