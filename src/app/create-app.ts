@@ -21,6 +21,14 @@ import { switchSession } from "../services/session-lifecycle.js";
 import { ShellService } from "../services/shell-service.js";
 import { ToolExecutor } from "../tools/executor.js";
 import { getAll } from "../tools/index.js";
+import { createCapabilities, type SubAgentSpawner } from "../tools/registry.js";
+import {
+  ShellCapability,
+  RegistryCapability,
+  ChangeJournalCapability,
+  SubAgentSpawnerCapability,
+} from "../tools/capabilities.js";
+import { runSubAgent } from "../sub-agent.js";
 import { createLogger } from "../utils/logger.js";
 import { loadGlobalPrompt } from "../utils/prompts.js";
 import type { AppRuntime } from "./types.js";
@@ -140,14 +148,21 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
       tools.delete(name);
     }
   }
+  const spawnSubAgent: SubAgentSpawner = (params) =>
+    runSubAgent({ ...params, permissionService });
+  const capabilities = createCapabilities([
+    [ShellCapability, shellService],
+    [RegistryCapability, agentRegistry],
+    [ChangeJournalCapability, sessionManager.getChangeJournal()],
+    [SubAgentSpawnerCapability, spawnSubAgent],
+  ]);
   const toolExecutor = new ToolExecutor({
     tools,
     permissionService,
     context: sessionManager.getContext(),
-    registry: agentRegistry,
     appConfig: config,
     currentAgentId: "1",
-    shell: shellService,
+    capabilities,
   });
 
   // deps is a shared mutable bag: modelSwitchService writes client/model,

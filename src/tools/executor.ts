@@ -4,13 +4,11 @@ import type {
   ToolConfig,
   ToolRunResult,
   UserPrompter,
+  Capabilities,
 } from "./registry.js";
 import type { LLMToolUseBlock } from "../llm/client.js";
 import type { LLMContext } from "../llm/context.js";
-import type { ChangeJournal } from "../services/change-journal.js";
-import type { AgentRegistry } from "../services/agent-registry.js";
 import type { AppConfig } from "../config.js";
-import type { ShellService } from "../services/shell-service.js";
 import {
   PermissionService,
   type PermissionMode,
@@ -28,11 +26,9 @@ export interface ToolExecutorOpts {
   readonly permissionService: PermissionService;
   readonly context: LLMContext;
   readonly logger?: pino.Logger;
-  // Stable execution environment — constant for the executor's lifetime.
-  readonly registry?: AgentRegistry;
   readonly appConfig?: AppConfig;
   readonly currentAgentId?: string;
-  readonly shell?: ShellService;
+  readonly capabilities: Capabilities;
 }
 
 /** Per-invocation inputs that can change between execute() calls. */
@@ -41,7 +37,6 @@ export interface ToolExecutionDynamic {
   config: ToolConfig;
   prompter?: UserPrompter;
   activeUserMessageOrdinal?: number;
-  changeJournal?: ChangeJournal;
 }
 
 /**
@@ -53,20 +48,18 @@ export class ToolExecutor {
   private permissionService: PermissionService;
   private context: LLMContext;
   private logger?: pino.Logger;
-  private registry?: AgentRegistry;
   private appConfig?: AppConfig;
   private currentAgentId?: string;
-  private shell?: ShellService;
+  private capabilities: Capabilities;
 
   constructor(opts: ToolExecutorOpts) {
     this.tools = opts.tools;
     this.permissionService = opts.permissionService;
     this.context = opts.context;
     this.logger = opts.logger;
-    this.registry = opts.registry;
     this.appConfig = opts.appConfig;
     this.currentAgentId = opts.currentAgentId;
-    this.shell = opts.shell;
+    this.capabilities = opts.capabilities;
   }
 
   /**
@@ -88,12 +81,12 @@ export class ToolExecutor {
       if (!allowed) {
         if (this.permissionService.getMode() === "auto") {
           return {
-            success: true,
-            result: `Tool execution denied by auto-gate: ${reason || "unknown reason"}`,
+            outcome: "error",
+            reason: `Tool execution denied by auto-gate: ${reason || "unknown reason"}`,
           };
         }
         return {
-          success: false,
+          outcome: "denied",
           reason: reason || "User rejected",
         };
       }
@@ -108,19 +101,17 @@ export class ToolExecutor {
   async execute(
     toolCalls: ToolCall[],
     dynamic: ToolExecutionDynamic,
-  ): Promise<ToolRunResult | null> {
+  ): Promise<"denied" | null> {
     if (toolCalls.length === 0) return null;
 
     const context: ToolExecutionContext = {
-      registry: this.registry,
       appConfig: this.appConfig,
       currentAgentId: this.currentAgentId ?? "1",
-      shell: this.shell,
       signal: dynamic.signal,
       config: dynamic.config,
       prompter: dynamic.prompter,
       activeUserMessageOrdinal: dynamic.activeUserMessageOrdinal,
-      changeJournal: dynamic.changeJournal,
+      capabilities: this.capabilities,
     };
 
     this.logger?.info(
@@ -149,7 +140,7 @@ export class ToolExecutor {
       }
       // Mark this tool and every remaining tool in the batch as denied,
       // flush their results, then surface the denial (no throw).
-      const deny = (reason: string): ToolRunResult => {
+      const deny = (reason: string): "denied" => {
         results.push({ toolUseId: block.id, content: reason });
         for (let j = i + 1; j < toolCalls.length; j++) {
           results.push({
@@ -160,7 +151,7 @@ export class ToolExecutor {
         for (const result of results) {
           this.context.completeToolCall(result.toolUseId, result.content);
         }
-        return { success: false };
+        return "denied";
       };
       try {
         const result = await this.runTool(
@@ -168,10 +159,22 @@ export class ToolExecutor {
           block.input as Record<string, unknown>,
           context,
         );
-        if (!result.success) {
-          return deny(result.reason ?? "Denied");
+        if (result.outcome === "denied") {
+          return deny(result.reason);
         }
-        results.push({ toolUseId: block.id, content: result.result ?? "" });
+        if (result.outcome === "error") {
+          // Soft error: write reason back, keep processing the batch.
+          results.push({
+            toolUseId: block.id,
+            content: `Error: ${result.reason}`,
+          });
+          this.logger?.info(
+            { toolName: tool.name, error: result.reason },
+            "Tool soft-failed",
+          );
+          continue;
+        }
+        results.push({ toolUseId: block.id, content: result.result });
         this.logger?.info(
           { toolName: tool.name, toolInput: block.input },
           "Tool result",

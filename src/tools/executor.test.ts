@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { ToolExecutor, type ToolCall, type ToolExecutionDynamic } from "./executor.js";
 import { PermissionService } from "../services/permission.js";
 import { LLMContext } from "../llm/context.js";
-import type { ToolDef } from "./registry.js";
+import { createCapabilities, type ToolDef } from "./registry.js";
 
 vi.mock("../utils/tool-format.js", () => ({
   callContent: vi.fn((name: string) => `${name}()`),
@@ -13,7 +13,7 @@ function makeTool(overrides?: Partial<ToolDef>): ToolDef {
     name: "testTool",
     description: "A test tool",
     input_schema: { type: "object" as const, properties: {} },
-    execute: vi.fn().mockResolvedValue({ success: true, result: "ok" }),
+    execute: vi.fn().mockResolvedValue({ outcome: "success", result: "ok" }),
     readOnly: true,
     ...overrides,
   };
@@ -34,6 +34,7 @@ function makeExecutor(overrides?: {
     tools,
     permissionService,
     context,
+    capabilities: createCapabilities([]),
   });
   return { executor, tools, permissionService, context };
 }
@@ -156,7 +157,7 @@ describe("ToolExecutor", () => {
 
       const result = await executor.execute([call], makeDynamic());
 
-      expect(result).toEqual({ success: false });
+      expect(result).toBe("denied");
     });
 
     it("denies the rest of the batch when one tool is denied", async () => {
@@ -187,7 +188,7 @@ describe("ToolExecutor", () => {
 
       const result = await executor.execute(calls, makeDynamic());
 
-      expect(result).toEqual({ success: false });
+      expect(result).toBe("denied");
       expect(tool2.execute).not.toHaveBeenCalled();
       expect(spy).toHaveBeenCalledWith("call_1", "User rejected");
       expect(spy).toHaveBeenCalledWith("call_2", "User rejected");
@@ -215,7 +216,7 @@ describe("ToolExecutor", () => {
 
       expect(spy).toHaveBeenCalledWith(
         "call_1",
-        "Tool execution denied by auto-gate: too risky",
+        "Error: Tool execution denied by auto-gate: too risky",
       );
     });
 
@@ -234,6 +235,34 @@ describe("ToolExecutor", () => {
       await executor.execute([call], makeDynamic());
 
       expect(spy).toHaveBeenCalledWith("call_1", "Error: boom");
+    });
+
+    it("treats non-fatal failure as soft: writes reason back and continues the batch", async () => {
+      const tool1 = makeTool({ name: "tool1" });
+      (tool1.execute as ReturnType<typeof vi.fn>).mockResolvedValue({
+        outcome: "error",
+        reason: "file not found",
+      });
+      const tool2 = makeTool({ name: "tool2" });
+      const { executor, context } = makeExecutor({
+        tools: new Map([
+          ["tool1", tool1],
+          ["tool2", tool2],
+        ]),
+      });
+      const calls = [
+        makeToolCall(tool1, {}, "call_1"),
+        makeToolCall(tool2, {}, "call_2"),
+      ];
+      prepareToolCalls(context, calls);
+      const spy = vi.spyOn(context, "completeToolCall");
+
+      const result = await executor.execute(calls, makeDynamic());
+
+      expect(result).toBeNull(); // batch not aborted
+      expect(tool2.execute).toHaveBeenCalled(); // subsequent tool still ran
+      expect(spy).toHaveBeenCalledWith("call_1", "Error: file not found");
+      expect(spy).toHaveBeenCalledWith("call_2", "ok");
     });
 
     it("executes multiple tools sequentially", async () => {

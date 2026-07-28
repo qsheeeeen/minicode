@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { grepTool } from "./grep.js";
+import { unwrapSuccess, unwrapError } from "../../testing/index.js";
 
 vi.mock("child_process", () => ({
   spawn: vi.fn(),
@@ -12,7 +13,8 @@ describe("grepTool", () => {
 
   it("returns error when pattern is missing", async () => {
     const result = await grepTool.execute({});
-    expect(result.result).toBe("Error: pattern is required");
+    expect(result.outcome).toBe("error");
+    expect(unwrapError(result)).toBe("pattern is required");
   });
 
   it("returns matches on success", async () => {
@@ -32,7 +34,7 @@ describe("grepTool", () => {
     (spawn as ReturnType<typeof vi.fn>).mockReturnValue(mockProc as any);
 
     const result = await grepTool.execute({ pattern: "TODO" });
-    expect(result.result).toBe("file.ts:1:match");
+    expect(unwrapSuccess(result)).toBe("file.ts:1:match");
   });
 
   it("returns 'No matches found' when grep finds nothing", async () => {
@@ -48,7 +50,7 @@ describe("grepTool", () => {
     (spawn as ReturnType<typeof vi.fn>).mockReturnValue(mockProc as any);
 
     const result = await grepTool.execute({ pattern: "nonexistent" });
-    expect(result.result).toBe("No matches found");
+    expect(unwrapSuccess(result)).toBe("No matches found");
   });
 
   it("passes correct args for case-insensitive search", async () => {

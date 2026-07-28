@@ -60,8 +60,8 @@ export const askUserTool: ToolDef<AskUserArgs> = {
     const options = args.options;
     if (!Array.isArray(options)) {
       return {
-        success: true,
-        result: `Error: AskUser tool requires 'options' to be an array, received: ${JSON.stringify(args.options)}`,
+        outcome: "error",
+        reason: `AskUser 'options' must be an array, received: ${JSON.stringify(args.options)}`,
       };
     }
     const multiSelect = args.multiSelect ?? false;
@@ -74,11 +74,11 @@ export const askUserTool: ToolDef<AskUserArgs> = {
 
     if (!answer) {
       return {
-        success: false,
+        outcome: "denied",
         reason: "User cancelled the question",
       };
     }
-    return { success: true, result: `User selected: "${answer}"` };
+    return { outcome: "success", result: `User selected: "${answer}"` };
   },
 };
 register(askUserTool);

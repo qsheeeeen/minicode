@@ -33,7 +33,21 @@ export function createVirtualTool(
     readOnly: options?.readOnly ?? true,
     execute: async (args: Record<string, unknown>): Promise<ToolRunResult> => {
       const output = await handler(args);
-      return { success: true, result: output };
+      return { outcome: "success", result: output };
     },
   };
+}
+
+/** Assert a success outcome and return its result text. */
+export function unwrapSuccess(r: ToolRunResult): string {
+  if (r.outcome !== "success")
+    throw new Error(`expected success outcome, got ${r.outcome}`);
+  return r.result;
+}
+
+/** Assert an error outcome and return its reason text. */
+export function unwrapError(r: ToolRunResult): string {
+  if (r.outcome !== "error")
+    throw new Error(`expected error outcome, got ${r.outcome}`);
+  return r.reason;
 }

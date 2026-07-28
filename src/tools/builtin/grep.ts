@@ -37,7 +37,7 @@ export const grepTool: ToolDef = {
     context?: ToolExecutionContext,
   ): Promise<ToolRunResult> => {
     const pattern = args.pattern as string;
-    if (!pattern) return { success: true, result: "Error: pattern is required" };
+    if (!pattern) return { outcome: "error", reason: "pattern is required" };
 
     const searchPath = (args.path as string) || ".";
     const recursive = args.recursive !== false;
@@ -68,10 +68,10 @@ export const grepTool: ToolDef = {
           resolve(trimmed || "No matches found");
         });
       });
-      return { success: true, result: output };
+      return { outcome: "success", result: output };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      return { success: true, result: msg };
+      return { outcome: "error", reason: msg };
     }
   },
 };

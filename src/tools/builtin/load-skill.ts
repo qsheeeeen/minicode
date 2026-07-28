@@ -25,11 +25,11 @@ export const loadSkillTool: ToolDef = {
     const skillBody = getSkillBody(skillName);
 
     if (!skillBody) {
-      return { success: true, result: `Error: Skill '${skillName}' not found.` };
+      return { outcome: "error", reason: `Skill '${skillName}' not found` };
     }
 
     const output = `<loaded_skill name="${skillName}">\n<instructions>\n${skillBody}\n</instructions>\n</loaded_skill>`;
-    return { success: true, result: output };
+    return { outcome: "success", result: output };
   },
 };
 register(loadSkillTool);

@@ -2,6 +2,7 @@ import fs from "fs/promises";
 import path from "path";
 import type { ToolDef, ToolExecutionContext, ToolRunResult } from "../registry.js";
 import { register } from "../registry.js";
+import { ChangeJournalCapability } from "../capabilities.js";
 
 interface TextReplacementRange {
   readonly start: number;
@@ -41,8 +42,9 @@ async function recordWriteChange(
   result: WriteTextResult,
 ): Promise<void> {
   const userMessageOrdinal = context?.activeUserMessageOrdinal ?? 0;
-  if (!context?.changeJournal || userMessageOrdinal <= 0) return;
-  await context.changeJournal.recordChange(
+  const changeJournal = context?.capabilities.get(ChangeJournalCapability);
+  if (!changeJournal || userMessageOrdinal <= 0) return;
+  await changeJournal.recordChange(
     userMessageOrdinal,
     result.path,
     "write",
@@ -74,10 +76,10 @@ export const writeTool: ToolDef = {
       const content = args.content as string;
       const result = await writeText(filePath, content);
       await recordWriteChange(context, result);
-      return { success: true, result: `Wrote ${filePath}` };
+      return { outcome: "success", result: `Wrote ${filePath}` };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      return { success: true, result: msg };
+      return { outcome: "error", reason: msg };
     }
   },
 };

@@ -8,6 +8,7 @@ import { ToolExecutor } from "./tools/executor.js";
 import { PermissionService } from "./services/permission.js";
 import { SessionPersistence } from "./services/session-persistence.js";
 import { getAll } from "./tools/index.js";
+import { createCapabilities } from "./tools/registry.js";
 
 function makeTestModel() {
   return new Model("test-model", "test-provider", 200000);
@@ -46,6 +47,7 @@ function makeDeps(overrides?: {
     tools: getAll(),
     permissionService,
     context,
+    capabilities: createCapabilities([]),
   });
   const deps: AgentDeps = {
     client,
@@ -145,7 +147,7 @@ vi.mock("./tools/index.js", async (importOriginal) => {
     description: "Test Tool",
     input_schema: { type: "object", properties: {} },
     requiresPermission: true,
-    execute: vi.fn().mockResolvedValue({ success: true, result: "success" }),
+    execute: vi.fn().mockResolvedValue({ outcome: "success", result: "success" }),
   };
   return {
     ...original,

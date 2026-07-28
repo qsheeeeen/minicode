@@ -6,7 +6,7 @@ import {
   defaultTextResponse,
   createVirtualTool,
 } from "../../testing/index.js";
-import type { ToolDef } from "../../tools/registry.js";
+import { createCapabilities, type ToolDef } from "../../tools/registry.js";
 import { SessionManager } from "../../services/session-manager.js";
 import { ContextManager } from "../../services/context-manager.js";
 import { RuntimeEvents } from "../../services/runtime-events.js";
@@ -52,6 +52,7 @@ function createTestDeps(responses = [defaultTextResponse("OK")]) {
     tools,
     permissionService: new PermissionService("yolo"),
     context: sessionManager.getContext(),
+    capabilities: createCapabilities([]),
   });
   const deps: AgentDeps = {
     client,

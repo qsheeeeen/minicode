@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { writeTool } from "./write.js";
+import { createCapabilities } from "../registry.js";
+import { ChangeJournalCapability } from "../capabilities.js";
+import { unwrapSuccess, unwrapError } from "../../testing/index.js";
 
 vi.mock("fs/promises", () => ({
   default: {
@@ -10,12 +13,12 @@ vi.mock("fs/promises", () => ({
 }));
 
 function makeContext() {
-  return {
+  const journal = { recordChange: vi.fn().mockResolvedValue(undefined) };
+  const context = {
     activeUserMessageOrdinal: 2,
-    changeJournal: {
-      recordChange: vi.fn().mockResolvedValue(undefined),
-    },
+    capabilities: createCapabilities([[ChangeJournalCapability, journal]]),
   } as any;
+  return { context, journal };
 }
 
 describe("writeTool", () => {
@@ -29,7 +32,7 @@ describe("writeTool", () => {
       (fs.readFile as ReturnType<typeof vi.fn>).mockRejectedValue(
         Object.assign(new Error("not found"), { code: "ENOENT" }),
       );
-      const context = makeContext();
+      const { context, journal } = makeContext();
 
       const result = await writeTool.execute(
         {
@@ -39,14 +42,14 @@ describe("writeTool", () => {
         context,
       );
 
-      expect(result.result).toBe("Wrote test.txt");
+      expect(unwrapSuccess(result)).toBe("Wrote test.txt");
       expect(fs.mkdir).toHaveBeenCalledWith(".", { recursive: true });
       expect(fs.writeFile).toHaveBeenCalledWith(
         "test.txt",
         "hello world",
         "utf-8",
       );
-      expect(context.changeJournal.recordChange).toHaveBeenCalledWith(
+      expect(journal.recordChange).toHaveBeenCalledWith(
         2,
         "test.txt",
         "write",
@@ -58,7 +61,7 @@ describe("writeTool", () => {
     it("records existing file content for overwrite", async () => {
       const fs = (await import("fs/promises")).default;
       (fs.readFile as ReturnType<typeof vi.fn>).mockResolvedValue("old");
-      const context = makeContext();
+      const { context, journal } = makeContext();
 
       await writeTool.execute(
         {
@@ -69,7 +72,7 @@ describe("writeTool", () => {
       );
 
       expect(fs.mkdir).toHaveBeenCalledWith("dir", { recursive: true });
-      expect(context.changeJournal.recordChange).toHaveBeenCalledWith(
+      expect(journal.recordChange).toHaveBeenCalledWith(
         2,
         "dir/test.txt",
         "write",
@@ -83,7 +86,7 @@ describe("writeTool", () => {
       (fs.readFile as ReturnType<typeof vi.fn>).mockRejectedValue(
         new Error("EACCES"),
       );
-      const context = makeContext();
+      const { context, journal } = makeContext();
 
       const result = await writeTool.execute(
         {
@@ -93,8 +96,9 @@ describe("writeTool", () => {
         context,
       );
 
-      expect(result.result).toContain("EACCES");
-      expect(context.changeJournal.recordChange).not.toHaveBeenCalled();
+      expect(result.outcome).toBe("error");
+      expect(unwrapError(result)).toContain("EACCES");
+      expect(journal.recordChange).not.toHaveBeenCalled();
     });
   });
 });

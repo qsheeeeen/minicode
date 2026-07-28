@@ -17,7 +17,7 @@ describe("askUserTool", () => {
       );
 
       expect(result).toEqual({
-        success: true,
+        outcome: "success",
         result: 'User selected: "Option A"',
       });
       expect(mockPrompt).toHaveBeenCalledWith({
@@ -51,7 +51,7 @@ describe("askUserTool", () => {
         { prompter: { prompt: mockPrompt } } as any,
       );
       expect(result).toEqual({
-        success: false,
+        outcome: "denied",
         reason: "User cancelled the question",
       });
     });
@@ -81,10 +81,8 @@ describe("askUserTool", () => {
         {} as any,
       );
       expect(result).toMatchObject({
-        success: true,
-        result: expect.stringContaining(
-          "Error: AskUser tool requires 'options' to be an array",
-        ),
+        outcome: "error",
+        reason: expect.stringContaining("must be an array"),
       });
     });
 

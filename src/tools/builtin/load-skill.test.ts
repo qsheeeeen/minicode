@@ -6,6 +6,7 @@ vi.mock("../../skills/index.js", () => ({
 
 import { loadSkillTool } from "./load-skill.js";
 import { getSkillBody } from "../../skills/index.js";
+import { unwrapSuccess, unwrapError } from "../../testing/index.js";
 
 const mockGetSkillBody = vi.mocked(getSkillBody);
 
@@ -14,7 +15,7 @@ describe("loadSkillTool", () => {
     mockGetSkillBody.mockReturnValue("do the thing");
 
     const result = await loadSkillTool.execute({ name: "my-skill" });
-    expect(result.result).toBe(
+    expect(unwrapSuccess(result)).toBe(
       '<loaded_skill name="my-skill">\n<instructions>\ndo the thing\n</instructions>\n</loaded_skill>',
     );
   });
@@ -23,6 +24,7 @@ describe("loadSkillTool", () => {
     mockGetSkillBody.mockReturnValue(undefined);
 
     const result = await loadSkillTool.execute({ name: "nonexistent" });
-    expect(result.result).toBe("Error: Skill 'nonexistent' not found.");
+    expect(result.outcome).toBe("error");
+    expect(unwrapError(result)).toBe("Skill 'nonexistent' not found");
   });
 });

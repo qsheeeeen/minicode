@@ -1,5 +1,6 @@
 import type { ToolDef, ToolRunResult, ToolExecutionContext } from "../registry.js";
 import { register } from "../registry.js";
+import { ShellCapability } from "../capabilities.js";
 
 export const shellTool: ToolDef = {
   name: "Shell",
@@ -19,9 +20,9 @@ export const shellTool: ToolDef = {
     args: Record<string, unknown>,
     context?: ToolExecutionContext,
   ): Promise<ToolRunResult> => {
-    const shell = context?.shell;
+    const shell = context?.capabilities.get(ShellCapability);
     if (!shell) {
-      return { success: true, result: "Error: shell service not available" };
+      return { outcome: "error", reason: "shell service not available" };
     }
     try {
       const command = args.command as string;
@@ -30,10 +31,10 @@ export const shellTool: ToolDef = {
         timeoutMs: timeout ? timeout * 1000 : undefined,
         signal: context?.signal,
       });
-      return { success: true, result: shell.formatResult(result) };
+      return { outcome: "success", result: shell.formatResult(result) };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      return { success: true, result: msg };
+      return { outcome: "error", reason: msg };
     }
   },
 };

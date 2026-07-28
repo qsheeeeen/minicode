@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
+  buildSystemPrompt,
   readPromptFile,
   loadGlobalPrompt,
   loadProjectPrompt,
@@ -67,5 +68,20 @@ describe("loadProjectPrompt", () => {
     const readCall = (fs.default.readFile as ReturnType<typeof vi.fn>).mock
       .calls[0][0];
     expect(readCall).toBe("/my/project/AGENTS.md");
+  });
+});
+
+describe("buildSystemPrompt", () => {
+  it("includes roleSystemPrompt as a section", () => {
+    const prompt = buildSystemPrompt({
+      roleSystemPrompt: "you are a reviewer",
+    });
+    expect(prompt).toContain("you are a reviewer");
+    expect(prompt).toContain("# Role");
+  });
+
+  it("omits role section when not provided", () => {
+    const prompt = buildSystemPrompt({});
+    expect(prompt).not.toContain("# Role");
   });
 });

@@ -51,4 +51,23 @@ describe("PromptManager", () => {
       expect(after).not.toBe(before);
     });
   });
+
+  describe("setRolePrompt", () => {
+    it("injects role prompt into system prompt", () => {
+      const pm = new PromptManager();
+      pm.setRolePrompt("you are a researcher");
+      expect(pm.getSystemPrompt()).toContain("you are a researcher");
+    });
+
+    it("constructor accepts roleSystemPrompt", () => {
+      const pm = new PromptManager("", "", "you are a planner");
+      expect(pm.getSystemPrompt()).toContain("you are a planner");
+    });
+
+    it("clears role prompt when set to empty", () => {
+      const pm = new PromptManager("", "", "role-text");
+      pm.setRolePrompt("");
+      expect(pm.getSystemPrompt()).not.toContain("role-text");
+    });
+  });
 });

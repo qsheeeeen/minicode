@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readTool } from "./read.js";
+import { unwrapSuccess, unwrapError } from "../../testing/index.js";
 
 vi.mock("fs/promises", () => ({
   default: {
@@ -24,7 +25,7 @@ describe("readTool", () => {
       const result = await readTool.execute({ path: "test.txt" });
       const fs = (await import("fs/promises")).default;
 
-      expect(result.result).toBe("file content");
+      expect(unwrapSuccess(result)).toBe("file content");
       expect(fs.readFile).toHaveBeenCalledWith("test.txt", "utf-8");
     });
 
@@ -36,7 +37,8 @@ describe("readTool", () => {
 
       const result = await readTool.execute({ path: "nonexistent.txt" });
 
-      expect(result.result).toContain("ENOENT");
+      expect(result.outcome).toBe("error");
+      expect(unwrapError(result)).toContain("ENOENT");
     });
 
     it("slices lines with offset and limit", async () => {
@@ -48,7 +50,7 @@ describe("readTool", () => {
         limit: 2,
       });
 
-      expect(result.result).toBe("line2\nline3");
+      expect(unwrapSuccess(result)).toBe("line2\nline3");
     });
 
     it("uses 1-indexed offset", async () => {
@@ -56,7 +58,7 @@ describe("readTool", () => {
 
       const result = await readTool.execute({ path: "test.txt", offset: 1 });
 
-      expect(result.result).toBe("line1\nline2\nline3");
+      expect(unwrapSuccess(result)).toBe("line1\nline2\nline3");
     });
 
     it("handles offset without limit", async () => {
@@ -64,7 +66,7 @@ describe("readTool", () => {
 
       const result = await readTool.execute({ path: "test.txt", offset: 3 });
 
-      expect(result.result).toBe("line3\nline4");
+      expect(unwrapSuccess(result)).toBe("line3\nline4");
     });
 
     it("handles limit only (no offset)", async () => {
@@ -72,7 +74,7 @@ describe("readTool", () => {
 
       const result = await readTool.execute({ path: "test.txt", limit: 2 });
 
-      expect(result.result).toBe("line1\nline2");
+      expect(unwrapSuccess(result)).toBe("line1\nline2");
     });
   });
 });

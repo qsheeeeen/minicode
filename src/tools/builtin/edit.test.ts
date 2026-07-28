@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { editTool } from "./edit.js";
+import { createCapabilities } from "../registry.js";
+import { ChangeJournalCapability } from "../capabilities.js";
+import { unwrapSuccess, unwrapError } from "../../testing/index.js";
 
 vi.mock("fs/promises", () => ({
   default: {
@@ -9,12 +12,12 @@ vi.mock("fs/promises", () => ({
 }));
 
 function makeContext() {
-  return {
+  const journal = { recordChange: vi.fn().mockResolvedValue(undefined) };
+  const context = {
     activeUserMessageOrdinal: 2,
-    changeJournal: {
-      recordChange: vi.fn().mockResolvedValue(undefined),
-    },
+    capabilities: createCapabilities([[ChangeJournalCapability, journal]]),
   } as any;
+  return { context, journal };
 }
 
 describe("editTool", () => {
@@ -28,7 +31,7 @@ describe("editTool", () => {
       (fs.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(
         "hello world",
       );
-      const context = makeContext();
+      const { context, journal } = makeContext();
 
       const result = await editTool.execute(
         {
@@ -39,13 +42,13 @@ describe("editTool", () => {
         context,
       );
 
-      expect(result.result).toContain("Edited test.txt");
+      expect(unwrapSuccess(result)).toContain("Edited test.txt");
       expect(fs.writeFile).toHaveBeenCalledWith(
         "test.txt",
         "hello minicode",
         "utf-8",
       );
-      expect(context.changeJournal.recordChange).toHaveBeenCalledWith(
+      expect(journal.recordChange).toHaveBeenCalledWith(
         2,
         "test.txt",
         "edit",
@@ -59,7 +62,7 @@ describe("editTool", () => {
       (fs.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(
         "foo bar foo",
       );
-      const context = makeContext();
+      const { context, journal } = makeContext();
 
       await editTool.execute(
         {
@@ -76,7 +79,7 @@ describe("editTool", () => {
         "baz bar baz",
         "utf-8",
       );
-      expect(context.changeJournal.recordChange).toHaveBeenCalledWith(
+      expect(journal.recordChange).toHaveBeenCalledWith(
         2,
         "test.txt",
         "edit",
@@ -93,7 +96,7 @@ describe("editTool", () => {
       (fs.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(
         "hello world",
       );
-      const context = makeContext();
+      const { context, journal } = makeContext();
 
       const result = await editTool.execute(
         {
@@ -104,8 +107,9 @@ describe("editTool", () => {
         context,
       );
 
-      expect(result.result).toContain("oldText not found");
-      expect(context.changeJournal.recordChange).not.toHaveBeenCalled();
+      expect(result.outcome).toBe("error");
+      expect(unwrapError(result)).toContain("oldText not found");
+      expect(journal.recordChange).not.toHaveBeenCalled();
     });
   });
 });

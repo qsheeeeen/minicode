@@ -159,9 +159,8 @@ export async function runAgent(
         prompter: opts?.prompter,
         activeUserMessageOrdinal:
           deps.sessionManager.getActiveUserMessageOrdinal(),
-        changeJournal: deps.sessionManager.getChangeJournal(),
       });
-      if (outcome && !outcome.success) {
+      if (outcome === "denied") {
         break;
       }
 

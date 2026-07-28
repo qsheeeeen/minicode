@@ -12,12 +12,18 @@ import {
 export class PromptManager {
   private userPrompt: string;
   private projectPromptFile: string;
+  private roleSystemPrompt: string;
   private environmentContext = "";
   private systemPrompt = "";
 
-  constructor(userPrompt: string = "", projectPromptFile: string = "") {
+  constructor(
+    userPrompt: string = "",
+    projectPromptFile: string = "",
+    roleSystemPrompt: string = "",
+  ) {
     this.userPrompt = userPrompt;
     this.projectPromptFile = projectPromptFile;
+    this.roleSystemPrompt = roleSystemPrompt;
     this.refreshSystemPrompt();
   }
 
@@ -33,6 +39,7 @@ export class PromptManager {
       environmentContext: this.environmentContext,
       userPrompt: this.userPrompt,
       projectPromptFile: this.projectPromptFile,
+      roleSystemPrompt: this.roleSystemPrompt,
     });
   }
 
@@ -46,6 +53,12 @@ export class PromptManager {
 
   setUserPrompt(prompt: string): void {
     this.userPrompt = prompt;
+    this.refreshSystemPrompt();
+  }
+
+  /** Set the sub-agent role prompt and rebuild. Empty clears it. */
+  setRolePrompt(prompt: string): void {
+    this.roleSystemPrompt = prompt;
     this.refreshSystemPrompt();
   }
 

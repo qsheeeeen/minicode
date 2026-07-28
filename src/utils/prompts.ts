@@ -22,6 +22,8 @@ export interface SystemPromptOptions {
   environmentContext?: string;
   userPrompt?: string;
   projectPromptFile?: string;
+  /** Role prompt for a spawned sub-agent (e.g. researcher/reviewer). */
+  roleSystemPrompt?: string;
 }
 
 /**
@@ -30,6 +32,10 @@ export interface SystemPromptOptions {
  */
 export function buildSystemPrompt(opts: SystemPromptOptions): string {
   let prompt = SYSTEM_PROMPT;
+
+  if (opts.roleSystemPrompt) {
+    prompt += `\n\n# Role\n${opts.roleSystemPrompt}`;
+  }
 
   if (opts.environmentContext) {
     prompt += `\n\n# Environment\n${opts.environmentContext}`;
