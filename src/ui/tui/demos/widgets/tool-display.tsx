@@ -63,12 +63,19 @@ function Demo() {
         />
       </Box>
       <Box marginBottom={1}>
-        <ToolDisplay name="LoadSkill" input={{ name: "code-review" }} output="Loaded" />
+        <ToolDisplay
+          name="LoadSkill"
+          input={{ name: "test-skill" }}
+          output="Loaded"
+        />
       </Box>
       <Box marginBottom={1}>
         <ToolDisplay
           name="AskUser"
-          input={{ question: "Which database should we use?", multiSelect: true }}
+          input={{
+            question: "Which database should we use?",
+            multiSelect: true,
+          }}
         />
       </Box>
     </Box>
