@@ -3,13 +3,12 @@ import { Box, useInput, useApp } from "ink";
 import { runAgent, isAbortError, type AgentDeps } from "../agent.js";
 import type { AppConfig } from "../config.js";
 import type { UserPrompter } from "../tools/registry.js";
-import { routeInput } from "./routing.js";
-import { processRoute } from "./route-handler.js";
 import {
   inputRequestToState,
   createCommandContext,
   type CommandContext,
 } from "./commands/index.js";
+import { processRoutedInput } from "./turn.js";
 import { AgentRegistry } from "../services/index.js";
 import type { RuntimeEvents } from "../services/runtime-events.js";
 import type { SessionStats } from "../services/session-stats.js";
@@ -20,8 +19,11 @@ import type { ModelSwitchService } from "../services/model-switcher.js";
 import type { ContextManager } from "../services/context-manager.js";
 import type { RuntimeState } from "../services/runtime-state.js";
 import type { LLMContext } from "../llm/context.js";
+import type { CommandRegistry } from "./commands/registry.js";
+import type { SkillRegistry } from "../skills/index.js";
+import type { InputRouter } from "./routing.js";
 import { Receipt } from "./tui/Receipt.js";
-import { UITimeline } from "./tui/timeline.js";
+import { SessionTimeline } from "./timeline.js";
 
 import { useTuiState } from "./tui/state.js";
 import { connectAgent } from "./tui/connect-agent.js";
@@ -54,6 +56,11 @@ export interface AppProps {
   context: LLMContext;
   permissionService: PermissionService;
   shellService: ShellService;
+  commandRegistry: CommandRegistry;
+  skillRegistry: SkillRegistry;
+  router: InputRouter;
+  /** True once session bootstrap + UI wiring completed (safe to auto-run). */
+  connected?: boolean;
 }
 
 function AppContent({
@@ -73,11 +80,15 @@ function AppContent({
   context,
   permissionService,
   shellService,
+  commandRegistry,
+  skillRegistry,
+  router,
+  connected = false,
   prompterRef,
   uiTimeline,
 }: AppProps & {
   prompterRef: React.RefObject<UserPrompter | null>;
-  uiTimeline: UITimeline;
+  uiTimeline: SessionTimeline;
 }) {
   const { exit } = useApp();
   const input = useTuiState((s) => s.input);
@@ -110,6 +121,9 @@ function AppContent({
       createCommandContext({
         deps,
         config,
+        commands: commandRegistry,
+        skills: skillRegistry,
+        router,
         sessionStats,
         modelSwitchService,
         contextManager,
@@ -134,10 +148,13 @@ function AppContent({
     [
       deps,
       config,
+      commandRegistry,
+      skillRegistry,
       sessionStats,
       modelSwitchService,
       contextManager,
       runtimeState,
+      router,
     ],
   );
 
@@ -146,20 +163,14 @@ function AppContent({
       if (!value.trim()) return false;
       if (loadingRef.current) return false;
 
-      const route = await routeInput(value, cmdContext());
-      const processed = processRoute(
-        route,
+      const processed = await processRoutedInput({
+        input: value,
+        cmdContext: cmdContext(),
         context,
         shellService,
-        sessionManager.reportStatus.bind(sessionManager),
-      );
-
-      if (processed.type === "run" && processed.displayContent) {
-        uiTimeline.setDisplay(
-          context.getUserMessageCount(),
-          processed.displayContent,
-        );
-      }
+        reportStatus: sessionManager.reportStatus.bind(sessionManager),
+        timeline: uiTimeline,
+      });
 
       if (processed.type === "done") {
         if (processed.shellOutput) {
@@ -207,11 +218,11 @@ function AppContent({
   );
 
   useEffect(() => {
-    if (autoSubmitPending && initialPrompt) {
+    if (connected && autoSubmitPending && initialPrompt) {
       setAutoSubmitPending(false);
       handleSubmit(initialPrompt);
     }
-  }, [autoSubmitPending, initialPrompt, handleSubmit]);
+  }, [connected, autoSubmitPending, initialPrompt, handleSubmit]);
 
   const isModal = pendingPrompt !== null;
 
@@ -268,6 +279,8 @@ function AppContent({
           loadingRef={loadingRef}
           config={config}
           modelSwitchService={modelSwitchService}
+          commandRegistry={commandRegistry}
+          skillRegistry={skillRegistry}
         />
       )}
       <SubAgentBar />
@@ -290,15 +303,19 @@ export function App(props: AppProps) {
 
   // Bridge Agent domain observables to UI state.
   const prompterRef = useRef<UserPrompter | null>(null);
-  const uiTimelineRef = useRef<UITimeline | null>(null);
+  const uiTimelineRef = useRef<SessionTimeline | null>(null);
   if (!uiTimelineRef.current) {
-    uiTimelineRef.current = new UITimeline(props.context);
+    uiTimelineRef.current = new SessionTimeline(props.context, (messages) =>
+      useTuiState.setState({ messages }),
+    );
   }
+  const [connected, setConnected] = React.useState(false);
 
   useEffect(() => {
-    const { cleanup, prompter } = connectAgent({
+    const { cleanup, prompter, ready } = connectAgent({
       sessionManager: props.sessionManager,
       contextManager: props.contextManager,
+      runtimeState: props.runtimeState,
       runtimeEvents: props.runtimeEvents,
       uiTimeline: uiTimelineRef.current!,
       initialSession: props.initialSession,
@@ -307,12 +324,14 @@ export function App(props: AppProps) {
       registry: props.agentRegistry,
     });
     prompterRef.current = prompter;
+    void ready.finally(() => setConnected(true));
     return cleanup;
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <AppContent
       {...props}
+      connected={connected}
       prompterRef={prompterRef}
       uiTimeline={uiTimelineRef.current}
     />

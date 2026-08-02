@@ -7,7 +7,10 @@ import type { SessionStats } from "../../services/session-stats.js";
 import { SessionPersistence } from "../../services/session-persistence.js";
 import { switchSession } from "../../services/session-lifecycle.js";
 import { createLogger } from "../../utils/logger.js";
+import type { SkillRegistry } from "../../skills/index.js";
+import type { InputRouter } from "../routing.js";
 import type { CommandContext, InputRequest } from "./index.js";
+import type { CommandRegistry } from "./registry.js";
 
 /**
  * UI-facing bridges. The composition root (headless) and the TUI inject
@@ -22,6 +25,9 @@ export interface CommandContextBridges {
 export interface CreateCommandContextOpts {
   deps: AgentDeps;
   config: AppConfig;
+  commands: CommandRegistry;
+  skills: SkillRegistry;
+  router: InputRouter;
   sessionStats: SessionStats;
   modelSwitchService: ModelSwitchService;
   contextManager: ContextManager;
@@ -36,6 +42,9 @@ export function createCommandContext(
   const {
     deps,
     config,
+    commands,
+    skills,
+    router,
     sessionStats,
     modelSwitchService,
     contextManager,
@@ -49,6 +58,9 @@ export function createCommandContext(
     model: deps.model,
     config,
     context,
+    commands,
+    skills,
+    router,
     sessionManager,
     get changeJournal() {
       return sessionManager.getChangeJournal();

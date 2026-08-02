@@ -9,28 +9,70 @@ export interface SkillMeta {
   dirPath?: string;
 }
 
-const skills = new Map<string, SkillMeta>();
+/**
+ * SkillRegistry — an explicit, injectable registry of skills. Owned by the
+ * composition root (one per app) instead of a process-global map, so tests
+ * and multiple app instances never share state.
+ */
+export class SkillRegistry {
+  private skills = new Map<string, SkillMeta>();
 
-export function registerSkill(meta: SkillMeta): void {
-  skills.set(meta.name, meta);
+  register(meta: SkillMeta): void {
+    this.skills.set(meta.name, meta);
+  }
+
+  getAvailable(): Pick<SkillMeta, "name" | "description">[] {
+    return Array.from(this.skills.values()).map((s) => ({
+      name: s.name,
+      description: s.description,
+    }));
+  }
+
+  getBody(name: string): string | undefined {
+    return this.skills.get(name)?.body;
+  }
+
+  clear(): void {
+    this.skills.clear();
+  }
+
+  /** Scan a directory (each subdir with SKILL.md) and register found skills. */
+  async loadDirectory(skillsDir: string): Promise<void> {
+    try {
+      const entries = await fs.readdir(skillsDir, { withFileTypes: true });
+
+      for (const entry of entries) {
+        if (entry.isDirectory()) {
+          const skillDirPath = path.join(skillsDir, entry.name);
+          const skillFilePath = path.join(skillDirPath, "SKILL.md");
+
+          try {
+            const content = await fs.readFile(skillFilePath, "utf-8");
+            const meta = parseSkillFile(content, skillDirPath);
+            if (meta) {
+              this.skills.set(meta.name, meta);
+            }
+          } catch {
+            // Ignore if SKILL.md is missing or unreadable
+          }
+        }
+      }
+    } catch {
+      // Ignore if skills directory doesn't exist
+    }
+  }
 }
 
-export function getAvailableSkills(): Pick<
-  SkillMeta,
-  "name" | "description"
->[] {
-  return Array.from(skills.values()).map((s) => ({
-    name: s.name,
-    description: s.description,
-  }));
+/** Register the built-in skills (called explicitly by the composition root). */
+export function registerBuiltinSkills(registry: SkillRegistry): void {
+  registry.register(skillCreator);
+  registry.register(initSkill);
 }
 
-export function getSkillBody(name: string): string | undefined {
-  return skills.get(name)?.body;
-}
-
-export function resetSkills(): void {
-  skills.clear();
+export function createDefaultSkillRegistry(): SkillRegistry {
+  const registry = new SkillRegistry();
+  registerBuiltinSkills(registry);
+  return registry;
 }
 
 function parseSkillFile(content: string, dirPath: string): SkillMeta | null {
@@ -59,31 +101,6 @@ function parseSkillFile(content: string, dirPath: string): SkillMeta | null {
     body: match[2].trim(),
     dirPath,
   };
-}
-
-export async function loadSkills(skillsDir: string): Promise<void> {
-  try {
-    const entries = await fs.readdir(skillsDir, { withFileTypes: true });
-
-    for (const entry of entries) {
-      if (entry.isDirectory()) {
-        const skillDirPath = path.join(skillsDir, entry.name);
-        const skillFilePath = path.join(skillDirPath, "SKILL.md");
-
-        try {
-          const content = await fs.readFile(skillFilePath, "utf-8");
-          const meta = parseSkillFile(content, skillDirPath);
-          if (meta) {
-            skills.set(meta.name, meta);
-          }
-        } catch {
-          // Ignore if SKILL.md is missing or unreadable
-        }
-      }
-    }
-  } catch {
-    // Ignore if skills directory doesn't exist
-  }
 }
 
 const promptFile = "AGENTS.md";
@@ -183,6 +200,3 @@ description: <what the skill does and when to use it>
 
 Recap what was set up and remind the user they can run /init again anytime to refine.`,
 };
-
-registerSkill(skillCreator);
-registerSkill(initSkill);

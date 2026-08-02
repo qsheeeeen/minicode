@@ -5,6 +5,7 @@ import { capability } from "./registry.js";
 import type { ShellService } from "../services/shell-service.js";
 import type { AgentRegistry } from "../services/agent-registry.js";
 import type { ChangeJournal } from "../services/change-journal.js";
+import type { SkillRegistry } from "../skills/index.js";
 import type { SubAgentSpawner } from "./registry.js";
 
 export const ShellCapability = capability<ShellService>("shell");
@@ -13,3 +14,5 @@ export const ChangeJournalCapability =
   capability<ChangeJournal>("changeJournal");
 export const SubAgentSpawnerCapability =
   capability<SubAgentSpawner>("subAgentSpawner");
+export const SkillRegistryCapability =
+  capability<SkillRegistry>("skillRegistry");

@@ -17,7 +17,7 @@ import { SessionPersistence } from "../../services/session-persistence.js";
 import { AgentRegistry } from "../../services/agent-registry.js";
 import { connectAgent } from "./connect-agent.js";
 import { useTuiState, initialState } from "./state.js";
-import { UITimeline } from "./timeline.js";
+import { SessionTimeline } from "../timeline.js";
 
 function createTestDeps(responses = [defaultTextResponse("OK")]) {
   const tools = new Map<string, ToolDef>([
@@ -62,7 +62,14 @@ function createTestDeps(responses = [defaultTextResponse("OK")]) {
     toolExecutor,
     promptManager,
   };
-  return { deps, sessionManager, contextManager, runtimeEvents };
+  const runtimeState = { setLogger: vi.fn() };
+  return { deps, sessionManager, contextManager, runtimeEvents, runtimeState };
+}
+
+function makeTimeline(sessionManager: SessionManager): SessionTimeline {
+  return new SessionTimeline(sessionManager.getContext(), (messages) =>
+    useTuiState.setState({ messages }),
+  );
 }
 
 describe("connectAgent", () => {
@@ -82,15 +89,21 @@ describe("connectAgent", () => {
   });
 
   it("should update messages with assistant text after runAgent()", async () => {
-    const { deps, sessionManager, contextManager, runtimeEvents } =
-      createTestDeps([defaultTextResponse("Hello from assistant!")]);
+    const {
+      deps,
+      sessionManager,
+      contextManager,
+      runtimeEvents,
+      runtimeState,
+    } = createTestDeps([defaultTextResponse("Hello from assistant!")]);
     const registry = new AgentRegistry();
 
     const result = connectAgent({
       sessionManager,
       contextManager,
+      runtimeState,
       runtimeEvents,
-      uiTimeline: new UITimeline(sessionManager.getContext()),
+      uiTimeline: makeTimeline(sessionManager),
       initialSession: "test-session",
       registry,
     });
@@ -117,8 +130,13 @@ describe("connectAgent", () => {
   });
 
   it("should update messages for context changes during streaming", async () => {
-    const { deps, sessionManager, contextManager, runtimeEvents } =
-      createTestDeps([defaultTextResponse("Streaming text")]);
+    const {
+      deps,
+      sessionManager,
+      contextManager,
+      runtimeEvents,
+      runtimeState,
+    } = createTestDeps([defaultTextResponse("Streaming text")]);
     const registry = new AgentRegistry();
 
     const snapshots: DisplayMessage[][] = [];
@@ -129,8 +147,9 @@ describe("connectAgent", () => {
     const result = connectAgent({
       sessionManager,
       contextManager,
+      runtimeState,
       runtimeEvents,
-      uiTimeline: new UITimeline(sessionManager.getContext()),
+      uiTimeline: makeTimeline(sessionManager),
       initialSession: "test-session",
       registry,
     });
@@ -148,14 +167,16 @@ describe("connectAgent", () => {
   });
 
   it("should update token count when agent token count changes", () => {
-    const { sessionManager, contextManager, runtimeEvents } = createTestDeps();
+    const { sessionManager, contextManager, runtimeEvents, runtimeState } =
+      createTestDeps();
     const registry = new AgentRegistry();
 
     const result = connectAgent({
       sessionManager,
       contextManager,
+      runtimeState,
       runtimeEvents,
-      uiTimeline: new UITimeline(sessionManager.getContext()),
+      uiTimeline: makeTimeline(sessionManager),
       initialSession: "test-session",
       registry,
     });
@@ -168,14 +189,16 @@ describe("connectAgent", () => {
   });
 
   it("should sync currentSession from session.changed events", () => {
-    const { sessionManager, contextManager, runtimeEvents } = createTestDeps();
+    const { sessionManager, contextManager, runtimeEvents, runtimeState } =
+      createTestDeps();
     const registry = new AgentRegistry();
 
     const result = connectAgent({
       sessionManager,
       contextManager,
+      runtimeState,
       runtimeEvents,
-      uiTimeline: new UITimeline(sessionManager.getContext()),
+      uiTimeline: makeTimeline(sessionManager),
       initialSession: "test-session",
       registry,
     });
@@ -187,14 +210,16 @@ describe("connectAgent", () => {
   });
 
   it("should sync permissionMode from permission.mode_changed events", () => {
-    const { sessionManager, contextManager, runtimeEvents } = createTestDeps();
+    const { sessionManager, contextManager, runtimeEvents, runtimeState } =
+      createTestDeps();
     const registry = new AgentRegistry();
 
     const result = connectAgent({
       sessionManager,
       contextManager,
+      runtimeState,
       runtimeEvents,
-      uiTimeline: new UITimeline(sessionManager.getContext()),
+      uiTimeline: makeTimeline(sessionManager),
       initialSession: "test-session",
       registry,
     });
@@ -206,14 +231,16 @@ describe("connectAgent", () => {
   });
 
   it("should register main agent in registry", () => {
-    const { sessionManager, contextManager, runtimeEvents } = createTestDeps();
+    const { sessionManager, contextManager, runtimeEvents, runtimeState } =
+      createTestDeps();
     const registry = new AgentRegistry();
 
     const result = connectAgent({
       sessionManager,
       contextManager,
+      runtimeState,
       runtimeEvents,
-      uiTimeline: new UITimeline(sessionManager.getContext()),
+      uiTimeline: makeTimeline(sessionManager),
       initialSession: "test-session",
       registry,
     });
@@ -227,15 +254,21 @@ describe("connectAgent", () => {
   });
 
   it("should unsubscribe on cleanup", async () => {
-    const { deps, sessionManager, contextManager, runtimeEvents } =
-      createTestDeps([defaultTextResponse("After cleanup")]);
+    const {
+      deps,
+      sessionManager,
+      contextManager,
+      runtimeEvents,
+      runtimeState,
+    } = createTestDeps([defaultTextResponse("After cleanup")]);
     const registry = new AgentRegistry();
 
     const result = connectAgent({
       sessionManager,
       contextManager,
+      runtimeState,
       runtimeEvents,
-      uiTimeline: new UITimeline(sessionManager.getContext()),
+      uiTimeline: makeTimeline(sessionManager),
       initialSession: "test-session",
       registry,
     });

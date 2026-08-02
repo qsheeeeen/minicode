@@ -93,6 +93,3 @@ ${conversationText}`;
     return "Conversation summary unavailable";
   }
 }
-
-/** @deprecated Use SummaryCompressionStrategy instead. */
-export const CompressionService = SummaryCompressionStrategy;

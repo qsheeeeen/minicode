@@ -11,11 +11,12 @@
 import type { AgentRegistry } from "../../services/index.js";
 import type { SessionManager } from "../../services/session-manager.js";
 import type { UserPrompter, Prompt } from "../../tools/registry.js";
-import { SessionPersistence } from "../../services/session-persistence.js";
 import type { ContextManager } from "../../services/context-manager.js";
+import type { RuntimeState } from "../../services/runtime-state.js";
 import type { RuntimeEvents } from "../../services/runtime-events.js";
+import { restoreSession } from "../../services/session-lifecycle.js";
 import { useTuiState } from "./state.js";
-import { UITimeline } from "./timeline.js";
+import type { SessionTimeline } from "../timeline.js";
 
 /** UserPrompter implementation: resolves/rejects via UI state. */
 class CallbackPrompter implements UserPrompter {
@@ -28,8 +29,9 @@ class CallbackPrompter implements UserPrompter {
 export interface ConnectAgentOptions {
   sessionManager: SessionManager;
   contextManager: ContextManager;
+  runtimeState: RuntimeState;
   runtimeEvents: RuntimeEvents;
-  uiTimeline: UITimeline;
+  uiTimeline: SessionTimeline;
   initialSession: string;
   sessionName?: string;
   resumeRecent: boolean;
@@ -39,10 +41,13 @@ export interface ConnectAgentOptions {
 export function connectAgent(options: ConnectAgentOptions): {
   cleanup: () => void;
   prompter: UserPrompter;
+  /** Resolves once the initial session has been activated/restored. */
+  ready: Promise<void>;
 } {
   const {
     sessionManager,
     contextManager,
+    runtimeState,
     runtimeEvents,
     uiTimeline,
     initialSession,
@@ -93,26 +98,30 @@ export function connectAgent(options: ConnectAgentOptions): {
 
   // 5. Load initial session (async — onChange subscription will push updates)
   const loadInitial = async () => {
-    sessionManager.setSession(initialSession);
-    useTuiState.setState({ currentSession: initialSession });
-    if (sessionName || resumeRecent) {
-      const data = await SessionPersistence.load(initialSession);
-      if (data) {
-        context.replaceBlocks(data.blocks);
-        const totalTokens = data.totalTokens || 0;
-        if (totalTokens > 0) {
-          contextManager.setTokenCount(totalTokens);
-        }
-      } else if (sessionName) {
+    try {
+      const { loaded } = await restoreSession({
+        sessionManager,
+        contextManager,
+        runtimeState,
+        name: initialSession,
+        load: !!(sessionName || resumeRecent),
+      });
+      if (sessionName && !loaded) {
         sessionManager.reportStatus({
           role: "status",
           content: `Created new session: ${sessionName}`,
           timestamp: new Date(),
         });
       }
+    } catch (e) {
+      sessionManager.reportStatus({
+        role: "error",
+        content: `Session restore failed: ${e instanceof Error ? e.message : String(e)}`,
+        timestamp: new Date(),
+      });
     }
   };
-  loadInitial();
+  const ready = loadInitial();
 
   // Return cleanup function and prompter for run() calls
   return {
@@ -121,5 +130,6 @@ export function connectAgent(options: ConnectAgentOptions): {
       unsubStore();
     },
     prompter,
+    ready,
   };
 }

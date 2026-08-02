@@ -14,7 +14,10 @@ import {
   type Capabilities,
   type ToolRegistry,
 } from "./tools/registry.js";
-import { getAgentType, DEFAULT_AGENT_TYPE } from "./tools/agent-types.js";
+import {
+  type AgentTypeRegistry,
+  DEFAULT_AGENT_TYPE,
+} from "./tools/agent-types.js";
 import { RegistryCapability } from "./tools/capabilities.js";
 import { ModelFactory } from "./llm/model.js";
 import type { Model } from "./llm/model.js";
@@ -55,6 +58,8 @@ export interface RunSubAgentParams {
   permissionService: PermissionService;
   /** Tool registry owned by the composition root. */
   toolRegistry: ToolRegistry;
+  /** Agent-type registry owned by the composition root. */
+  agentTypes: AgentTypeRegistry;
   /** Runtime factory injected from the composition root (app/). */
   createRuntime: (opts: SubAgentRuntimeOpts) => SubAgentRuntime;
 }
@@ -64,11 +69,17 @@ export interface RunSubAgentParams {
 export async function runSubAgent(
   params: RunSubAgentParams,
 ): Promise<ToolRunResult> {
-  const { task, parent, permissionService, toolRegistry, createRuntime } =
-    params;
+  const {
+    task,
+    parent,
+    permissionService,
+    toolRegistry,
+    agentTypes,
+    createRuntime,
+  } = params;
   const agentTypeName = params.agentType || DEFAULT_AGENT_TYPE;
 
-  const type = getAgentType(agentTypeName);
+  const type = agentTypes.get(agentTypeName);
   if (!type) {
     return { outcome: "error", reason: `Unknown agent type: ${agentTypeName}` };
   }

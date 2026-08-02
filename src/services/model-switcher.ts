@@ -1,9 +1,6 @@
 import type { AppConfig } from "../config.js";
 import { ModelFactory, type ModelSelection } from "../llm/model.js";
-import type { LLMClient } from "../llm/client.js";
-import type { Model } from "../llm/model.js";
 import type { ContextManager } from "./context-manager.js";
-import type { PermissionService } from "./permission.js";
 import type { SessionManager } from "./session-manager.js";
 import type { RuntimeState } from "./runtime-state.js";
 
@@ -12,7 +9,6 @@ export interface ModelSwitchServiceOpts {
   readonly contextManager: ContextManager;
   readonly sessionManager: SessionManager;
   readonly runtimeState: RuntimeState;
-  readonly permissionService?: PermissionService;
 }
 
 export interface SwitchAgentModelOpts {
@@ -27,14 +23,12 @@ export class ModelSwitchService {
   private contextManager: ContextManager;
   private sessionManager: SessionManager;
   private runtimeState: RuntimeState;
-  private permissionService?: PermissionService;
 
   constructor(opts: ModelSwitchServiceOpts) {
     this.appConfig = opts.appConfig;
     this.contextManager = opts.contextManager;
     this.sessionManager = opts.sessionManager;
     this.runtimeState = opts.runtimeState;
-    this.permissionService = opts.permissionService;
   }
 
   async switchAgentModel(opts: SwitchAgentModelOpts): Promise<ModelSelection> {
@@ -45,9 +39,9 @@ export class ModelSwitchService {
     }
     const { client, model } = selection;
 
+    // runtimeState is the single source of truth; ContextManager and the
+    // permission gate subscribe to model.changed in the composition root.
     this.runtimeState.setClientModel(client, model);
-    this.contextManager.setModel(client, model);
-    this.permissionService?.updateAutoGate(client, model);
 
     if (opts.tier) {
       await this.appConfig.setTier(opts.tier, opts.modelSpec);

@@ -3,6 +3,8 @@ import { Box, Text, useInput } from "ink";
 import { useTuiState } from "./state.js";
 import { getInputComponent } from "./inputs.js";
 import { getCommandList } from "../commands/index.js";
+import type { CommandRegistry } from "../commands/registry.js";
+import type { SkillRegistry } from "../../skills/index.js";
 import { modeHandlers } from "./mode-handlers.js";
 import type { Model } from "../../llm/model.js";
 import type { AppConfig } from "../../config.js";
@@ -14,6 +16,8 @@ interface InputAreaProps {
   loadingRef: React.MutableRefObject<boolean>;
   config: AppConfig;
   modelSwitchService: ModelSwitchService;
+  commandRegistry: CommandRegistry;
+  skillRegistry: SkillRegistry;
 }
 
 export function InputArea({
@@ -22,6 +26,8 @@ export function InputArea({
   loadingRef,
   config,
   modelSwitchService,
+  commandRegistry,
+  skillRegistry,
 }: InputAreaProps) {
   const input = useTuiState((s) => s.input);
   const pendingPrompt = useTuiState((s) => s.pendingPrompt);
@@ -29,8 +35,11 @@ export function InputArea({
 
   // Command autocomplete logic
   const commandList = useMemo(
-    () => getCommandList().sort((a, b) => a.name.localeCompare(b.name)),
-    [],
+    () =>
+      getCommandList(commandRegistry, skillRegistry).sort((a, b) =>
+        a.name.localeCompare(b.name),
+      ),
+    [commandRegistry, skillRegistry],
   );
   const matchingCommands = useMemo(() => {
     if (!input.value.startsWith("/")) return [];
@@ -110,14 +119,7 @@ export function InputArea({
         await handleSubmit(value);
       }
     },
-    [
-      input.mode,
-      model,
-      config,
-      modelSwitchService,
-      handleSubmit,
-      loadingRef,
-    ],
+    [input.mode, model, config, modelSwitchService, handleSubmit, loadingRef],
   );
 
   const handleCancel = useCallback(() => {
@@ -127,17 +129,12 @@ export function InputArea({
     setSelectedSuggestion(0);
   }, []);
 
-  const handleChange = useCallback(
-    (v: string) => {
-      useTuiState.setState((state) =>
-        state.input.value === v
-          ? state
-          : { input: { ...state.input, value: v } },
-      );
-      setSelectedSuggestion(0);
-    },
-    [],
-  );
+  const handleChange = useCallback((v: string) => {
+    useTuiState.setState((state) =>
+      state.input.value === v ? state : { input: { ...state.input, value: v } },
+    );
+    setSelectedSuggestion(0);
+  }, []);
 
   const InputComponent = getInputComponent(input.mode);
   const inputProps = {

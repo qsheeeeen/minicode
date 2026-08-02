@@ -1,25 +1,20 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
-  describe,
-  it,
-  expect,
-  vi,
-  beforeAll,
-  afterAll,
-  beforeEach,
-  afterEach,
-} from "vitest";
-import {
-  registerCommand,
   executeCommand,
-  getCommandNames,
   getCommandList,
   getHelp,
-  registerAllCommands,
-  resetCommands,
+  registerBuiltinCommands,
+  registerSkillCommands,
+  CommandRegistry,
   type CommandContext,
 } from "./index.js";
+import {
+  createDefaultSkillRegistry,
+  SkillRegistry,
+} from "../../skills/index.js";
+import { createDefaultRouter } from "../routing.js";
 
-const { sessionPersistenceMock, configMock, skillsMock } = vi.hoisted(() => ({
+const { sessionPersistenceMock, configMock } = vi.hoisted(() => ({
   sessionPersistenceMock: {
     getProjectHash: vi.fn().mockReturnValue("testhash"),
     load: vi.fn().mockResolvedValue(null),
@@ -33,10 +28,6 @@ const { sessionPersistenceMock, configMock, skillsMock } = vi.hoisted(() => ({
     providers: {} as Record<string, any>,
     tiers: {} as Record<string, string>,
   },
-  skillsMock: {
-    getAvailableSkills: vi.fn().mockReturnValue([]),
-    getSkillBody: vi.fn().mockReturnValue(undefined),
-  },
 }));
 
 vi.mock("../../services/session-persistence.js", () => ({
@@ -46,8 +37,6 @@ vi.mock("../../services/session-persistence.js", () => ({
 vi.mock("../../utils/logger.js", () => ({
   createLogger: vi.fn().mockResolvedValue({ info: vi.fn(), error: vi.fn() }),
 }));
-
-vi.mock("../../skills/index.js", () => skillsMock);
 
 vi.mock("react", () => ({
   createElement: vi.fn((...args: any[]) => args),
@@ -59,22 +48,19 @@ vi.mock("ink", () => ({
 }));
 
 describe("Builtin commands", () => {
-  beforeAll(() => {
-    registerAllCommands();
-  });
-
-  afterAll(() => {
-    vi.restoreAllMocks();
-  });
+  let commands: CommandRegistry;
+  let skills: SkillRegistry;
 
   beforeEach(() => {
-    resetCommands();
-    registerAllCommands();
+    commands = new CommandRegistry();
+    skills = createDefaultSkillRegistry();
+    registerBuiltinCommands(commands);
+    registerSkillCommands(commands, skills);
     vi.clearAllMocks();
   });
 
   it("registers expected commands", () => {
-    const names = getCommandNames();
+    const names = commands.getNames();
 
     expect(names).toContain("exit");
     expect(names).toContain("clear");
@@ -143,6 +129,9 @@ describe("Builtin commands", () => {
       model: model as any,
       config: configMock as any,
       context: context as any,
+      commands,
+      skills,
+      router: createDefaultRouter(),
       sessionManager: sessionManager as any,
       changeJournal: changeJournal as any,
       sessionStats: {
@@ -334,8 +323,9 @@ describe("Builtin commands", () => {
     });
 
     it("/skills with no skills shows no-skills status", async () => {
-      skillsMock.getAvailableSkills.mockReturnValue([]);
-      const { ctx, sessionManager } = makeCtx();
+      const { ctx, sessionManager } = makeCtx({
+        skills: new SkillRegistry(),
+      });
 
       const result = await executeCommand("skills", [], ctx as CommandContext);
       expect(result.handled).toBe(true);
@@ -348,11 +338,18 @@ describe("Builtin commands", () => {
     });
 
     it("/skills with available skills renders skill list", async () => {
-      skillsMock.getAvailableSkills.mockReturnValue([
-        { name: "my-skill", description: "A custom skill" },
-        { name: "other", description: "Another one" },
-      ]);
-      const { ctx, sessionManager } = makeCtx();
+      const withSkills = new SkillRegistry();
+      withSkills.register({
+        name: "my-skill",
+        description: "A custom skill",
+        body: "body",
+      });
+      withSkills.register({
+        name: "other",
+        description: "Another one",
+        body: "body",
+      });
+      const { ctx, sessionManager } = makeCtx({ skills: withSkills });
 
       const result = await executeCommand("skills", [], ctx as CommandContext);
       expect(result.handled).toBe(true);
@@ -376,6 +373,17 @@ describe("Builtin commands", () => {
         providers: { anthropic: {}, openai: {} },
         tiers: {},
       });
+    });
+
+    it("getCommandList merges builtin and skill commands", () => {
+      const list = getCommandList(commands, skills);
+      const names = list.map((c) => c.name);
+      expect(names).toContain("exit");
+      expect(names).toContain("skill-creator");
+    });
+
+    it("getHelp includes shell hint", () => {
+      expect(getHelp(commands, skills)).toContain("!<command>");
     });
   });
 });

@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { render, Box, useInput } from "ink";
 import { Model } from "../../../llm/model.js";
+import { CommandRegistry } from "../../commands/registry.js";
+import { createDefaultSkillRegistry } from "../../../skills/index.js";
 import { useTuiState } from "../state.js";
 import { Header } from "../Header.js";
 import { Help } from "../Help.js";
@@ -73,6 +75,8 @@ function Demo() {
           loadingRef={{ current: false }}
           config={{} as any}
           modelSwitchService={{ switchAgentModel: async () => null } as any}
+          commandRegistry={new CommandRegistry()}
+          skillRegistry={createDefaultSkillRegistry()}
         />
       ) : mode === "effort" ? (
         <Box

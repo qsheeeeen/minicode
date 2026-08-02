@@ -1,11 +1,10 @@
 import type { CommandHandler } from "../registry.js";
-import { getAvailableSkills } from "../../../skills/index.js";
 
 export const skillsCommand: CommandHandler = {
   name: "skills",
   description: "List available skills",
   handler: async (_args, ctx): Promise<void> => {
-    const skills = getAvailableSkills();
+    const skills = ctx.skills.getAvailable();
     if (skills.length === 0) {
       ctx.sessionManager.reportStatus({
         role: "status",

@@ -1,5 +1,6 @@
 import { ToolRegistry } from "./registry.js";
 import { registerBuiltinTools } from "./builtin/index.js";
+import type { AgentTypeRegistry } from "./agent-types.js";
 
 export { ToolRegistry, capability, createCapabilities } from "./registry.js";
 export type {
@@ -17,8 +18,12 @@ export type {
 } from "./registry.js";
 
 /** Fresh registry preloaded with every built-in tool. */
-export function createDefaultToolRegistry(): ToolRegistry {
+export function createDefaultToolRegistry(
+  opts: {
+    agentTypes?: AgentTypeRegistry;
+  } = {},
+): ToolRegistry {
   const registry = new ToolRegistry();
-  registerBuiltinTools(registry);
+  registerBuiltinTools(registry, opts);
   return registry;
 }

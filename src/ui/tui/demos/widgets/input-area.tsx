@@ -4,6 +4,8 @@ import { render, Box } from "ink";
 import { Model } from "../../../../llm/model.js";
 import { useTuiState } from "../../state.js";
 import { InputArea } from "../../InputArea.js";
+import { CommandRegistry } from "../../../commands/registry.js";
+import { createDefaultSkillRegistry } from "../../../../skills/index.js";
 
 const model = new Model("test", "test", 200000);
 const loadingRef = { current: false };
@@ -24,6 +26,8 @@ render(
       loadingRef={loadingRef}
       config={{} as any}
       modelSwitchService={{ switchAgentModel: async () => null } as any}
+      commandRegistry={new CommandRegistry()}
+      skillRegistry={createDefaultSkillRegistry()}
     />
   </Box>,
 );

@@ -3,6 +3,11 @@ import { render } from "ink-testing-library";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { InputArea } from "./InputArea.js";
 import { useTuiState, initialState } from "./state.js";
+import { CommandRegistry } from "../commands/registry.js";
+import { createDefaultSkillRegistry } from "../../skills/index.js";
+
+const commandRegistry = new CommandRegistry();
+const skillRegistry = createDefaultSkillRegistry();
 
 describe("InputArea Component", () => {
   const mockLoadingRef = (
@@ -35,6 +40,8 @@ describe("InputArea Component", () => {
         agentRef={mockAgentRef}
         handleSubmit={vi.fn()}
         loadingRef={mockLoadingRef(false)}
+        commandRegistry={commandRegistry}
+        skillRegistry={skillRegistry}
       />,
     );
 
@@ -56,6 +63,8 @@ describe("InputArea Component", () => {
         agentRef={mockAgentRef}
         handleSubmit={vi.fn()}
         loadingRef={mockLoadingRef(false)}
+        commandRegistry={commandRegistry}
+        skillRegistry={skillRegistry}
       />,
     );
 
@@ -80,6 +89,8 @@ describe("InputArea Component", () => {
         agentRef={mockAgentRef}
         handleSubmit={vi.fn()}
         loadingRef={mockLoadingRef(true)}
+        commandRegistry={commandRegistry}
+        skillRegistry={skillRegistry}
       />,
     );
 

@@ -2,13 +2,14 @@ import fs from "fs";
 import { runAgent, isAbortError, type AgentDeps } from "../agent.js";
 import type { UserPrompter, Prompt } from "../tools/registry.js";
 import type { CommandContext } from "./commands/index.js";
-import { routeInput } from "./routing.js";
-import { processRoute } from "./route-handler.js";
+import { restoreSession } from "../services/session-lifecycle.js";
 import { SessionPersistence } from "../services/session-persistence.js";
 import type { ShellService } from "../services/shell-service.js";
 import type { RuntimeEvents } from "../services/runtime-events.js";
 import type { RuntimeState } from "../services/runtime-state.js";
 import { HeadlessRenderer } from "./headless-renderer.js";
+import { SessionTimeline } from "./timeline.js";
+import { processRoutedInput } from "./turn.js";
 
 export async function runHeadless(
   deps: AgentDeps,
@@ -43,36 +44,27 @@ export async function runHeadless(
 
   const context = sessionManager.getContext();
 
-  // Set up renderer with status forwarding
-  const renderer = new HeadlessRenderer(context);
+  // Set up the shared timeline + printer with status forwarding.
+  const timeline = new SessionTimeline(context);
+  const renderer = new HeadlessRenderer(timeline);
   const unsubscribeRuntimeEvents = runtimeEvents.subscribe((event) => {
     if (event.type === "status.added") {
-      renderer.addStatus(event.status);
+      timeline.appendStatus(event.status);
     }
   });
 
-  // Load session if requested
-  if (sessionName || resumeRecent) {
-    const name =
-      sessionName ??
-      (await SessionPersistence.getMostRecent()) ??
-      `session-${Date.now()}`;
-    const data = await SessionPersistence.load(name);
-    if (data) {
-      context.replaceBlocks(data.blocks);
-      const totalTokens = data.totalTokens || 0;
-      if (totalTokens > 0) {
-        contextManager.setTokenCount(totalTokens);
-      }
-      const { createLogger } = await import("../utils/logger.js");
-      const newLogger = await createLogger(
-        SessionPersistence.getProjectHash(),
-        name,
-      );
-      sessionManager.setSession(name);
-      runtimeState.setLogger(newLogger);
-    }
-  }
+  // Load session if requested.
+  const name =
+    sessionName ??
+    (resumeRecent ? await SessionPersistence.getMostRecent() : undefined) ??
+    `session-${Date.now()}`;
+  await restoreSession({
+    sessionManager,
+    contextManager,
+    runtimeState,
+    name,
+    load: !!(sessionName || resumeRecent),
+  });
 
   const headlessPrompter: UserPrompter = {
     prompt: async (req: Prompt) => {
@@ -96,20 +88,14 @@ export async function runHeadless(
       return;
     }
 
-    const route = await routeInput(initialPrompt, cmdContext);
-    const processed = processRoute(
-      route,
+    const processed = await processRoutedInput({
+      input: initialPrompt,
+      cmdContext,
       context,
       shellService,
-      sessionManager.reportStatus.bind(sessionManager),
-    );
-
-    if (processed.type === "run" && processed.displayContent) {
-      renderer.setDisplay(
-        context.getUserMessageCount(),
-        processed.displayContent,
-      );
-    }
+      reportStatus: sessionManager.reportStatus.bind(sessionManager),
+      timeline,
+    });
 
     if (processed.type === "done") {
       if (processed.shellOutput) {

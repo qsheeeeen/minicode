@@ -4,32 +4,33 @@ vi.mock("./commands/index.js", () => ({
   executeCommand: vi.fn(),
 }));
 
-describe("routeInput", () => {
+import { createDefaultRouter } from "./routing.js";
+
+describe("InputRouter.route", () => {
+  const router = createDefaultRouter();
+  const cmdContext = {} as any;
+
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it("returns 'none' for empty input", async () => {
-    const { routeInput } = await import("./routing.js");
-    const result = await routeInput("", {} as any);
+    const result = await router.route("", cmdContext);
     expect(result).toEqual({ action: "none" });
   });
 
   it("returns 'none' for whitespace-only input", async () => {
-    const { routeInput } = await import("./routing.js");
-    const result = await routeInput("   ", {} as any);
+    const result = await router.route("   ", cmdContext);
     expect(result).toEqual({ action: "none" });
   });
 
   it("routes '!' prefix to shell", async () => {
-    const { routeInput } = await import("./routing.js");
-    const result = await routeInput("!echo hello", {} as any);
+    const result = await router.route("!echo hello", cmdContext);
     expect(result).toEqual({ action: "shell", promptText: "echo hello" });
   });
 
   it("returns 'none' for '!' with no command", async () => {
-    const { routeInput } = await import("./routing.js");
-    const result = await routeInput("!", {} as any);
+    const result = await router.route("!", cmdContext);
     expect(result).toEqual({ action: "none" });
   });
 
@@ -41,8 +42,7 @@ describe("routeInput", () => {
       displayContent: "display",
     });
 
-    const { routeInput } = await import("./routing.js");
-    const result = await routeInput("/help", {} as any);
+    const result = await router.route("/help", cmdContext);
     expect(result).toEqual({
       action: "command",
       promptText: "command result",
@@ -57,20 +57,17 @@ describe("routeInput", () => {
       handled: true,
     });
 
-    const { routeInput } = await import("./routing.js");
-    const result = await routeInput("/clear", {} as any);
+    const result = await router.route("/clear", cmdContext);
     expect(result).toEqual({ action: "command" });
   });
 
   it("routes plain text to llm", async () => {
-    const { routeInput } = await import("./routing.js");
-    const result = await routeInput("hello world", {} as any);
+    const result = await router.route("hello world", cmdContext);
     expect(result).toEqual({ action: "llm", promptText: "hello world" });
   });
 
   it("trims whitespace from input", async () => {
-    const { routeInput } = await import("./routing.js");
-    const result = await routeInput("  hello  ", {} as any);
+    const result = await router.route("  hello  ", cmdContext);
     expect(result).toEqual({ action: "llm", promptText: "hello" });
   });
 });

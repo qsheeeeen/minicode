@@ -23,6 +23,9 @@ export async function runTuiApp(app: AppRuntime): Promise<void> {
     context: app.sessionManager.getContext(),
     permissionService: app.permissionService,
     shellService: app.shellService,
+    commandRegistry: app.commandRegistry,
+    skillRegistry: app.skillRegistry,
+    router: app.router,
   };
   render(<App {...props} />, { exitOnCtrlC: false });
 }

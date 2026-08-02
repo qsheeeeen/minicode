@@ -1,16 +1,17 @@
-import type { StatusMessage } from "./display.js";
 import type { LLMBlock, LLMContext } from "../llm/context.js";
 import { callContent } from "../utils/tool-format.js";
+import type { SessionTimeline } from "./timeline.js";
 
 /**
- * HeadlessRenderer — incremental stdout renderer for non-TUI mode.
+ * HeadlessRenderer — incremental stdout printer for non-TUI mode.
  *
- * It renders the LLMContext block stream directly.
+ * It is a pure printer: all view bookkeeping (statuses, display overrides,
+ * derived messages) lives on the shared SessionTimeline, which the TUI uses
+ * too. This renderer only tracks what has already been printed.
  */
 export class HeadlessRenderer {
+  private timeline: SessionTimeline;
   private context: LLMContext;
-  private statuses: StatusMessage[] = [];
-  private displays = new Map<number, string>();
   private userCount = 0;
   private printedBlocks = 0;
   private streamedChars = new Map<number, number>();
@@ -18,31 +19,28 @@ export class HeadlessRenderer {
   private printedToolUses = new Set<string>();
   private printedResults = new Set<string>();
   private lastStatusIdx = 0;
+  private unsubMessages: (() => void) | null = null;
   private unsubscribe: (() => void) | null = null;
 
-  constructor(context: LLMContext) {
-    this.context = context;
-  }
-
-  addStatus(msg: StatusMessage): void {
-    this.statuses.push(msg);
-  }
-
-  /** Override the displayed text for the user message at `userIndex` (0-based). */
-  setDisplay(userIndex: number, display: string): void {
-    this.displays.set(userIndex, display);
+  constructor(timeline: SessionTimeline) {
+    this.timeline = timeline;
+    this.context = timeline.getContext();
+    this.unsubMessages = timeline.onMessages(() => this.render(false));
   }
 
   start(): void {
-    this.unsubscribe = this.context.onChange(() => this.render(false));
+    this.unsubscribe = this.context.onChange(() => this.timeline.sync());
   }
 
   stop(): void {
     this.unsubscribe?.();
     this.unsubscribe = null;
+    this.unsubMessages?.();
+    this.unsubMessages = null;
   }
 
   renderFinal(): void {
+    this.timeline.sync();
     this.render(true);
   }
 
@@ -73,7 +71,7 @@ export class HeadlessRenderer {
     isFinal: boolean,
   ): void {
     if (block.type === "user") {
-      const display = this.displays.get(this.userCount);
+      const display = this.timeline.getDisplay(this.userCount);
       this.userCount++;
       process.stdout.write(`[user]\n${(display ?? block.text).trim()}\n\n`);
     } else if (block.type === "thinking") {
@@ -131,8 +129,9 @@ export class HeadlessRenderer {
   }
 
   private renderStatuses(): void {
-    for (let i = this.lastStatusIdx; i < this.statuses.length; i++) {
-      const s = this.statuses[i];
+    const statuses = this.timeline.getStatuses();
+    for (let i = this.lastStatusIdx; i < statuses.length; i++) {
+      const s = statuses[i];
       if (s.role === "error") console.error(`[error] ${s.content}`);
       else if (s.toolDisplay) {
         const td = s.toolDisplay;
@@ -143,6 +142,6 @@ export class HeadlessRenderer {
         console.log(s.content);
       }
     }
-    this.lastStatusIdx = this.statuses.length;
+    this.lastStatusIdx = statuses.length;
   }
 }

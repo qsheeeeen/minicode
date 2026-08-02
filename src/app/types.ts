@@ -9,6 +9,9 @@ import type { ShellService } from "../services/shell-service.js";
 import type { SessionManager } from "../services/session-manager.js";
 import type { RuntimeState } from "../services/runtime-state.js";
 import type { CommandContext } from "../ui/commands/index.js";
+import type { CommandRegistry } from "../ui/commands/registry.js";
+import type { SkillRegistry } from "../skills/index.js";
+import type { InputRouter } from "../ui/routing.js";
 
 export interface AppRuntime {
   readonly deps: AgentDeps;
@@ -31,4 +34,7 @@ export interface AppRuntime {
   readonly modelSwitchService: ModelSwitchService;
   readonly shellService: ShellService;
   readonly commandContext: CommandContext;
+  readonly commandRegistry: CommandRegistry;
+  readonly skillRegistry: SkillRegistry;
+  readonly router: InputRouter;
 }

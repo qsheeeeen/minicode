@@ -18,6 +18,7 @@ import {
 } from "./tools/registry.js";
 import { RegistryCapability } from "./tools/capabilities.js";
 import { createDefaultToolRegistry } from "./tools/index.js";
+import { createDefaultAgentTypes } from "./tools/agent-types.js";
 
 vi.mock("./utils/tool-format.js", () => ({
   callContent: vi.fn((name: string) => `${name}()`),
@@ -54,6 +55,7 @@ describe("sub-agent", () => {
   function defaultSpawnOptions() {
     return {
       toolRegistry: createDefaultToolRegistry(),
+      agentTypes: createDefaultAgentTypes(),
       createRuntime: (opts: Parameters<typeof createSubAgentRuntime>[0]) =>
         createSubAgentRuntime(opts),
     };

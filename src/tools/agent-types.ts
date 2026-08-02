@@ -1,5 +1,6 @@
 // Declarative agent-type registry. The SubAgent tool picks a type by name;
 // sub-agent-runtime reads it to configure the child. Pure data, zero deps.
+// An explicit instance owned by the composition root, not a module global.
 
 export type SubAgentToolSet = "readonly" | "all" | string[];
 
@@ -12,18 +13,24 @@ export interface SubAgentType {
   tier?: "pro" | "flash";
 }
 
-const types = new Map<string, SubAgentType>();
+export class AgentTypeRegistry {
+  private types = new Map<string, SubAgentType>();
 
-export function registerAgentType(t: SubAgentType): void {
-  types.set(t.name, t);
-}
+  register(t: SubAgentType): void {
+    this.types.set(t.name, t);
+  }
 
-export function getAgentType(name: string): SubAgentType | undefined {
-  return types.get(name);
-}
+  get(name: string): SubAgentType | undefined {
+    return this.types.get(name);
+  }
 
-export function listAgentTypes(): SubAgentType[] {
-  return [...types.values()];
+  list(): SubAgentType[] {
+    return [...this.types.values()];
+  }
+
+  clear(): void {
+    this.types.clear();
+  }
 }
 
 /** Default when the SubAgent tool omits `agentType`. Equivalent to legacy read-only. */
@@ -31,8 +38,8 @@ export const DEFAULT_AGENT_TYPE = "researcher";
 
 // ── Built-in types ─────────────────────────────────────────────────────────
 
-function registerBuiltinAgentTypes(): void {
-  registerAgentType({
+export function registerBuiltinAgentTypes(registry: AgentTypeRegistry): void {
+  registry.register({
     name: "researcher",
     description:
       "Read-only investigation: code exploration, search, dependency analysis, debugging research.",
@@ -40,7 +47,7 @@ function registerBuiltinAgentTypes(): void {
     tools: "readonly",
   });
 
-  registerAgentType({
+  registry.register({
     name: "reviewer",
     description:
       "Read-only code review: critique code or a change for bugs, security, architecture.",
@@ -48,7 +55,7 @@ function registerBuiltinAgentTypes(): void {
     tools: "readonly",
   });
 
-  registerAgentType({
+  registry.register({
     name: "planner",
     description:
       "Read-only planning: produce a step-by-step implementation plan without executing it.",
@@ -56,7 +63,7 @@ function registerBuiltinAgentTypes(): void {
     tools: "readonly",
   });
 
-  registerAgentType({
+  registry.register({
     name: "worker",
     description:
       "Execute a well-scoped sub-task with full read/write tools (files, shell).",
@@ -65,10 +72,8 @@ function registerBuiltinAgentTypes(): void {
   });
 }
 
-registerBuiltinAgentTypes();
-
-/** Reset to the built-in type set (test isolation). */
-export function resetAgentTypes(): void {
-  types.clear();
-  registerBuiltinAgentTypes();
+export function createDefaultAgentTypes(): AgentTypeRegistry {
+  const registry = new AgentTypeRegistry();
+  registerBuiltinAgentTypes(registry);
+  return registry;
 }

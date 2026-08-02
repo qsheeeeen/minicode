@@ -3,7 +3,7 @@ import type {
   ToolRunResult,
   ToolExecutionContext,
 } from "../registry.js";
-import { getSkillBody } from "../../skills/index.js";
+import { SkillRegistryCapability } from "../capabilities.js";
 
 export const loadSkillTool: ToolDef = {
   name: "LoadSkill",
@@ -22,10 +22,11 @@ export const loadSkillTool: ToolDef = {
   },
   execute: async (
     args: Record<string, unknown>,
-    _context?: ToolExecutionContext,
+    context?: ToolExecutionContext,
   ): Promise<ToolRunResult> => {
     const skillName = String(args.name);
-    const skillBody = getSkillBody(skillName);
+    const skills = context?.capabilities.get(SkillRegistryCapability);
+    const skillBody = skills?.getBody(skillName);
 
     if (!skillBody) {
       return { outcome: "error", reason: `Skill '${skillName}' not found` };

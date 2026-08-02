@@ -1,3 +1,6 @@
+import type { LLMClient } from "../llm/client.js";
+import type { Model } from "../llm/model.js";
+
 export interface RuntimeStatus {
   role: "status" | "error";
   content: string;
@@ -17,6 +20,7 @@ export type RuntimeStatusInput = Omit<RuntimeStatus, "userMessageIndex"> & {
 
 export type RuntimeEvent =
   | { type: "context.tokens_changed"; tokenCount: number }
+  | { type: "model.changed"; client: LLMClient; model: Model }
   | {
       type: "status.added";
       status: RuntimeStatus;

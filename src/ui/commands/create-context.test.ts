@@ -2,7 +2,10 @@ import { describe, it, expect, vi } from "vitest";
 import { Model } from "../../llm/model.js";
 import type { AgentDeps } from "../../agent.js";
 import { createCommandContext } from "./create-context.js";
+import { CommandRegistry } from "./registry.js";
 import type { InputRequest } from "./index.js";
+import { createDefaultSkillRegistry } from "../../skills/index.js";
+import { createDefaultRouter } from "../routing.js";
 
 vi.mock("../../utils/logger.js", () => ({
   createLogger: vi.fn().mockResolvedValue({ info: vi.fn(), error: vi.fn() }),
@@ -44,6 +47,9 @@ function makeOpts(overrides: Record<string, any> = {}) {
   const opts = {
     deps,
     config: {} as any,
+    commands: new CommandRegistry(),
+    skills: createDefaultSkillRegistry(),
+    router: createDefaultRouter(),
     sessionStats,
     modelSwitchService: {} as any,
     contextManager: { setTokenCount: vi.fn() },

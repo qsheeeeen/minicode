@@ -1,6 +1,8 @@
 /**
- * Command registry — a standalone module with no imports on other command files.
- * This avoids circular dependencies between index.ts and builtin/*.ts.
+ * Command registry — a standalone module with no imports on other command
+ * files. This avoids circular dependencies between index.ts and builtin/*.ts.
+ * The registry is an explicit instance owned by the composition root, so
+ * command registration is composition, not module-load side effects.
  */
 
 export interface CommandHandler {
@@ -15,33 +17,37 @@ export interface CommandHandler {
   prompt?: (args: string[]) => string;
 }
 
-const commands = new Map<string, CommandHandler>();
+export class CommandRegistry {
+  private commands = new Map<string, CommandHandler>();
 
-export function registerCommand(cmd: CommandHandler): void {
-  if (!cmd.handler && !cmd.prompt) {
-    throw new Error(`Command "${cmd.name}" must have either handler or prompt`);
+  register(cmd: CommandHandler): void {
+    if (!cmd.handler && !cmd.prompt) {
+      throw new Error(
+        `Command "${cmd.name}" must have either handler or prompt`,
+      );
+    }
+    if (cmd.handler && cmd.prompt) {
+      throw new Error(
+        `Command "${cmd.name}" cannot have both handler and prompt`,
+      );
+    }
+    this.commands.set(cmd.name, cmd);
   }
-  if (cmd.handler && cmd.prompt) {
-    throw new Error(
-      `Command "${cmd.name}" cannot have both handler and prompt`,
-    );
+
+  get(name: string): CommandHandler | undefined {
+    return this.commands.get(name);
   }
-  commands.set(cmd.name, cmd);
-}
 
-export function getCommand(name: string): CommandHandler | undefined {
-  return commands.get(name);
-}
+  getNames(): string[] {
+    return Array.from(this.commands.keys());
+  }
 
-export function getCommandNames(): string[] {
-  return Array.from(commands.keys());
-}
+  getAll(): CommandHandler[] {
+    return Array.from(this.commands.values());
+  }
 
-export function getAllCommands(): CommandHandler[] {
-  return Array.from(commands.values());
-}
-
-/** Clear all registered commands (test isolation). */
-export function resetCommands(): void {
-  commands.clear();
+  /** Clear all registered commands (test isolation). */
+  clear(): void {
+    this.commands.clear();
+  }
 }

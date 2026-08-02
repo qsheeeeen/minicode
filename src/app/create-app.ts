@@ -6,6 +6,7 @@ import type { AppConfig } from "../config.js";
 import { createClient } from "../llm/client.js";
 import { Model } from "../llm/model.js";
 import { SkillManager } from "../skills/skill-manager.js";
+import { createDefaultSkillRegistry } from "../skills/index.js";
 import {
   AgentRegistry,
   RuntimeEvents,
@@ -27,13 +28,19 @@ import {
   RegistryCapability,
   ChangeJournalCapability,
   SubAgentSpawnerCapability,
+  SkillRegistryCapability,
 } from "../tools/capabilities.js";
+import { createDefaultAgentTypes } from "../tools/agent-types.js";
 import { runSubAgent } from "../sub-agent.js";
 import { createLogger } from "../utils/logger.js";
 import { loadGlobalPrompt } from "../utils/prompts.js";
-import { getAvailableSkills } from "../skills/index.js";
-import { createCommandContext } from "../ui/commands/create-context.js";
-import { registerAllCommands } from "../ui/commands/index.js";
+import {
+  CommandRegistry,
+  createCommandContext,
+  registerBuiltinCommands,
+  registerSkillCommands,
+} from "../ui/commands/index.js";
+import { createDefaultRouter } from "../ui/routing.js";
 import { createSubAgentRuntime } from "./create-sub-agent-runtime.js";
 import type { AppRuntime } from "./types.js";
 
@@ -97,11 +104,11 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
     initialSession,
   );
 
-  const skillManager = new SkillManager()
+  const skillRegistry = createDefaultSkillRegistry();
+  const skillManager = new SkillManager(skillRegistry)
     .addDirectory(path.join(os.homedir(), ".minicode", "skills"))
     .addDirectory(path.resolve(cwd, ".agents", "skills"));
   await skillManager.loadAll();
-  skillManager.registerAsCommands();
 
   const agentRegistry = new AgentRegistry();
   const runtimeEvents = new RuntimeEvents();
@@ -117,6 +124,16 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
     model.contextLength ?? 200000,
     thinking.effort,
     model.displayName,
+  );
+
+  // RuntimeState is the single owner of the mutable client/model/logger
+  // handles; downstream services follow model.changed instead of being
+  // manually synced by each mutator.
+  const runtimeState = new RuntimeState(
+    initialClient,
+    initialModel,
+    logger,
+    runtimeEvents,
   );
 
   const sessionManager = new SessionManager(
@@ -141,16 +158,26 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
     initialModel,
     runtimeEvents,
   );
+
+  // One sync point for model switches: runtimeState emits, consumers follow.
+  runtimeEvents.subscribe((event) => {
+    if (event.type === "model.changed") {
+      contextManager.setModel(event.client, event.model);
+      permissionService.updateAutoGate(event.client, event.model);
+    }
+  });
+
   const shellService = new ShellService({ cwd });
   const promptManager = new PromptManager(
     userPrompt,
     projectPromptFile,
     "",
-    getAvailableSkills(),
+    skillRegistry.getAvailable(),
   );
   promptManager.refreshEnvironment();
 
-  const toolRegistry = createDefaultToolRegistry();
+  const agentTypes = createDefaultAgentTypes();
+  const toolRegistry = createDefaultToolRegistry({ agentTypes });
   const tools = toolRegistry.getAll();
   const availability = { agentRegistry };
   for (const [name, tool] of tools) {
@@ -163,6 +190,7 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
       ...params,
       permissionService,
       toolRegistry,
+      agentTypes,
       createRuntime: (opts) => createSubAgentRuntime(opts),
     });
   const capabilities = createCapabilities([
@@ -170,6 +198,7 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
     [RegistryCapability, agentRegistry],
     [ChangeJournalCapability, sessionManager.getChangeJournal()],
     [SubAgentSpawnerCapability, spawnSubAgent],
+    [SkillRegistryCapability, skillRegistry],
   ]);
   const toolExecutor = new ToolExecutor({
     tools,
@@ -180,9 +209,6 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
     capabilities,
   });
 
-  // RuntimeState is the sole owner of mutable handles; deps exposes read-only
-  // getters so swap-heavy services never write into the agent's dependency bag.
-  const runtimeState = new RuntimeState(initialClient, initialModel, logger);
   const deps: AgentDeps = {
     get client() {
       return runtimeState.client;
@@ -199,12 +225,16 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
     promptManager,
   };
 
+  const commandRegistry = new CommandRegistry();
+  registerBuiltinCommands(commandRegistry);
+  registerSkillCommands(commandRegistry, skillRegistry);
+  const router = createDefaultRouter();
+
   const modelSwitchService = new ModelSwitchService({
     appConfig: config,
     contextManager,
     sessionManager,
     runtimeState,
-    permissionService,
   });
 
   sessionManager.setSession(initialSession);
@@ -212,6 +242,9 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
   const commandContext = createCommandContext({
     deps,
     config,
+    commands: commandRegistry,
+    skills: skillRegistry,
+    router,
     sessionStats,
     modelSwitchService,
     contextManager,
@@ -222,8 +255,6 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
       exit: () => process.exit(0),
     },
   });
-
-  registerAllCommands();
 
   return {
     deps,
@@ -246,5 +277,8 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
     modelSwitchService,
     shellService,
     commandContext,
+    commandRegistry,
+    skillRegistry,
+    router,
   };
 }

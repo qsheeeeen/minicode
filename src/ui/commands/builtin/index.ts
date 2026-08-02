@@ -10,23 +10,23 @@ import { testCommand } from "./test.js";
 import { skillsCommand } from "./skills.js";
 import { modelCommand } from "./model.js";
 import { undoCommand } from "./undo.js";
-import { registerCommand } from "../registry.js";
+import type { CommandRegistry } from "../registry.js";
 
 /**
  * Register every built-in slash command. Explicitly called by the composition
  * root (and tests); importing command modules never mutates state by itself.
  */
-export function registerAllCommands(): void {
-  registerCommand(exitCommand);
-  registerCommand(clearCommand);
-  registerCommand(compressCommand);
-  registerCommand(effortCommand);
-  registerCommand(newCommand);
-  registerCommand(renameCommand);
-  registerCommand(resumeCommand);
-  registerCommand(planCommand);
-  registerCommand(testCommand);
-  registerCommand(skillsCommand);
-  registerCommand(modelCommand);
-  registerCommand(undoCommand);
+export function registerBuiltinCommands(registry: CommandRegistry): void {
+  registry.register(exitCommand);
+  registry.register(clearCommand);
+  registry.register(compressCommand);
+  registry.register(effortCommand);
+  registry.register(newCommand);
+  registry.register(renameCommand);
+  registry.register(resumeCommand);
+  registry.register(planCommand);
+  registry.register(testCommand);
+  registry.register(skillsCommand);
+  registry.register(modelCommand);
+  registry.register(undoCommand);
 }

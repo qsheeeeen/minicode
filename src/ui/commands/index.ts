@@ -4,22 +4,20 @@ import type { SessionManager } from "../../services/session-manager.js";
 import type { ChangeJournal } from "../../services/change-journal.js";
 import type { LLMBlock, LLMContext } from "../../llm/context.js";
 import type { AppConfig, Providers } from "../../config.js";
+import type { SkillRegistry } from "../../skills/index.js";
 import type { ModelSwitchService } from "../../services/model-switcher.js";
 import type { ContextManager } from "../../services/context-manager.js";
 import type { ChangeEntry } from "../../services/change-journal.js";
 import type { StatusReporter } from "../../services/session-manager.js";
-import { getSkillBody, getAvailableSkills } from "../../skills/index.js";
-import { registerAllCommands } from "./builtin/index.js";
-import {
-  registerCommand,
-  getCommand,
-  getCommandNames,
-  getAllCommands,
-} from "./registry.js";
+import type { InputRouter } from "../routing.js";
+import { registerBuiltinCommands } from "./builtin/index.js";
+import type { CommandRegistry } from "./registry.js";
+import { registerSkillCommands } from "./skill-commands.js";
 
 export type { CommandHandler } from "./registry.js";
-export { registerCommand, getCommandNames, resetCommands } from "./registry.js";
-export { registerAllCommands } from "./builtin/index.js";
+export { CommandRegistry } from "./registry.js";
+export { registerBuiltinCommands } from "./builtin/index.js";
+export { registerSkillCommands } from "./skill-commands.js";
 export { createCommandContext } from "./create-context.js";
 
 export type InputRequest =
@@ -82,6 +80,9 @@ export interface CommandContext {
   model: Model;
   config: AppConfig;
   context: LLMContext;
+  commands: CommandRegistry;
+  skills: SkillRegistry;
+  router: InputRouter;
   sessionManager: SessionManager;
   changeJournal: ChangeJournal;
   sessionStats: SessionStats;
@@ -107,7 +108,7 @@ export async function executeCommand(
   promptText?: string;
   displayContent?: string;
 }> {
-  const cmd = getCommand(name);
+  const cmd = context.commands.get(name);
   if (cmd) {
     if (cmd.handler) {
       await cmd.handler(args, context);
@@ -123,7 +124,7 @@ export async function executeCommand(
   }
 
   // Dynamic skill commands: if no builtin command matched, check skills
-  const body = getSkillBody(name);
+  const body = context.skills.getBody(name);
   if (body) {
     return {
       handled: true,
@@ -135,20 +136,29 @@ export async function executeCommand(
   return { handled: false };
 }
 
-export function getCommandList(): Array<{ name: string; description: string }> {
-  const builtin = getAllCommands().map((cmd) => ({
+export function getCommandList(
+  commands: CommandRegistry,
+  skills: SkillRegistry,
+): Array<{ name: string; description: string }> {
+  const builtin = commands.getAll().map((cmd) => ({
     name: cmd.name,
     description: cmd.description,
   }));
-  const skills = getAvailableSkills()
-    .filter((s) => !getCommandNames().includes(s.name))
+  const skillCommands = skills
+    .getAvailable()
+    .filter((s) => !commands.getNames().includes(s.name))
     .map((s) => ({ name: s.name, description: s.description }));
-  return [...builtin, ...skills].sort((a, b) => a.name.localeCompare(b.name));
+  return [...builtin, ...skillCommands].sort((a, b) =>
+    a.name.localeCompare(b.name),
+  );
 }
 
-export function getHelp(): string {
+export function getHelp(
+  commands: CommandRegistry,
+  skills: SkillRegistry,
+): string {
   const lines = ["Available commands:"];
-  for (const cmd of getCommandList()) {
+  for (const cmd of getCommandList(commands, skills)) {
     lines.push(`  /${cmd.name} - ${cmd.description}`);
   }
   lines.push("  !<command> - Run a shell command directly");

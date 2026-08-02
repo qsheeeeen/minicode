@@ -13,8 +13,8 @@ import {
   RegistryCapability,
   ChangeJournalCapability,
   SubAgentSpawnerCapability,
+  SkillRegistryCapability,
 } from "../tools/capabilities.js";
-import { getAvailableSkills } from "../skills/index.js";
 import type { SubAgentRuntime, SubAgentRuntimeOpts } from "../sub-agent.js";
 
 /** Wire a standalone child runtime (parameterised mirror of create-app). */
@@ -46,11 +46,13 @@ export function createSubAgentRuntime(
     events: runtimeEvents,
     compressionThresholdRatio,
   });
+  // Skills come from the parent's registry (shared, read-only for children).
+  const skillRegistry = parentCapabilities.get(SkillRegistryCapability);
   const promptManager = new PromptManager(
     userPrompt,
     "",
     roleSystemPrompt ?? "",
-    getAvailableSkills(),
+    skillRegistry?.getAvailable() ?? [],
   );
   // Child capabilities: reuse the parent's stable services, override changeJournal.
   const capabilities = createCapabilities([
@@ -61,6 +63,7 @@ export function createSubAgentRuntime(
       SubAgentSpawnerCapability,
       parentCapabilities.get(SubAgentSpawnerCapability),
     ],
+    [SkillRegistryCapability, skillRegistry],
   ]);
   const toolExecutor = new ToolExecutor({
     tools,

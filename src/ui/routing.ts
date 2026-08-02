@@ -15,18 +15,38 @@ export interface InputHandler {
   ): Promise<RouteResult> | RouteResult;
 }
 
-const handlers: InputHandler[] = [];
+/**
+ * InputRouter — explicit instance routing user input to shell / command /
+ * LLM handlers. Owned by the composition root (one per app) instead of a
+ * module-level handler list.
+ */
+export class InputRouter {
+  private handlers: InputHandler[] = [];
 
-export function registerInputHandler(handler: InputHandler): void {
-  handlers.push(handler);
-}
+  register(handler: InputHandler): void {
+    this.handlers.push(handler);
+  }
 
-export function clearInputHandlers(): void {
-  handlers.length = 0;
-}
+  clear(): void {
+    this.handlers.length = 0;
+  }
 
-export function getInputHandlers(): readonly InputHandler[] {
-  return handlers;
+  getHandlers(): readonly InputHandler[] {
+    return this.handlers;
+  }
+
+  async route(input: string, cmdContext: CommandContext): Promise<RouteResult> {
+    const trimmed = input.trim();
+    if (!trimmed) return { action: "none" };
+
+    for (const handler of this.handlers) {
+      if (handler.matches(trimmed)) {
+        return await handler.handle(trimmed, cmdContext);
+      }
+    }
+
+    return { action: "llm", promptText: trimmed };
+  }
 }
 
 // ── Built-in handlers ──────────────────────────────────────────────────────
@@ -75,23 +95,11 @@ class LlmInputHandler implements InputHandler {
   }
 }
 
-// Register built-in handlers in priority order.
-registerInputHandler(new ShellInputHandler());
-registerInputHandler(new CommandInputHandler());
-registerInputHandler(new LlmInputHandler());
-
-export async function routeInput(
-  input: string,
-  cmdContext: CommandContext,
-): Promise<RouteResult> {
-  const trimmed = input.trim();
-  if (!trimmed) return { action: "none" };
-
-  for (const handler of handlers) {
-    if (handler.matches(trimmed)) {
-      return await handler.handle(trimmed, cmdContext);
-    }
-  }
-
-  return { action: "llm", promptText: trimmed };
+/** Default router with built-in handlers in priority order. */
+export function createDefaultRouter(): InputRouter {
+  const router = new InputRouter();
+  router.register(new ShellInputHandler());
+  router.register(new CommandInputHandler());
+  router.register(new LlmInputHandler());
+  return router;
 }
