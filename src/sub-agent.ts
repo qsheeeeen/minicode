@@ -1,47 +1,73 @@
 // Sub-agent: declarative spawn of a typed child agent. This file is pure
 // policy (resolve type → build runtime via injected factory → orchestrate).
-// The runtime factory lives in app/create-sub-agent-runtime.ts (composition).
+// The runtime factory (app/create-agent-runtime.ts) is shared with the main
+// agent — a sub-agent is the same agent loop, parameterized by tools, role
+// prompt, and lifecycle.
 
 import { runAgent, type AgentDeps } from "./agent.js";
 import { PermissionService } from "./services/permission.js";
 import type { SessionManager } from "./services/session-manager.js";
 import type { ContextManager } from "./services/context-manager.js";
 import type { RuntimeEvents } from "./services/runtime-events.js";
+import type { SessionStats } from "./services/session-stats.js";
 import {
   type ToolDef,
   type ToolRunResult,
   type ToolExecutionContext,
   type Capabilities,
   type ToolRegistry,
+  createCapabilities,
 } from "./tools/registry.js";
 import {
   type AgentTypeRegistry,
   DEFAULT_AGENT_TYPE,
 } from "./tools/agent-types.js";
-import { RegistryCapability } from "./tools/capabilities.js";
+import {
+  RegistryCapability,
+  ShellCapability,
+  ChangeJournalCapability,
+  SubAgentSpawnerCapability,
+  SkillRegistryCapability,
+} from "./tools/capabilities.js";
 import { ModelFactory } from "./llm/model.js";
 import type { Model } from "./llm/model.js";
 import type { LLMClient } from "./llm/client.js";
 import type { LLMBlock } from "./llm/context.js";
 import type { AppConfig } from "./config.js";
+import type pino from "pino";
 
-// ── Runtime wiring ────────────────────────────────────────────────────────
-
-export interface SubAgentRuntimeOpts {
+/**
+ * AgentRuntimeOpts — the unified contract for building an agent runtime.
+ * The main agent and every sub-agent go through the same factory
+ * (app/create-agent-runtime.ts); only the parameters differ.
+ */
+export interface AgentRuntimeOpts {
   client: LLMClient;
   model: Model;
   userPrompt: string;
+  projectPromptFile?: string;
   roleSystemPrompt?: string;
+  skills?: ReadonlyArray<{ name: string; description: string }>;
   tools: Map<string, ToolDef<any>>;
   permissionService: PermissionService;
-  subId: string;
+  currentAgentId: string;
   appConfig?: AppConfig;
-  /** Parent capabilities — shell/registry/spawnSubAgent reused, changeJournal overridden. */
-  parentCapabilities: Capabilities;
+  sessionStats?: SessionStats;
+  /** Shared event bus; omitted → the runtime creates its own (sub-agents). */
+  events?: RuntimeEvents;
   compressionThresholdRatio?: number;
+  /**
+   * Capability assembly, evaluated after the runtime's own SessionManager
+   * exists (so changeJournal can come from the fresh session).
+   */
+  capabilities: (parts: { sessionManager: SessionManager }) => Capabilities;
+  /** Live handles for client/model/logger (main follows RuntimeState). */
+  getClient?: () => LLMClient;
+  getModel?: () => Model;
+  getLogger?: () => pino.Logger | undefined;
 }
 
-export interface SubAgentRuntime {
+export interface AgentRuntime {
   deps: AgentDeps;
   sessionManager: SessionManager;
   contextManager: ContextManager;
@@ -61,7 +87,7 @@ export interface RunSubAgentParams {
   /** Agent-type registry owned by the composition root. */
   agentTypes: AgentTypeRegistry;
   /** Runtime factory injected from the composition root (app/). */
-  createRuntime: (opts: SubAgentRuntimeOpts) => SubAgentRuntime;
+  createRuntime: (opts: AgentRuntimeOpts) => AgentRuntime;
 }
 
 /** Resolve the type, build + run the child, return its summary. Registry
@@ -122,9 +148,26 @@ export async function runSubAgent(
       roleSystemPrompt: type.systemPrompt,
       tools,
       permissionService,
-      subId,
+      currentAgentId: subId,
       appConfig,
-      parentCapabilities: parent.capabilities,
+      // Child inherits the parent's stable services; only changeJournal is
+      // bound to the child's own fresh session.
+      capabilities: ({ sessionManager: childSession }) =>
+        createCapabilities([
+          [ShellCapability, parent.capabilities.get(ShellCapability)],
+          [RegistryCapability, parent.capabilities.get(RegistryCapability)],
+          [ChangeJournalCapability, childSession.getChangeJournal()],
+          [
+            SubAgentSpawnerCapability,
+            parent.capabilities.get(SubAgentSpawnerCapability),
+          ],
+          [
+            SkillRegistryCapability,
+            parent.capabilities.get(SkillRegistryCapability),
+          ],
+        ]),
+      skills:
+        parent.capabilities.get(SkillRegistryCapability)?.getAvailable() ?? [],
     },
   );
   const subContext = sessionManager.getContext();

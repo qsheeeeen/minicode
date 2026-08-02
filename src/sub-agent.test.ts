@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { runSubAgent } from "./sub-agent.js";
 import { runAgent } from "./agent.js";
-import { createSubAgentRuntime } from "./app/create-sub-agent-runtime.js";
+import { createAgentRuntime } from "./app/create-agent-runtime.js";
 import { AgentRegistry } from "./services/agent-registry.js";
 import { PermissionService } from "./services/permission.js";
 import { Model } from "./llm/model.js";
@@ -16,7 +16,10 @@ import {
   createCapabilities,
   type ToolExecutionContext,
 } from "./tools/registry.js";
-import { RegistryCapability } from "./tools/capabilities.js";
+import {
+  RegistryCapability,
+  ChangeJournalCapability,
+} from "./tools/capabilities.js";
 import { createDefaultToolRegistry } from "./tools/index.js";
 import { createDefaultAgentTypes } from "./tools/agent-types.js";
 
@@ -56,21 +59,24 @@ describe("sub-agent", () => {
     return {
       toolRegistry: createDefaultToolRegistry(),
       agentTypes: createDefaultAgentTypes(),
-      createRuntime: (opts: Parameters<typeof createSubAgentRuntime>[0]) =>
-        createSubAgentRuntime(opts),
+      createRuntime: (opts: Parameters<typeof createAgentRuntime>[0]) =>
+        createAgentRuntime(opts),
     };
   }
 
-  describe("createSubAgentRuntime", () => {
+  describe("createAgentRuntime", () => {
     it("wires a complete AgentDeps graph", () => {
-      const runtime = createSubAgentRuntime({
+      const runtime = createAgentRuntime({
         client: new VirtualLLMClient([defaultTextResponse("ok")]),
         model: new Model("m", "p", 200000),
         userPrompt: "",
         tools: new Map(),
         permissionService: new PermissionService("yolo"),
-        subId: "2",
-        parentCapabilities: createCapabilities([]),
+        currentAgentId: "2",
+        capabilities: ({ sessionManager }) =>
+          createCapabilities([
+            [ChangeJournalCapability, sessionManager.getChangeJournal()],
+          ]),
       });
       expect(runtime.deps.sessionManager).toBeDefined();
       expect(runtime.deps.contextManager).toBe(runtime.contextManager);
