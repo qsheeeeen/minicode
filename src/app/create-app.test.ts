@@ -99,6 +99,38 @@ describe("createApp", () => {
     });
   });
 
+  it("runtime deps follow model switches through RuntimeState", async () => {
+    const config = new AppConfig({
+      providers: {
+        test: {
+          apiKey: "test-key",
+          protocol: "anthropic",
+          models: { "next-model": { contextLength: 1234 } },
+        },
+      },
+      model: "test-model@test",
+    });
+
+    const runtime = await createApp({
+      args: makeArgs(),
+      config,
+      version: "1.0.0",
+      cwd: "/tmp",
+      programStartTime: 123,
+      stdinIsTTY: false,
+    });
+
+    expect(runtime.deps.model).toBe(runtime.runtimeState.model);
+
+    await runtime.modelSwitchService.switchAgentModel({
+      modelSpec: "next-model@test",
+      persistDefault: false,
+    });
+
+    expect(runtime.deps.model.getName()).toBe("next-model");
+    expect(runtime.runtimeState.model.getName()).toBe("next-model");
+  });
+
   it("exposes the latest change journal through command context", async () => {
     const runtime = await createApp({
       args: makeArgs(),

@@ -1,6 +1,6 @@
-import { registerCommand } from "../registry.js";
+import type { CommandHandler } from "../registry.js";
 
-registerCommand({
+export const modelCommand: CommandHandler = {
   name: "model",
   description: "Switch model/provider",
   handler: async (_args, ctx): Promise<void> => {
@@ -10,4 +10,4 @@ registerCommand({
       tiers: ctx.config.tiers,
     });
   },
-});
+};

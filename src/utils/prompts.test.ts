@@ -3,7 +3,6 @@ import {
   buildSystemPrompt,
   readPromptFile,
   loadGlobalPrompt,
-  loadProjectPrompt,
 } from "./prompts.js";
 
 vi.mock("fs/promises", () => ({
@@ -54,23 +53,6 @@ describe("loadGlobalPrompt", () => {
   });
 });
 
-describe("loadProjectPrompt", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it("loads from project directory", async () => {
-    const fs = await import("fs/promises");
-    (fs.default.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(
-      "project prompt",
-    );
-    await loadProjectPrompt("/my/project");
-    const readCall = (fs.default.readFile as ReturnType<typeof vi.fn>).mock
-      .calls[0][0];
-    expect(readCall).toBe("/my/project/AGENTS.md");
-  });
-});
-
 describe("buildSystemPrompt", () => {
   it("includes roleSystemPrompt as a section", () => {
     const prompt = buildSystemPrompt({
@@ -83,5 +65,19 @@ describe("buildSystemPrompt", () => {
   it("omits role section when not provided", () => {
     const prompt = buildSystemPrompt({});
     expect(prompt).not.toContain("# Role");
+  });
+
+  it("includes available skills when provided", () => {
+    const prompt = buildSystemPrompt({
+      skills: [{ name: "my-skill", description: "A test skill" }],
+    });
+    expect(prompt).toContain("<available_skills>");
+    expect(prompt).toContain("<name>my-skill</name>");
+    expect(prompt).toContain("A test skill");
+  });
+
+  it("omits the skills section when none are provided", () => {
+    const prompt = buildSystemPrompt({});
+    expect(prompt).not.toContain("<available_skills>");
   });
 });

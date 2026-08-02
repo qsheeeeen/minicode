@@ -1,6 +1,6 @@
-import { registerCommand } from "../registry.js";
+import type { CommandHandler } from "../registry.js";
 
-registerCommand({
+export const undoCommand: CommandHandler = {
   name: "undo",
   description: "Rollback to a previous user message",
   handler: async (_args, ctx): Promise<void> => {
@@ -40,4 +40,4 @@ registerCommand({
       reportStatus: ctx.sessionManager.reportStatus.bind(ctx.sessionManager),
     });
   },
-});
+};

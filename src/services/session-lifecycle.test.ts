@@ -12,22 +12,19 @@ describe("switchSession", () => {
       setSession: vi.fn(),
       reportStatus,
     };
-    const setCurrentSession = vi.fn();
-    const setLogger = vi.fn();
+    const runtimeState = { setLogger: vi.fn() };
     const sessionStats = { incrementSessionCount: vi.fn() };
 
     await switchSession({
       sessionManager: sessionManager as any,
       sessionName: "test-session",
-      setCurrentSession,
-      setLogger,
+      runtimeState: runtimeState as any,
       sessionStats: sessionStats as any,
       statusMessage: "Created session",
     });
 
     expect(sessionManager.setSession).toHaveBeenCalledWith("test-session");
-    expect(setLogger).toHaveBeenCalled();
-    expect(setCurrentSession).toHaveBeenCalledWith("test-session");
+    expect(runtimeState.setLogger).toHaveBeenCalled();
     expect(sessionStats.incrementSessionCount).toHaveBeenCalledWith(
       "test-session",
     );
@@ -46,8 +43,7 @@ describe("switchSession", () => {
     await switchSession({
       sessionManager: sessionManager as any,
       sessionName: "s2",
-      setCurrentSession: vi.fn(),
-      setLogger: vi.fn(),
+      runtimeState: { setLogger: vi.fn() } as any,
       sessionStats: { incrementSessionCount: vi.fn() } as any,
     });
 

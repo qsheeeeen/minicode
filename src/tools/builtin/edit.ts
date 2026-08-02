@@ -1,7 +1,10 @@
 import fs from "fs/promises";
 import { generateDiffSummary } from "../../utils/diff.js";
-import type { ToolDef, ToolExecutionContext, ToolRunResult } from "../registry.js";
-import { register } from "../registry.js";
+import type {
+  ToolDef,
+  ToolExecutionContext,
+  ToolRunResult,
+} from "../registry.js";
 import { ChangeJournalCapability } from "../capabilities.js";
 
 interface TextReplacementRange {
@@ -83,7 +86,9 @@ async function recordEditChange(
   result: EditTextResult,
 ): Promise<void> {
   const userMessageOrdinal = context?.activeUserMessageOrdinal ?? 0;
-  const changeJournal = context?.capabilities.get(ChangeJournalCapability);
+  const changeJournal = context
+    ? context.capabilities.require(ChangeJournalCapability)
+    : undefined;
   if (!changeJournal || userMessageOrdinal <= 0) return;
   await changeJournal.recordChange(
     userMessageOrdinal,
@@ -136,11 +141,13 @@ export const editTool: ToolDef = {
         })
         .join("\n");
       const stats = headerLine ? ` (${headerLine.content})` : "";
-      return { outcome: "success", result: `Edited ${path}${stats}\n${diffText}` };
+      return {
+        outcome: "success",
+        result: `Edited ${path}${stats}\n${diffText}`,
+      };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       return { outcome: "error", reason: msg };
     }
   },
 };
-register(editTool);

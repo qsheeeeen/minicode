@@ -1,5 +1,8 @@
-import type { ToolDef, ToolRunResult, ToolExecutionContext } from "../registry.js";
-import { register } from "../registry.js";
+import type {
+  ToolDef,
+  ToolRunResult,
+  ToolExecutionContext,
+} from "../registry.js";
 import { getSkillBody } from "../../skills/index.js";
 
 export const loadSkillTool: ToolDef = {
@@ -32,4 +35,3 @@ export const loadSkillTool: ToolDef = {
     return { outcome: "success", result: output };
   },
 };
-register(loadSkillTool);

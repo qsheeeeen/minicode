@@ -7,7 +7,7 @@ import { PromptManager } from "./services/prompt-manager.js";
 import { ToolExecutor } from "./tools/executor.js";
 import { PermissionService } from "./services/permission.js";
 import { SessionPersistence } from "./services/session-persistence.js";
-import { getAll } from "./tools/index.js";
+import { createDefaultToolRegistry } from "./tools/index.js";
 import { createCapabilities } from "./tools/registry.js";
 
 function makeTestModel() {
@@ -44,7 +44,7 @@ function makeDeps(overrides?: {
   const promptManager = new PromptManager(o.userPrompt);
   const permissionService = new PermissionService(o.permissionMode ?? "manual");
   const toolExecutor = new ToolExecutor({
-    tools: getAll(),
+    tools: createDefaultToolRegistry().getAll(),
     permissionService,
     context,
     capabilities: createCapabilities([]),
@@ -147,12 +147,18 @@ vi.mock("./tools/index.js", async (importOriginal) => {
     description: "Test Tool",
     input_schema: { type: "object", properties: {} },
     requiresPermission: true,
-    execute: vi.fn().mockResolvedValue({ outcome: "success", result: "success" }),
+    execute: vi
+      .fn()
+      .mockResolvedValue({ outcome: "success", result: "success" }),
   };
   return {
     ...original,
-    getAll: () => new Map([[testTool.name, testTool]]),
-    getSubAgentTools: () => new Map([[testTool.name, testTool]]),
+    createDefaultToolRegistry: () => ({
+      getAll: () => new Map([[testTool.name, testTool]]),
+      get: () => undefined,
+      getSubAgentTools: () => new Map([[testTool.name, testTool]]),
+      reset: () => {},
+    }),
   };
 });
 

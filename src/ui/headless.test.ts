@@ -1,11 +1,26 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const { mockRun } = vi.hoisted(() => ({ mockRun: vi.fn() }));
+const { sessionPersistenceMock } = vi.hoisted(() => ({
+  sessionPersistenceMock: {
+    getProjectHash: vi.fn().mockReturnValue("testhash"),
+    getMostRecent: vi.fn().mockResolvedValue(null),
+    load: vi.fn().mockResolvedValue(null),
+  },
+}));
 
 vi.mock("../agent.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../agent.js")>();
   return { ...actual, runAgent: mockRun };
 });
+
+vi.mock("../utils/logger.js", () => ({
+  createLogger: vi.fn().mockResolvedValue({ info: vi.fn(), error: vi.fn() }),
+}));
+
+vi.mock("../services/session-persistence.js", () => ({
+  SessionPersistence: sessionPersistenceMock,
+}));
 
 const mockOnChange = vi.fn().mockReturnValue(() => {});
 const mockSubscribe = vi.fn().mockReturnValue(() => {});
@@ -13,6 +28,7 @@ const mockSubscribe = vi.fn().mockReturnValue(() => {});
 const mockContext = {
   onChange: mockOnChange,
   getUserMessageCount: vi.fn().mockReturnValue(0),
+  replaceBlocks: vi.fn(),
 };
 
 const mockSessionManager = {
@@ -40,6 +56,8 @@ const mockDeps = {
 
 const mockShellService = { runSync: vi.fn().mockReturnValue("output") };
 
+const mockRuntimeState = { setLogger: vi.fn() };
+
 import { runHeadless } from "./headless.js";
 
 describe("runHeadless", () => {
@@ -62,7 +80,13 @@ describe("runHeadless", () => {
 
   it("calls runAgent with prompter that returns empty string", async () => {
     mockRun.mockResolvedValueOnce(true);
-    await runHeadless(mockDeps, "test prompt", mockRuntimeEvents as any, mockShellService);
+    await runHeadless(
+      mockDeps,
+      "test prompt",
+      mockRuntimeEvents as any,
+      mockShellService,
+      mockRuntimeState as any,
+    );
 
     expect(mockRun).toHaveBeenCalledWith(
       mockDeps,
@@ -82,7 +106,13 @@ describe("runHeadless", () => {
 
   it("calls runAgent with initial prompt", async () => {
     mockRun.mockResolvedValueOnce(true);
-    await runHeadless(mockDeps, "test prompt", mockRuntimeEvents as any, mockShellService);
+    await runHeadless(
+      mockDeps,
+      "test prompt",
+      mockRuntimeEvents as any,
+      mockShellService,
+      mockRuntimeState as any,
+    );
     expect(mockRun).toHaveBeenCalledWith(
       mockDeps,
       "test prompt",
@@ -96,7 +126,13 @@ describe("runHeadless", () => {
     abortErr.name = "AbortError";
     mockRun.mockRejectedValueOnce(abortErr);
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-    await runHeadless(mockDeps, "test prompt", mockRuntimeEvents as any, mockShellService);
+    await runHeadless(
+      mockDeps,
+      "test prompt",
+      mockRuntimeEvents as any,
+      mockShellService,
+      mockRuntimeState as any,
+    );
     expect(logSpy).toHaveBeenCalledWith("(Aborted)");
     logSpy.mockRestore();
   });
@@ -104,7 +140,13 @@ describe("runHeadless", () => {
   it("handles generic error", async () => {
     mockRun.mockRejectedValueOnce(new Error("test error"));
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    await runHeadless(mockDeps, "test prompt", mockRuntimeEvents as any, mockShellService);
+    await runHeadless(
+      mockDeps,
+      "test prompt",
+      mockRuntimeEvents as any,
+      mockShellService,
+      mockRuntimeState as any,
+    );
     expect(errSpy).toHaveBeenCalledWith("(Error: test error)");
     errSpy.mockRestore();
   });
@@ -112,7 +154,39 @@ describe("runHeadless", () => {
   it("throws non-Error objects", async () => {
     mockRun.mockRejectedValueOnce("string error");
     await expect(
-      runHeadless(mockDeps, "test prompt", mockRuntimeEvents as any, mockShellService),
+      runHeadless(
+        mockDeps,
+        "test prompt",
+        mockRuntimeEvents as any,
+        mockShellService,
+        mockRuntimeState as any,
+      ),
     ).rejects.toBe("string error");
+  });
+
+  it("loads a resumed session and swaps the logger via runtimeState", async () => {
+    mockRun.mockResolvedValueOnce(true);
+    sessionPersistenceMock.getMostRecent.mockResolvedValue("resumed-session");
+    sessionPersistenceMock.load.mockResolvedValue({
+      blocks: [{ type: "user", text: "old" }],
+      totalTokens: 10,
+    });
+
+    await runHeadless(
+      mockDeps,
+      "prompt",
+      mockRuntimeEvents as any,
+      mockShellService,
+      mockRuntimeState as any,
+      undefined,
+      true,
+    );
+
+    expect(sessionPersistenceMock.load).toHaveBeenCalledWith("resumed-session");
+    expect(mockContext.replaceBlocks).toHaveBeenCalledWith([
+      { type: "user", text: "old" },
+    ]);
+    expect(mockContextManager.setTokenCount).toHaveBeenCalledWith(10);
+    expect(mockRuntimeState.setLogger).toHaveBeenCalled();
   });
 });

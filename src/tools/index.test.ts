@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { getAll, getSubAgentTools } from "./index.js";
+import { createDefaultToolRegistry } from "./index.js";
 
 describe("tool registry", () => {
-  it("getAll() returns self-registered tools", () => {
-    const tools = getAll();
+  it("creates a registry with all built-in tools", () => {
+    const tools = createDefaultToolRegistry().getAll();
     expect(tools.size).toBeGreaterThan(0);
     expect(tools.has("Read")).toBe(true);
     expect(tools.has("Write")).toBe(true);
@@ -14,7 +14,7 @@ describe("tool registry", () => {
   });
 
   it("getSubAgentTools() returns only read-only non-interactive tools", () => {
-    const safe = getSubAgentTools();
+    const safe = createDefaultToolRegistry().getSubAgentTools();
     const names = [...safe.keys()];
     expect(names).toContain("Read");
     expect(names).toContain("Grep");
@@ -27,16 +27,29 @@ describe("tool registry", () => {
   });
 
   it("getAll() returns a Map copy", () => {
-    const tools = getAll();
-    expect(tools).toBeInstanceOf(Map);
+    const registry = createDefaultToolRegistry();
+    expect(registry.getAll()).toBeInstanceOf(Map);
   });
 
   it("tools have required properties", () => {
-    for (const [name, tool] of getAll()) {
+    for (const [name, tool] of createDefaultToolRegistry().getAll()) {
       expect(tool.name).toBe(name);
       expect(typeof tool.description).toBe("string");
       expect(tool.input_schema).toBeDefined();
       expect(typeof tool.execute).toBe("function");
     }
+  });
+
+  it("fresh instances do not share registrations", () => {
+    const a = createDefaultToolRegistry();
+    const b = createDefaultToolRegistry();
+    b.register({
+      name: "OnlyInB",
+      description: "d",
+      input_schema: {},
+      execute: async () => ({ outcome: "success", result: "ok" }),
+    });
+    expect(a.get("OnlyInB")).toBeUndefined();
+    expect(b.get("OnlyInB")).toBeDefined();
   });
 });

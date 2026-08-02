@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { createSubAgentRuntime, runSubAgent } from "./sub-agent.js";
+import { runSubAgent } from "./sub-agent.js";
+import { runAgent } from "./agent.js";
+import { createSubAgentRuntime } from "./app/create-sub-agent-runtime.js";
 import { AgentRegistry } from "./services/agent-registry.js";
 import { PermissionService } from "./services/permission.js";
 import { Model } from "./llm/model.js";
@@ -15,10 +17,17 @@ import {
   type ToolExecutionContext,
 } from "./tools/registry.js";
 import { RegistryCapability } from "./tools/capabilities.js";
+import { createDefaultToolRegistry } from "./tools/index.js";
 
 vi.mock("./utils/tool-format.js", () => ({
   callContent: vi.fn((name: string) => `${name}()`),
 }));
+
+// Wrap runAgent so the failure path can be forced deterministically.
+vi.mock("./agent.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./agent.js")>();
+  return { ...actual, runAgent: vi.fn(actual.runAgent) };
+});
 
 function makeParent(
   registry: AgentRegistry,
@@ -41,6 +50,14 @@ describe("sub-agent", () => {
       "/tmp/minicode-sub-agent-test",
     );
   });
+
+  function defaultSpawnOptions() {
+    return {
+      toolRegistry: createDefaultToolRegistry(),
+      createRuntime: (opts: Parameters<typeof createSubAgentRuntime>[0]) =>
+        createSubAgentRuntime(opts),
+    };
+  }
 
   describe("createSubAgentRuntime", () => {
     it("wires a complete AgentDeps graph", () => {
@@ -72,6 +89,7 @@ describe("sub-agent", () => {
         agentType: "researcher",
         parent,
         permissionService: new PermissionService("yolo"),
+        ...defaultSpawnOptions(),
       });
 
       expect(result.outcome).toBe("success");
@@ -86,6 +104,7 @@ describe("sub-agent", () => {
         task: "x",
         parent,
         permissionService: new PermissionService("yolo"),
+        ...defaultSpawnOptions(),
       });
       expect(result.outcome).toBe("success");
     });
@@ -98,6 +117,7 @@ describe("sub-agent", () => {
         agentType: "no-such-type",
         parent,
         permissionService: new PermissionService("yolo"),
+        ...defaultSpawnOptions(),
       });
       expect(result.outcome).toBe("error");
       expect(unwrapError(result)).toContain("Unknown agent type");
@@ -119,9 +139,28 @@ describe("sub-agent", () => {
         task: "x",
         parent,
         permissionService: new PermissionService("yolo"),
+        ...defaultSpawnOptions(),
       });
       expect(result.outcome).toBe("error");
       expect(unwrapError(result)).toContain("AgentRegistry");
+    });
+
+    it("returns error (not success) when the child run fails", async () => {
+      const registry = new AgentRegistry();
+      const { parent } = makeParent(registry, []);
+      vi.mocked(runAgent).mockRejectedValueOnce(new Error("boom"));
+
+      const result = await runSubAgent({
+        task: "x",
+        parent,
+        permissionService: new PermissionService("yolo"),
+        ...defaultSpawnOptions(),
+      });
+
+      expect(result.outcome).toBe("error");
+      expect(unwrapError(result)).toContain("Agent #");
+      expect(unwrapError(result)).toContain("boom");
+      expect(registry.getAll()).toHaveLength(0); // cleaned up
     });
   });
 });

@@ -25,7 +25,9 @@ function createService() {
   const permissionService = {
     updateAutoGate: vi.fn(),
   };
-  const setModel = vi.fn();
+  const runtimeState = {
+    setClientModel: vi.fn(),
+  };
   vi.spyOn(appConfig, "setModel").mockResolvedValue();
   vi.spyOn(appConfig, "setTier").mockResolvedValue();
 
@@ -33,7 +35,7 @@ function createService() {
     appConfig,
     contextManager: contextManager as any,
     sessionManager: sessionManager as any,
-    setModel,
+    runtimeState: runtimeState as any,
     permissionService: permissionService as any,
   });
 
@@ -43,7 +45,7 @@ function createService() {
     contextManager,
     sessionManager,
     permissionService,
-    setModel,
+    runtimeState,
   };
 }
 
@@ -55,7 +57,7 @@ describe("ModelSwitchService", () => {
       contextManager,
       sessionManager,
       permissionService,
-      setModel,
+      runtimeState,
     } = createService();
 
     const selection = await service.switchAgentModel({
@@ -63,7 +65,7 @@ describe("ModelSwitchService", () => {
     });
     const { client, model } = selection;
 
-    expect(setModel).toHaveBeenCalledWith(client, model);
+    expect(runtimeState.setClientModel).toHaveBeenCalledWith(client, model);
     expect(model.getName()).toBe("next-model");
     expect(contextManager.setModel).toHaveBeenCalledWith(client, model);
     expect(permissionService.updateAutoGate).toHaveBeenCalledWith(

@@ -1,6 +1,8 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { SessionManager } from "./session-manager.js";
 import { SessionStats } from "./session-stats.js";
+import { RuntimeEvents } from "./runtime-events.js";
+import { SessionPersistence } from "./session-persistence.js";
 
 describe("SessionManager", () => {
   describe("constructor", () => {
@@ -35,6 +37,23 @@ describe("SessionManager", () => {
     it("provides a ChangeJournal", () => {
       const sm = new SessionManager();
       expect(sm.getChangeJournal()).toBeDefined();
+    });
+  });
+
+  describe("events", () => {
+    it("emits session.changed on setSession", () => {
+      const events = new RuntimeEvents();
+      const seen: string[] = [];
+      events.subscribe((event) => {
+        if (event.type === "session.changed") seen.push(event.sessionName);
+      });
+      const sm = new SessionManager(undefined, undefined, events);
+      const spy = vi
+        .spyOn(SessionPersistence, "getSessionDir")
+        .mockReturnValue("/tmp/minicode-session-manager-test");
+      sm.setSession("next-session");
+      spy.mockRestore();
+      expect(seen).toEqual(["next-session"]);
     });
   });
 

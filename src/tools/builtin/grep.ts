@@ -1,6 +1,9 @@
 import { spawn } from "child_process";
-import type { ToolDef, ToolRunResult, ToolExecutionContext } from "../registry.js";
-import { register } from "../registry.js";
+import type {
+  ToolDef,
+  ToolRunResult,
+  ToolExecutionContext,
+} from "../registry.js";
 
 export const grepTool: ToolDef = {
   name: "Grep",
@@ -75,4 +78,3 @@ export const grepTool: ToolDef = {
     }
   },
 };
-register(grepTool);

@@ -7,6 +7,7 @@ import { routeInput } from "./routing.js";
 import { processRoute } from "./route-handler.js";
 import {
   inputRequestToState,
+  createCommandContext,
   type CommandContext,
 } from "./commands/index.js";
 import { AgentRegistry } from "../services/index.js";
@@ -17,12 +18,10 @@ import type { PermissionService } from "../services/permission.js";
 import type { ShellService } from "../services/shell-service.js";
 import type { ModelSwitchService } from "../services/model-switcher.js";
 import type { ContextManager } from "../services/context-manager.js";
+import type { RuntimeState } from "../services/runtime-state.js";
 import type { LLMContext } from "../llm/context.js";
 import { Receipt } from "./tui/Receipt.js";
 import { UITimeline } from "./tui/timeline.js";
-import { switchSession } from "../services/session-lifecycle.js";
-import { SessionPersistence } from "../services/session-persistence.js";
-import { createLogger } from "../utils/logger.js";
 
 import { useTuiState } from "./tui/state.js";
 import { connectAgent } from "./tui/connect-agent.js";
@@ -37,6 +36,7 @@ import { Help } from "./tui/Help.js";
 
 export interface AppProps {
   deps: AgentDeps;
+  runtimeState: RuntimeState;
   config: AppConfig;
   version: string;
   promptFiles: string[];
@@ -58,6 +58,7 @@ export interface AppProps {
 
 function AppContent({
   deps,
+  runtimeState,
   config,
   version,
   promptFiles,
@@ -105,66 +106,39 @@ function AppContent({
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const cmdContext = useCallback(
-    (): CommandContext => ({
-      model: deps.model,
+    (): CommandContext =>
+      createCommandContext({
+        deps,
+        config,
+        sessionStats,
+        modelSwitchService,
+        contextManager,
+        runtimeState,
+        bridges: {
+          isAgentRunning: () => loadingRef.current,
+          presentInput: (request) => {
+            const inputState = inputRequestToState(request);
+            useTuiState.setState((state) => ({
+              input: {
+                ...state.input,
+                mode: inputState.mode,
+                props: inputState.props,
+                value: "",
+                key: state.input.key + 1,
+              },
+            }));
+          },
+          exit: () => useTuiState.setState({ showReceipt: true }),
+        },
+      }),
+    [
+      deps,
       config,
-      context,
-      sessionManager,
-      get changeJournal() {
-        return sessionManager.getChangeJournal();
-      },
       sessionStats,
       modelSwitchService,
       contextManager,
-      isAgentRunning: () => loadingRef.current,
-      loadContext: (blocks, totalTokens = 0) => {
-        context.replaceBlocks(blocks);
-        contextManager.setTokenCount(totalTokens);
-      },
-      switchSession: async (name, opts) => {
-        await switchSession({
-          sessionManager,
-          sessionName: name,
-          setLogger: (logger) => {
-            deps.logger = logger;
-          },
-          setCurrentSession: (session) =>
-            useTuiState.setState({ currentSession: session }),
-          sessionStats,
-          statusMessage: opts?.statusMessage,
-        });
-      },
-      renameCurrentSession: async (newName) => {
-        const oldName = sessionManager.getSessionName();
-        await SessionPersistence.rename(oldName, newName);
-        const newLogger = await createLogger(
-          SessionPersistence.getProjectHash(),
-          newName,
-        );
-        sessionManager.setSession(newName);
-        deps.logger = newLogger;
-        useTuiState.setState({ currentSession: newName });
-        sessionManager.reportStatus({
-          role: "status",
-          content: `Renamed: ${oldName} -> ${newName}`,
-          timestamp: new Date(),
-        });
-      },
-      presentInput: (request) => {
-        const inputState = inputRequestToState(request);
-        useTuiState.setState((state) => ({
-          input: {
-            ...state.input,
-            mode: inputState.mode,
-            props: inputState.props,
-            value: "",
-            key: state.input.key + 1,
-          },
-        }));
-      },
-      exit: () => useTuiState.setState({ showReceipt: true }),
-    }),
-    [deps, sessionManager, contextManager, config, modelSwitchService],
+      runtimeState,
+    ],
   );
 
   const handleSubmit = useCallback(
@@ -256,8 +230,7 @@ function AppContent({
         return;
       }
       if (key.shift && key.tab) {
-        const next = permissionService.cycleMode();
-        useTuiState.setState({ permissionMode: next });
+        permissionService.cycleMode();
         return;
       }
       if (key.escape && isLoading) {

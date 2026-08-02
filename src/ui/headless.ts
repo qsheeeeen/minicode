@@ -7,6 +7,7 @@ import { processRoute } from "./route-handler.js";
 import { SessionPersistence } from "../services/session-persistence.js";
 import type { ShellService } from "../services/shell-service.js";
 import type { RuntimeEvents } from "../services/runtime-events.js";
+import type { RuntimeState } from "../services/runtime-state.js";
 import { HeadlessRenderer } from "./headless-renderer.js";
 
 export async function runHeadless(
@@ -14,6 +15,7 @@ export async function runHeadless(
   initialPrompt: string | undefined,
   runtimeEvents: RuntimeEvents,
   shellService: ShellService,
+  runtimeState: RuntimeState,
   sessionName?: string,
   resumeRecent?: boolean,
   cmdContext?: CommandContext,
@@ -68,7 +70,7 @@ export async function runHeadless(
         name,
       );
       sessionManager.setSession(name);
-      deps.logger = newLogger;
+      runtimeState.setLogger(newLogger);
     }
   }
 
@@ -103,7 +105,10 @@ export async function runHeadless(
     );
 
     if (processed.type === "run" && processed.displayContent) {
-      renderer.setDisplay(context.getUserMessageCount(), processed.displayContent);
+      renderer.setDisplay(
+        context.getUserMessageCount(),
+        processed.displayContent,
+      );
     }
 
     if (processed.type === "done") {

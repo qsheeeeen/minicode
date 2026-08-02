@@ -1,5 +1,8 @@
-import type { ToolDef, ToolRunResult, ToolExecutionContext } from "../registry.js";
-import { register } from "../registry.js";
+import type {
+  ToolDef,
+  ToolRunResult,
+  ToolExecutionContext,
+} from "../registry.js";
 
 interface AskUserArgs {
   question: string;
@@ -81,4 +84,3 @@ export const askUserTool: ToolDef<AskUserArgs> = {
     return { outcome: "success", result: `User selected: "${answer}"` };
   },
 };
-register(askUserTool);

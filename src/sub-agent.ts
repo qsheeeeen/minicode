@@ -1,31 +1,23 @@
-// Sub-agent: declarative spawn of a typed child agent. Wiring (createSubAgent
-// Runtime) + orchestration (runSubAgent) both live here in the agent layer — a
-// child runtime is assembled dynamically at spawn time, not at app startup, so
-// its composition belongs with the spawn logic, not in the app composition root.
+// Sub-agent: declarative spawn of a typed child agent. This file is pure
+// policy (resolve type → build runtime via injected factory → orchestrate).
+// The runtime factory lives in app/create-sub-agent-runtime.ts (composition).
 
 import { runAgent, type AgentDeps } from "./agent.js";
-import { SessionManager } from "./services/session-manager.js";
-import { ContextManager } from "./services/context-manager.js";
-import { RuntimeEvents } from "./services/runtime-events.js";
-import { PromptManager } from "./services/prompt-manager.js";
 import { PermissionService } from "./services/permission.js";
-import { ToolExecutor } from "./tools/executor.js";
+import type { SessionManager } from "./services/session-manager.js";
+import type { ContextManager } from "./services/context-manager.js";
+import type { RuntimeEvents } from "./services/runtime-events.js";
 import {
-  getSubAgentTools,
-  createCapabilities,
   type ToolDef,
   type ToolRunResult,
   type ToolExecutionContext,
   type Capabilities,
+  type ToolRegistry,
 } from "./tools/registry.js";
 import { getAgentType, DEFAULT_AGENT_TYPE } from "./tools/agent-types.js";
-import {
-  ShellCapability,
-  RegistryCapability,
-  ChangeJournalCapability,
-  SubAgentSpawnerCapability,
-} from "./tools/capabilities.js";
-import { ModelFactory, type Model } from "./llm/model.js";
+import { RegistryCapability } from "./tools/capabilities.js";
+import { ModelFactory } from "./llm/model.js";
+import type { Model } from "./llm/model.js";
 import type { LLMClient } from "./llm/client.js";
 import type { LLMBlock } from "./llm/context.js";
 import type { AppConfig } from "./config.js";
@@ -53,65 +45,6 @@ export interface SubAgentRuntime {
   runtimeEvents: RuntimeEvents;
 }
 
-/** Wire a standalone child runtime (parameterised mirror of create-app's wiring). */
-export function createSubAgentRuntime(
-  opts: SubAgentRuntimeOpts,
-): SubAgentRuntime {
-  const {
-    client,
-    model,
-    userPrompt,
-    roleSystemPrompt,
-    tools,
-    permissionService,
-    subId,
-    appConfig,
-    parentCapabilities,
-    compressionThresholdRatio = 0.8,
-  } = opts;
-
-  const sessionManager = new SessionManager();
-  const runtimeEvents = new RuntimeEvents();
-  const contextManager = new ContextManager({
-    client,
-    model,
-    getContext: () => sessionManager.getContext(),
-    getChangeJournal: () => sessionManager.getChangeJournal(),
-    setActiveUserMessageOrdinal: (ordinal) =>
-      sessionManager.setActiveUserMessageOrdinal(ordinal),
-    events: runtimeEvents,
-    compressionThresholdRatio,
-  });
-  const promptManager = new PromptManager(userPrompt, "", roleSystemPrompt ?? "");
-  // Child capabilities: reuse the parent's stable services, override changeJournal.
-  const capabilities = createCapabilities([
-    [ShellCapability, parentCapabilities.get(ShellCapability)],
-    [RegistryCapability, parentCapabilities.get(RegistryCapability)],
-    [ChangeJournalCapability, sessionManager.getChangeJournal()],
-    [
-      SubAgentSpawnerCapability,
-      parentCapabilities.get(SubAgentSpawnerCapability),
-    ],
-  ]);
-  const toolExecutor = new ToolExecutor({
-    tools,
-    permissionService,
-    context: sessionManager.getContext(),
-    appConfig,
-    currentAgentId: subId,
-    capabilities,
-  });
-  const deps: AgentDeps = {
-    client,
-    model,
-    sessionManager,
-    contextManager,
-    toolExecutor,
-    promptManager,
-  };
-  return { deps, sessionManager, contextManager, runtimeEvents };
-}
-
 // ── Spawn ─────────────────────────────────────────────────────────────────
 
 export interface RunSubAgentParams {
@@ -120,6 +53,10 @@ export interface RunSubAgentParams {
   parent: ToolExecutionContext;
   /** Reuses the parent's PermissionService so the child inherits its mode. */
   permissionService: PermissionService;
+  /** Tool registry owned by the composition root. */
+  toolRegistry: ToolRegistry;
+  /** Runtime factory injected from the composition root (app/). */
+  createRuntime: (opts: SubAgentRuntimeOpts) => SubAgentRuntime;
 }
 
 /** Resolve the type, build + run the child, return its summary. Registry
@@ -127,7 +64,8 @@ export interface RunSubAgentParams {
 export async function runSubAgent(
   params: RunSubAgentParams,
 ): Promise<ToolRunResult> {
-  const { task, parent, permissionService } = params;
+  const { task, parent, permissionService, toolRegistry, createRuntime } =
+    params;
   const agentTypeName = params.agentType || DEFAULT_AGENT_TYPE;
 
   const type = getAgentType(agentTypeName);
@@ -144,8 +82,8 @@ export async function runSubAgent(
 
   // Resolve tool-set from the type declaration.
   const tools = Array.isArray(type.tools)
-    ? getSubAgentTools({ allowlist: type.tools })
-    : getSubAgentTools({ readOnly: type.tools === "readonly" });
+    ? toolRegistry.getSubAgentTools({ allowlist: type.tools })
+    : toolRegistry.getSubAgentTools({ readOnly: type.tools === "readonly" });
 
   // Resolve model — optionally override via the type's tier.
   const appConfig = parent.appConfig;
@@ -165,8 +103,8 @@ export async function runSubAgent(
   const subId = registry.allocateSubId();
   const parentId = parent.currentAgentId || "1";
 
-  const { deps, sessionManager, contextManager, runtimeEvents } =
-    createSubAgentRuntime({
+  const { deps, sessionManager, contextManager, runtimeEvents } = createRuntime(
+    {
       client: subClient,
       model: subModel,
       userPrompt: config.userPrompt,
@@ -176,7 +114,8 @@ export async function runSubAgent(
       subId,
       appConfig,
       parentCapabilities: parent.capabilities,
-    });
+    },
+  );
   const subContext = sessionManager.getContext();
 
   const unsubTokens = runtimeEvents.subscribe((event) => {
@@ -186,7 +125,9 @@ export async function runSubAgent(
   });
   let toolCallCount = 0;
   const unsubBlocks = subContext.onChange(() => {
-    const tc = subContext.getBlocks().filter((b) => b.type === "tool_use").length;
+    const tc = subContext
+      .getBlocks()
+      .filter((b) => b.type === "tool_use").length;
     if (tc !== toolCallCount) {
       toolCallCount = tc;
       registry.updateProgress(subId, { toolCalls: tc });
@@ -227,7 +168,7 @@ export async function runSubAgent(
     registry.updateStatus(subId, "error");
     registry.updateSummary(subId, `Error: ${msg}`);
     registry.remove(subId);
-    return { outcome: "success", result: `Agent #${subId} failed: ${msg}` };
+    return { outcome: "error", reason: `Agent #${subId} failed: ${msg}` };
   } finally {
     unsubTokens();
     unsubBlocks();

@@ -20,7 +20,9 @@ export type RuntimeEvent =
   | {
       type: "status.added";
       status: RuntimeStatus;
-    };
+    }
+  | { type: "session.changed"; sessionName: string }
+  | { type: "permission.mode_changed"; mode: "manual" | "yolo" | "auto" };
 
 export type RuntimeEventListener = (event: RuntimeEvent) => void;
 

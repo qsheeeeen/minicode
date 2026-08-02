@@ -1,7 +1,7 @@
-import { registerCommand } from "../registry.js";
+import type { CommandHandler } from "../registry.js";
 import { getAvailableSkills } from "../../../skills/index.js";
 
-registerCommand({
+export const skillsCommand: CommandHandler = {
   name: "skills",
   description: "List available skills",
   handler: async (_args, ctx): Promise<void> => {
@@ -54,4 +54,4 @@ registerCommand({
       timestamp: new Date(),
     });
   },
-});
+};

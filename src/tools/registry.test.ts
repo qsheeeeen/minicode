@@ -1,83 +1,108 @@
 import { describe, it, expect } from "vitest";
-import {
-  register,
-  getAll,
-  getSubAgentTools,
-  capability,
-  createCapabilities,
-} from "./registry.js";
+import { ToolRegistry, capability, createCapabilities } from "./registry.js";
 import type { ToolDef } from "./index.js";
-import "./index.js"; // load built-in tools so registry tests run against real data
 
-describe("register", () => {
+function makeTool(name: string): ToolDef {
+  return {
+    name,
+    description: "A test tool",
+    input_schema: { type: "object", properties: {} },
+    execute: async () => ({ outcome: "success", result: "ok" }),
+  };
+}
+
+describe("ToolRegistry.register", () => {
   it("adds tool to registry", () => {
-    const tool: ToolDef = {
-      name: "reg-test",
-      description: "A test tool",
-      input_schema: { type: "object", properties: {} },
-      execute: async () => ({ output: "ok" }),
-    };
-    register(tool);
-    expect(getAll().get("reg-test")).toBe(tool);
+    const registry = new ToolRegistry();
+    const tool = makeTool("reg-test");
+    registry.register(tool);
+    expect(registry.getAll().get("reg-test")).toBe(tool);
   });
 
   it("overwrites existing tool with same name", () => {
-    const tool1: ToolDef = {
-      name: "overwrite-test",
-      description: "Tool 1",
-      input_schema: { type: "object", properties: {} },
-      execute: async () => ({ output: "ok" }),
-    };
-    const tool2: ToolDef = {
-      name: "overwrite-test",
-      description: "Tool 2",
-      input_schema: { type: "object", properties: {} },
-      execute: async () => ({ output: "changed" }),
-    };
-    register(tool1);
-    register(tool2);
-    expect(getAll().get("overwrite-test")?.description).toBe("Tool 2");
+    const registry = new ToolRegistry();
+    registry.register(makeTool("overwrite-test"));
+    registry.register({ ...makeTool("overwrite-test"), description: "Tool 2" });
+    expect(registry.getAll().get("overwrite-test")?.description).toBe("Tool 2");
+  });
+
+  it("instances are isolated from each other", () => {
+    const a = new ToolRegistry();
+    const b = new ToolRegistry();
+    a.register(makeTool("only-a"));
+    expect(a.get("only-a")).toBeDefined();
+    expect(b.get("only-a")).toBeUndefined();
+  });
+
+  it("reset clears the registry", () => {
+    const registry = new ToolRegistry();
+    registry.register(makeTool("temp"));
+    registry.reset();
+    expect(registry.getAll().size).toBe(0);
   });
 });
 
-describe("all", () => {
+describe("ToolRegistry.getAll", () => {
   it("returns all registered tools as Map", () => {
-    const tools = getAll();
-    expect(tools).toBeInstanceOf(Map);
-    expect(tools.size).toBeGreaterThan(0);
+    const registry = new ToolRegistry();
+    registry.register(makeTool("one"));
+    registry.register(makeTool("two"));
+    expect(registry.getAll()).toBeInstanceOf(Map);
+    expect(registry.getAll().size).toBe(2);
   });
 
   it("returns a copy (mutations don't affect source)", () => {
-    const tools = getAll();
-    const sizeBefore = getAll().size;
+    const registry = new ToolRegistry();
+    registry.register(makeTool("Read"));
+    const tools = registry.getAll();
     tools.delete("Read");
-    expect(getAll().size).toBe(sizeBefore);
+    expect(registry.get("Read")).toBeDefined();
   });
 });
 
-describe("subAgentTools", () => {
+describe("getSubAgentTools", () => {
+  const readOnlyTool = (name: string): ToolDef => ({
+    ...makeTool(name),
+    readOnly: true,
+  });
+  const writeTool = (name: string): ToolDef => ({
+    ...makeTool(name),
+    requiresPermission: true,
+  });
+  const interactiveTool = (name: string): ToolDef => ({
+    ...makeTool(name),
+    interactive: true,
+  });
+
+  function registryWithSample(): ToolRegistry {
+    const registry = new ToolRegistry();
+    registry.register(readOnlyTool("Read"));
+    registry.register(readOnlyTool("Grep"));
+    registry.register(writeTool("Write"));
+    registry.register(interactiveTool("AskUser"));
+    registry.register(writeTool("SubAgent"));
+    return registry;
+  }
+
   it("returns only read-only non-interactive tools by default", () => {
-    const safe = getSubAgentTools();
-    expect(safe).toBeInstanceOf(Map);
-    for (const tool of safe.values()) {
-      expect(tool.readOnly ?? !tool.requiresPermission).toBe(true);
-      expect(tool.interactive).toBeFalsy();
-    }
-    expect(safe.has("SubAgent")).toBe(false);
+    const safe = registryWithSample().getSubAgentTools();
+    expect([...safe.keys()].sort()).toEqual(["Grep", "Read"]);
   });
 
   it("readOnly:false includes write tools (superset of default)", () => {
-    const safe = getSubAgentTools();
-    const all = getSubAgentTools({ readOnly: false });
+    const safe = registryWithSample().getSubAgentTools();
+    const all = registryWithSample().getSubAgentTools({ readOnly: false });
     for (const name of safe.keys()) expect(all.has(name)).toBe(true);
-    expect(all.size).toBeGreaterThanOrEqual(safe.size);
     // still excludes SubAgent and interactive tools
     expect(all.has("SubAgent")).toBe(false);
-    for (const tool of all.values()) expect(tool.interactive).toBeFalsy();
+    expect(all.has("AskUser")).toBe(false);
+    expect(all.has("Write")).toBe(true);
   });
 
   it("allowlist takes precedence and returns only named tools", () => {
-    const allowed = getSubAgentTools({ allowlist: ["Read", "Grep"] });
+    const allowed = registryWithSample().getSubAgentTools({
+      allowlist: ["Read", "Grep"],
+    });
     expect([...allowed.keys()].sort()).toEqual(["Grep", "Read"]);
   });
 });
@@ -92,6 +117,25 @@ describe("capabilities", () => {
   it("get returns undefined for an unregistered capability", () => {
     const Foo = capability<string>("foo");
     expect(createCapabilities([]).get(Foo)).toBeUndefined();
+  });
+
+  it("require returns the service and throws when missing", () => {
+    const Foo = capability<string>("foo");
+    const caps = createCapabilities([[Foo, "bar"]]);
+    expect(caps.require(Foo)).toBe("bar");
+    expect(() => createCapabilities([]).require(Foo)).toThrow(
+      'Required capability not provided: "foo"',
+    );
+  });
+
+  it("rejects duplicate capability keys at construction", () => {
+    const Foo = capability<string>("foo");
+    expect(() =>
+      createCapabilities([
+        [Foo, "x"],
+        [Foo, "y"],
+      ]),
+    ).toThrow('Duplicate capability registration: "foo"');
   });
 
   it("different capability names are independent", () => {

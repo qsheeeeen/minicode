@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { PermissionService, AutoPermissionStrategy } from "./permission.js";
 import type { LLMClient } from "../llm/client.js";
 import { Model } from "../llm/model.js";
+import { RuntimeEvents } from "./runtime-events.js";
 
 describe("PermissionService", () => {
   describe("getMode", () => {
@@ -16,6 +17,23 @@ describe("PermissionService", () => {
       const service = new PermissionService("manual");
       service.setMode("auto");
       expect(service.getMode()).toBe("auto");
+    });
+
+    it("emits permission.mode_changed when events are provided", () => {
+      const events = new RuntimeEvents();
+      const seen: Array<"manual" | "yolo" | "auto"> = [];
+      events.subscribe((event) => {
+        if (event.type === "permission.mode_changed") seen.push(event.mode);
+      });
+      const service = new PermissionService(
+        "manual",
+        undefined,
+        undefined,
+        events,
+      );
+      service.setMode("auto");
+      service.cycleMode(); // auto -> manual
+      expect(seen).toEqual(["auto", "manual"]);
     });
   });
 

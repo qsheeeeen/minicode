@@ -1,7 +1,7 @@
-import { registerCommand } from "../registry.js";
+import type { CommandHandler } from "../registry.js";
 import { SessionPersistence } from "../../../services/session-persistence.js";
 
-registerCommand({
+export const resumeCommand: CommandHandler = {
   name: "resume",
   description: "Load a session (without args: list sessions)",
   handler: async (args, ctx): Promise<void> => {
@@ -25,4 +25,4 @@ registerCommand({
       }
     }
   },
-});
+};

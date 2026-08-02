@@ -9,10 +9,7 @@ import { ChangeJournal } from "./change-journal.js";
 import { SessionPersistence } from "./session-persistence.js";
 import type { SessionStats } from "./session-stats.js";
 import type { LLMBlock } from "../llm/context.js";
-import {
-  RuntimeEvents,
-  type RuntimeStatusInput,
-} from "./runtime-events.js";
+import { RuntimeEvents, type RuntimeStatusInput } from "./runtime-events.js";
 
 export type StatusReporter = (msg: RuntimeStatusInput) => void;
 
@@ -54,6 +51,7 @@ export class SessionManager {
       SessionPersistence.getSessionDir(),
       sessionName,
     );
+    this.events.emit({ type: "session.changed", sessionName });
   }
 
   /** Clear all session state (context, journal, user message ordinal). */
@@ -69,13 +67,11 @@ export class SessionManager {
     if (meta.model !== undefined) this._meta.model = meta.model;
     if (meta.totalTokens !== undefined)
       this._meta.totalTokens = meta.totalTokens;
-    await SessionPersistence.save(
+    return SessionPersistence.save(
       this._currentSession,
       this.context.getBlocks(),
       { model: this._meta.model, totalTokens: this._meta.totalTokens },
-    ).catch((e) => {
-      throw e;
-    });
+    );
   }
 
   // -- Context accessors --

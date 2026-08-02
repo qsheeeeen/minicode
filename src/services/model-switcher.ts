@@ -5,12 +5,13 @@ import type { Model } from "../llm/model.js";
 import type { ContextManager } from "./context-manager.js";
 import type { PermissionService } from "./permission.js";
 import type { SessionManager } from "./session-manager.js";
+import type { RuntimeState } from "./runtime-state.js";
 
 export interface ModelSwitchServiceOpts {
   readonly appConfig: AppConfig;
   readonly contextManager: ContextManager;
   readonly sessionManager: SessionManager;
-  readonly setModel: (client: LLMClient, model: Model) => void;
+  readonly runtimeState: RuntimeState;
   readonly permissionService?: PermissionService;
 }
 
@@ -25,14 +26,14 @@ export class ModelSwitchService {
   private appConfig: AppConfig;
   private contextManager: ContextManager;
   private sessionManager: SessionManager;
-  private setModel: (client: LLMClient, model: Model) => void;
+  private runtimeState: RuntimeState;
   private permissionService?: PermissionService;
 
   constructor(opts: ModelSwitchServiceOpts) {
     this.appConfig = opts.appConfig;
     this.contextManager = opts.contextManager;
     this.sessionManager = opts.sessionManager;
-    this.setModel = opts.setModel;
+    this.runtimeState = opts.runtimeState;
     this.permissionService = opts.permissionService;
   }
 
@@ -44,7 +45,7 @@ export class ModelSwitchService {
     }
     const { client, model } = selection;
 
-    this.setModel(client, model);
+    this.runtimeState.setClientModel(client, model);
     this.contextManager.setModel(client, model);
     this.permissionService?.updateAutoGate(client, model);
 

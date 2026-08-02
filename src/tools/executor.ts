@@ -9,10 +9,7 @@ import type {
 import type { LLMToolUseBlock } from "../llm/client.js";
 import type { LLMContext } from "../llm/context.js";
 import type { AppConfig } from "../config.js";
-import {
-  PermissionService,
-  type PermissionMode,
-} from "../services/permission.js";
+import { PermissionService } from "../services/permission.js";
 import { callContent } from "../utils/tool-format.js";
 import type pino from "pino";
 
@@ -199,13 +196,5 @@ export class ToolExecutor {
 
   getTools(): Map<string, ToolDef> {
     return this.tools;
-  }
-
-  getPermissionService(): PermissionService {
-    return this.permissionService;
-  }
-
-  setPermissionMode(mode: PermissionMode): void {
-    this.permissionService.setMode(mode);
   }
 }

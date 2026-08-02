@@ -1,6 +1,6 @@
-import { registerCommand } from "../registry.js";
+import type { CommandHandler } from "../registry.js";
 
-registerCommand({
+export const compressCommand: CommandHandler = {
   name: "compress",
   description: "Compress conversation context",
   handler: async (_args, ctx): Promise<void> => {
@@ -11,4 +11,4 @@ registerCommand({
       timestamp: new Date(),
     });
   },
-});
+};

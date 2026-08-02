@@ -1,6 +1,5 @@
 import fs from "fs/promises";
 import type { ToolDef, ToolRunResult } from "../registry.js";
-import { register } from "../registry.js";
 
 export const readTool: ToolDef = {
   name: "Read",
@@ -19,9 +18,7 @@ export const readTool: ToolDef = {
     },
     required: ["path"],
   },
-  execute: async (
-    args: Record<string, unknown>,
-  ): Promise<ToolRunResult> => {
+  execute: async (args: Record<string, unknown>): Promise<ToolRunResult> => {
     try {
       const path = args.path as string;
       const offset = args.offset as number | undefined;
@@ -38,4 +35,3 @@ export const readTool: ToolDef = {
     }
   },
 };
-register(readTool);

@@ -7,10 +7,12 @@ import type { ModelSwitchService } from "../services/model-switcher.js";
 import type { PermissionService } from "../services/permission.js";
 import type { ShellService } from "../services/shell-service.js";
 import type { SessionManager } from "../services/session-manager.js";
+import type { RuntimeState } from "../services/runtime-state.js";
 import type { CommandContext } from "../ui/commands/index.js";
 
 export interface AppRuntime {
   readonly deps: AgentDeps;
+  readonly runtimeState: RuntimeState;
   readonly config: AppConfig;
   readonly version: string;
   readonly promptFiles: string[];

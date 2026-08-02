@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("./protocols/anthropic.js", () => ({
   AnthropicClient: class MockAnthropicClient {
@@ -30,9 +30,13 @@ vi.mock("./protocols/openai-responses.js", () => ({
   },
 }));
 
-import { createClient, registerProtocol } from "./client.js";
+import { createClient, registerProtocol, resetProtocols } from "./client.js";
 
 describe("createClient", () => {
+  beforeEach(() => {
+    resetProtocols();
+  });
+
   it("returns AnthropicClient for 'anthropic'", () => {
     const client = createClient(
       "anthropic",

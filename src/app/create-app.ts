@@ -15,12 +15,12 @@ import { ContextManager } from "../services/context-manager.js";
 import { ModelSwitchService } from "../services/model-switcher.js";
 import { PermissionService } from "../services/permission.js";
 import { PromptManager } from "../services/prompt-manager.js";
+import { RuntimeState } from "../services/runtime-state.js";
 import { SessionManager } from "../services/session-manager.js";
 import { SessionPersistence } from "../services/session-persistence.js";
-import { switchSession } from "../services/session-lifecycle.js";
 import { ShellService } from "../services/shell-service.js";
 import { ToolExecutor } from "../tools/executor.js";
-import { getAll } from "../tools/index.js";
+import { createDefaultToolRegistry } from "../tools/index.js";
 import { createCapabilities, type SubAgentSpawner } from "../tools/registry.js";
 import {
   ShellCapability,
@@ -31,8 +31,11 @@ import {
 import { runSubAgent } from "../sub-agent.js";
 import { createLogger } from "../utils/logger.js";
 import { loadGlobalPrompt } from "../utils/prompts.js";
+import { getAvailableSkills } from "../skills/index.js";
+import { createCommandContext } from "../ui/commands/create-context.js";
+import { registerAllCommands } from "../ui/commands/index.js";
+import { createSubAgentRuntime } from "./create-sub-agent-runtime.js";
 import type { AppRuntime } from "./types.js";
-import type { CommandContext } from "../ui/commands/index.js";
 
 export interface CreateAppOpts {
   readonly args: Args;
@@ -136,12 +139,19 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
     permissionMode,
     initialClient,
     initialModel,
+    runtimeEvents,
   );
   const shellService = new ShellService({ cwd });
-  const promptManager = new PromptManager(userPrompt, projectPromptFile);
+  const promptManager = new PromptManager(
+    userPrompt,
+    projectPromptFile,
+    "",
+    getAvailableSkills(),
+  );
   promptManager.refreshEnvironment();
 
-  const tools = getAll();
+  const toolRegistry = createDefaultToolRegistry();
+  const tools = toolRegistry.getAll();
   const availability = { agentRegistry };
   for (const [name, tool] of tools) {
     if (tool.requires?.some((r) => !availability[r])) {
@@ -149,7 +159,12 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
     }
   }
   const spawnSubAgent: SubAgentSpawner = (params) =>
-    runSubAgent({ ...params, permissionService });
+    runSubAgent({
+      ...params,
+      permissionService,
+      toolRegistry,
+      createRuntime: (opts) => createSubAgentRuntime(opts),
+    });
   const capabilities = createCapabilities([
     [ShellCapability, shellService],
     [RegistryCapability, agentRegistry],
@@ -165,12 +180,19 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
     capabilities,
   });
 
-  // deps is a shared mutable bag: modelSwitchService writes client/model,
-  // session switches write logger, and runAgent reads the latest each loop.
+  // RuntimeState is the sole owner of mutable handles; deps exposes read-only
+  // getters so swap-heavy services never write into the agent's dependency bag.
+  const runtimeState = new RuntimeState(initialClient, initialModel, logger);
   const deps: AgentDeps = {
-    client: initialClient,
-    model: initialModel,
-    logger,
+    get client() {
+      return runtimeState.client;
+    },
+    get model() {
+      return runtimeState.model;
+    },
+    get logger() {
+      return runtimeState.logger;
+    },
     sessionManager,
     contextManager,
     toolExecutor,
@@ -181,64 +203,31 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
     appConfig: config,
     contextManager,
     sessionManager,
-    setModel: (client, model) => {
-      deps.client = client;
-      deps.model = model;
-    },
+    runtimeState,
     permissionService,
   });
 
   sessionManager.setSession(initialSession);
 
-  const commandContext: CommandContext = {
-    model: initialModel,
+  const commandContext = createCommandContext({
+    deps,
     config,
-    context: sessionManager.getContext(),
-    sessionManager,
-    get changeJournal() {
-      return sessionManager.getChangeJournal();
-    },
     sessionStats,
     modelSwitchService,
     contextManager,
-    isAgentRunning: () => false,
-    loadContext: (blocks, totalTokens = 0) => {
-      sessionManager.getContext().replaceBlocks(blocks);
-      contextManager.setTokenCount(totalTokens);
+    runtimeState,
+    bridges: {
+      isAgentRunning: () => false,
+      presentInput: () => {},
+      exit: () => process.exit(0),
     },
-    switchSession: async (name: string, opts?: { statusMessage?: string }) => {
-      await switchSession({
-        sessionManager,
-        sessionName: name,
-        setLogger: (newLogger) => {
-          deps.logger = newLogger;
-        },
-        setCurrentSession: () => {},
-        sessionStats,
-        statusMessage: opts?.statusMessage,
-      });
-    },
-    renameCurrentSession: async (newName: string) => {
-      const oldName = sessionManager.getSessionName();
-      await SessionPersistence.rename(oldName, newName);
-      const newLogger = await createLogger(
-        SessionPersistence.getProjectHash(),
-        newName,
-      );
-      sessionManager.setSession(newName);
-      deps.logger = newLogger;
-      sessionManager.reportStatus({
-        role: "status",
-        content: `Renamed: ${oldName} -> ${newName}`,
-        timestamp: new Date(),
-      });
-    },
-    presentInput: () => {},
-    exit: () => process.exit(0),
-  };
+  });
+
+  registerAllCommands();
 
   return {
     deps,
+    runtimeState,
     config,
     version,
     promptFiles,

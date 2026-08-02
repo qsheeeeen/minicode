@@ -1,29 +1,28 @@
 import { render } from "ink";
 import type { AppRuntime } from "./types.js";
-import { App } from "../ui/tui.js";
+import { App, type AppProps } from "../ui/tui.js";
 
 export async function runTuiApp(app: AppRuntime): Promise<void> {
-  render(
-    <App
-      deps={app.deps}
-      config={app.config}
-      version={app.version}
-      promptFiles={app.promptFiles}
-      initialSession={app.initialSession}
-      initialPrompt={app.initialPrompt}
-      sessionName={app.sessionName}
-      resumeRecent={app.resumeRecent}
-      agentRegistry={app.agentRegistry}
-      runtimeEvents={app.runtimeEvents}
-      programStartTime={app.programStartTime}
-      sessionStats={app.sessionStats}
-      modelSwitchService={app.modelSwitchService}
-      sessionManager={app.sessionManager}
-      contextManager={app.contextManager}
-      context={app.sessionManager.getContext()}
-      permissionService={app.permissionService}
-      shellService={app.shellService}
-    />,
-    { exitOnCtrlC: false },
-  );
+  const props: AppProps = {
+    deps: app.deps,
+    runtimeState: app.runtimeState,
+    config: app.config,
+    version: app.version,
+    promptFiles: app.promptFiles,
+    initialSession: app.initialSession,
+    initialPrompt: app.initialPrompt,
+    sessionName: app.sessionName,
+    resumeRecent: app.resumeRecent,
+    agentRegistry: app.agentRegistry,
+    runtimeEvents: app.runtimeEvents,
+    programStartTime: app.programStartTime,
+    sessionStats: app.sessionStats,
+    modelSwitchService: app.modelSwitchService,
+    sessionManager: app.sessionManager,
+    contextManager: app.contextManager,
+    context: app.sessionManager.getContext(),
+    permissionService: app.permissionService,
+    shellService: app.shellService,
+  };
+  render(<App {...props} />, { exitOnCtrlC: false });
 }

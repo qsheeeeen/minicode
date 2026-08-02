@@ -1,7 +1,10 @@
 import fs from "fs/promises";
 import path from "path";
-import type { ToolDef, ToolExecutionContext, ToolRunResult } from "../registry.js";
-import { register } from "../registry.js";
+import type {
+  ToolDef,
+  ToolExecutionContext,
+  ToolRunResult,
+} from "../registry.js";
 import { ChangeJournalCapability } from "../capabilities.js";
 
 interface TextReplacementRange {
@@ -42,7 +45,9 @@ async function recordWriteChange(
   result: WriteTextResult,
 ): Promise<void> {
   const userMessageOrdinal = context?.activeUserMessageOrdinal ?? 0;
-  const changeJournal = context?.capabilities.get(ChangeJournalCapability);
+  const changeJournal = context
+    ? context.capabilities.require(ChangeJournalCapability)
+    : undefined;
   if (!changeJournal || userMessageOrdinal <= 0) return;
   await changeJournal.recordChange(
     userMessageOrdinal,
@@ -83,4 +88,3 @@ export const writeTool: ToolDef = {
     }
   },
 };
-register(writeTool);

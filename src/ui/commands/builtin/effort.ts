@@ -1,7 +1,7 @@
-import { registerCommand } from "../registry.js";
+import type { CommandHandler } from "../registry.js";
 import type { EffortLevel } from "../../../llm/client.js";
 
-registerCommand({
+export const effortCommand: CommandHandler = {
   name: "effort",
   description: "Set thinking effort (low|medium|high|xhigh|max)",
   handler: async (args, ctx): Promise<void> => {
@@ -19,4 +19,4 @@ registerCommand({
       timestamp: new Date(),
     });
   },
-});
+};

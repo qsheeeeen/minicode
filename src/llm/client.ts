@@ -129,16 +129,25 @@ export function createClient(
   );
 }
 
-// Built-in protocol registrations
-registerProtocol(
-  "anthropic",
-  (apiKey, baseURL) => new AnthropicClient(apiKey, baseURL),
-);
-registerProtocol(
-  "openai",
-  (apiKey, baseURL) => new OpenAIChatClient(apiKey, baseURL),
-);
-registerProtocol(
-  "openai-responses",
-  (apiKey, baseURL) => new OpenAIResponsesClient(apiKey, baseURL),
-);
+function registerBuiltinProtocols(): void {
+  registerProtocol(
+    "anthropic",
+    (apiKey, baseURL) => new AnthropicClient(apiKey, baseURL),
+  );
+  registerProtocol(
+    "openai",
+    (apiKey, baseURL) => new OpenAIChatClient(apiKey, baseURL),
+  );
+  registerProtocol(
+    "openai-responses",
+    (apiKey, baseURL) => new OpenAIResponsesClient(apiKey, baseURL),
+  );
+}
+
+registerBuiltinProtocols();
+
+/** Reset to the built-in protocol set (test isolation). */
+export function resetProtocols(): void {
+  protocols.clear();
+  registerBuiltinProtocols();
+}

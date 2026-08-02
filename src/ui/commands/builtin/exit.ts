@@ -1,9 +1,9 @@
-import { registerCommand } from "../registry.js";
+import type { CommandHandler } from "../registry.js";
 
-registerCommand({
+export const exitCommand: CommandHandler = {
   name: "exit",
   description: "Exit the application",
   handler: async (_args, ctx): Promise<void> => {
     ctx.exit();
   },
-});
+};

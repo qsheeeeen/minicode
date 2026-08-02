@@ -61,6 +61,16 @@ export function connectAgent(options: ConnectAgentOptions): {
 
     if (event.type === "status.added") {
       uiTimeline.appendStatus(event.status);
+      return;
+    }
+
+    if (event.type === "session.changed") {
+      useTuiState.setState({ currentSession: event.sessionName });
+      return;
+    }
+
+    if (event.type === "permission.mode_changed") {
+      useTuiState.setState({ permissionMode: event.mode });
     }
   });
 

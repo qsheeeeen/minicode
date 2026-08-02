@@ -7,7 +7,10 @@ export interface CommandHandler {
   name: string;
   description: string;
   // System command: directly manipulates app state
-  handler?: (args: string[], context: import("./index.js").CommandContext) => Promise<void>;
+  handler?: (
+    args: string[],
+    context: import("./index.js").CommandContext,
+  ) => Promise<void>;
   // Prompt command: returns text to inject into agent conversation
   prompt?: (args: string[]) => string;
 }
@@ -36,4 +39,9 @@ export function getCommandNames(): string[] {
 
 export function getAllCommands(): CommandHandler[] {
   return Array.from(commands.values());
+}
+
+/** Clear all registered commands (test isolation). */
+export function resetCommands(): void {
+  commands.clear();
 }

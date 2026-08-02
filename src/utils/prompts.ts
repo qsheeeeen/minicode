@@ -1,7 +1,6 @@
 import fs from "fs/promises";
 import path from "path";
 import os from "os";
-import { getAvailableSkills } from "../skills/index.js";
 
 export const SYSTEM_PROMPT = `You are an interactive CLI coding agent that helps users with software engineering tasks. Use the following instructions and available tools to assist the user.
 
@@ -24,6 +23,8 @@ export interface SystemPromptOptions {
   projectPromptFile?: string;
   /** Role prompt for a spawned sub-agent (e.g. researcher/reviewer). */
   roleSystemPrompt?: string;
+  /** Skills available for discovery (injected, never read from globals). */
+  skills?: ReadonlyArray<{ name: string; description: string }>;
 }
 
 /**
@@ -49,7 +50,7 @@ export function buildSystemPrompt(opts: SystemPromptOptions): string {
     prompt += `\n\n# Workspace Information\nThis workspace's description is in \`${opts.projectPromptFile}\`. Use the Read tool to load it at the start of each conversation. Note: the description may be outdated — always verify against the actual code when in doubt.`;
   }
 
-  const availableSkills = getAvailableSkills();
+  const availableSkills = opts.skills ?? [];
   if (availableSkills.length > 0) {
     prompt += `\n\n<available_skills>\n`;
     availableSkills.forEach((skill) => {
@@ -101,9 +102,4 @@ export async function readPromptFile(filePath: string): Promise<string> {
 export async function loadGlobalPrompt(): Promise<string> {
   const globalPromptPath = path.join(os.homedir(), ".minicode", "AGENTS.md");
   return readPromptFile(globalPromptPath);
-}
-
-export async function loadProjectPrompt(cwd: string): Promise<string> {
-  const projectPromptPath = path.join(cwd, "AGENTS.md");
-  return readPromptFile(projectPromptPath);
 }

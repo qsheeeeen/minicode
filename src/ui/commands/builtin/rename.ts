@@ -1,6 +1,6 @@
-import { registerCommand } from "../registry.js";
+import type { CommandHandler } from "../registry.js";
 
-registerCommand({
+export const renameCommand: CommandHandler = {
   name: "rename",
   description: "Rename current session",
   handler: async (args, ctx): Promise<void> => {
@@ -9,4 +9,4 @@ registerCommand({
       await ctx.renameCurrentSession(newName);
     }
   },
-});
+};

@@ -14,6 +14,8 @@ import {
   getCommandNames,
   getCommandList,
   getHelp,
+  registerAllCommands,
+  resetCommands,
   type CommandContext,
 } from "./index.js";
 
@@ -58,7 +60,7 @@ vi.mock("ink", () => ({
 
 describe("Builtin commands", () => {
   beforeAll(() => {
-    // Commands are already registered at import time
+    registerAllCommands();
   });
 
   afterAll(() => {
@@ -66,6 +68,8 @@ describe("Builtin commands", () => {
   });
 
   beforeEach(() => {
+    resetCommands();
+    registerAllCommands();
     vi.clearAllMocks();
   });
 

@@ -167,6 +167,44 @@ describe("connectAgent", () => {
     expect(state.tokenCount).toBe(5000);
   });
 
+  it("should sync currentSession from session.changed events", () => {
+    const { sessionManager, contextManager, runtimeEvents } = createTestDeps();
+    const registry = new AgentRegistry();
+
+    const result = connectAgent({
+      sessionManager,
+      contextManager,
+      runtimeEvents,
+      uiTimeline: new UITimeline(sessionManager.getContext()),
+      initialSession: "test-session",
+      registry,
+    });
+    cleanup = result.cleanup;
+
+    runtimeEvents.emit({ type: "session.changed", sessionName: "s2" });
+
+    expect(useTuiState.getState().currentSession).toBe("s2");
+  });
+
+  it("should sync permissionMode from permission.mode_changed events", () => {
+    const { sessionManager, contextManager, runtimeEvents } = createTestDeps();
+    const registry = new AgentRegistry();
+
+    const result = connectAgent({
+      sessionManager,
+      contextManager,
+      runtimeEvents,
+      uiTimeline: new UITimeline(sessionManager.getContext()),
+      initialSession: "test-session",
+      registry,
+    });
+    cleanup = result.cleanup;
+
+    runtimeEvents.emit({ type: "permission.mode_changed", mode: "auto" });
+
+    expect(useTuiState.getState().permissionMode).toBe("auto");
+  });
+
   it("should register main agent in registry", () => {
     const { sessionManager, contextManager, runtimeEvents } = createTestDeps();
     const registry = new AgentRegistry();

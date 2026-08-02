@@ -2,6 +2,7 @@ import type { LLMClient } from "../llm/client.js";
 import type { LLMStreamResult } from "../llm/client.js";
 import type { Model } from "../llm/model.js";
 import type { UserPrompter } from "../tools/registry.js";
+import type { RuntimeEvents } from "./runtime-events.js";
 
 export type PermissionMode = "manual" | "yolo" | "auto";
 
@@ -124,9 +125,16 @@ Reply with exactly one of:
 export class PermissionService {
   private mode: PermissionMode;
   private strategies: Map<PermissionMode, PermissionStrategy>;
+  private events?: RuntimeEvents;
 
-  constructor(initialMode: PermissionMode, client?: LLMClient, model?: Model) {
+  constructor(
+    initialMode: PermissionMode,
+    client?: LLMClient,
+    model?: Model,
+    events?: RuntimeEvents,
+  ) {
     this.mode = initialMode;
+    this.events = events;
     this.strategies = new Map<PermissionMode, PermissionStrategy>([
       ["yolo", new YoloPermissionStrategy()],
       ["manual", new ManualPermissionStrategy()],
@@ -140,6 +148,7 @@ export class PermissionService {
 
   setMode(mode: PermissionMode): void {
     this.mode = mode;
+    this.events?.emit({ type: "permission.mode_changed", mode });
   }
 
   setStrategy(mode: PermissionMode, strategy: PermissionStrategy): void {
@@ -156,8 +165,9 @@ export class PermissionService {
 
   cycleMode(): PermissionMode {
     const idx = MODES.indexOf(this.mode);
-    this.mode = MODES[(idx + 1) % MODES.length];
-    return this.mode;
+    const next = MODES[(idx + 1) % MODES.length];
+    this.setMode(next);
+    return next;
   }
 
   async check(

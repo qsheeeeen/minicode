@@ -6,7 +6,6 @@ import type {
   ToolRunResult,
   ToolExecutionContext,
 } from "../registry.js";
-import { register } from "../registry.js";
 import { listAgentTypes, DEFAULT_AGENT_TYPE } from "../agent-types.js";
 import { SubAgentSpawnerCapability } from "../capabilities.js";
 
@@ -63,5 +62,3 @@ export const agentTool: ToolDef = {
     return spawnSubAgent({ task, agentType, parent: context });
   },
 };
-
-register(agentTool);

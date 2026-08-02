@@ -1,12 +1,17 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import {
   registerAgentType,
   getAgentType,
   listAgentTypes,
+  resetAgentTypes,
   DEFAULT_AGENT_TYPE,
 } from "./agent-types.js";
 
 describe("agent-types registry", () => {
+  beforeEach(() => {
+    resetAgentTypes();
+  });
+
   it("registers and retrieves a type", () => {
     registerAgentType({
       name: "test-only-type",
@@ -24,12 +29,7 @@ describe("agent-types registry", () => {
   it("listAgentTypes includes the built-ins", () => {
     const names = listAgentTypes().map((t) => t.name);
     expect(names).toEqual(
-      expect.arrayContaining([
-        "researcher",
-        "reviewer",
-        "planner",
-        "worker",
-      ]),
+      expect.arrayContaining(["researcher", "reviewer", "planner", "worker"]),
     );
   });
 

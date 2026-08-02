@@ -9,6 +9,7 @@ import type { ContextManager } from "../../services/context-manager.js";
 import type { ChangeEntry } from "../../services/change-journal.js";
 import type { StatusReporter } from "../../services/session-manager.js";
 import { getSkillBody, getAvailableSkills } from "../../skills/index.js";
+import { registerAllCommands } from "./builtin/index.js";
 import {
   registerCommand,
   getCommand,
@@ -17,7 +18,9 @@ import {
 } from "./registry.js";
 
 export type { CommandHandler } from "./registry.js";
-export { registerCommand, getCommandNames } from "./registry.js";
+export { registerCommand, getCommandNames, resetCommands } from "./registry.js";
+export { registerAllCommands } from "./builtin/index.js";
+export { createCommandContext } from "./create-context.js";
 
 export type InputRequest =
   | { type: "effort-picker" }
@@ -43,9 +46,10 @@ export type InputRequest =
       reportStatus: StatusReporter;
     };
 
-export function inputRequestToState(
-  request: InputRequest,
-): { mode: string; props: Record<string, unknown> } {
+export function inputRequestToState(request: InputRequest): {
+  mode: string;
+  props: Record<string, unknown>;
+} {
   switch (request.type) {
     case "effort-picker":
       return { mode: "effort-select", props: {} };
@@ -150,8 +154,3 @@ export function getHelp(): string {
   lines.push("  !<command> - Run a shell command directly");
   return lines.join("\n");
 }
-
-// Side-effect import: registers all builtin commands.
-// registry.ts has no circular dependency on this file, so builtin/*.ts
-// can safely import from registry.ts.
-import "./builtin/index.js";

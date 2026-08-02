@@ -1,6 +1,10 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { VirtualLLMClient } from "./virtual-llm.js";
-import { createClient, registerProtocol } from "../llm/client.js";
+import {
+  createClient,
+  registerProtocol,
+  resetProtocols,
+} from "../llm/client.js";
 import type { LLMAssistantBlock, LLMStream } from "../llm/client.js";
 
 // Helper: collect all events from a stream and return the final response
@@ -15,6 +19,10 @@ async function collectStream(stream: LLMStream) {
 }
 
 describe("VirtualLLMClient", () => {
+  beforeEach(() => {
+    resetProtocols();
+  });
+
   describe("streaming contract", () => {
     it("yields stream events in order, then returns the response", async () => {
       const client = new VirtualLLMClient([
@@ -106,20 +114,14 @@ describe("VirtualLLMClient", () => {
         VirtualLLMClient.textResponse("second"),
       ]);
 
-      const stream1 = client.chatStream(
-        [{ role: "user", content: "q1" }],
-        [],
-      );
+      const stream1 = client.chatStream([{ role: "user", content: "q1" }], []);
       const events1 = await collectStream(stream1);
       expect(events1.result.content[0]).toEqual({
         type: "text",
         text: "first",
       });
 
-      const stream2 = client.chatStream(
-        [{ role: "user", content: "q2" }],
-        [],
-      );
+      const stream2 = client.chatStream([{ role: "user", content: "q2" }], []);
       const events2 = await collectStream(stream2);
       expect(events2.result.content[0]).toEqual({
         type: "text",
@@ -327,8 +329,10 @@ describe("VirtualLLMClient", () => {
 
   describe("factory registration", () => {
     it("createClient returns VirtualLLMClient after registration", () => {
-      registerProtocol("virtual", () =>
-        new VirtualLLMClient([VirtualLLMClient.textResponse("from factory")]),
+      registerProtocol(
+        "virtual",
+        () =>
+          new VirtualLLMClient([VirtualLLMClient.textResponse("from factory")]),
       );
 
       const client = createClient("virtual");
@@ -336,10 +340,12 @@ describe("VirtualLLMClient", () => {
     });
 
     it("createClient with virtual protocol produces working stream", async () => {
-      registerProtocol("virtual", () =>
-        new VirtualLLMClient([
-          VirtualLLMClient.textResponse("factory hello"),
-        ]),
+      registerProtocol(
+        "virtual",
+        () =>
+          new VirtualLLMClient([
+            VirtualLLMClient.textResponse("factory hello"),
+          ]),
       );
 
       const client = createClient("virtual");

@@ -1,5 +1,8 @@
-import type { ToolDef, ToolRunResult, ToolExecutionContext } from "../registry.js";
-import { register } from "../registry.js";
+import type {
+  ToolDef,
+  ToolRunResult,
+  ToolExecutionContext,
+} from "../registry.js";
 import { ShellCapability } from "../capabilities.js";
 
 export const shellTool: ToolDef = {
@@ -38,4 +41,3 @@ export const shellTool: ToolDef = {
     }
   },
 };
-register(shellTool);

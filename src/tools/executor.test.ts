@@ -1,5 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
-import { ToolExecutor, type ToolCall, type ToolExecutionDynamic } from "./executor.js";
+import {
+  ToolExecutor,
+  type ToolCall,
+  type ToolExecutionDynamic,
+} from "./executor.js";
 import { PermissionService } from "../services/permission.js";
 import { LLMContext } from "../llm/context.js";
 import { createCapabilities, type ToolDef } from "./registry.js";
@@ -87,17 +91,6 @@ describe("ToolExecutor", () => {
       const { executor, tools } = makeExecutor();
       expect(executor.getTools()).toBe(tools);
     });
-
-    it("stores permission service", () => {
-      const { executor, permissionService } = makeExecutor();
-      expect(executor.getPermissionService()).toBe(permissionService);
-    });
-
-    it("setPermissionMode delegates to service", () => {
-      const { executor } = makeExecutor({ permissionMode: "manual" });
-      executor.setPermissionMode("yolo");
-      expect(executor.getPermissionService().getMode()).toBe("yolo");
-    });
   });
 
   describe("execute", () => {
@@ -142,13 +135,13 @@ describe("ToolExecutor", () => {
         readOnly: false,
         requiresPermission: true,
       });
-      const { executor, context } = makeExecutor({
+      const { executor, permissionService, context } = makeExecutor({
         tools: new Map([["testTool", tool]]),
         permissionMode: "manual",
       });
 
       // Mock permission service to deny
-      vi.spyOn(executor.getPermissionService(), "check").mockResolvedValue({
+      vi.spyOn(permissionService, "check").mockResolvedValue({
         allowed: false,
         reason: "User rejected",
       });
@@ -167,7 +160,7 @@ describe("ToolExecutor", () => {
         requiresPermission: true,
       });
       const tool2 = makeTool({ name: "tool2" });
-      const { executor, context } = makeExecutor({
+      const { executor, permissionService, context } = makeExecutor({
         tools: new Map([
           ["tool1", tool1],
           ["tool2", tool2],
@@ -175,7 +168,7 @@ describe("ToolExecutor", () => {
         permissionMode: "manual",
       });
 
-      vi.spyOn(executor.getPermissionService(), "check").mockResolvedValue({
+      vi.spyOn(permissionService, "check").mockResolvedValue({
         allowed: false,
         reason: "User rejected",
       });
@@ -199,7 +192,7 @@ describe("ToolExecutor", () => {
         readOnly: false,
         requiresPermission: true,
       });
-      const { executor, context } = makeExecutor({
+      const { executor, permissionService, context } = makeExecutor({
         tools: new Map([["testTool", tool]]),
         permissionMode: "auto",
       });
@@ -207,7 +200,7 @@ describe("ToolExecutor", () => {
       prepareToolCalls(context, [call]);
       const spy = vi.spyOn(context, "completeToolCall");
 
-      vi.spyOn(executor.getPermissionService(), "check").mockResolvedValue({
+      vi.spyOn(permissionService, "check").mockResolvedValue({
         allowed: false,
         reason: "too risky",
       });
@@ -288,6 +281,5 @@ describe("ToolExecutor", () => {
       expect(spy).toHaveBeenCalledWith("call_1", "ok");
       expect(spy).toHaveBeenCalledWith("call_2", "ok");
     });
-
   });
 });
