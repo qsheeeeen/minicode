@@ -26,6 +26,7 @@ export class SessionManager {
     sessionName?: string,
     sessionStats?: SessionStats,
     events = new RuntimeEvents(),
+    private persistent = true,
   ) {
     this._currentSession = sessionName ?? `session-${Date.now()}`;
     this.sessionStats = sessionStats;
@@ -67,6 +68,8 @@ export class SessionManager {
     if (meta.model !== undefined) this._meta.model = meta.model;
     if (meta.totalTokens !== undefined)
       this._meta.totalTokens = meta.totalTokens;
+    // Ephemeral sessions (sub-agents) never touch disk.
+    if (!this.persistent) return;
     return SessionPersistence.save(
       this._currentSession,
       this.context.getBlocks(),

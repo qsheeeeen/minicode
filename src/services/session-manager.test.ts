@@ -99,4 +99,31 @@ describe("SessionManager", () => {
       expect(sm.getMessages()).toEqual([]);
     });
   });
+
+  describe("saveStore", () => {
+    it("persists to disk by default", async () => {
+      const sm = new SessionManager("persistent-session");
+      sm.setMessages([{ type: "user", text: "hi" }]);
+      const saveSpy = vi
+        .spyOn(SessionPersistence, "save")
+        .mockResolvedValue(undefined);
+      await sm.saveStore({ model: "m", totalTokens: 10 });
+      expect(saveSpy).toHaveBeenCalledWith(
+        "persistent-session",
+        [{ type: "user", text: "hi" }],
+        { model: "m", totalTokens: 10 },
+      );
+      saveSpy.mockRestore();
+    });
+
+    it("skips disk for non-persistent sessions", async () => {
+      const sm = new SessionManager(undefined, undefined, undefined, false);
+      const saveSpy = vi
+        .spyOn(SessionPersistence, "save")
+        .mockResolvedValue(undefined);
+      await sm.saveStore({ model: "m", totalTokens: 10 });
+      expect(saveSpy).not.toHaveBeenCalled();
+      saveSpy.mockRestore();
+    });
+  });
 });

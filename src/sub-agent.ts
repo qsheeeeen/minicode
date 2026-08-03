@@ -65,6 +65,8 @@ export interface AgentRuntimeOpts {
   getClient?: () => LLMClient;
   getModel?: () => Model;
   getLogger?: () => pino.Logger | undefined;
+  /** Persist the session to disk (main: true; sub-agents: false). */
+  persistent?: boolean;
 }
 
 export interface AgentRuntime {
@@ -168,6 +170,7 @@ export async function runSubAgent(
         ]),
       skills:
         parent.capabilities.get(SkillRegistryCapability)?.getAvailable() ?? [],
+      persistent: false,
     },
   );
   const subContext = sessionManager.getContext();

@@ -16,6 +16,7 @@ export function createAgentRuntime(opts: AgentRuntimeOpts): AgentRuntime {
     undefined,
     opts.sessionStats,
     events,
+    opts.persistent ?? true,
   );
   const contextManager = new ContextManager({
     client: opts.client,
