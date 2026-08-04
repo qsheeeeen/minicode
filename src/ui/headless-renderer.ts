@@ -100,7 +100,7 @@ export class HeadlessRenderer {
       if (!this.printedResults.has(block.tool_use_id)) {
         this.printedResults.add(block.tool_use_id);
         for (const line of block.content.split("\n")) {
-          if (line) process.stdout.write(`       ${line}\n`);
+          if (line) process.stdout.write(`${line}\n`);
         }
         if (isStable || isFinal) process.stdout.write("\n");
       }
