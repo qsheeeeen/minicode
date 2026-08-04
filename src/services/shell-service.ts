@@ -1,4 +1,5 @@
 import { execSync, spawn } from "child_process";
+import path from "path";
 
 export interface ShellServiceOpts {
   readonly cwd: string;
@@ -9,6 +10,11 @@ export interface ShellServiceOpts {
 export interface ShellRunOptions {
   readonly timeoutMs?: number;
   readonly signal?: AbortSignal;
+}
+
+export interface ShellProcessOptions extends ShellRunOptions {
+  /** Working directory override; relative paths resolve against the service cwd. */
+  readonly cwd?: string;
 }
 
 export interface ShellResult {
@@ -35,8 +41,36 @@ export class ShellService {
   }
 
   async run(command: string, opts: ShellRunOptions = {}): Promise<ShellResult> {
+    return this.spawnAndCollect(command, [], {
+      ...opts,
+      shell: true,
+      cwd: this.cwd,
+    });
+  }
+
+  /** Run an executable with explicit args, no shell interpretation. */
+  async runProcess(
+    executable: string,
+    args: string[],
+    opts: ShellProcessOptions = {},
+  ): Promise<ShellResult> {
+    return this.spawnAndCollect(executable, args, {
+      ...opts,
+      shell: false,
+      cwd: opts.cwd ? path.resolve(this.cwd, opts.cwd) : this.cwd,
+    });
+  }
+
+  private spawnAndCollect(
+    command: string,
+    args: string[],
+    opts: ShellRunOptions & { shell: boolean; cwd: string },
+  ): Promise<ShellResult> {
     return new Promise<ShellResult>((resolve) => {
-      const proc = spawn(command, [], { shell: true, cwd: this.cwd });
+      const proc = spawn(command, args, {
+        shell: opts.shell,
+        cwd: opts.cwd,
+      });
       let stdout = "";
       let stderr = "";
       let timedOut = false;

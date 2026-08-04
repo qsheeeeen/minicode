@@ -33,7 +33,27 @@ describe("callContent", () => {
   });
 
   it("formats Shell with command", () => {
-    expect(callContent("Shell", { command: "npm test" })).toBe("Shell(npm test)");
+    expect(callContent("Shell", { command: "npm test" })).toBe(
+      "Shell(npm test)",
+    );
+  });
+
+  it("formats Python with code preview", () => {
+    expect(callContent("Python", { code: "print(1)" })).toBe(
+      "Python(print(1))",
+    );
+  });
+
+  it("formats Python with long code truncated", () => {
+    expect(callContent("Python", { code: "x".repeat(50) })).toBe(
+      `Python(${"x".repeat(40)}...)`,
+    );
+  });
+
+  it("formats Python with path and timeout", () => {
+    expect(
+      callContent("Python", { code: "print(1)", path: "src", timeout: 5 }),
+    ).toBe('Python(print(1), path: "src", timeout: 5)');
   });
 
   it("formats SubAgent with short task", () => {
@@ -50,9 +70,7 @@ describe("callContent", () => {
   });
 
   it("formats LoadSkill with name", () => {
-    expect(callContent("LoadSkill", { name: "tdd" })).toBe(
-      "LoadSkill(tdd)",
-    );
+    expect(callContent("LoadSkill", { name: "tdd" })).toBe("LoadSkill(tdd)");
   });
 
   it("formats AskUser with question", () => {

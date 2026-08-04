@@ -2,6 +2,7 @@ import { readTool } from "./read.js";
 import { writeTool } from "./write.js";
 import { editTool } from "./edit.js";
 import { shellTool } from "./shell.js";
+import { pythonTool } from "./python.js";
 import { grepTool } from "./grep.js";
 import { createAgentTool } from "./sub-agent.js";
 import { loadSkillTool } from "./load-skill.js";
@@ -20,6 +21,7 @@ export function registerBuiltinTools(
   registry.register(writeTool);
   registry.register(editTool);
   registry.register(shellTool);
+  registry.register(pythonTool);
   registry.register(grepTool);
   registry.register(createAgentTool(agentTypes));
   registry.register(loadSkillTool);
