@@ -44,4 +44,32 @@ describe("ToolDisplay", () => {
     );
     expect(lastFrame()).toContain("Edit(f.ts)");
   });
+
+  it("renders Python call with full code (no truncation)", () => {
+    const longCode =
+      "total = 0\nfor i in range(1, 100):\n    total += i\nprint(total)";
+    const { lastFrame } = render(
+      <ToolDisplay name="Python" input={{ code: longCode, path: "src" }} />,
+    );
+    const frame = lastFrame();
+    expect(frame).toContain(longCode);
+    expect(frame).not.toContain("...");
+  });
+
+  it("renders Python output in full (no truncation)", () => {
+    const longOutput = Array.from(
+      { length: 30 },
+      (_, i) => `line ${i}`,
+    ).join("\n");
+    const { lastFrame } = render(
+      <ToolDisplay
+        name="Python"
+        input={{ code: "print('hi')" }}
+        output={longOutput}
+      />,
+    );
+    const frame = lastFrame();
+    expect(frame).toContain("line 0");
+    expect(frame).toContain("line 29");
+  });
 });

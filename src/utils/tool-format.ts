@@ -25,8 +25,7 @@ export function callContent(
       return `Shell(${[input.command as string, ...opts(["timeout"])].join(", ")})`;
     case "Python": {
       const code = input.code as string;
-      const preview = code.length > 40 ? code.slice(0, 40) + "..." : code;
-      return `Python(${[preview, ...opts(["path", "timeout"])].join(", ")})`;
+      return `Python(${[code, ...opts(["path", "timeout"])].join(", ")})`;
     }
     case "SubAgent": {
       const task = input.task as string;

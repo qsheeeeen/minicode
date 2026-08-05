@@ -44,10 +44,9 @@ describe("callContent", () => {
     );
   });
 
-  it("formats Python with long code truncated", () => {
-    expect(callContent("Python", { code: "x".repeat(50) })).toBe(
-      `Python(${"x".repeat(40)}...)`,
-    );
+  it("formats Python with long code in full (no truncation)", () => {
+    const code = "x".repeat(50);
+    expect(callContent("Python", { code })).toBe(`Python(${code})`);
   });
 
   it("formats Python with path and timeout", () => {
