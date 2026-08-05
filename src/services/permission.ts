@@ -11,6 +11,8 @@ const MODES: PermissionMode[] = ["manual", "yolo", "auto"];
 export interface PermissionCheckResult {
   allowed: boolean;
   reason?: string;
+  /** Switch the permission mode as a side effect of this check (e.g. yolo). */
+  switchToMode?: PermissionMode;
 }
 
 export interface PermissionStrategy {
@@ -46,7 +48,9 @@ export class ManualPermissionStrategy implements PermissionStrategy {
       ],
     });
     if (!answer) return { allowed: false, reason: "User cancelled" };
-    if (answer === "yolo") return { allowed: true, reason: "yolo" };
+    if (answer === "yolo") {
+      return { allowed: true, reason: "yolo", switchToMode: "yolo" };
+    }
     if (answer === "yes") return { allowed: true };
     return { allowed: false, reason: "User rejected" };
   }
@@ -183,6 +187,13 @@ export class PermissionService {
         reason: `Unknown permission mode: ${this.mode}`,
       };
     }
-    return strategy.check(toolName, toolInput, displayText, prompter);
+    const result = await strategy.check(
+      toolName,
+      toolInput,
+      displayText,
+      prompter,
+    );
+    if (result.switchToMode) this.setMode(result.switchToMode);
+    return result;
   }
 }

@@ -98,6 +98,65 @@ describe("PermissionService", () => {
       expect(result).toEqual({ allowed: false, reason: "User cancelled" });
     });
 
+    it("manual switches to yolo when the user answers yes to all", async () => {
+      const service = new PermissionService("manual");
+      const promptMock = vi.fn().mockResolvedValue("yolo");
+
+      const result = await service.check(
+        "Shell",
+        { command: "ls" },
+        "List files",
+        { prompt: promptMock },
+      );
+
+      expect(result).toEqual({
+        allowed: true,
+        reason: "yolo",
+        switchToMode: "yolo",
+      });
+      expect(service.getMode()).toBe("yolo");
+    });
+
+    it("emits permission.mode_changed when yes to all switches mode", async () => {
+      const events = new RuntimeEvents();
+      const seen: Array<"manual" | "yolo" | "auto"> = [];
+      events.subscribe((event) => {
+        if (event.type === "permission.mode_changed") seen.push(event.mode);
+      });
+      const service = new PermissionService(
+        "manual",
+        undefined,
+        undefined,
+        events,
+      );
+      const promptMock = vi.fn().mockResolvedValue("yolo");
+
+      await service.check("Shell", { command: "ls" }, "List files", {
+        prompt: promptMock,
+      });
+
+      expect(seen).toEqual(["yolo"]);
+    });
+
+    it("does not prompt again after yes to all switched to yolo", async () => {
+      const service = new PermissionService("manual");
+      const promptMock = vi.fn().mockResolvedValue("yolo");
+      await service.check("Shell", { command: "ls" }, "List files", {
+        prompt: promptMock,
+      });
+      promptMock.mockClear();
+
+      const result = await service.check(
+        "Shell",
+        { command: "ls" },
+        "List files",
+        { prompt: promptMock },
+      );
+
+      expect(result).toEqual({ allowed: true });
+      expect(promptMock).not.toHaveBeenCalled();
+    });
+
     it("keeps strategies scoped to each service instance", async () => {
       const first = new PermissionService("auto");
       const second = new PermissionService("auto");
