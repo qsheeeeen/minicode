@@ -60,40 +60,11 @@ export class ToolExecutor {
   }
 
   /**
-   * Run a single tool with permission check and change tracking.
-   */
-  private async runTool(
-    tool: ToolDef,
-    args: Record<string, unknown>,
-    context: ToolExecutionContext,
-  ): Promise<ToolRunResult> {
-    if (!(tool.readOnly ?? !tool.requiresPermission)) {
-      const displayText = callContent(tool.name, args);
-      const { allowed, reason } = await this.permissionService.check(
-        tool.name,
-        args,
-        displayText,
-        context?.prompter,
-      );
-      if (!allowed) {
-        if (this.permissionService.getMode() === "auto") {
-          return {
-            outcome: "error",
-            reason: `Tool execution denied by auto-gate: ${reason || "unknown reason"}`,
-          };
-        }
-        return {
-          outcome: "denied",
-          reason: reason || "User rejected",
-        };
-      }
-    }
-
-    return tool.execute(args, context);
-  }
-
-  /**
-   * Execute tool calls sequentially and push tool_result blocks.
+   * Execute tool calls and push tool_result blocks.
+   *
+   * Permission checks are serialized (prompts must never race); once every
+   * tool is approved, executions run concurrently and results are written
+   * back in the original tool_use order.
    */
   async execute(
     toolCalls: ToolCall[],
@@ -117,79 +88,98 @@ export class ToolExecutor {
         toolCount: toolCalls.length,
         tools: toolCalls.map((t) => t.block.name),
       },
-      "Executing tools sequentially",
+      "Executing tools",
     );
 
-    const results: Array<{ toolUseId: string; content: string }> = [];
-
+    // Phase 1 — permission checks, serialized so prompts never race.
+    const approvals: Array<{ autoDenied?: string }> = [];
     for (let i = 0; i < toolCalls.length; i++) {
       const { block, tool } = toolCalls[i];
       if (!tool) {
-        results.push({
-          toolUseId: block.id,
-          content: `Error: Tool '${block.name}' not found or not available.`,
-        });
+        approvals.push({});
         this.logger?.warn(
           { toolName: block.name },
           "LLM attempted to use an unavailable tool",
         );
         continue;
       }
-      // Mark this tool and every remaining tool in the batch as denied,
-      // flush their results, then surface the denial (no throw).
-      const deny = (reason: string): "denied" => {
-        results.push({ toolUseId: block.id, content: reason });
-        for (let j = i + 1; j < toolCalls.length; j++) {
-          results.push({
-            toolUseId: toolCalls[j].block.id,
-            content: reason,
+      if (tool.readOnly ?? !tool.requiresPermission) {
+        approvals.push({});
+        continue;
+      }
+
+      const args = block.input as Record<string, unknown>;
+      const { allowed, reason } = await this.permissionService.check(
+        tool.name,
+        args,
+        callContent(tool.name, args),
+        context.prompter,
+      );
+      if (!allowed) {
+        if (this.permissionService.getMode() === "auto") {
+          approvals.push({
+            autoDenied: reason || "unknown reason",
           });
-        }
-        for (const result of results) {
-          this.context.completeToolCall(result.toolUseId, result.content);
-        }
-        return "denied";
-      };
-      try {
-        const result = await this.runTool(
-          tool,
-          block.input as Record<string, unknown>,
-          context,
-        );
-        if (result.outcome === "denied") {
-          return deny(result.reason);
-        }
-        if (result.outcome === "error") {
-          // Soft error: write reason back, keep processing the batch.
-          results.push({
-            toolUseId: block.id,
-            content: `Error: ${result.reason}`,
-          });
-          this.logger?.info(
-            { toolName: tool.name, error: result.reason },
-            "Tool soft-failed",
-          );
           continue;
         }
-        results.push({ toolUseId: block.id, content: result.result });
-        this.logger?.info(
-          { toolName: tool.name, toolInput: block.input },
-          "Tool result",
-        );
-      } catch (reason) {
-        const error = `Error: ${reason instanceof Error ? reason.message : String(reason)}`;
-        results.push({ toolUseId: block.id, content: error });
-        this.logger?.error(
-          { toolName: tool.name, error: String(reason) },
-          "Tool error",
-        );
+        // Hard denial: nothing runs, every tool_use in the batch gets the
+        // denial so no tool_use is left without a tool_result.
+        const denial = reason || "User rejected";
+        for (const { block: b } of toolCalls) {
+          this.context.completeToolCall(b.id, denial);
+        }
+        return "denied";
       }
+      approvals.push({});
     }
+
+    // Phase 2 — run approved tools concurrently, keep results in order.
+    const results: Array<{ toolUseId: string; content: string }> = new Array(
+      toolCalls.length,
+    );
+    let batchDenied = false;
+    await Promise.all(
+      toolCalls.map(async (call, i) => {
+        const { block, tool } = call;
+        let content: string;
+        if (!tool) {
+          content = `Error: Tool '${block.name}' not found or not available.`;
+        } else if (approvals[i].autoDenied) {
+          content = `Error: Tool execution denied by auto-gate: ${approvals[i].autoDenied}`;
+        } else {
+          try {
+            const result = await tool.execute(
+              block.input as Record<string, unknown>,
+              context,
+            );
+            if (result.outcome === "denied") {
+              content = result.reason;
+              batchDenied = true;
+            } else if (result.outcome === "error") {
+              content = `Error: ${result.reason}`;
+              this.logger?.info(
+                { toolName: tool.name, error: result.reason },
+                "Tool soft-failed",
+              );
+            } else {
+              content = result.result;
+            }
+          } catch (reason) {
+            content = `Error: ${reason instanceof Error ? reason.message : String(reason)}`;
+            this.logger?.error(
+              { toolName: tool.name, error: String(reason) },
+              "Tool error",
+            );
+          }
+        }
+        results[i] = { toolUseId: block.id, content };
+      }),
+    );
 
     for (const result of results) {
       this.context.completeToolCall(result.toolUseId, result.content);
     }
-    return null;
+    return batchDenied ? "denied" : null;
   }
 
   // -- Accessors for Agent to use in the LLM loop --

@@ -258,7 +258,132 @@ describe("ToolExecutor", () => {
       expect(spy).toHaveBeenCalledWith("call_2", "ok");
     });
 
-    it("executes multiple tools sequentially", async () => {
+    it("executes multiple tools in parallel", async () => {
+      let markSecondStarted!: () => void;
+      const secondStarted = new Promise<void>((resolve) => {
+        markSecondStarted = resolve;
+      });
+      const order: string[] = [];
+      const tool1 = makeTool({
+        name: "tool1",
+        execute: vi.fn(async () => {
+          order.push("1");
+          await secondStarted;
+          return { outcome: "success", result: "1" };
+        }),
+      });
+      const tool2 = makeTool({
+        name: "tool2",
+        execute: vi.fn(async () => {
+          order.push("2");
+          markSecondStarted();
+          return { outcome: "success", result: "2" };
+        }),
+      });
+      const { executor, context } = makeExecutor({
+        tools: new Map([
+          ["tool1", tool1],
+          ["tool2", tool2],
+        ]),
+      });
+      const calls = [
+        makeToolCall(tool1, {}, "call_1"),
+        makeToolCall(tool2, {}, "call_2"),
+      ];
+      prepareToolCalls(context, calls);
+
+      await Promise.race([
+        executor.execute(calls, makeDynamic()),
+        new Promise((_, reject) =>
+          setTimeout(
+            () => reject(new Error("tools did not run in parallel")),
+            500,
+          ),
+        ),
+      ]);
+
+      expect(order).toEqual(["1", "2"]);
+      expect(tool1.execute).toHaveBeenCalled();
+      expect(tool2.execute).toHaveBeenCalled();
+    });
+
+    it("writes tool results in original order when executions finish out of order", async () => {
+      const tool1 = makeTool({
+        name: "tool1",
+        execute: vi.fn(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 20));
+          return { outcome: "success", result: "slow" };
+        }),
+      });
+      const tool2 = makeTool({
+        name: "tool2",
+        execute: vi.fn(async () => ({
+          outcome: "success",
+          result: "fast",
+        })),
+      });
+      const { executor, context } = makeExecutor({
+        tools: new Map([
+          ["tool1", tool1],
+          ["tool2", tool2],
+        ]),
+      });
+      const calls = [
+        makeToolCall(tool1, {}, "call_1"),
+        makeToolCall(tool2, {}, "call_2"),
+      ];
+      prepareToolCalls(context, calls);
+      const spy = vi.spyOn(context, "completeToolCall");
+
+      await executor.execute(calls, makeDynamic());
+
+      expect(spy.mock.calls.map((c) => c[0])).toEqual(["call_1", "call_2"]);
+      expect(spy.mock.calls.map((c) => c[1])).toEqual(["slow", "fast"]);
+    });
+
+    it("hard denial runs nothing and denies every tool_use in the batch", async () => {
+      const tool1 = makeTool({
+        name: "tool1",
+        readOnly: false,
+        requiresPermission: true,
+      });
+      const tool2 = makeTool({
+        name: "tool2",
+        readOnly: false,
+        requiresPermission: true,
+      });
+      const { executor, permissionService, context } = makeExecutor({
+        tools: new Map([
+          ["tool1", tool1],
+          ["tool2", tool2],
+        ]),
+        permissionMode: "manual",
+      });
+      const checkMock = vi
+        .spyOn(permissionService, "check")
+        .mockResolvedValueOnce({ allowed: true })
+        .mockResolvedValueOnce({ allowed: false, reason: "User rejected" });
+      const calls = [
+        makeToolCall(tool1, {}, "call_1"),
+        makeToolCall(tool2, {}, "call_2"),
+      ];
+      prepareToolCalls(context, calls);
+      const spy = vi.spyOn(context, "completeToolCall");
+
+      const result = await executor.execute(calls, makeDynamic());
+
+      expect(result).toBe("denied");
+      expect(tool1.execute).not.toHaveBeenCalled();
+      expect(tool2.execute).not.toHaveBeenCalled();
+      expect(checkMock).toHaveBeenCalledTimes(2);
+      expect(spy.mock.calls.map((c) => c[0])).toEqual(["call_1", "call_2"]);
+      expect(spy.mock.calls.map((c) => c[1])).toEqual([
+        "User rejected",
+        "User rejected",
+      ]);
+    });
+
+    it("executes multiple tools", async () => {
       const tool1 = makeTool({ name: "tool1" });
       const tool2 = makeTool({ name: "tool2" });
       const { executor, context } = makeExecutor({
