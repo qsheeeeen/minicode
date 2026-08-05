@@ -44,6 +44,10 @@ type AnthropicContentBlockParam = Anthropic.Messages.ContentBlockParam;
 function toSdkMessages(blocks: LLMBlock[]): Anthropic.Messages.MessageParam[] {
   const out: Anthropic.Messages.MessageParam[] = [];
   let assistantBlocks: LLMAssistantBlock[] = [];
+  // Anthropic requires ALL tool_result blocks for one assistant message to
+  // arrive together, in the user message immediately after the tool_use
+  // blocks — so accumulate consecutive results and flush them as one message.
+  let pendingToolResults: AnthropicContentBlockParam[] = [];
 
   const flushAssistant = () => {
     if (assistantBlocks.length === 0) return;
@@ -66,27 +70,31 @@ function toSdkMessages(blocks: LLMBlock[]): Anthropic.Messages.MessageParam[] {
     assistantBlocks = [];
   };
 
+  const flushToolResults = () => {
+    if (pendingToolResults.length === 0) return;
+    flushAssistant();
+    out.push({ role: "user" as const, content: pendingToolResults });
+    pendingToolResults = [];
+  };
+
   for (const block of blocks) {
     if (block.type === "user") {
+      flushToolResults();
       flushAssistant();
       out.push({ role: "user" as const, content: block.text });
     } else if (block.type === "tool_result") {
-      flushAssistant();
-      out.push({
-        role: "user" as const,
-        content: [
-          {
-            type: "tool_result" as const,
-            tool_use_id: block.tool_use_id,
-            content: block.content,
-          },
-        ],
+      pendingToolResults.push({
+        type: "tool_result" as const,
+        tool_use_id: block.tool_use_id,
+        content: block.content,
       });
     } else {
+      flushToolResults();
       assistantBlocks.push(block);
     }
   }
 
+  flushToolResults();
   flushAssistant();
   return out;
 }

@@ -91,4 +91,115 @@ describe("AnthropicClient", () => {
       );
     });
   });
+
+  describe("message conversion", () => {
+    it("groups all tool_results into one user message after the tool_use message", () => {
+      const client = new AnthropicClient();
+      client.chatStream(
+        [
+          { type: "user", text: "task" },
+          { type: "tool_use", id: "call_1", name: "Read", input: {} },
+          { type: "tool_use", id: "call_2", name: "Shell", input: {} },
+          { type: "tool_result", tool_use_id: "call_1", content: "read-out" },
+          { type: "tool_result", tool_use_id: "call_2", content: "shell-out" },
+        ],
+        [],
+        {},
+      );
+
+      expect(mockStream).toHaveBeenCalledWith(
+        expect.objectContaining({
+          messages: [
+            { role: "user", content: "task" },
+            {
+              role: "assistant",
+              content: [
+                { type: "tool_use", id: "call_1", name: "Read", input: {} },
+                { type: "tool_use", id: "call_2", name: "Shell", input: {} },
+              ],
+            },
+            {
+              role: "user",
+              content: [
+                {
+                  type: "tool_result",
+                  tool_use_id: "call_1",
+                  content: "read-out",
+                },
+                {
+                  type: "tool_result",
+                  tool_use_id: "call_2",
+                  content: "shell-out",
+                },
+              ],
+            },
+          ],
+        }),
+        expect.anything(),
+      );
+    });
+
+    it("flushes tool_results before the next user message", () => {
+      const client = new AnthropicClient();
+      client.chatStream(
+        [
+          { type: "user", text: "u1" },
+          { type: "tool_use", id: "call_1", name: "Read", input: {} },
+          { type: "tool_result", tool_use_id: "call_1", content: "out" },
+          { type: "user", text: "u2" },
+        ],
+        [],
+        {},
+      );
+
+      expect(mockStream).toHaveBeenCalledWith(
+        expect.objectContaining({
+          messages: [
+            { role: "user", content: "u1" },
+            {
+              role: "assistant",
+              content: [
+                { type: "tool_use", id: "call_1", name: "Read", input: {} },
+              ],
+            },
+            {
+              role: "user",
+              content: [
+                {
+                  type: "tool_result",
+                  tool_use_id: "call_1",
+                  content: "out",
+                },
+              ],
+            },
+            { role: "user", content: "u2" },
+          ],
+        }),
+        expect.anything(),
+      );
+    });
+
+    it("filters thinking blocks out of assistant messages", () => {
+      const client = new AnthropicClient();
+      client.chatStream(
+        [
+          { type: "user", text: "u1" },
+          { type: "thinking", thinking: "hidden" },
+          { type: "text", text: "answer" },
+        ],
+        [],
+        {},
+      );
+
+      expect(mockStream).toHaveBeenCalledWith(
+        expect.objectContaining({
+          messages: [
+            { role: "user", content: "u1" },
+            { role: "assistant", content: [{ type: "text", text: "answer" }] },
+          ],
+        }),
+        expect.anything(),
+      );
+    });
+  });
 });
