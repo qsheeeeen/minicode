@@ -205,7 +205,12 @@ export async function runSubAgent(
   });
 
   try {
-    await runAgent(deps, task, subController.signal);
+    // Inherit the parent's prompter so permission prompts inside the child
+    // (e.g. Shell in manual mode) reach the user instead of being silently
+    // denied — without it the run breaks early and no final summary exists.
+    await runAgent(deps, task, subController.signal, {
+      prompter: parent.prompter,
+    });
     const blocks = subContext.getBlocks();
     const finalResponse = extractFinalResponse(blocks);
     const summary = generateSummary(blocks);
@@ -234,7 +239,17 @@ export async function runSubAgent(
 }
 
 function extractFinalResponse(blocks: LLMBlock[]): string | null {
+  // Only text emitted after the last tool round counts as the final
+  // response; otherwise a stale intro text can masquerade as the result
+  // when the model ends its turn with an empty/thinking-only message.
+  let afterLastTool = 0;
   for (let i = blocks.length - 1; i >= 0; i--) {
+    if (blocks[i].type === "tool_use" || blocks[i].type === "tool_result") {
+      afterLastTool = i + 1;
+      break;
+    }
+  }
+  for (let i = blocks.length - 1; i >= afterLastTool; i--) {
     const block = blocks[i];
     if (block.type === "text" && block.text.trim()) {
       return block.text.trim();
@@ -245,5 +260,24 @@ function extractFinalResponse(blocks: LLMBlock[]): string | null {
 
 function generateSummary(blocks: LLMBlock[]): string {
   const toolCallCount = blocks.filter((b) => b.type === "tool_use").length;
-  return toolCallCount > 0 ? `${toolCallCount} operations` : "Task completed";
+  if (toolCallCount === 0) return "Task completed";
+  // The agent ended without a text summary (thinking-only final message).
+  // Surface the most recent tool outputs so the caller still gets the actual
+  // content instead of a bare operation count.
+  const results = blocks
+    .filter(
+      (b): b is Extract<LLMBlock, { type: "tool_result" }> =>
+        b.type === "tool_result",
+    )
+    .slice(-2)
+    .map((b) => b.content.trim())
+    .filter(Boolean)
+    .map((content) =>
+      content.length > 1000
+        ? `${content.slice(0, 1000)}... (truncated)`
+        : content,
+    );
+  const output =
+    results.length > 0 ? `\nLatest output:\n${results.join("\n---\n")}` : "";
+  return `${toolCallCount} operations${output}`;
 }
