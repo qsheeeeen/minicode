@@ -37,6 +37,42 @@ export function isAbortError(e: unknown): boolean {
   );
 }
 
+function abortError(): Error {
+  const err = new Error("Aborted");
+  err.name = "AbortError";
+  return err;
+}
+
+/**
+ * Await the next stream chunk, but reject as AbortError as soon as the
+ * signal fires — even if the underlying stream never settles (a stalled
+ * provider must not make the run un-abortable).
+ */
+function nextWithAbort<T>(
+  next: Promise<IteratorResult<T>>,
+  signal: AbortSignal,
+): Promise<IteratorResult<T>> {
+  if (signal.aborted) return Promise.reject(abortError());
+  return new Promise<IteratorResult<T>>((resolve, reject) => {
+    const cleanup = () => signal.removeEventListener("abort", onAbort);
+    const onAbort = () => {
+      cleanup();
+      reject(abortError());
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+    next.then(
+      (value) => {
+        cleanup();
+        resolve(value);
+      },
+      (error) => {
+        cleanup();
+        reject(error);
+      },
+    );
+  });
+}
+
 async function saveStore(deps: AgentDeps): Promise<void> {
   await deps.sessionManager
     .saveStore({
@@ -74,7 +110,7 @@ async function streamLLM(
     while (true) {
       signal.throwIfAborted();
 
-      const next = await stream.next();
+      const next = await nextWithAbort(stream.next(), signal);
       if (next.done) {
         result = next.value as LLMStreamResult;
         break;

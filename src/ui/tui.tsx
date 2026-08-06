@@ -259,6 +259,9 @@ function AppContent({
   useInput(
     (keyInput, key) => {
       if ((key.escape || (key.ctrl && keyInput === "c")) && pendingPrompt) {
+        // Cancelling a prompt mid-run means aborting the whole run, not just
+        // denying this one request.
+        abortRef.current?.abort();
         pendingPrompt.resolve("");
         useTuiState.setState({ pendingPrompt: null });
       }

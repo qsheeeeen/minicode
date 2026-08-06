@@ -368,6 +368,34 @@ describe("runAgent", () => {
       ctrl.abort();
       await expect(runPromise).rejects.toMatchObject({ name: "AbortError" });
     });
+
+    it("aborts even when the provider stream never settles", async () => {
+      const hangingStream = {
+        next: () => new Promise(() => {}),
+        [Symbol.asyncIterator]() {
+          return this;
+        },
+      };
+      mockChatStream.mockReturnValueOnce(hangingStream as any);
+      const { deps } = makeDeps();
+      const ctrl = new AbortController();
+      const runPromise = runAgent(deps, "Hello", ctrl.signal);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      ctrl.abort();
+
+      await expect(
+        Promise.race([
+          runPromise,
+          new Promise((_, reject) =>
+            setTimeout(
+              () =>
+                reject(new Error("abort did not interrupt a stalled stream")),
+              500,
+            ),
+          ),
+        ]),
+      ).rejects.toMatchObject({ name: "AbortError" });
+    });
   });
 
   describe("rejection", () => {
