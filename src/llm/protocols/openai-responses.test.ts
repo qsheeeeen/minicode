@@ -137,6 +137,65 @@ describe("OpenAIResponsesClient", () => {
       expect(collected.result.content[1].type).toBe("text");
     });
 
+    it("passes thinking blocks back as reasoning input items", async () => {
+      responsesCreateMock.mockReturnValue(mockStream([]));
+      const client = new OpenAIResponsesClient("test-key");
+      client.chatStream(
+        [
+          { type: "user", text: "hi" },
+          { type: "thinking", thinking: "reasoning text" },
+          { type: "text", text: "answer" },
+        ],
+        [],
+        {},
+      );
+
+      expect(responsesCreateMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          input: [
+            { role: "user", content: "hi" },
+            {
+              type: "reasoning",
+              content: [{ type: "reasoning_text", text: "reasoning text" }],
+            },
+            { role: "assistant", content: "answer" },
+          ],
+        }),
+        expect.anything(),
+      );
+    });
+
+    it("yields thinking deltas from reasoning_text events", async () => {
+      responsesCreateMock.mockReturnValue(
+        mockStream([
+          { type: "response.reasoning_text.delta", delta: "think..." },
+          { type: "response.reasoning_text.done" },
+          {
+            type: "response.completed",
+            response: {
+              output: [
+                {
+                  type: "reasoning",
+                  content: [{ type: "reasoning_text", text: "think..." }],
+                },
+              ],
+              status: "completed",
+              usage: { input_tokens: 5, output_tokens: 3 },
+            },
+          },
+        ]),
+      );
+
+      const client = new OpenAIResponsesClient("test-key");
+      const stream = client.chatStream([], []);
+      const collected = await collectStream(stream);
+
+      expect(collected.events[0]).toEqual({
+        type: "thinking",
+        thinking: "think...",
+      });
+    });
+
     it("yields tool_use events inline on output_item.done", async () => {
       responsesCreateMock.mockReturnValue(
         mockStream([

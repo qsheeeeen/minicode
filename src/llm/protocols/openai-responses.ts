@@ -119,7 +119,14 @@ function toSdkMessages(blocks: LLMBlock[]): ResponseInputItem[] {
           });
           break;
         case "thinking":
-          // Skip thinking blocks — not sent back to the API.
+          // DeepSeek (and the Responses spec) require reasoning content to
+          // be passed back on the next request — drop it and the API rejects
+          // the turn with "reasoning_text must be passed back".
+          flushText();
+          input.push({
+            type: "reasoning",
+            content: [{ type: "reasoning_text", text: block.thinking }],
+          } as ResponseInputItem);
           break;
       }
     }
@@ -151,7 +158,9 @@ function toSdkMessages(blocks: LLMBlock[]): ResponseInputItem[] {
 // Response conversion (SDK → internal)
 
 // Convert an OpenAI Responses response object to LLMStreamResult.
-function toLLMStreamResult(response: OpenAI.Responses.Response): LLMStreamResult {
+function toLLMStreamResult(
+  response: OpenAI.Responses.Response,
+): LLMStreamResult {
   const content: LLMAssistantBlock[] = [];
   let hasToolCalls = false;
 
@@ -310,7 +319,9 @@ export class OpenAIResponsesClient implements LLMClient {
             currentText = "";
             break;
           }
-          case "response.reasoning.delta": {
+          case "response.reasoning.delta":
+          case "response.reasoning_text.delta":
+          case "response.reasoning_summary_text.delta": {
             const delta = (event as unknown as StreamDeltaEvent).delta;
             if (delta) {
               currentThinking += delta;
@@ -318,7 +329,9 @@ export class OpenAIResponsesClient implements LLMClient {
             }
             break;
           }
-          case "response.reasoning.done": {
+          case "response.reasoning.done":
+          case "response.reasoning_text.done":
+          case "response.reasoning_summary_text.done": {
             currentThinking = "";
             break;
           }
