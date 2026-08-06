@@ -27,5 +27,11 @@ export async function runTuiApp(app: AppRuntime): Promise<void> {
     skillRegistry: app.skillRegistry,
     router: app.router,
   };
-  render(<App {...props} />, { exitOnCtrlC: false });
+  render(<App {...props} />, {
+    exitOnCtrlC: false,
+    // Line-level diffing: Ink only rewrites changed lines, so previously
+    // printed content stays untouched (terminal selection keeps working
+    // while thinking/text streams).
+    incrementalRendering: true,
+  });
 }

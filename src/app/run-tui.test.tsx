@@ -42,6 +42,7 @@ describe("runTuiApp", () => {
 
     expect(render).toHaveBeenCalledWith(expect.anything(), {
       exitOnCtrlC: false,
+      incrementalRendering: true,
     });
     expect(app.sessionManager.getContext).toHaveBeenCalled();
   });
