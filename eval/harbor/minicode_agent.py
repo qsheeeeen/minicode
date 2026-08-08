@@ -195,7 +195,11 @@ Components: main restricted universe multiverse
 Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 EOF
   fi
-  apt-get update >/dev/null 2>&1
+  # Never let mirror warm-up stall the whole trial: fail fast and let the
+  # verifier's own install retry with the (now mirrored) sources.
+  printf 'Acquire::http::Timeout "20";\nAcquire::https::Timeout "20";\nAcquire::Retries "0";\n' \
+    > /etc/apt/apt.conf.d/99minicode-timeout 2>/dev/null
+  timeout 90 apt-get update >/dev/null 2>&1 || true
 fi
 
 # uv/PyPI mirror for every user home (uv reads ~/.config/uv/uv.toml).
