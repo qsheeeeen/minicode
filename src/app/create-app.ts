@@ -143,7 +143,17 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
   const agentTypes = createDefaultAgentTypes();
   const toolRegistry = createDefaultToolRegistry({ agentTypes });
   const tools = toolRegistry.getAll();
-  const availability = { agentRegistry };
+  const availability: Record<string, boolean> = { agentRegistry: true };
+  // Register Python only when the environment actually has python3; otherwise
+  // the tool would always fail and just waste agent turns.
+  try {
+    const probe = await shellService.runProcess("python3", ["--version"], {
+      timeoutMs: 5000,
+    });
+    availability.python3 = probe.exitCode === 0;
+  } catch {
+    availability.python3 = false;
+  }
   for (const [name, tool] of tools) {
     if (tool.requires?.some((r) => !availability[r])) {
       tools.delete(name);

@@ -19,7 +19,7 @@ export interface UserPrompter {
   prompt(req: Prompt): Promise<string>;
 }
 
-export type ToolRequirement = "agentRegistry";
+export type ToolRequirement = "agentRegistry" | "python3";
 
 export interface ToolConfig {
   client: LLMClient;

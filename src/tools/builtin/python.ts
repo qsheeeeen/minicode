@@ -17,6 +17,7 @@ export const pythonTool: ToolDef = {
     "Use this instead of Shell for ad-hoc Python scripts. " +
     "Optionally set 'path' to a working directory (relative to the project root) " +
     "and 'timeout' to a limit in seconds.",
+  requires: ["python3"],
   requiresPermission: true,
   readOnly: false,
   input_schema: {
