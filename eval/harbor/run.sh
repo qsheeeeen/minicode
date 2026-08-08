@@ -12,6 +12,11 @@
 #   bash eval/harbor/run.sh deepseek/deepseek-v4-flash -l 10  # extra flags pass to harbor run
 #   bash eval/harbor/run.sh --local fix-git deepseek/deepseek-v4-flash
 #   bash eval/harbor/run.sh --proxy deepseek/deepseek-v4-flash
+#   MINICODE_AGENT_TIMEOUT_MULTIPLIER=1 bash eval/harbor/run.sh ...  # restore 900s
+#
+# Agent timeout defaults to 2x the task's timeout (1800s for most tasks) so
+# complex multi-step work has room to finish; override with
+# MINICODE_AGENT_TIMEOUT_MULTIPLIER (1 = task default).
 #
 # --mirrors points apt/uv/PyPI in the task container at China mirrors
 # (--ak mirrors=true), useful when container installs are slow/blocked.
@@ -76,6 +81,7 @@ COMMON_ARGS=(
   -a minicode_agent:MinicodeAgent
   -m "$MODEL"
   -l 1
+  --agent-timeout-multiplier "${MINICODE_AGENT_TIMEOUT_MULTIPLIER:-2}"
   "${EXTRA_ARGS[@]}"
 )
 
