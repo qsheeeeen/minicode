@@ -12,10 +12,16 @@ const __dirname = path.dirname(__filename);
 const programStartTime = Date.now();
 
 const packagePath = path.join(__dirname, "../package.json");
-const packageJson = JSON.parse(
-  await import("fs/promises").then((fs) => fs.readFile(packagePath, "utf-8")),
-);
-const VERSION = packageJson.version;
+let VERSION = "0.0.0";
+try {
+  const packageJson = JSON.parse(
+    await import("fs/promises").then((fs) => fs.readFile(packagePath, "utf-8")),
+  );
+  VERSION = packageJson.version;
+} catch {
+  // Standalone builds (e.g. bun build --compile) don't carry package.json;
+  // fall back so the binary still runs.
+}
 
 const config = await AppConfig.load();
 const args = new Args(process.argv, config, VERSION);
