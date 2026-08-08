@@ -76,6 +76,32 @@ describe("createApp", () => {
     expect(runtime.commandContext.model.getName()).toBe("test-model");
   });
 
+  it("excludes interactive tools in headless mode", async () => {
+    const config = new AppConfig({});
+    const runtime = await createApp({
+      args: makeArgs({ headless: true }),
+      config,
+      version: "1.0.0",
+      cwd: "/tmp",
+      programStartTime: 123,
+      stdinIsTTY: false,
+    });
+    expect(runtime.deps.toolExecutor.getTools().has("AskUser")).toBe(false);
+  });
+
+  it("keeps interactive tools in TUI mode", async () => {
+    const config = new AppConfig({});
+    const runtime = await createApp({
+      args: makeArgs({ headless: false }),
+      config,
+      version: "1.0.0",
+      cwd: "/tmp",
+      programStartTime: 123,
+      stdinIsTTY: true,
+    });
+    expect(runtime.deps.toolExecutor.getTools().has("AskUser")).toBe(true);
+  });
+
   it("emits runtime status events for token threshold messages", async () => {
     const runtime = await createApp({
       args: makeArgs(),

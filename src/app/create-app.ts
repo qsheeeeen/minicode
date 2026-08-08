@@ -148,6 +148,11 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
     if (tool.requires?.some((r) => !availability[r])) {
       tools.delete(name);
     }
+    // Interactive tools (e.g. AskUser) are meaningless without a human at the
+    // terminal; don't let the model call them in headless/scripted runs.
+    if (headless && tool.interactive) {
+      tools.delete(name);
+    }
   }
   const spawnSubAgent: SubAgentSpawner = (params) =>
     runSubAgent({
