@@ -93,6 +93,21 @@ export class ShellService {
       if (opts.signal?.aborted) abort();
       opts.signal?.addEventListener("abort", abort, { once: true });
 
+      // Missing executables (ENOENT) surface as an 'error' event; without a
+      // listener the failure escapes as an uncaught exception and kills the
+      // whole process instead of becoming a tool result.
+      proc.on("error", (err) => {
+        clearTimeout(timeout);
+        opts.signal?.removeEventListener("abort", abort);
+        resolve({
+          stdout: "",
+          stderr: err.message,
+          exitCode: null,
+          timedOut: false,
+          aborted: false,
+        });
+      });
+
       proc.stdout?.on("data", (d) => append("stdout", d));
       proc.stderr?.on("data", (d) => append("stderr", d));
       proc.on("close", (code) => {

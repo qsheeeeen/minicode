@@ -38,6 +38,18 @@ describe("ShellService", () => {
     expect(service.formatResult(result)).toBe("hello");
   });
 
+  it("returns a failed result instead of throwing when the executable is missing", async () => {
+    const service = new ShellService({ cwd: process.cwd() });
+
+    const result = await service.runProcess(
+      "minicode-no-such-executable-xyz",
+      [],
+    );
+
+    expect(result.exitCode).toBeNull();
+    expect(result.stderr).toContain("minicode-no-such-executable-xyz");
+  });
+
   it("does not shell-interpret args passed to runProcess", async () => {
     const service = new ShellService({ cwd: process.cwd() });
 
