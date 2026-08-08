@@ -10,14 +10,18 @@
 #   bash eval/run.sh deepseek/deepseek-v4-flash        # 1 task, custom model
 #   bash eval/run.sh --mirrors deepseek/deepseek-v4-flash
 #   bash eval/run.sh deepseek/deepseek-v4-flash -l 10  # extra flags pass to harbor run
+#   bash eval/run.sh --local fix-git deepseek/deepseek-v4-flash
 #
 # --mirrors points apt/uv/PyPI in the task container at China mirrors
 # (--ak mirrors=true), useful when container installs are slow/blocked.
+# --local <task> runs a prepared local task copy (eval/harbor/tasks/<task>)
+# with patched dependency fetching; see eval/harbor/prepare_tasks.sh.
 
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MIRRORS=0
+LOCAL_TASK=""
 POSITIONAL=()
 
 usage() {
@@ -28,6 +32,14 @@ usage() {
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --mirrors) MIRRORS=1 ;;
+    --local)
+      LOCAL_TASK="${2:-}"
+      if [[ -z "$LOCAL_TASK" ]]; then
+        echo "--local requires a task name (e.g. fix-git)" >&2
+        exit 1
+      fi
+      shift 2
+      ;;
     -h | --help) usage ;;
     *) POSITIONAL+=("$1") ;;
   esac
@@ -52,9 +64,23 @@ fi
 
 echo "==> Terminal-Bench smoke: $MODEL (1 task)"
 cd "$REPO_ROOT"
-PYTHONPATH=eval/harbor harbor run \
-  -d terminal-bench@2.0 \
-  -a minicode_agent:MinicodeAgent \
-  -m "$MODEL" \
-  -l 1 \
-  "${EXTRA_ARGS[@]}"
+if [[ -n "$LOCAL_TASK" ]]; then
+  TASK_DIR="$REPO_ROOT/eval/harbor/tasks/$LOCAL_TASK"
+  if [[ ! -f "$TASK_DIR/task.toml" ]]; then
+    echo "Local task not found: $TASK_DIR (run eval/harbor/prepare_tasks.sh)" >&2
+    exit 1
+  fi
+  PYTHONPATH=eval/harbor harbor run \
+    -p "$TASK_DIR" \
+    -a minicode_agent:MinicodeAgent \
+    -m "$MODEL" \
+    -l 1 \
+    "${EXTRA_ARGS[@]}"
+else
+  PYTHONPATH=eval/harbor harbor run \
+    -d terminal-bench@2.0 \
+    -a minicode_agent:MinicodeAgent \
+    -m "$MODEL" \
+    -l 1 \
+    "${EXTRA_ARGS[@]}"
+fi
