@@ -6,6 +6,10 @@ coverage/
 /minicode
 minicode-go
 package-lock.json
+eval/harbor/.cache/
+__pycache__/
+# Harbor / Terminal-Bench run artifacts (written to the repo root)
+/jobs/
 /testperm
 /testask
 /testsuggest
