@@ -12,6 +12,7 @@
 #
 # Options:
 #   --skip-docker   skip Docker install
+#   --skip-docker-proxy  skip syncing the Docker daemon proxy to Clash
 #   --skip-harbor   skip Harbor CLI install
 #   --skip-build    skip building the minicode binary
 #   -h, --help      show this help
@@ -20,6 +21,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 SKIP_DOCKER=0
+SKIP_DOCKER_PROXY=0
 SKIP_HARBOR=0
 SKIP_BUILD=0
 
@@ -31,6 +33,7 @@ usage() {
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --skip-docker) SKIP_DOCKER=1 ;;
+    --skip-docker-proxy) SKIP_DOCKER_PROXY=1 ;;
     --skip-harbor) SKIP_HARBOR=1 ;;
     --skip-build) SKIP_BUILD=1 ;;
     -h | --help) usage ;;
@@ -89,6 +92,42 @@ install_docker() {
   say "Docker is ready."
 }
 
+sync_docker_proxy() {
+  # Clash on Windows pushes its (random) proxy port into WSL via HTTPS_PROXY.
+  # The Docker daemon needs the same port to pull images from Docker Hub.
+  local src="${HTTPS_PROXY:-${https_proxy:-}}"
+  if [[ -z "$src" ]]; then
+    say "No proxy in WSL environment (HTTPS_PROXY) — skipping daemon proxy sync."
+    return 0
+  fi
+
+  local port="${src##*:}"
+  port="${port%%/*}"
+
+  local current=""
+  local conf=/etc/systemd/system/docker.service.d/proxy.conf
+  if [[ -f "$conf" ]]; then
+    current="$(sed -n 's/.*HTTPS_PROXY=http:\/\/127.0.0.1:\([0-9]*\).*/\1/p' "$conf" | head -1)"
+  fi
+  if [[ "$current" == "$port" ]]; then
+    say "Docker daemon proxy already at 127.0.0.1:$port — skipping."
+    return 0
+  fi
+
+  require_sudo
+  say "Syncing Docker daemon proxy to 127.0.0.1:$port (restarts Docker)..."
+  sudo mkdir -p /etc/systemd/system/docker.service.d
+  sudo tee "$conf" >/dev/null <<EOF
+[Service]
+Environment="HTTP_PROXY=http://127.0.0.1:${port}"
+Environment="HTTPS_PROXY=http://127.0.0.1:${port}"
+Environment="NO_PROXY=localhost,127.0.0.1,192.168.*,172.*,10.*,<local>"
+EOF
+  sudo systemctl daemon-reload
+  sudo systemctl restart docker
+  say "Docker daemon proxy is now 127.0.0.1:$port"
+}
+
 install_harbor() {
   if command -v harbor >/dev/null 2>&1; then
     say "Harbor CLI already on PATH — skipping."
@@ -137,6 +176,7 @@ echo "Repo root: $REPO_ROOT"
 echo
 
 [[ $SKIP_DOCKER -eq 0 ]] && install_docker
+[[ $SKIP_DOCKER_PROXY -eq 0 ]] && sync_docker_proxy
 [[ $SKIP_HARBOR -eq 0 ]] && install_harbor
 [[ $SKIP_BUILD -eq 0 ]] && build_binary
 
