@@ -17,8 +17,9 @@
 # (--ak mirrors=true), useful when container installs are slow/blocked.
 # --local <task> runs a prepared local task copy (eval/harbor/tasks/<task>)
 # with patched dependency fetching; see eval/harbor/prepare_tasks.sh.
-# --proxy routes the whole container through the host proxy: start it with
-# `bash eval/harbor/proxy.sh start` first (requires the upstream proxy on).
+# --proxy routes the whole container through a container-reachable proxy
+# (MINICODE_PROXY_URL, e.g. http://172.17.0.1:4395). Prepare it with
+# `bash eval/harbor/proxy.sh start` first.
 
 set -euo pipefail
 
@@ -78,13 +79,16 @@ COMMON_ARGS=(
 )
 
 if [[ $PROXY -eq 1 ]]; then
-  PROXY_PORT="${MINICODE_PROXY_PORT:-4396}"
-  PROXY_URL="${MINICODE_PROXY_URL:-http://172.17.0.1:${PROXY_PORT}}"
+  PROXY_URL="${MINICODE_PROXY_URL:-}"
   APT_CONF="/tmp/minicode-apt-proxy.conf"
   COMPOSE_FILE="/tmp/minicode-proxy-compose.yaml"
   CONFIG_FILE="/tmp/minicode-proxy-jobconfig.json"
   NO_PROXY="localhost,127.0.0.1,172.16.0.0/12,10.0.0.0/8,192.168.0.0/16"
 
+  if [[ -z "$PROXY_URL" ]]; then
+    echo "MINICODE_PROXY_URL is required with --proxy (see eval/harbor/proxy.sh)." >&2
+    exit 1
+  fi
   if [[ ! -f "$APT_CONF" ]]; then
     echo "apt proxy conf missing — run 'bash eval/harbor/proxy.sh start' first." >&2
     exit 1
