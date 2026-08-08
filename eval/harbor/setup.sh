@@ -2,48 +2,20 @@
 #
 # One-shot setup for running Terminal-Bench (Harbor) with minicode:
 #   1. Docker Engine (Ubuntu/Debian, via sudo)
-#   2. Harbor CLI (via uv, falling back to an isolated /tmp uv install)
-#   3. Standalone minicode eval binary (via bun)
+#   2. Docker daemon proxy synced to the Clash port in the WSL environment
+#   3. Harbor CLI (via uv, falling back to an isolated /tmp uv install)
+#   4. Standalone minicode eval binary (via bun)
 #
+# Everything is idempotent and auto-detected: already-installed tools, an
+# up-to-date binary and a matching daemon proxy are skipped without asking.
 # Run this from a normal WSL2/Ubuntu terminal (not inside the Codex sandbox),
 # from anywhere — it locates the repo relative to this script:
 #
 #   bash eval/harbor/setup.sh
-#
-# Options:
-#   --skip-docker   skip Docker install
-#   --skip-docker-proxy  skip syncing the Docker daemon proxy to Clash
-#   --skip-harbor   skip Harbor CLI install
-#   --skip-build    skip building the minicode binary
-#   -h, --help      show this help
 
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-SKIP_DOCKER=0
-SKIP_DOCKER_PROXY=0
-SKIP_HARBOR=0
-SKIP_BUILD=0
-
-usage() {
-  sed -n '2,18p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
-  exit 0
-}
-
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --skip-docker) SKIP_DOCKER=1 ;;
-    --skip-docker-proxy) SKIP_DOCKER_PROXY=1 ;;
-    --skip-harbor) SKIP_HARBOR=1 ;;
-    --skip-build) SKIP_BUILD=1 ;;
-    -h | --help) usage ;;
-    *)
-      echo "Unknown option: $1" >&2
-      usage
-      ;;
-  esac
-  shift
-done
 
 say() { printf '\n==> %s\n' "$*"; }
 
@@ -61,7 +33,8 @@ require_sudo() {
 }
 
 install_docker() {
-  if command -v docker >/dev/null 2>&1 && sudo -n docker info >/dev/null 2>&1; then
+  if command -v docker >/dev/null 2>&1 &&
+    { docker info >/dev/null 2>&1 || sudo -n docker info >/dev/null 2>&1; }; then
     say "Docker is already installed and running — skipping."
     return
   fi
@@ -175,10 +148,10 @@ echo "Terminal-Bench setup for minicode"
 echo "Repo root: $REPO_ROOT"
 echo
 
-[[ $SKIP_DOCKER -eq 0 ]] && install_docker
-[[ $SKIP_DOCKER_PROXY -eq 0 ]] && sync_docker_proxy
-[[ $SKIP_HARBOR -eq 0 ]] && install_harbor
-[[ $SKIP_BUILD -eq 0 ]] && build_binary
+install_docker
+sync_docker_proxy
+install_harbor
+build_binary
 
 cat <<EOF
 
