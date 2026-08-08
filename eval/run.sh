@@ -79,7 +79,7 @@ COMMON_ARGS=(
 
 if [[ $PROXY -eq 1 ]]; then
   PROXY_PORT="${MINICODE_PROXY_PORT:-4396}"
-  PROXY_URL="http://172.17.0.1:${PROXY_PORT}"
+  PROXY_URL="${MINICODE_PROXY_URL:-http://172.17.0.1:${PROXY_PORT}}"
   APT_CONF="/tmp/minicode-apt-proxy.conf"
   COMPOSE_FILE="/tmp/minicode-proxy-compose.yaml"
   CONFIG_FILE="/tmp/minicode-proxy-jobconfig.json"
