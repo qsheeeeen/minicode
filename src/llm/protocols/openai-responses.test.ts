@@ -405,6 +405,104 @@ describe("OpenAIResponsesClient", () => {
       expect(assistantItems[0].content).toBe("answer");
     });
 
+    it("uses the provider call_id as the tool id for round-trips", async () => {
+      responsesCreateMock.mockReturnValue(
+        mockStream([
+          {
+            type: "response.output_item.done",
+            item: {
+              type: "function_call",
+              id: "item-uuid-1",
+              call_id: "call_00_real123",
+              name: "Read",
+              arguments: "{}",
+            },
+          },
+          {
+            type: "response.completed",
+            response: {
+              output: [],
+              status: "completed",
+              usage: { input_tokens: 5, output_tokens: 0 },
+            },
+          },
+        ]),
+      );
+
+      const blocks = [
+        {
+          type: "tool_use" as const,
+          id: "call_00_real123",
+          name: "Read",
+          input: {},
+        },
+        {
+          type: "tool_result" as const,
+          tool_use_id: "call_00_real123",
+          content: "file content",
+        },
+      ];
+
+      const client = new OpenAIResponsesClient("test-key");
+      const stream = client.chatStream(blocks, []);
+      const collected = await collectStream(stream);
+
+      const toolEvent = collected.events.find((e) => e.type === "tool_use");
+      if (toolEvent?.type !== "tool_use") throw new Error("expected tool_use");
+      expect(toolEvent.id).toBe("call_00_real123");
+
+      const params = responsesCreateMock.mock.calls[0][0];
+      const fc = params.input.find((i: any) => i.type === "function_call");
+      const output = params.input.find(
+        (i: any) => i.type === "function_call_output",
+      );
+      expect(fc).toMatchObject({
+        type: "function_call",
+        id: "call_00_real123",
+        call_id: "call_00_real123",
+      });
+      expect(output).toMatchObject({
+        type: "function_call_output",
+        call_id: "call_00_real123",
+      });
+    });
+
+    it("falls back to the item id when no provider call_id exists", async () => {
+      responsesCreateMock.mockReturnValue(
+        mockStream([
+          {
+            type: "response.completed",
+            response: {
+              output: [],
+              status: "completed",
+              usage: { input_tokens: 5, output_tokens: 0 },
+            },
+          },
+        ]),
+      );
+
+      const blocks = [
+        { type: "tool_use" as const, id: "call_1", name: "Read", input: {} },
+        {
+          type: "tool_result" as const,
+          tool_use_id: "call_1",
+          content: "file content",
+        },
+      ];
+
+      const client = new OpenAIResponsesClient("test-key");
+      const stream = client.chatStream(blocks, []);
+      await collectStream(stream);
+
+      const params = responsesCreateMock.mock.calls[0][0];
+      const fc = params.input.find((i: any) => i.type === "function_call");
+      const output = params.input.find(
+        (i: any) => i.type === "function_call_output",
+      );
+      expect(fc).toMatchObject({ call_id: "call_1" });
+      expect(output).toMatchObject({ call_id: "call_1" });
+    });
+
     it("passes system prompt as instructions", async () => {
       responsesCreateMock.mockReturnValue(
         mockStream([

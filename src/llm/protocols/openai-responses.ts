@@ -185,7 +185,10 @@ function toLLMStreamResult(
         }
         content.push({
           type: "tool_use",
-          id: item.id ?? item.call_id,
+          // The provider's `call_id` is the identifier function_call_output
+          // references on later turns (DeepSeek requires it verbatim), so it
+          // becomes the internal tool id. `item.id` is only an item locator.
+          id: item.call_id ?? item.id,
           name: item.name,
           input: parsedArgs,
         });
@@ -349,7 +352,7 @@ export class OpenAIResponsesClient implements LLMClient {
               }
               yield {
                 type: "tool_use",
-                id: item.id ?? item.call_id ?? "",
+                id: item.call_id ?? item.id ?? "",
                 name: item.name,
                 input: parsedArgs,
               };
