@@ -2,22 +2,35 @@
 #
 # Prepare proxy access for eval runs.
 #
-# The proxy must already be reachable from containers (listen on 0.0.0.0 /
-# allow-lan) and its container-reachable address goes in MINICODE_PROXY_URL,
-# e.g. http://172.17.0.1:4395 (docker0 gateway).
+# Clash on Windows pushes its (random) proxy port into WSL via
+# HTTPS_PROXY=http://127.0.0.1:<port>. eval/run.sh --proxy runs the task
+# container with --network host so 127.0.0.1 inside the container is the WSL
+# loopback and the proxy is directly reachable. This script generates the apt
+# proxy config that run.sh mounts into the container.
 #
-#   MINICODE_PROXY_URL=http://172.17.0.1:4395 bash eval/harbor/proxy.sh start
-#   MINICODE_PROXY_URL=http://172.17.0.1:4395 bash eval/run.sh --proxy deepseek/deepseek-v4-flash
+#   bash eval/harbor/proxy.sh start   # auto-detect proxy from env
+#   MINICODE_PROXY_URL=http://127.0.0.1:11952 bash eval/run.sh --proxy deepseek/deepseek-v4-flash
 
 set -euo pipefail
 
-PROXY_URL="${MINICODE_PROXY_URL:-}"
 APT_CONF="/tmp/minicode-apt-proxy.conf"
 
-if [[ -z "$PROXY_URL" ]]; then
-  echo "error: MINICODE_PROXY_URL is required (e.g. http://172.17.0.1:4395)" >&2
-  exit 1
-fi
+container_proxy_url() {
+  if [[ -n "${MINICODE_PROXY_URL:-}" ]]; then
+    echo "$MINICODE_PROXY_URL"
+    return 0
+  fi
+  local src="${HTTPS_PROXY:-${https_proxy:-}}"
+  if [[ -z "$src" ]]; then
+    echo "error: no proxy in environment (HTTPS_PROXY) and MINICODE_PROXY_URL unset" >&2
+    return 1
+  fi
+  # With --network host the container shares the WSL network stack, so the
+  # WSL-visible 127.0.0.1:<port> is already the container proxy address.
+  echo "$src"
+}
+
+PROXY_URL="$(container_proxy_url)"
 
 parse_host() {
   local host="${PROXY_URL#http://}"

@@ -17,9 +17,10 @@
 # (--ak mirrors=true), useful when container installs are slow/blocked.
 # --local <task> runs a prepared local task copy (eval/harbor/tasks/<task>)
 # with patched dependency fetching; see eval/harbor/prepare_tasks.sh.
-# --proxy routes the whole container through a container-reachable proxy
-# (MINICODE_PROXY_URL, e.g. http://172.17.0.1:4395). Prepare it with
-# `bash eval/harbor/proxy.sh start` first.
+# --proxy routes the whole container through Clash: the task container runs
+# with host networking so it shares the WSL loopback, and the proxy address
+# (127.0.0.1:<random port>) is read from the WSL environment that Clash
+# updates automatically. Prepare it with `bash eval/harbor/proxy.sh start`.
 
 set -euo pipefail
 
@@ -79,23 +80,33 @@ COMMON_ARGS=(
 )
 
 if [[ $PROXY -eq 1 ]]; then
-  PROXY_URL="${MINICODE_PROXY_URL:-}"
+  if [[ -n "${MINICODE_PROXY_URL:-}" ]]; then
+    PROXY_URL="$MINICODE_PROXY_URL"
+  else
+    # Follow the proxy Clash pushed into WSL (HTTPS_PROXY=http://127.0.0.1:<port>);
+    # host networking makes 127.0.0.1 inside the container reach the WSL loopback.
+    SRC_PROXY="${HTTPS_PROXY:-${https_proxy:-}}"
+    if [[ -z "$SRC_PROXY" ]]; then
+      echo "no proxy in environment — set MINICODE_PROXY_URL or run Clash with WSL proxy support." >&2
+      exit 1
+    fi
+    PROXY_URL="$SRC_PROXY"
+  fi
   APT_CONF="/tmp/minicode-apt-proxy.conf"
   COMPOSE_FILE="/tmp/minicode-proxy-compose.yaml"
   CONFIG_FILE="/tmp/minicode-proxy-jobconfig.json"
   NO_PROXY="localhost,127.0.0.1,172.16.0.0/12,10.0.0.0/8,192.168.0.0/16"
 
-  if [[ -z "$PROXY_URL" ]]; then
-    echo "MINICODE_PROXY_URL is required with --proxy (see eval/harbor/proxy.sh)." >&2
-    exit 1
-  fi
-  if [[ ! -f "$APT_CONF" ]]; then
-    echo "apt proxy conf missing — run 'bash eval/harbor/proxy.sh start' first." >&2
-    exit 1
-  fi
-  cat > "$COMPOSE_FILE" <<EOF
+  # apt ignores env vars; write its proxy config so the verifier's apt steps
+  # also go through the container proxy.
+  cat > "$APT_CONF" <<EOF
+Acquire::http::Proxy "$PROXY_URL";
+Acquire::https::Proxy "$PROXY_URL";
+EOF
+cat > "$COMPOSE_FILE" <<EOF
 services:
   main:
+    network_mode: host
     volumes:
       - $APT_CONF:/etc/apt/apt.conf.d/99minicode-proxy:ro
 EOF
