@@ -6,12 +6,12 @@
 # an API key for the model provider, and the minicode eval binary.
 #
 # Usage:
-#   bash eval/run.sh                                   # 1 task, anthropic/claude-sonnet-4-5
-#   bash eval/run.sh deepseek/deepseek-v4-flash        # 1 task, custom model
-#   bash eval/run.sh --mirrors deepseek/deepseek-v4-flash
-#   bash eval/run.sh deepseek/deepseek-v4-flash -l 10  # extra flags pass to harbor run
-#   bash eval/run.sh --local fix-git deepseek/deepseek-v4-flash
-#   bash eval/run.sh --proxy deepseek/deepseek-v4-flash
+#   bash eval/harbor/run.sh                                   # 1 task, anthropic/claude-sonnet-4-5
+#   bash eval/harbor/run.sh deepseek/deepseek-v4-flash        # 1 task, custom model
+#   bash eval/harbor/run.sh --mirrors deepseek/deepseek-v4-flash
+#   bash eval/harbor/run.sh deepseek/deepseek-v4-flash -l 10  # extra flags pass to harbor run
+#   bash eval/harbor/run.sh --local fix-git deepseek/deepseek-v4-flash
+#   bash eval/harbor/run.sh --proxy deepseek/deepseek-v4-flash
 #
 # --mirrors points apt/uv/PyPI in the task container at China mirrors
 # (--ak mirrors=true), useful when container installs are slow/blocked.
@@ -24,7 +24,7 @@
 
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 MIRRORS=0
 LOCAL_TASK=""
 PROXY=0

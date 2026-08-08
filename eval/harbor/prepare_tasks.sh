@@ -33,4 +33,4 @@ for task in "${TASKS[@]}"; do
   rm -rf "$TASKS_DIR/$task/.git"
 done
 
-echo "Done. Run: bash eval/run.sh --local fix-git deepseek/deepseek-v4-flash"
+echo "Done. Run: bash eval/harbor/run.sh --local fix-git deepseek/deepseek-v4-flash"

@@ -3,13 +3,13 @@
 # Prepare proxy access for eval runs.
 #
 # Clash on Windows pushes its (random) proxy port into WSL via
-# HTTPS_PROXY=http://127.0.0.1:<port>. eval/run.sh --proxy runs the task
+# HTTPS_PROXY=http://127.0.0.1:<port>. eval/harbor/run.sh --proxy runs the task
 # container with --network host so 127.0.0.1 inside the container is the WSL
 # loopback and the proxy is directly reachable. This script generates the apt
 # proxy config that run.sh mounts into the container.
 #
 #   bash eval/harbor/proxy.sh start   # auto-detect proxy from env
-#   MINICODE_PROXY_URL=http://127.0.0.1:11952 bash eval/run.sh --proxy deepseek/deepseek-v4-flash
+#   MINICODE_PROXY_URL=http://127.0.0.1:11952 bash eval/harbor/run.sh --proxy deepseek/deepseek-v4-flash
 
 set -euo pipefail
 
@@ -50,7 +50,7 @@ start() {
   fi
 
   # apt ignores env vars; give the container a static apt proxy config that
-  # eval/run.sh --proxy mounts into the task container.
+  # eval/harbor/run.sh --proxy mounts into the task container.
   cat > "$APT_CONF" <<EOF
 Acquire::http::Proxy "$PROXY_URL";
 Acquire::https::Proxy "$PROXY_URL";
