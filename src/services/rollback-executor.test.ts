@@ -39,7 +39,9 @@ describe("RollbackExecutor", () => {
 
       const { RollbackExecutor } = await import("./rollback-executor.js");
       const executor = new RollbackExecutor();
-      const result = await executor.rollbackConversation(journal, context, 2);
+      const outcome = await executor.rollbackConversation(journal, context, 2);
+      expect(outcome.ok).toBe(true);
+      const result = (outcome as { result: any }).result;
 
       expect(context.getBlocks()).toEqual([
         { type: "user", text: "first" },
@@ -84,11 +86,13 @@ describe("RollbackExecutor", () => {
 
       const { RollbackExecutor } = await import("./rollback-executor.js");
       const executor = new RollbackExecutor();
-      const result = await executor.rollbackFilesAndConversation(
+      const outcome = await executor.rollbackFilesAndConversation(
         journal,
         context,
         2,
       );
+      expect(outcome.ok).toBe(true);
+      const result = (outcome as { result: any }).result;
 
       expect(result.filesRestored).toContain("a.ts");
       expect(result.filesDeleted).toContain("b.ts");
@@ -113,11 +117,13 @@ describe("RollbackExecutor", () => {
 
       const { RollbackExecutor } = await import("./rollback-executor.js");
       const executor = new RollbackExecutor();
-      const result = await executor.rollbackFilesAndConversation(
+      const outcome = await executor.rollbackFilesAndConversation(
         journal,
         context,
         5,
       );
+      expect(outcome.ok).toBe(true);
+      const result = (outcome as { result: any }).result;
 
       expect(result.filesRestored).toEqual([]);
       expect(result.filesDeleted).toEqual([]);
@@ -167,7 +173,7 @@ describe("RollbackExecutor", () => {
       expect(fs.writeFile).toHaveBeenNthCalledWith(2, "a.ts", "A", "utf-8");
     });
 
-    it("throws on rollback conflicts", async () => {
+    it("returns a failure value on rollback conflicts", async () => {
       const journal = makeMockJournal([
         {
           userMessageOrdinal: 2,
@@ -185,9 +191,19 @@ describe("RollbackExecutor", () => {
       const { RollbackExecutor } = await import("./rollback-executor.js");
       const executor = new RollbackExecutor();
 
-      await expect(
-        executor.rollbackFilesAndConversation(journal, context, 2),
-      ).rejects.toThrow("Rollback conflict");
+      const outcome = await executor.rollbackFilesAndConversation(
+        journal,
+        context,
+        2,
+      );
+      expect(outcome.ok).toBe(false);
+      if (!outcome.ok) {
+        expect(outcome.reason).toContain("Rollback conflict");
+        expect(outcome.partial).toEqual({
+          filesRestored: [],
+          filesDeleted: [],
+        });
+      }
       expect(journal.pruneFromUserMessage).not.toHaveBeenCalled();
     });
   });

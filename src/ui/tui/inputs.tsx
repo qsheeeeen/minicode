@@ -362,22 +362,32 @@ export function UndoInput({
             await import("../../services/rollback-executor.js");
           const executor = new RollbackExecutor();
 
-          try {
-            let result;
-            if (v === "both") {
-              result = await executor.rollbackFilesAndConversation(
-                changeJournal,
-                context,
-                selectedUserMessageOrdinal,
-              );
-            } else {
-              result = await executor.rollbackConversation(
-                changeJournal,
-                context,
-                selectedUserMessageOrdinal,
-              );
-            }
+          const outcome =
+            v === "both"
+              ? await executor.rollbackFilesAndConversation(
+                  changeJournal,
+                  context,
+                  selectedUserMessageOrdinal,
+                )
+              : await executor.rollbackConversation(
+                  changeJournal,
+                  context,
+                  selectedUserMessageOrdinal,
+                );
 
+          if (!outcome.ok) {
+            const { filesRestored, filesDeleted } = outcome.partial;
+            const partialNote =
+              filesRestored.length + filesDeleted.length > 0
+                ? ` (${filesRestored.length} restored, ${filesDeleted.length} deleted before failure)`
+                : "";
+            reportStatus?.({
+              role: "error",
+              content: `(Rollback failed: ${outcome.reason}${partialNote})`,
+              timestamp: new Date(),
+            });
+          } else {
+            const result = outcome.result;
             const parts: string[] = [];
             if (v === "both") {
               if (result.filesRestored.length > 0) {
@@ -391,12 +401,6 @@ export function UndoInput({
             reportStatus?.({
               role: "status",
               content: `(Rollback: ${parts.join(", ")})`,
-              timestamp: new Date(),
-            });
-          } catch (e) {
-            reportStatus?.({
-              role: "error",
-              content: `(Rollback failed: ${(e as Error).message})`,
               timestamp: new Date(),
             });
           }
