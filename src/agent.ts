@@ -7,6 +7,9 @@ import type { SessionManager } from "./services/session-manager.js";
 import type { ContextManager } from "./services/context-manager.js";
 import type pino from "pino";
 
+export { isAbortError } from "./core/results.js";
+export { TurnFaultError, isTurnFaultError } from "./core/results.js";
+
 /**
  * Dependencies for runAgent. This is a mutable parameter bag owned by the
  * caller — runAgent only reads it. `client`/`model`/`logger` are writable
@@ -25,16 +28,6 @@ export interface AgentDeps {
 
 export interface RunAgentOpts {
   prompter?: UserPrompter;
-}
-
-/** True for the AbortError raised by signal.throwIfAborted(). */
-export function isAbortError(e: unknown): boolean {
-  return (
-    typeof e === "object" &&
-    e !== null &&
-    "name" in e &&
-    (e as { name: unknown }).name === "AbortError"
-  );
 }
 
 function abortError(): Error {
