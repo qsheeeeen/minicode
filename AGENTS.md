@@ -68,7 +68,7 @@ Forced by root constraints, not convention. Before adding code or a module, conf
 - `LLMContext` blocks are the **single source of truth**; derived views (tokens / display / stats / journal) compute or subscribe — never a second copy.
 - Cross-cutting concerns (persistence, tokens, change-tracking, permission, prompts) are narrow-interface services, each with state where it belongs.
 - Declaration (`registry`) vs. execution (`executor`) for extensible things.
-- **Errors are values, not control flow** — tool denial/failure returns as `ToolRunResult`, never throws across a boundary; only abort/IO-crash throws.
+- **Errors are values, not control flow** — two failure classes, no third: step failures (tool denial, validation, rollback conflict) return as values (`ToolRunResult`, `ok:false` results); turn failures (abort, fatal IO, LLM fault) throw only `TurnFaultError` (`core/results.ts`) and are caught exactly once at the turn boundary. Vendor exceptions never cross the LLM port — they arrive as `{ok:false, fault}` stream terminal values.
 
 **Dependency direction (a violation is a bug):**
 ```
