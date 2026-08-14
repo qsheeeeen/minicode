@@ -55,18 +55,17 @@ async function modelSelectHandler(
     }
 
     if (modelSpec) {
-      try {
-        await modelSwitchService.switchAgentModel({
-          modelSpec,
-          tier: tierMatch[2] ? tier : undefined,
-        });
-      } catch (error) {
+      const result = await modelSwitchService.switchAgentModel({
+        modelSpec,
+        tier: tierMatch[2] ? tier : undefined,
+      });
+      if (!result.ok) {
         useTuiState.setState((state) => ({
           messages: [
             ...state.messages,
             {
               role: "error",
-              content: `(Error: ${error instanceof Error ? error.message : String(error)})`,
+              content: `(Error: ${result.reason})`,
               timestamp: new Date(),
             },
           ],

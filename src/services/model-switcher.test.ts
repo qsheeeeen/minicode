@@ -49,10 +49,11 @@ describe("ModelSwitchService", () => {
     const { service, appConfig, contextManager, sessionManager, runtimeState } =
       createService();
 
-    const selection = await service.switchAgentModel({
+    const outcome = await service.switchAgentModel({
       modelSpec: "next-model@test",
     });
-    const { client, model } = selection;
+    expect(outcome.ok).toBe(true);
+    const { client, model } = (outcome as { selection: any }).selection;
 
     expect(runtimeState.setClientModel).toHaveBeenCalledWith(client, model);
     expect(model.getName()).toBe("next-model");
@@ -86,13 +87,16 @@ describe("ModelSwitchService", () => {
     expect(appConfig.setModel).not.toHaveBeenCalled();
   });
 
-  it("throws when the model spec cannot be resolved", async () => {
+  it("returns a failure value when the model spec cannot be resolved", async () => {
     const { service } = createService();
 
-    await expect(
-      service.switchAgentModel({
-        modelSpec: "missing@unknown",
-      }),
-    ).rejects.toThrow('Could not resolve "missing@unknown".');
+    const outcome = await service.switchAgentModel({
+      modelSpec: "missing@unknown",
+    });
+
+    expect(outcome).toEqual({
+      ok: false,
+      reason: 'Could not resolve "missing@unknown".',
+    });
   });
 });

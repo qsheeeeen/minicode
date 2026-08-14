@@ -18,6 +18,12 @@ export interface SwitchAgentModelOpts {
   readonly reportStatus?: boolean;
 }
 
+/** Switch outcome as a value — an unresolvable spec is user-input validation,
+ *  not an exceptional condition. */
+export type SwitchModelResult =
+  | { ok: true; selection: ModelSelection }
+  | { ok: false; reason: string };
+
 export class ModelSwitchService {
   private appConfig: AppConfig;
   private contextManager: ContextManager;
@@ -31,11 +37,13 @@ export class ModelSwitchService {
     this.runtimeState = opts.runtimeState;
   }
 
-  async switchAgentModel(opts: SwitchAgentModelOpts): Promise<ModelSelection> {
+  async switchAgentModel(
+    opts: SwitchAgentModelOpts,
+  ): Promise<SwitchModelResult> {
     const factory = new ModelFactory(this.appConfig);
     const selection = factory.fromSpec(opts.modelSpec);
     if (!selection) {
-      throw new Error(`Could not resolve "${opts.modelSpec}".`);
+      return { ok: false, reason: `Could not resolve "${opts.modelSpec}".` };
     }
     const { client, model } = selection;
 
@@ -63,6 +71,6 @@ export class ModelSwitchService {
       });
     }
 
-    return selection;
+    return { ok: true, selection };
   }
 }
