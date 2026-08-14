@@ -9,6 +9,7 @@ import { modeHandlers } from "./mode-handlers.js";
 import type { Model } from "../../llm/model.js";
 import type { AppConfig } from "../../config.js";
 import type { ModelSwitchService } from "../../services/model-switcher.js";
+import type { SessionManager } from "../../services/session-manager.js";
 
 interface InputAreaProps {
   model: Model;
@@ -16,6 +17,7 @@ interface InputAreaProps {
   loadingRef: React.MutableRefObject<boolean>;
   config: AppConfig;
   modelSwitchService: ModelSwitchService;
+  sessionManager: SessionManager;
   commandRegistry: CommandRegistry;
   skillRegistry: SkillRegistry;
 }
@@ -26,6 +28,7 @@ export function InputArea({
   loadingRef,
   config,
   modelSwitchService,
+  sessionManager,
   commandRegistry,
   skillRegistry,
 }: InputAreaProps) {
@@ -91,6 +94,7 @@ export function InputArea({
           model,
           config,
           modelSwitchService,
+          sessionManager,
           handleSubmit,
         });
         useTuiState.setState((state) => ({

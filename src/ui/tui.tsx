@@ -282,6 +282,7 @@ function AppContent({
           loadingRef={loadingRef}
           config={config}
           modelSwitchService={modelSwitchService}
+          sessionManager={sessionManager}
           commandRegistry={commandRegistry}
           skillRegistry={skillRegistry}
         />

@@ -2,12 +2,13 @@ import type { Model } from "../../llm/model.js";
 import type { EffortLevel } from "../../llm/client.js";
 import type { AppConfig } from "../../config.js";
 import type { ModelSwitchService } from "../../services/model-switcher.js";
-import { useTuiState } from "./state.js";
+import type { SessionManager } from "../../services/session-manager.js";
 
 export interface ModeHandlerDeps {
   model: Model;
   config: AppConfig;
   modelSwitchService: ModelSwitchService;
+  sessionManager: SessionManager;
   handleSubmit: (value: string) => Promise<boolean>;
 }
 
@@ -18,20 +19,18 @@ export type ModeHandler = (
 
 async function effortSelectHandler(
   value: string,
-  { model, config }: ModeHandlerDeps,
+  { model, config, sessionManager }: ModeHandlerDeps,
 ): Promise<void> {
   model.setEffort(value as EffortLevel);
   config.setEffort(value as EffortLevel);
-  useTuiState.setState((state) => ({
-    messages: [
-      ...state.messages,
-      {
-        role: "status",
-        content: `(Effort set to: ${value})`,
-        timestamp: new Date(),
-      },
-    ],
-  }));
+  // Status goes through the event bus; the timeline owns the messages array,
+  // so writing useTuiState.messages directly here would be wiped by the next
+  // timeline.sync().
+  sessionManager.reportStatus({
+    role: "status",
+    content: `(Effort set to: ${value})`,
+    timestamp: new Date(),
+  });
 }
 
 async function sessionListHandler(
@@ -43,7 +42,7 @@ async function sessionListHandler(
 
 async function modelSelectHandler(
   value: string,
-  { config, modelSwitchService }: ModeHandlerDeps,
+  { config, modelSwitchService, sessionManager }: ModeHandlerDeps,
 ): Promise<void> {
   const tierMatch = value.match(/^(pro|flash):(.*)$/);
   if (tierMatch) {
@@ -60,16 +59,11 @@ async function modelSelectHandler(
         tier: tierMatch[2] ? tier : undefined,
       });
       if (!result.ok) {
-        useTuiState.setState((state) => ({
-          messages: [
-            ...state.messages,
-            {
-              role: "error",
-              content: `(Error: ${result.reason})`,
-              timestamp: new Date(),
-            },
-          ],
-        }));
+        sessionManager.reportStatus({
+          role: "error",
+          content: `(Error: ${result.reason})`,
+          timestamp: new Date(),
+        });
       }
     }
   }
