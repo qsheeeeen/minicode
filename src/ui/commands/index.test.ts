@@ -165,6 +165,80 @@ describe("Builtin commands", () => {
       expect(ctx.exit).toHaveBeenCalled();
     });
 
+    it("/undo <n> rolls back the conversation without a picker", async () => {
+      const context = {
+        ...makeContextMock(),
+        getUserMessages: vi.fn().mockReturnValue(["first", "second"]),
+        truncateBeforeUserMessageOrdinal: vi.fn(),
+      };
+      const journal = {
+        getEntriesByUserMessage: vi.fn().mockResolvedValue(new Map()),
+        pruneFromUserMessage: vi.fn().mockResolvedValue(undefined),
+      };
+      const { ctx, sessionManager } = makeCtx({
+        context,
+        changeJournal: journal,
+      });
+
+      const result = await executeCommand(
+        "undo",
+        ["2"],
+        ctx as CommandContext,
+      );
+
+      expect(result.handled).toBe(true);
+      expect(context.truncateBeforeUserMessageOrdinal).toHaveBeenCalledWith(2);
+      expect(journal.pruneFromUserMessage).toHaveBeenCalledWith(2);
+      expect(ctx.presentInput).not.toHaveBeenCalled();
+      expect(sessionManager.reportStatus).toHaveBeenCalledWith(
+        expect.objectContaining({
+          role: "status",
+          content: "(Rollback: conversation rolled back)",
+        }),
+      );
+    });
+
+    it("bare /undo presents a display-only picker (no domain handles)", async () => {
+      const context = {
+        ...makeContextMock(),
+        getUserMessages: vi.fn().mockReturnValue(["first"]),
+      };
+      const { ctx } = makeCtx({
+        context,
+        changeJournal: {
+          getEntriesByUserMessage: vi.fn().mockResolvedValue(new Map()),
+        },
+      });
+
+      await executeCommand("undo", [], ctx as CommandContext);
+
+      expect(ctx.presentInput).toHaveBeenCalledTimes(1);
+      const request = (ctx.presentInput as ReturnType<typeof vi.fn>).mock
+        .calls[0][0];
+      expect(request.type).toBe("rollback-picker");
+      expect(request.userMessages).toEqual(["first"]);
+      expect(request.changeJournal).toBeUndefined();
+      expect(request.context).toBeUndefined();
+      expect(request.reportStatus).toBeUndefined();
+    });
+
+    it("/undo with an out-of-range number reports an error", async () => {
+      const context = {
+        ...makeContextMock(),
+        getUserMessages: vi.fn().mockReturnValue(["first"]),
+      };
+      const { ctx, sessionManager } = makeCtx({ context });
+
+      await executeCommand("undo", ["9"], ctx as CommandContext);
+
+      expect(sessionManager.reportStatus).toHaveBeenCalledWith(
+        expect.objectContaining({
+          role: "error",
+          content: "(Invalid message number: 9)",
+        }),
+      );
+    });
+
     it("/compress calls ctx.contextManager.compress() and reports status", async () => {
       const { ctx, sessionManager, contextManager } = makeCtx();
 

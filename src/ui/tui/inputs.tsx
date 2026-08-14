@@ -3,9 +3,6 @@ import { Box, Text, useInput } from "ink";
 import { Select, TextInput } from "@inkjs/ui";
 import type { ProviderConfig } from "../../config.js";
 import type { ChangeEntry } from "../../services/change-journal.js";
-import type { ChangeJournal } from "../../services/change-journal.js";
-import type { LLMContext } from "../../llm/context.js";
-import type { StatusReporter } from "../../services/session-manager.js";
 
 export interface InputComponentProps {
   onSubmit?: (value: string) => void;
@@ -230,14 +227,11 @@ export function ModelSelectInput({
 
 // Undo: two-step rollback UI (select user message → select scope)
 export function UndoInput({
-  onExecute: _onExecute,
+  onExecute,
   onCancel,
   entriesByUserMessage = [],
   userMessages = [],
   totalUserMessages = 0,
-  changeJournal,
-  context,
-  reportStatus,
 }: InputComponentProps & {
   entriesByUserMessage?: Array<{
     userMessageOrdinal: number;
@@ -245,14 +239,10 @@ export function UndoInput({
   }>;
   userMessages?: string[];
   totalUserMessages?: number;
-  changeJournal?: ChangeJournal;
-  context?: LLMContext;
-  reportStatus?: StatusReporter;
 }) {
   const [step, setStep] = useState<"list" | "confirm">("list");
   const [selectedUserMessageOrdinal, setSelectedUserMessageOrdinal] =
     useState(0);
-  const [processing, setProcessing] = useState(false);
 
   useInput((_input, key) => {
     if (key.escape) {
@@ -346,66 +336,14 @@ export function UndoInput({
       )}
       <Select
         options={scopeOptions}
-        onChange={async (v) => {
-          if (processing) return;
+        onChange={(v) => {
           if (v === "cancel") {
             onCancel?.();
             return;
           }
-          if (!changeJournal || !context) {
-            onCancel?.();
-            return;
-          }
-          setProcessing(true);
-
-          const { RollbackExecutor } =
-            await import("../../services/rollback-executor.js");
-          const executor = new RollbackExecutor();
-
-          const outcome =
-            v === "both"
-              ? await executor.rollbackFilesAndConversation(
-                  changeJournal,
-                  context,
-                  selectedUserMessageOrdinal,
-                )
-              : await executor.rollbackConversation(
-                  changeJournal,
-                  context,
-                  selectedUserMessageOrdinal,
-                );
-
-          if (!outcome.ok) {
-            const { filesRestored, filesDeleted } = outcome.partial;
-            const partialNote =
-              filesRestored.length + filesDeleted.length > 0
-                ? ` (${filesRestored.length} restored, ${filesDeleted.length} deleted before failure)`
-                : "";
-            reportStatus?.({
-              role: "error",
-              content: `(Rollback failed: ${outcome.reason}${partialNote})`,
-              timestamp: new Date(),
-            });
-          } else {
-            const result = outcome.result;
-            const parts: string[] = [];
-            if (v === "both") {
-              if (result.filesRestored.length > 0) {
-                parts.push(`restored ${result.filesRestored.length} file(s)`);
-              }
-              if (result.filesDeleted.length > 0) {
-                parts.push(`deleted ${result.filesDeleted.length} file(s)`);
-              }
-            }
-            parts.push("conversation rolled back");
-            reportStatus?.({
-              role: "status",
-              content: `(Rollback: ${parts.join(", ")})`,
-              timestamp: new Date(),
-            });
-          }
-
-          onCancel?.();
+          // Feed a fully parameterized command back through the input
+          // pipeline — execution lives in the command layer (works headless).
+          onExecute?.(`/undo ${selectedUserMessageOrdinal} ${v}`);
         }}
       />
       <Text dimColor>↑↓ navigate, Enter select, Esc back</Text>

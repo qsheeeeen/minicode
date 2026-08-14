@@ -8,7 +8,6 @@ import type { SkillRegistry } from "../../skills/index.js";
 import type { ModelSwitchService } from "../../services/model-switcher.js";
 import type { ContextManager } from "../../services/context-manager.js";
 import type { ChangeEntry } from "../../services/change-journal.js";
-import type { StatusReporter } from "../../services/session-manager.js";
 import type { InputRouter } from "../routing.js";
 import { registerBuiltinCommands } from "./builtin/index.js";
 import type { CommandRegistry } from "./registry.js";
@@ -39,9 +38,6 @@ export type InputRequest =
         entries: ChangeEntry[];
       }>;
       userMessages: string[];
-      changeJournal: ChangeJournal;
-      context: LLMContext;
-      reportStatus: StatusReporter;
     };
 
 export function inputRequestToState(request: InputRequest): {
@@ -68,9 +64,6 @@ export function inputRequestToState(request: InputRequest): {
           totalUserMessages: request.totalUserMessages,
           entriesByUserMessage: request.entriesByUserMessage,
           userMessages: request.userMessages,
-          changeJournal: request.changeJournal,
-          context: request.context,
-          reportStatus: request.reportStatus,
         },
       };
   }
