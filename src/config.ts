@@ -101,11 +101,15 @@ export class AppConfig {
   }
 
   /** Read the config file once and return a fresh instance (no caching). */
-  static async load(configPath: string = DEFAULT_CONFIG_PATH): Promise<AppConfig> {
+  static async load(
+    configPath: string = DEFAULT_CONFIG_PATH,
+  ): Promise<AppConfig> {
     let raw: Config = {};
     try {
       await fsPromises.mkdir(path.dirname(configPath), { recursive: true });
-      raw = JSON.parse(await fsPromises.readFile(configPath, "utf-8")) as Config;
+      raw = JSON.parse(
+        await fsPromises.readFile(configPath, "utf-8"),
+      ) as Config;
     } catch {
       // Missing or unreadable config — start empty
     }

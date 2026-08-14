@@ -15,7 +15,11 @@ describe("TurnFaultError", () => {
     });
     expect(err.message).toBe("LLM error (retryable): rate limited");
     expect(isTurnFaultError(err)).toBe(true);
-    expect(err.fault).toEqual({ kind: "llm", reason: "rate limited", retryable: true });
+    expect(err.fault).toEqual({
+      kind: "llm",
+      reason: "rate limited",
+      retryable: true,
+    });
   });
 
   it("is recognizable across unknown values", () => {

@@ -81,8 +81,7 @@ export class ChangeJournal {
       .filter((e) => e.userMessageOrdinal > prunedCount)
       .map((e) => ({
         ...e,
-        userMessageOrdinal:
-          e.userMessageOrdinal - prunedCount + offsetAdded,
+        userMessageOrdinal: e.userMessageOrdinal - prunedCount + offsetAdded,
       }));
     await this.writeFile(kept);
     this.entries = kept;

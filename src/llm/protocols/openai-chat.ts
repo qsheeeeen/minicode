@@ -4,19 +4,19 @@
 // converts between internal types and the OpenAI Chat Completions API format.
 
 import OpenAI from "openai";
+import { isAbortError } from "../../core/results.js";
+import { faultFromError } from "./shared.js";
 import type {
   LLMClient,
   LLMStream,
   LLMToolDef,
   ChatOptions,
   LLMStreamResult,
+  StopReason,
   EffortLevel,
   LLMBlock,
 } from "../client.js";
-import type {
-  LLMAssistantBlock,
-  LLMToolUseBlock,
-} from "../client.js";
+import type { LLMAssistantBlock, LLMToolUseBlock } from "../client.js";
 
 // Constants
 
@@ -45,7 +45,7 @@ function toSdkEffort(effort: EffortLevel): OpenAI.ReasoningEffort {
 
 // Stop reason mapping (OpenAI → internal)
 
-function mapStopReason(reason: string | null): string {
+function mapStopReason(reason: string | null): StopReason {
   switch (reason) {
     case "stop":
       return "end_turn";
@@ -53,8 +53,12 @@ function mapStopReason(reason: string | null): string {
       return "tool_use";
     case "length":
       return "max_tokens";
+    case "content_filter":
+      return "refusal";
+    case null:
+      return "end_turn";
     default:
-      return reason ?? "end_turn";
+      return "unknown";
   }
 }
 
@@ -192,114 +196,123 @@ export class OpenAIChatClient implements LLMClient {
       params.reasoning_effort = toSdkEffort(effort);
     }
 
-    const streamPromise = this.client.chat.completions.create(params, {
-      signal: abortController.signal,
-    });
+    // The request starts lazily inside the generator: a stream that is never
+    // consumed (e.g. the signal fired before the first next()) must not leave
+    // an unobserved fetch rejection behind.
+    const client = this.client;
 
     async function* run(): AsyncGenerator<
       LLMAssistantBlock,
       LLMStreamResult,
       unknown
     > {
-      const stream = await streamPromise;
+      try {
+        const stream = await client.chat.completions.create(params, {
+          signal: abortController.signal,
+        });
 
-      let textContent = "";
-      let thinkingContent = "";
-      const pendingToolCalls: Map<
-        number,
-        { id: string; name: string; arguments: string }
-      > = new Map();
-      let finishReason: string | null = null;
-      let usage: OpenAI.CompletionUsage | undefined;
+        let textContent = "";
+        let thinkingContent = "";
+        const pendingToolCalls: Map<
+          number,
+          { id: string; name: string; arguments: string }
+        > = new Map();
+        let finishReason: string | null = null;
+        let usage: OpenAI.CompletionUsage | undefined;
 
-      for await (const chunk of stream) {
-        if (chunk.usage) {
-          usage = chunk.usage;
-        }
+        for await (const chunk of stream) {
+          if (chunk.usage) {
+            usage = chunk.usage;
+          }
 
-        const delta = chunk.choices?.[0]?.delta;
-        if (!delta) {
-          if (chunk.choices?.[0]?.finish_reason) {
+          const delta = chunk.choices?.[0]?.delta;
+          if (!delta) {
+            if (chunk.choices?.[0]?.finish_reason) {
+              finishReason = chunk.choices[0].finish_reason;
+            }
+            continue;
+          }
+
+          if (chunk.choices[0].finish_reason) {
             finishReason = chunk.choices[0].finish_reason;
           }
-          continue;
-        }
 
-        if (chunk.choices[0].finish_reason) {
-          finishReason = chunk.choices[0].finish_reason;
-        }
+          if (delta.content) {
+            textContent += delta.content;
+            yield { type: "text", text: delta.content };
+          }
 
-        if (delta.content) {
-          textContent += delta.content;
-          yield { type: "text", text: delta.content };
-        }
+          // @ts-expect-error - reasoning_content not yet in types
+          const reasoning = delta.reasoning_content;
+          if (typeof reasoning === "string" && reasoning.length > 0) {
+            thinkingContent += reasoning;
+            yield { type: "thinking", thinking: reasoning };
+          }
 
-        // @ts-expect-error - reasoning_content not yet in types
-        const reasoning = delta.reasoning_content;
-        if (typeof reasoning === "string" && reasoning.length > 0) {
-          thinkingContent += reasoning;
-          yield { type: "thinking", thinking: reasoning };
-        }
+          if (delta.tool_calls) {
+            for (const tc of delta.tool_calls) {
+              const idx = tc.index;
+              let pending = pendingToolCalls.get(idx);
 
-        if (delta.tool_calls) {
-          for (const tc of delta.tool_calls) {
-            const idx = tc.index;
-            let pending = pendingToolCalls.get(idx);
+              if (!pending) {
+                pending = {
+                  id: tc.id ?? "",
+                  name: tc.function?.name ?? "",
+                  arguments: "",
+                };
+                pendingToolCalls.set(idx, pending);
+              }
 
-            if (!pending) {
-              pending = {
-                id: tc.id ?? "",
-                name: tc.function?.name ?? "",
-                arguments: "",
-              };
-              pendingToolCalls.set(idx, pending);
+              if (tc.id) pending.id = tc.id;
+              if (tc.function?.name) pending.name = tc.function.name;
+              if (tc.function?.arguments)
+                pending.arguments += tc.function.arguments;
             }
-
-            if (tc.id) pending.id = tc.id;
-            if (tc.function?.name) pending.name = tc.function.name;
-            if (tc.function?.arguments)
-              pending.arguments += tc.function.arguments;
           }
         }
-      }
 
-      const content: LLMAssistantBlock[] = [];
+        const content: LLMAssistantBlock[] = [];
 
-      if (thinkingContent.length > 0) {
-        content.push({ type: "thinking", thinking: thinkingContent });
-      }
+        if (thinkingContent.length > 0) {
+          content.push({ type: "thinking", thinking: thinkingContent });
+        }
 
-      if (textContent.length > 0) {
-        content.push({ type: "text", text: textContent });
-      }
+        if (textContent.length > 0) {
+          content.push({ type: "text", text: textContent });
+        }
 
-      for (const [, pending] of pendingToolCalls) {
-        let input: Record<string, unknown> = {};
-        try {
-          input = JSON.parse(pending.arguments);
-        } catch {}
-        const block: LLMToolUseBlock = {
-          type: "tool_use",
-          id: pending.id,
-          name: pending.name,
-          input,
-        };
-        content.push(block);
-        yield block;
-      }
+        for (const [, pending] of pendingToolCalls) {
+          let input: Record<string, unknown> = {};
+          try {
+            input = JSON.parse(pending.arguments);
+          } catch {}
+          const block: LLMToolUseBlock = {
+            type: "tool_use",
+            id: pending.id,
+            name: pending.name,
+            input,
+          };
+          content.push(block);
+          yield block;
+        }
 
-      return {
-        content,
-        stop_reason: mapStopReason(finishReason),
-        usage: {
-          input: {
-            total: usage?.prompt_tokens ?? 0,
-            cache_miss: 0,
-            cache_hit: 0,
+        return {
+          ok: true,
+          content,
+          stop_reason: mapStopReason(finishReason),
+          usage: {
+            input: {
+              total: usage?.prompt_tokens ?? 0,
+              cache_miss: 0,
+              cache_hit: 0,
+            },
+            output: usage?.completion_tokens ?? 0,
           },
-          output: usage?.completion_tokens ?? 0,
-        },
-      };
+        };
+      } catch (e) {
+        if (isAbortError(e)) throw e;
+        return { ok: false, fault: faultFromError(e) };
+      }
     }
 
     return run();

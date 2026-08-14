@@ -44,6 +44,7 @@ describe("SummaryCompressionStrategy", () => {
           next: vi.fn().mockResolvedValue({
             done: true,
             value: {
+              ok: true,
               content: [{ type: "text", text: "Summary of conversation" }],
             },
           }),
@@ -84,7 +85,7 @@ describe("SummaryCompressionStrategy", () => {
         chatStream: vi.fn().mockReturnValue({
           next: vi.fn().mockResolvedValue({
             done: true,
-            value: { content: [{ type: "text", text: "Summary" }] },
+            value: { ok: true, content: [{ type: "text", text: "Summary" }] },
           }),
         }),
       } as unknown as LLMClient;
@@ -110,7 +111,7 @@ describe("SummaryCompressionStrategy", () => {
         chatStream: vi.fn().mockReturnValue({
           next: vi.fn().mockResolvedValue({
             done: true,
-            value: { content: [{ type: "text", text: "Summary" }] },
+            value: { ok: true, content: [{ type: "text", text: "Summary" }] },
           }),
         }),
       } as unknown as LLMClient;

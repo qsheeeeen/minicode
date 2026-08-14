@@ -1,5 +1,6 @@
+import { TurnFaultError } from "./core/results.js";
 import type { Model } from "./llm/model.js";
-import type { LLMClient, LLMToolDef, LLMStreamResult } from "./llm/client.js";
+import type { LLMClient, LLMToolDef, LLMStreamOk } from "./llm/client.js";
 import type { ToolExecutor, ToolCall } from "./tools/executor.js";
 import type { UserPrompter } from "./tools/registry.js";
 import type { PromptManager } from "./services/prompt-manager.js";
@@ -78,12 +79,15 @@ async function saveStore(deps: AgentDeps): Promise<void> {
 }
 
 // Stream LLM response, updating context in real-time.
-// Returns the stream result and any tool calls the LLM requested.
+// Returns the successful stream result and any tool calls the LLM requested;
+// provider faults (ok:false terminal values) become TurnFaultError here —
+// the single conversion point between the value channel and the fault
+// exception that ends the turn.
 async function streamLLM(
   deps: AgentDeps,
   toolDefs: LLMToolDef[],
   signal: AbortSignal,
-): Promise<{ result: LLMStreamResult; toolCalls: ToolCall[] }> {
+): Promise<{ result: LLMStreamOk; toolCalls: ToolCall[] }> {
   const context = deps.sessionManager.getContext();
   const stream = deps.client.chatStream(context.getBlocks(), toolDefs, {
     system: deps.promptManager.getSystemPrompt(),
@@ -98,14 +102,16 @@ async function streamLLM(
     else context.appendAssistantText(delta);
   };
 
-  let result: LLMStreamResult | undefined;
+  let result: LLMStreamOk | undefined;
   try {
     while (true) {
       signal.throwIfAborted();
 
       const next = await nextWithAbort(stream.next(), signal);
       if (next.done) {
-        result = next.value as LLMStreamResult;
+        const terminal = next.value;
+        if (!terminal.ok) throw new TurnFaultError(terminal.fault);
+        result = terminal;
         break;
       }
 
@@ -130,7 +136,7 @@ async function streamLLM(
     saveStore(deps);
   }
 
-  return { result: result!, toolCalls };
+  return { result, toolCalls };
 }
 
 export async function runAgent(

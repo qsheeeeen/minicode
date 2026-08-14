@@ -73,7 +73,7 @@ class MockStream implements AsyncIterable<any> {
     this._promise = new Promise((resolve, reject) => {
       this.resolveFinal = (val) => {
         this.end();
-        resolve(val);
+        resolve({ ok: true, ...val });
       };
       this.rejectFinal = reject;
     });
@@ -95,6 +95,8 @@ class MockStream implements AsyncIterable<any> {
   private end() {
     this.isDone = true;
     const fakeResponse = {
+      ok: true as const,
+      stop_reason: "end_turn" as const,
       usage: { input: { total: 10, cache_miss: 0, cache_hit: 0 }, output: 10 },
     };
     if (this.resolveNext) {

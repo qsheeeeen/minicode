@@ -187,6 +187,7 @@ describe("sub-agent", () => {
             },
           ],
           result: {
+            ok: true,
             content: [],
             stop_reason: "tool_use",
             usage: {

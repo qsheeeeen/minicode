@@ -180,9 +180,7 @@ describe("RollbackExecutor", () => {
       ]);
       const context = makeContext([{ type: "user", text: "first" }]);
       const fs = (await import("fs/promises")).default;
-      (fs.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(
-        "unexpected",
-      );
+      (fs.readFile as ReturnType<typeof vi.fn>).mockResolvedValue("unexpected");
 
       const { RollbackExecutor } = await import("./rollback-executor.js");
       const executor = new RollbackExecutor();

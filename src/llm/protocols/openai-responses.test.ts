@@ -140,7 +140,7 @@ describe("OpenAIResponsesClient", () => {
     it("passes thinking blocks back as reasoning input items", async () => {
       responsesCreateMock.mockReturnValue(mockStream([]));
       const client = new OpenAIResponsesClient("test-key");
-      client.chatStream(
+      const stream = client.chatStream(
         [
           { type: "user", text: "hi" },
           { type: "thinking", thinking: "reasoning text" },
@@ -149,6 +149,7 @@ describe("OpenAIResponsesClient", () => {
         [],
         {},
       );
+      await stream.next();
 
       expect(responsesCreateMock).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -305,8 +306,14 @@ describe("OpenAIResponsesClient", () => {
       const stream = client.chatStream([], []);
       const collected = await collectStream(stream);
 
-      expect(collected.result.stop_reason).toBe("error");
-      expect(collected.result.content).toEqual([]);
+      expect(collected.result).toEqual({
+        ok: false,
+        fault: {
+          kind: "llm",
+          reason: "stream ended without a completed event",
+          retryable: true,
+        },
+      });
     });
 
     it("maps stop reasons from response status", async () => {

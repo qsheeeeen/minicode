@@ -57,10 +57,9 @@ describe("ToolDisplay", () => {
   });
 
   it("renders Python output in full (no truncation)", () => {
-    const longOutput = Array.from(
-      { length: 30 },
-      (_, i) => `line ${i}`,
-    ).join("\n");
+    const longOutput = Array.from({ length: 30 }, (_, i) => `line ${i}`).join(
+      "\n",
+    );
     const { lastFrame } = render(
       <ToolDisplay
         name="Python"

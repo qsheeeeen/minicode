@@ -2,8 +2,16 @@ import { describe, it, expect } from "vitest";
 import { SessionStats } from "./session-stats.js";
 import type { TokenUsage } from "../llm/client.js";
 
-function usage(input: number, output: number, cacheMiss = 0, cacheHit = 0): TokenUsage {
-  return { input: { total: input, cache_miss: cacheMiss, cache_hit: cacheHit }, output };
+function usage(
+  input: number,
+  output: number,
+  cacheMiss = 0,
+  cacheHit = 0,
+): TokenUsage {
+  return {
+    input: { total: input, cache_miss: cacheMiss, cache_hit: cacheHit },
+    output,
+  };
 }
 
 describe("SessionStats", () => {

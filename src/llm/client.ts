@@ -4,6 +4,7 @@
 // codebase programs against these abstractions, never against a concrete SDK.
 
 import type { Model } from "./model.js";
+import type { TurnFault } from "../core/results.js";
 import { AnthropicClient } from "./protocols/anthropic.js";
 import { OpenAIChatClient } from "./protocols/openai-chat.js";
 import { OpenAIResponsesClient } from "./protocols/openai-responses.js";
@@ -90,11 +91,26 @@ export interface TokenUsage {
   output: number;
 }
 
-export interface LLMStreamResult {
+/** Canonical stop reasons. Vendor-specific values are mapped, never passed
+ *  through — unmapped statuses become "unknown". */
+export type StopReason =
+  | "end_turn"
+  | "tool_use"
+  | "max_tokens"
+  | "refusal"
+  | "unknown";
+
+/** Stream terminal value. Provider failures arrive as a value (`ok: false`),
+ *  never as a raw vendor exception; the caller converts the fault into a
+ *  TurnFaultError at the turn boundary. Abort still propagates as AbortError. */
+export interface LLMStreamOk {
+  ok: true;
   content: LLMAssistantBlock[];
-  stop_reason: string;
+  stop_reason: StopReason;
   usage: TokenUsage;
 }
+
+export type LLMStreamResult = LLMStreamOk | { ok: false; fault: TurnFault };
 
 // Stream interface
 

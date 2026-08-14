@@ -7,6 +7,8 @@
 // of items rather than the chat-completions message array.
 
 import OpenAI from "openai";
+import { isAbortError } from "../../core/results.js";
+import { faultFromError } from "./shared.js";
 
 import type {
   LLMClient,
@@ -14,6 +16,7 @@ import type {
   LLMToolDef,
   ChatOptions,
   LLMStreamResult,
+  StopReason,
   TokenUsage,
   EffortLevel,
   LLMBlock,
@@ -215,8 +218,21 @@ function toLLMStreamResult(
     }
   }
 
+  // A failed response is a fault value, not a pseudo-success.
+  if (!hasToolCalls && response.status === "failed") {
+    return {
+      ok: false,
+      fault: {
+        kind: "llm",
+        reason:
+          response.error?.message ?? "provider reported a failed response",
+        retryable: false,
+      },
+    };
+  }
+
   // Determine stop reason
-  let stop_reason: string;
+  let stop_reason: StopReason;
   if (hasToolCalls) {
     stop_reason = "tool_use";
   } else {
@@ -227,11 +243,8 @@ function toLLMStreamResult(
       case "incomplete":
         stop_reason = "max_tokens";
         break;
-      case "failed":
-        stop_reason = "error";
-        break;
       default:
-        stop_reason = response.status ?? "end_turn";
+        stop_reason = "unknown";
     }
   }
 
@@ -245,7 +258,7 @@ function toLLMStreamResult(
     output: response.usage?.output_tokens ?? 0,
   };
 
-  return { content, stop_reason, usage };
+  return { ok: true, content, stop_reason, usage };
 }
 
 // OpenAIResponsesClient
@@ -273,7 +286,9 @@ export class OpenAIResponsesClient implements LLMClient {
 
     // If the caller provided a signal, forward abort
     if (options.signal) {
-      options.signal.addEventListener("abort", () => abortController.abort());
+      options.signal.addEventListener("abort", () => abortController.abort(), {
+        once: true,
+      });
     }
 
     const params: OpenAI.Responses.ResponseCreateParamsStreaming = {
@@ -291,95 +306,104 @@ export class OpenAIResponsesClient implements LLMClient {
       params.reasoning = { effort: toSdkEffort(effort) };
     }
 
-    const streamPromise = this.client.responses.create(params, {
-      signal: abortController.signal,
-    }) as unknown as Promise<
-      AsyncIterable<OpenAI.Responses.ResponseStreamEvent>
-    >;
+    // Lazy start: the request begins on the first next(), so a stream that is
+    // never consumed leaves no unobserved fetch rejection behind.
+    const client = this.client;
 
     async function* run(): AsyncGenerator<
       LLMAssistantBlock,
       LLMStreamResult,
       unknown
     > {
-      const stream = await streamPromise;
+      try {
+        const stream = (await client.responses.create(params, {
+          signal: abortController.signal,
+        })) as unknown as AsyncIterable<OpenAI.Responses.ResponseStreamEvent>;
 
-      let currentText = "";
-      let currentThinking = "";
-      let finalResult: LLMStreamResult | null = null;
+        let currentText = "";
+        let currentThinking = "";
+        let finalResult: LLMStreamResult | null = null;
 
-      for await (const event of stream) {
-        switch (event.type as string) {
-          case "response.output_text.delta": {
-            const delta = (event as unknown as StreamDeltaEvent).delta;
-            if (delta) {
-              currentText += delta;
-              yield { type: "text", text: delta };
-            }
-            break;
-          }
-          case "response.output_text.done": {
-            currentText = "";
-            break;
-          }
-          case "response.reasoning.delta":
-          case "response.reasoning_text.delta":
-          case "response.reasoning_summary_text.delta": {
-            const delta = (event as unknown as StreamDeltaEvent).delta;
-            if (delta) {
-              currentThinking += delta;
-              yield { type: "thinking", thinking: delta };
-            }
-            break;
-          }
-          case "response.reasoning.done":
-          case "response.reasoning_text.done":
-          case "response.reasoning_summary_text.done": {
-            currentThinking = "";
-            break;
-          }
-          case "response.output_item.done": {
-            const item = (event as unknown as StreamOutputItemDoneEvent).item;
-            if (item && item.type === "function_call") {
-              let parsedArgs: Record<string, unknown> = {};
-              try {
-                parsedArgs = JSON.parse(item.arguments) as Record<
-                  string,
-                  unknown
-                >;
-              } catch {
-                parsedArgs = { _raw: item.arguments };
+        for await (const event of stream) {
+          switch (event.type as string) {
+            case "response.output_text.delta": {
+              const delta = (event as unknown as StreamDeltaEvent).delta;
+              if (delta) {
+                currentText += delta;
+                yield { type: "text", text: delta };
               }
-              yield {
-                type: "tool_use",
-                id: item.call_id ?? item.id ?? "",
-                name: item.name,
-                input: parsedArgs,
-              };
+              break;
             }
-            break;
-          }
-          case "response.completed": {
-            const response = (event as unknown as StreamCompletedEvent)
-              .response;
-            if (response) {
-              finalResult = toLLMStreamResult(response);
+            case "response.output_text.done": {
+              currentText = "";
+              break;
             }
-            break;
+            case "response.reasoning.delta":
+            case "response.reasoning_text.delta":
+            case "response.reasoning_summary_text.delta": {
+              const delta = (event as unknown as StreamDeltaEvent).delta;
+              if (delta) {
+                currentThinking += delta;
+                yield { type: "thinking", thinking: delta };
+              }
+              break;
+            }
+            case "response.reasoning.done":
+            case "response.reasoning_text.done":
+            case "response.reasoning_summary_text.done": {
+              currentThinking = "";
+              break;
+            }
+            case "response.output_item.done": {
+              const item = (event as unknown as StreamOutputItemDoneEvent).item;
+              if (item && item.type === "function_call") {
+                let parsedArgs: Record<string, unknown> = {};
+                try {
+                  parsedArgs = JSON.parse(item.arguments) as Record<
+                    string,
+                    unknown
+                  >;
+                } catch {
+                  parsedArgs = { _raw: item.arguments };
+                }
+                yield {
+                  type: "tool_use",
+                  id: item.call_id ?? item.id ?? "",
+                  name: item.name,
+                  input: parsedArgs,
+                };
+              }
+              break;
+            }
+            case "response.completed": {
+              const response = (event as unknown as StreamCompletedEvent)
+                .response;
+              if (response) {
+                finalResult = toLLMStreamResult(response);
+              }
+              break;
+            }
           }
         }
-      }
 
-      if (finalResult) {
-        return finalResult;
-      }
+        if (finalResult) {
+          return finalResult;
+        }
 
-      // Fallback if completed event didn't fire properly
-      return {
-        content: [],
-        stop_reason: "error",
-        usage: { input: { total: 0, cache_miss: 0, cache_hit: 0 }, output: 0 },
-      };
+        // The stream ended without a completed event — a transport fault, not a
+        // fake success with empty content.
+        return {
+          ok: false,
+          fault: {
+            kind: "llm",
+            reason: "stream ended without a completed event",
+            retryable: true,
+          },
+        };
+      } catch (e) {
+        if (isAbortError(e)) throw e;
+        return { ok: false, fault: faultFromError(e) };
+      }
     }
 
     return run();

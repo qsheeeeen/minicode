@@ -178,7 +178,7 @@ describe("PermissionService", () => {
         chatStream: vi.fn().mockReturnValue({
           next: vi.fn().mockResolvedValue({
             done: true,
-            value: { content: [{ type: "text", text: "yes" }] },
+            value: { ok: true, content: [{ type: "text", text: "yes" }] },
           }),
         }),
       } as unknown as LLMClient;
@@ -246,7 +246,7 @@ describe("PermissionService", () => {
         chatStream: vi.fn().mockReturnValue({
           next: vi.fn().mockResolvedValue({
             done: true,
-            value: { content: [{ type: "text", text: "yes" }] },
+            value: { ok: true, content: [{ type: "text", text: "yes" }] },
           }),
         }),
       } as unknown as LLMClient;
@@ -271,6 +271,7 @@ describe("PermissionService", () => {
           next: vi.fn().mockResolvedValue({
             done: true,
             value: {
+              ok: true,
               content: [
                 { type: "text", text: "no: this command is too dangerous" },
               ],
@@ -296,6 +297,7 @@ describe("PermissionService", () => {
           next: vi.fn().mockResolvedValue({
             done: true,
             value: {
+              ok: true,
               content: [{ type: "text", text: "yes, this is allowed" }],
             },
           }),
@@ -315,7 +317,10 @@ describe("PermissionService", () => {
         chatStream: vi.fn().mockReturnValue({
           next: vi.fn().mockResolvedValue({
             done: true,
-            value: { content: [{ type: "text", text: "I think not." }] },
+            value: {
+              ok: true,
+              content: [{ type: "text", text: "I think not." }],
+            },
           }),
         }),
       } as unknown as LLMClient;

@@ -72,8 +72,9 @@ describe("Args", () => {
   });
 
   it("throws on invalid permission mode", () => {
-    expect(() =>
-      new Args(["node", "minicode", "--permission", "invalid"], baseConfig),
+    expect(
+      () =>
+        new Args(["node", "minicode", "--permission", "invalid"], baseConfig),
     ).toThrow();
   });
 
@@ -84,7 +85,14 @@ describe("Args", () => {
 
   it("parses prompt after flags", () => {
     const args = new Args(
-      ["node", "minicode", "--headless", "--model", "claude-3@anthropic", "fix the bug"],
+      [
+        "node",
+        "minicode",
+        "--headless",
+        "--model",
+        "claude-3@anthropic",
+        "fix the bug",
+      ],
       baseConfig,
     );
     expect(args.initialPrompt).toBe("fix the bug");

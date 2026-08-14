@@ -1,4 +1,5 @@
-import type { LLMClient, LLMStreamResult } from "../llm/client.js";
+import { describeFault } from "../core/results.js";
+import type { LLMClient, LLMStreamOk } from "../llm/client.js";
 import type { LLMBlock, LLMContext } from "../llm/context.js";
 import type { Model } from "../llm/model.js";
 
@@ -44,16 +45,22 @@ ${conversationText}`;
         { model, maxTokens: 1000 },
       );
 
-      let result: LLMStreamResult | undefined;
+      let result: LLMStreamOk | undefined;
       while (true) {
         const next = await stream.next();
         if (next.done) {
-          result = next.value as LLMStreamResult;
+          const terminal = next.value;
+          if (!terminal.ok) {
+            throw new Error(
+              `Compression failed: ${describeFault(terminal.fault)}`,
+            );
+          }
+          result = terminal;
           break;
         }
       }
 
-      const summaryText = this.extractSummaryText(result!);
+      const summaryText = this.extractSummaryText(result);
       return [
         {
           type: "user",
@@ -84,7 +91,7 @@ ${conversationText}`;
     return lines.join("\n");
   }
 
-  private extractSummaryText(summary: LLMStreamResult): string {
+  private extractSummaryText(summary: LLMStreamOk): string {
     for (const block of summary.content) {
       if (block.type === "text") {
         return block.text;

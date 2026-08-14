@@ -1,3 +1,4 @@
+import { describeFault } from "../core/results.js";
 import type { LLMClient } from "../llm/client.js";
 import type { LLMStreamResult } from "../llm/client.js";
 import type { Model } from "../llm/model.js";
@@ -99,12 +100,20 @@ Reply with exactly one of:
       while (true) {
         const next = await stream.next();
         if (next.done) {
-          result = next.value as LLMStreamResult;
+          result = next.value;
           break;
         }
       }
+      if (!result || !result.ok) {
+        const reason =
+          result && !result.ok ? describeFault(result.fault) : "no result";
+        return {
+          allowed: false,
+          reason: `Auto-permission check failed: ${reason}`,
+        };
+      }
       const text =
-        result?.content[0]?.type === "text"
+        result.content[0]?.type === "text"
           ? result.content[0].text.trim()
           : "no: unknown error";
 

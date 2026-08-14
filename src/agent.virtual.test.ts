@@ -9,7 +9,11 @@ import {
 } from "./testing/index.js";
 import type { ScriptedResponse } from "./testing/index.js";
 
-import { createCapabilities, type ToolDef, type UserPrompter } from "./tools/registry.js";
+import {
+  createCapabilities,
+  type ToolDef,
+  type UserPrompter,
+} from "./tools/registry.js";
 import { SessionManager } from "./services/session-manager.js";
 import { ContextManager } from "./services/context-manager.js";
 import { RuntimeEvents } from "./services/runtime-events.js";
@@ -88,11 +92,7 @@ describe("runAgent virtual integration", () => {
       responses: [defaultTextResponse("Hello, I am the agent.")],
     });
 
-    await runAgent(
-      deps,
-      "Hi there",
-      new AbortController().signal,
-    );
+    await runAgent(deps, "Hi there", new AbortController().signal);
 
     expect(context.getBlocks()).toEqual([
       { type: "user", text: "Hi there" },
@@ -115,11 +115,7 @@ describe("runAgent virtual integration", () => {
       tools,
     });
 
-    await runAgent(
-      deps,
-      "Use the Echo tool",
-      new AbortController().signal,
-    );
+    await runAgent(deps, "Use the Echo tool", new AbortController().signal);
 
     expect(context.getBlocks()).toEqual([
       { type: "user", text: "Use the Echo tool" },
@@ -168,6 +164,7 @@ describe("runAgent virtual integration", () => {
             },
           ],
           result: {
+            ok: true,
             content: [
               {
                 type: "tool_use",
@@ -194,11 +191,7 @@ describe("runAgent virtual integration", () => {
       tools,
     });
 
-    await runAgent(
-      deps,
-      "Run both tools",
-      new AbortController().signal,
-    );
+    await runAgent(deps, "Run both tools", new AbortController().signal);
 
     // Verify tool execution order
     expect(callOrder).toEqual(["A", "B"]);

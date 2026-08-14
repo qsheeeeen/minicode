@@ -3,6 +3,8 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import type { MessageStreamEvent } from "@anthropic-ai/sdk/resources/messages.js";
+import { isAbortError } from "../../core/results.js";
+import { faultFromError } from "./shared.js";
 import type { LLMStream } from "../client.js";
 import type { MessageCreateParamsStreaming } from "@anthropic-ai/sdk/resources/messages.js";
 
@@ -11,6 +13,7 @@ import type {
   LLMToolDef,
   ChatOptions,
   LLMStreamResult,
+  StopReason,
   EffortLevel,
   LLMBlock,
 } from "../client.js";
@@ -135,13 +138,32 @@ interface AnthropicCacheUsage {
   cache_read_input_tokens?: number;
 }
 
+function toStopReason(
+  reason: Anthropic.Messages.Message["stop_reason"],
+): StopReason {
+  switch (reason) {
+    case "tool_use":
+    case "max_tokens":
+    case "refusal":
+      return reason;
+    case "end_turn":
+    case "stop_sequence":
+    case "pause_turn":
+    case null:
+      return "end_turn";
+    default:
+      return "unknown";
+  }
+}
+
 function toLLMStreamResult(msg: Anthropic.Messages.Message): LLMStreamResult {
   const cacheUsage = msg.usage as typeof msg.usage & AnthropicCacheUsage;
   const cacheMiss = cacheUsage.cache_creation_input_tokens ?? 0;
   const cacheHit = cacheUsage.cache_read_input_tokens ?? 0;
   return {
+    ok: true,
     content: msg.content.map(toLLMAssistantBlock),
-    stop_reason: msg.stop_reason ?? "end_turn",
+    stop_reason: toStopReason(msg.stop_reason),
     usage: {
       input: {
         total: msg.usage.input_tokens,
@@ -188,9 +210,9 @@ export class AnthropicClient implements LLMClient {
       };
     }
 
-    const stream = this.client.messages.stream(params, {
-      signal: options.signal,
-    });
+    // Lazy start: the request begins on the first next(), so a stream that is
+    // never consumed leaves no unobserved request behind.
+    const client = this.client;
 
     async function* run(): AsyncGenerator<
       LLMAssistantBlock,
@@ -205,51 +227,60 @@ export class AnthropicClient implements LLMClient {
       let currentText = "";
       let currentThinking = "";
 
-      for await (const chunk of stream) {
-        const event = chunk as MessageStreamEvent;
-        if (event.type === "content_block_start") {
-          if (event.content_block.type === "tool_use") {
-            currentToolCall = {
-              id: event.content_block.id,
-              name: event.content_block.name,
-              arguments: "",
-            };
-          }
-        } else if (event.type === "content_block_delta") {
-          if (event.delta.type === "text_delta") {
-            yield { type: "text", text: event.delta.text };
-            currentText += event.delta.text;
-          } else if (event.delta.type === "thinking_delta") {
-            yield { type: "thinking", thinking: event.delta.thinking };
-            currentThinking += event.delta.thinking;
-          } else if (event.delta.type === "input_json_delta") {
+      try {
+        const stream = client.messages.stream(params, {
+          signal: options.signal,
+        });
+
+        for await (const chunk of stream) {
+          const event = chunk as MessageStreamEvent;
+          if (event.type === "content_block_start") {
+            if (event.content_block.type === "tool_use") {
+              currentToolCall = {
+                id: event.content_block.id,
+                name: event.content_block.name,
+                arguments: "",
+              };
+            }
+          } else if (event.type === "content_block_delta") {
+            if (event.delta.type === "text_delta") {
+              yield { type: "text", text: event.delta.text };
+              currentText += event.delta.text;
+            } else if (event.delta.type === "thinking_delta") {
+              yield { type: "thinking", thinking: event.delta.thinking };
+              currentThinking += event.delta.thinking;
+            } else if (event.delta.type === "input_json_delta") {
+              if (currentToolCall) {
+                currentToolCall.arguments += event.delta.partial_json;
+              }
+            }
+          } else if (event.type === "content_block_stop") {
             if (currentToolCall) {
-              currentToolCall.arguments += event.delta.partial_json;
+              let input = {};
+              try {
+                input = JSON.parse(currentToolCall.arguments);
+              } catch {}
+              yield {
+                type: "tool_use",
+                id: currentToolCall.id,
+                name: currentToolCall.name,
+                input,
+              };
+              currentToolCall = null;
+            } else if (currentThinking) {
+              currentThinking = "";
+            } else if (currentText) {
+              currentText = "";
             }
           }
-        } else if (event.type === "content_block_stop") {
-          if (currentToolCall) {
-            let input = {};
-            try {
-              input = JSON.parse(currentToolCall.arguments);
-            } catch {}
-            yield {
-              type: "tool_use",
-              id: currentToolCall.id,
-              name: currentToolCall.name,
-              input,
-            };
-            currentToolCall = null;
-          } else if (currentThinking) {
-            currentThinking = "";
-          } else if (currentText) {
-            currentText = "";
-          }
         }
-      }
 
-      const finalMsg = await stream.finalMessage();
-      return toLLMStreamResult(finalMsg);
+        const finalMsg = await stream.finalMessage();
+        return toLLMStreamResult(finalMsg);
+      } catch (e) {
+        if (isAbortError(e)) throw e;
+        return { ok: false, fault: faultFromError(e) };
+      }
     }
 
     return run();

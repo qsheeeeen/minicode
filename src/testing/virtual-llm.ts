@@ -15,11 +15,13 @@ import type {
   LLMAssistantBlock,
   LLMBlock,
 } from "../llm/client.js";
+import type { TurnFault } from "../core/results.js";
 
 // Types
 
 export interface ScriptedResponse {
   events: LLMAssistantBlock[];
+  /** Terminal value of the stream. Use faultResponse() to script ok:false. */
   result: LLMStreamResult;
 }
 
@@ -84,6 +86,7 @@ export class VirtualLLMClient implements LLMClient {
 
   private async *emptyStream(): LLMStream {
     return {
+      ok: true,
       content: [],
       stop_reason: "end_turn",
       usage: { input: { total: 0, cache_miss: 0, cache_hit: 0 }, output: 0 },
@@ -96,6 +99,7 @@ export class VirtualLLMClient implements LLMClient {
     return {
       events: [{ type: "text", text }],
       result: {
+        ok: true,
         content: [{ type: "text", text }],
         stop_reason: "end_turn",
         usage: DEFAULT_USAGE,
@@ -109,15 +113,19 @@ export class VirtualLLMClient implements LLMClient {
     input: Record<string, unknown>,
   ): ScriptedResponse {
     return {
-      events: [
-        { type: "tool_use", id: toolId, name: toolName, input },
-      ],
+      events: [{ type: "tool_use", id: toolId, name: toolName, input }],
       result: {
+        ok: true,
         content: [{ type: "tool_use", id: toolId, name: toolName, input }],
         stop_reason: "tool_use",
         usage: DEFAULT_USAGE,
       },
     };
+  }
+
+  /** A response that terminates the stream with a provider fault. */
+  static faultResponse(fault: TurnFault): ScriptedResponse {
+    return { events: [], result: { ok: false, fault } };
   }
 }
 

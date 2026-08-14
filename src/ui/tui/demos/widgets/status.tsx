@@ -18,6 +18,4 @@ useTuiState.setState({
     resolve: () => {},
   } as any,
 });
-render(
-  <Status />,
-);
+render(<Status />);

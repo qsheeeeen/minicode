@@ -1,9 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import {
-  AppConfig,
-  parseModelSpecifier,
-  resolveModel,
-} from "./config.js";
+import { AppConfig, parseModelSpecifier, resolveModel } from "./config.js";
 
 vi.mock("fs/promises", () => ({
   default: {

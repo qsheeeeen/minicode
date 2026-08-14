@@ -36,11 +36,12 @@ describe("AnthropicClient", () => {
   describe("chatStream", () => {
     it("sends correct parameters to client.messages.stream", async () => {
       const client = new AnthropicClient("test-key");
-      client.chatStream([{ type: "user", text: "hello" }], [], {
+      const s = client.chatStream([{ type: "user", text: "hello" }], [], {
         model: new Model("custom-model", "test-provider", 1000),
         maxTokens: 1000,
         system: "test system",
       });
+      await s.next();
 
       expect(mockStream).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -59,9 +60,10 @@ describe("AnthropicClient", () => {
 
     it("includes effort in output_config when provided", async () => {
       const client = new AnthropicClient();
-      client.chatStream([], [], {
+      const s = client.chatStream([], [], {
         model: new Model("custom-model", "test-provider", 1000, "xhigh"),
       });
+      await s.next();
 
       expect(mockStream).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -76,9 +78,10 @@ describe("AnthropicClient", () => {
   });
 
   describe("chatStream", () => {
-    it("sends correct parameters to client.messages.stream", () => {
+    it("sends correct parameters to client.messages.stream", async () => {
       const client = new AnthropicClient();
-      client.chatStream([{ type: "user", text: "hi" }], [], {});
+      const s = client.chatStream([{ type: "user", text: "hi" }], [], {});
+      await s.next();
 
       expect(mockStream).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -93,9 +96,9 @@ describe("AnthropicClient", () => {
   });
 
   describe("message conversion", () => {
-    it("groups all tool_results into one user message after the tool_use message", () => {
+    it("groups all tool_results into one user message after the tool_use message", async () => {
       const client = new AnthropicClient();
-      client.chatStream(
+      const s = client.chatStream(
         [
           { type: "user", text: "task" },
           { type: "tool_use", id: "call_1", name: "Read", input: {} },
@@ -106,6 +109,7 @@ describe("AnthropicClient", () => {
         [],
         {},
       );
+      await s.next();
 
       expect(mockStream).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -139,9 +143,9 @@ describe("AnthropicClient", () => {
       );
     });
 
-    it("flushes tool_results before the next user message", () => {
+    it("flushes tool_results before the next user message", async () => {
       const client = new AnthropicClient();
-      client.chatStream(
+      const s = client.chatStream(
         [
           { type: "user", text: "u1" },
           { type: "tool_use", id: "call_1", name: "Read", input: {} },
@@ -151,6 +155,7 @@ describe("AnthropicClient", () => {
         [],
         {},
       );
+      await s.next();
 
       expect(mockStream).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -179,9 +184,9 @@ describe("AnthropicClient", () => {
       );
     });
 
-    it("filters thinking blocks out of assistant messages", () => {
+    it("filters thinking blocks out of assistant messages", async () => {
       const client = new AnthropicClient();
-      client.chatStream(
+      const s = client.chatStream(
         [
           { type: "user", text: "u1" },
           { type: "thinking", thinking: "hidden" },
@@ -190,6 +195,7 @@ describe("AnthropicClient", () => {
         [],
         {},
       );
+      await s.next();
 
       expect(mockStream).toHaveBeenCalledWith(
         expect.objectContaining({

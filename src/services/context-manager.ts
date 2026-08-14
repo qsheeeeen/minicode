@@ -9,10 +9,7 @@ import {
 } from "./compression-service.js";
 import { ChangeJournal } from "./change-journal.js";
 import type { LLMContext } from "../llm/context.js";
-import type {
-  RuntimeEvents,
-  RuntimeStatusInput,
-} from "./runtime-events.js";
+import type { RuntimeEvents, RuntimeStatusInput } from "./runtime-events.js";
 
 export interface ContextManagerOpts {
   readonly client: LLMClient;
