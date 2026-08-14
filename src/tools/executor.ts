@@ -9,6 +9,7 @@ import type {
 import type { LLMToolUseBlock } from "../llm/client.js";
 import type { LLMContext } from "../llm/context.js";
 import type { AppConfig } from "../config.js";
+import { isAbortError, isTurnFaultError } from "../core/results.js";
 import { PermissionService } from "../services/permission.js";
 import { callContent } from "../utils/tool-format.js";
 import type pino from "pino";
@@ -84,7 +85,7 @@ export class ToolExecutor {
 
     this.logger?.info(
       {
-        session: context.config.model.getName(),
+        model: context.config.model.getName(),
         toolCount: toolCalls.length,
         tools: toolCalls.map((t) => t.block.name),
       },
@@ -165,6 +166,10 @@ export class ToolExecutor {
               content = result.result;
             }
           } catch (reason) {
+            // Turn failures (abort, fatal) must reach the turn boundary —
+            // converting them into a tool-error string would swallow the
+            // cancellation semantics.
+            if (isAbortError(reason) || isTurnFaultError(reason)) throw reason;
             content = `Error: ${reason instanceof Error ? reason.message : String(reason)}`;
             this.logger?.error(
               { toolName: tool.name, error: String(reason) },

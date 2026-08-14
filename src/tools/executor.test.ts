@@ -230,6 +230,22 @@ describe("ToolExecutor", () => {
       expect(spy).toHaveBeenCalledWith("call_1", "Error: boom");
     });
 
+    it("propagates AbortError instead of converting it to a tool error", async () => {
+      const abortError = new Error("Aborted");
+      abortError.name = "AbortError";
+      const tool = makeTool();
+      (tool.execute as ReturnType<typeof vi.fn>).mockRejectedValue(abortError);
+      const { executor, context } = makeExecutor({
+        tools: new Map([["testTool", tool]]),
+      });
+      const call = makeToolCall(tool);
+      prepareToolCalls(context, [call]);
+
+      await expect(executor.execute([call], makeDynamic())).rejects.toMatchObject({
+        name: "AbortError",
+      });
+    });
+
     it("treats non-fatal failure as soft: writes reason back and continues the batch", async () => {
       const tool1 = makeTool({ name: "tool1" });
       (tool1.execute as ReturnType<typeof vi.fn>).mockResolvedValue({
