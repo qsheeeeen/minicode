@@ -17,7 +17,7 @@ export type ModeHandler = (
   deps: ModeHandlerDeps,
 ) => Promise<void>;
 
-async function effortSelectHandler(
+export async function effortSelectHandler(
   value: string,
   { model, config, sessionManager }: ModeHandlerDeps,
 ): Promise<void> {
@@ -33,14 +33,14 @@ async function effortSelectHandler(
   });
 }
 
-async function sessionListHandler(
+export async function sessionListHandler(
   value: string,
   { handleSubmit }: ModeHandlerDeps,
 ): Promise<void> {
   handleSubmit(`/resume ${value}`);
 }
 
-async function modelSelectHandler(
+export async function modelSelectHandler(
   value: string,
   { config, modelSwitchService, sessionManager }: ModeHandlerDeps,
 ): Promise<void> {
@@ -69,8 +69,4 @@ async function modelSelectHandler(
   }
 }
 
-export const modeHandlers: Record<string, ModeHandler> = {
-  "effort-select": effortSelectHandler,
-  "session-list": sessionListHandler,
-  "model-select": modelSelectHandler,
-};
+

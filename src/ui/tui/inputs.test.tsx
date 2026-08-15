@@ -1,14 +1,8 @@
 import React from "react";
 import { render } from "ink-testing-library";
 import { describe, it, expect } from "vitest";
-import {
-  ChatInput,
-  EffortSelectInput,
-  SessionListInput,
-  getInputComponent,
-  inputComponents,
-  type InputComponentProps,
-} from "./inputs.js";
+import { ChatInput, EffortSelectInput, SessionListInput } from "./inputs.js";
+import { getInputComponent, inputModes } from "./input-modes.js";
 
 describe("ChatInput", () => {
   it("renders with placeholder", () => {
@@ -78,20 +72,23 @@ describe("getInputComponent", () => {
     expect(getInputComponent("nonexistent")).toBe(ChatInput);
   });
 
-  it("returns correct component for registered names", () => {
-    for (const reg of inputComponents) {
-      expect(getInputComponent(reg.name)).toBe(reg.Component);
+  it("returns correct component for registered modes", () => {
+    for (const [mode, def] of Object.entries(inputModes)) {
+      expect(getInputComponent(mode)).toBe(def.Component);
     }
   });
 });
 
-describe("inputComponents registry", () => {
-  it("contains expected registrations", () => {
-    const names = inputComponents.map((c) => c.name);
-    expect(names).toContain("chat");
-    expect(names).toContain("effort-select");
-    expect(names).toContain("session-list");
-    expect(names).toContain("model-select");
-    expect(names).toContain("undo");
+describe("inputModes registry", () => {
+  it("declares the expected modes", () => {
+    expect(Object.keys(inputModes)).toEqual(
+      expect.arrayContaining([
+        "chat",
+        "effort-select",
+        "session-list",
+        "model-select",
+        "undo",
+      ]),
+    );
   });
 });

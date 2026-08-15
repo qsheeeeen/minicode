@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
-import { modeHandlers, type ModeHandlerDeps } from "./mode-handlers.js";
+import { getInputModeHandler } from "./input-modes.js";
+import type { ModeHandlerDeps } from "./mode-handlers.js";
 import type { SessionManager } from "../../services/session-manager.js";
 
 function makeDeps(overrides?: Partial<ModeHandlerDeps>): ModeHandlerDeps {
@@ -29,7 +30,7 @@ describe("modeHandlers", () => {
   it("effort-select reports status through the session manager, not UI state", async () => {
     const deps = makeDeps();
 
-    await modeHandlers["effort-select"]("high", deps);
+    await getInputModeHandler("effort-select")!("high", deps);
 
     expect(deps.model.setEffort).toHaveBeenCalledWith("high");
     expect(deps.config.setEffort).toHaveBeenCalledWith("high");
@@ -51,7 +52,7 @@ describe("modeHandlers", () => {
       } as any,
     });
 
-    await modeHandlers["model-select"]("pro:x@y", deps);
+    await getInputModeHandler("model-select")!("pro:x@y", deps);
 
     expect(deps.sessionManager.reportStatus).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -64,7 +65,7 @@ describe("modeHandlers", () => {
   it("model-select with bare tier resolves from config and switches", async () => {
     const deps = makeDeps();
 
-    await modeHandlers["model-select"]("pro:", deps);
+    await getInputModeHandler("model-select")!("pro:", deps);
 
     expect(deps.modelSwitchService.switchAgentModel).toHaveBeenCalledWith({
       modelSpec: "m@p",
@@ -75,7 +76,7 @@ describe("modeHandlers", () => {
   it("session-list re-feeds the command layer", async () => {
     const deps = makeDeps();
 
-    await modeHandlers["session-list"]("s-123", deps);
+    await getInputModeHandler("session-list")!("s-123", deps);
 
     expect(deps.handleSubmit).toHaveBeenCalledWith("/resume s-123");
   });

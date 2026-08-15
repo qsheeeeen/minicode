@@ -1,11 +1,10 @@
 import React, { useMemo, useState, useCallback } from "react";
 import { Box, Text, useInput } from "ink";
 import { useTuiState } from "./state.js";
-import { getInputComponent } from "./inputs.js";
+import { getInputComponent, getInputModeHandler } from "./input-modes.js";
 import { getCommandList } from "../commands/index.js";
 import type { CommandRegistry } from "../commands/registry.js";
 import type { SkillRegistry } from "../../skills/index.js";
-import { modeHandlers } from "./mode-handlers.js";
 import type { Model } from "../../llm/model.js";
 import type { AppConfig } from "../../config.js";
 import type { ModelSwitchService } from "../../services/model-switcher.js";
@@ -88,7 +87,7 @@ export function InputArea({
   // Input value submission handler
   const handleSubmitValue = useCallback(
     async (value: string) => {
-      const handler = modeHandlers[input.mode];
+      const handler = getInputModeHandler(input.mode);
       if (handler) {
         await handler(value, {
           model,

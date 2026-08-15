@@ -351,23 +351,3 @@ export function UndoInput({
   );
 }
 
-// Input component registry
-export interface InputComponentRegistration {
-  name: string;
-  Component: React.ComponentType<InputComponentProps>;
-}
-
-export const inputComponents: InputComponentRegistration[] = [
-  { name: "chat", Component: ChatInput },
-  { name: "effort-select", Component: EffortSelectInput },
-  { name: "session-list", Component: SessionListInput },
-  { name: "model-select", Component: ModelSelectInput },
-  { name: "undo", Component: UndoInput },
-];
-
-export function getInputComponent(
-  name: string,
-): React.ComponentType<InputComponentProps> {
-  const found = inputComponents.find((c) => c.name === name);
-  return found?.Component || ChatInput;
-}
