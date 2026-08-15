@@ -22,7 +22,18 @@ export function registerProtocol(
   protocols.set(name, factory);
 }
 
-// LLM interface types (owned by the client layer)
+// The conversation block vocabulary is owned by core; this port adapts it.
+
+export type {
+  LLMUserBlock,
+  LLMTextBlock,
+  LLMThinkingBlock,
+  LLMToolUseBlock,
+  LLMToolResultBlock,
+  LLMAssistantBlock,
+  LLMBlock,
+} from "../core/blocks.js";
+import type { LLMAssistantBlock, LLMBlock } from "../core/blocks.js";
 
 export type EffortLevel =
   | "none"
@@ -38,46 +49,6 @@ export interface LLMToolDef {
   description: string;
   input_schema: Record<string, unknown>;
 }
-
-export interface LLMUserBlock {
-  type: "user";
-  text: string;
-}
-
-export interface LLMTextBlock {
-  type: "text";
-  text: string;
-}
-
-export interface LLMThinkingBlock {
-  type: "thinking";
-  thinking: string;
-}
-
-export interface LLMToolUseBlock {
-  type: "tool_use";
-  id: string;
-  name: string;
-  input: Record<string, unknown>;
-}
-
-export interface LLMToolResultBlock {
-  type: "tool_result";
-  tool_use_id: string;
-  content: string;
-}
-
-export type LLMAssistantBlock =
-  | LLMTextBlock
-  | LLMThinkingBlock
-  | LLMToolUseBlock;
-
-export type LLMBlock =
-  | LLMUserBlock
-  | LLMTextBlock
-  | LLMThinkingBlock
-  | LLMToolUseBlock
-  | LLMToolResultBlock;
 
 export interface ChatOptions {
   model?: Model;

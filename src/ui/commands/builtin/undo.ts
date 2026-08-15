@@ -83,7 +83,9 @@ export const undoCommand: CommandHandler = {
       const summary: string[] = [];
       if (scope === "both") {
         if (outcome.result.filesRestored.length > 0) {
-          summary.push(`restored ${outcome.result.filesRestored.length} file(s)`);
+          summary.push(
+            `restored ${outcome.result.filesRestored.length} file(s)`,
+          );
         }
         if (outcome.result.filesDeleted.length > 0) {
           summary.push(`deleted ${outcome.result.filesDeleted.length} file(s)`);

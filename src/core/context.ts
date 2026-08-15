@@ -3,9 +3,9 @@ import type {
   LLMThinkingBlock,
   LLMToolResultBlock,
   LLMToolUseBlock,
-} from "./client.js";
+} from "./blocks.js";
 
-export type { LLMBlock, LLMThinkingBlock, LLMToolUseBlock } from "./client.js";
+export type { LLMBlock, LLMThinkingBlock, LLMToolUseBlock } from "./blocks.js";
 
 function cloneBlock(block: LLMBlock): LLMBlock {
   if (block.type === "tool_use") {

@@ -1,4 +1,4 @@
-import type { LLMContext } from "../llm/context.js";
+import type { LLMContext } from "../core/context.js";
 
 export type AgentStatus = "idle" | "running" | "completed" | "error";
 

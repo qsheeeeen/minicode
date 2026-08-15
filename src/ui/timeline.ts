@@ -1,4 +1,4 @@
-import type { LLMContext } from "../llm/context.js";
+import type { LLMContext } from "../core/context.js";
 import type { RuntimeStatus } from "../services/runtime-events.js";
 import { toDisplayMessages, type DisplayMessage } from "./display.js";
 

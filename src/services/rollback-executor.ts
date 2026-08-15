@@ -1,6 +1,6 @@
 import fs from "fs/promises";
 import type { ChangeEntry, ChangeJournal } from "./change-journal.js";
-import type { LLMContext } from "../llm/context.js";
+import type { LLMContext } from "../core/context.js";
 
 export interface RollbackResult {
   filesRestored: string[];
@@ -15,7 +15,10 @@ export type RollbackOutcome =
 
 const EMPTY_RESULT: RollbackResult = { filesRestored: [], filesDeleted: [] };
 
-function fail(e: unknown, partial: RollbackResult = EMPTY_RESULT): RollbackOutcome {
+function fail(
+  e: unknown,
+  partial: RollbackResult = EMPTY_RESULT,
+): RollbackOutcome {
   return {
     ok: false,
     reason: e instanceof Error ? e.message : String(e),

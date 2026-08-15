@@ -93,11 +93,10 @@ Reply with exactly one of:
 - "yes"
 - "no: <reason explaining why it was denied>"`;
 
-      const stream = client.chatStream(
-        [{ type: "user", text: prompt }],
-        [],
-        { model, maxTokens: 100 },
-      );
+      const stream = client.chatStream([{ type: "user", text: prompt }], [], {
+        model,
+        maxTokens: 100,
+      });
       let result: LLMStreamResult | undefined;
       while (true) {
         const next = await stream.next();

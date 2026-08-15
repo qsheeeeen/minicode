@@ -7,7 +7,7 @@ import type {
   Capabilities,
 } from "./registry.js";
 import type { LLMToolUseBlock } from "../llm/client.js";
-import type { LLMContext } from "../llm/context.js";
+import type { LLMContext } from "../core/context.js";
 import type { AppConfig } from "../config.js";
 import { isAbortError, isTurnFaultError } from "../core/results.js";
 import { PermissionService } from "../services/permission.js";

@@ -180,11 +180,7 @@ describe("Builtin commands", () => {
         changeJournal: journal,
       });
 
-      const result = await executeCommand(
-        "undo",
-        ["2"],
-        ctx as CommandContext,
-      );
+      const result = await executeCommand("undo", ["2"], ctx as CommandContext);
 
       expect(result.handled).toBe(true);
       expect(context.truncateBeforeUserMessageOrdinal).toHaveBeenCalledWith(2);

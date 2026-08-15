@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { SummaryCompressionStrategy } from "./compression-service.js";
 import type { LLMClient } from "../llm/client.js";
-import { LLMContext, type LLMBlock } from "../llm/context.js";
+import { LLMContext, type LLMBlock } from "../core/context.js";
 import { Model } from "../llm/model.js";
 
 function userBlocks(count: number, prefix = "message"): LLMBlock[] {

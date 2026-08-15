@@ -2,7 +2,7 @@ export type {
   LLMBlock,
   LLMThinkingBlock,
   LLMToolUseBlock,
-} from "./llm/context.js";
+} from "./core/context.js";
 export type {
   DisplayMessage,
   MessageRole,

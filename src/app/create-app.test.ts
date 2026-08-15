@@ -174,9 +174,9 @@ describe("createApp", () => {
     });
 
     expect(SessionPersistence.load).toHaveBeenCalledWith("test-session");
-    expect(
-      runtime.sessionManager.getContext().getBlocks(),
-    ).toEqual([{ type: "user", text: "old" }]);
+    expect(runtime.sessionManager.getContext().getBlocks()).toEqual([
+      { type: "user", text: "old" },
+    ]);
     expect(runtime.contextManager.getTokenCount()).toBe(10);
     expect(runtime.runtimeState.logger).toBeDefined();
   });

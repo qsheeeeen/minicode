@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { LLMContext } from "../llm/context.js";
+import { LLMContext } from "../core/context.js";
 
 vi.mock("fs/promises", () => ({
   default: {

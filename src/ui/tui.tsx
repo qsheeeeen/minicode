@@ -18,7 +18,7 @@ import type { ShellService } from "../services/shell-service.js";
 import type { ModelSwitchService } from "../services/model-switcher.js";
 import type { ContextManager } from "../services/context-manager.js";
 import type { RuntimeState } from "../services/runtime-state.js";
-import type { LLMContext } from "../llm/context.js";
+import type { LLMContext } from "../core/context.js";
 import type { CommandRegistry } from "./commands/registry.js";
 import type { SkillRegistry } from "../skills/index.js";
 import type { InputRouter } from "./routing.js";

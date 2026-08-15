@@ -1,6 +1,6 @@
 import { describeFault } from "../core/results.js";
 import type { LLMClient, LLMStreamOk } from "../llm/client.js";
-import type { LLMBlock, LLMContext } from "../llm/context.js";
+import type { LLMBlock, LLMContext } from "../core/context.js";
 import type { Model } from "../llm/model.js";
 
 export interface CompressionStrategy {

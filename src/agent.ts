@@ -3,11 +3,7 @@ import type { AppConfig } from "./config.js";
 import type { Model } from "./llm/model.js";
 import type { LLMClient, LLMToolDef, LLMStreamOk } from "./llm/client.js";
 import type { ToolExecutor, ToolCall } from "./tools/executor.js";
-import type {
-  UserPrompter,
-  ToolDef,
-  Capabilities,
-} from "./tools/registry.js";
+import type { UserPrompter, ToolDef, Capabilities } from "./tools/registry.js";
 import type { PromptManager } from "./services/prompt-manager.js";
 import type { SessionManager } from "./services/session-manager.js";
 import type { ContextManager } from "./services/context-manager.js";

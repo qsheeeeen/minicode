@@ -5,7 +5,7 @@ import {
   type ToolExecutionDynamic,
 } from "./executor.js";
 import { PermissionService } from "../services/permission.js";
-import { LLMContext } from "../llm/context.js";
+import { LLMContext } from "../core/context.js";
 import { createCapabilities, type ToolDef } from "./registry.js";
 
 vi.mock("../utils/tool-format.js", () => ({
@@ -241,7 +241,9 @@ describe("ToolExecutor", () => {
       const call = makeToolCall(tool);
       prepareToolCalls(context, [call]);
 
-      await expect(executor.execute([call], makeDynamic())).rejects.toMatchObject({
+      await expect(
+        executor.execute([call], makeDynamic()),
+      ).rejects.toMatchObject({
         name: "AbortError",
       });
     });

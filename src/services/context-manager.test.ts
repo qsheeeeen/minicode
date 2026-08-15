@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { ContextManager } from "./context-manager.js";
 import { RuntimeEvents } from "./runtime-events.js";
-import { LLMContext } from "../llm/context.js";
+import { LLMContext } from "../core/context.js";
 import type { TokenUsage } from "../llm/client.js";
 
 function usage(

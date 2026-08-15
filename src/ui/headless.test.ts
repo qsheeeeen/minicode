@@ -144,14 +144,22 @@ describe("runHeadless", () => {
       mockShellService,
     );
     expect(mockSessionManager.reportStatus).toHaveBeenCalledWith(
-      expect.objectContaining({ role: "error", content: "(Error: test error)" }),
+      expect.objectContaining({
+        role: "error",
+        content: "(Error: test error)",
+      }),
     );
   });
 
   it("throws non-Error objects", async () => {
     mockRun.mockRejectedValueOnce("string error");
     await expect(
-      runHeadless(mockDeps, "test prompt", mockRuntimeEvents as any, mockShellService),
+      runHeadless(
+        mockDeps,
+        "test prompt",
+        mockRuntimeEvents as any,
+        mockShellService,
+      ),
     ).rejects.toBe("string error");
   });
 });

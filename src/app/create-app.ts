@@ -194,7 +194,10 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
         [RegistryCapability, agentRegistry],
         // The journal is recreated when a session is cleared — resolve it
         // at read time so tools never hold a closed handle.
-        [ChangeJournalCapability, lazy(() => sessionManager.getChangeJournal())],
+        [
+          ChangeJournalCapability,
+          lazy(() => sessionManager.getChangeJournal()),
+        ],
         [SubAgentSpawnerCapability, spawnSubAgent],
         [SkillRegistryCapability, skillRegistry],
       ]),

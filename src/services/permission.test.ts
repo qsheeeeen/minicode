@@ -256,7 +256,10 @@ describe("PermissionService", () => {
         }),
       } as unknown as LLMClient;
       const model = new Model("claude-3", "test-provider", 1000);
-      const strategy = new AutoPermissionStrategy(() => mockClient, () => model);
+      const strategy = new AutoPermissionStrategy(
+        () => mockClient,
+        () => model,
+      );
 
       const result = await strategy.check("Read", {
         path: "a.txt",

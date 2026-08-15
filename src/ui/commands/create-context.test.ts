@@ -80,9 +80,8 @@ describe("createCommandContext", () => {
   });
 
   it("resumeSession restores blocks, tokens, and activates the session", async () => {
-    const { SessionPersistence } = await import(
-      "../../services/session-persistence.js"
-    );
+    const { SessionPersistence } =
+      await import("../../services/session-persistence.js");
     (SessionPersistence.load as ReturnType<typeof vi.fn>).mockResolvedValue({
       blocks: [{ type: "user", text: "x" }],
       totalTokens: 42,
@@ -101,9 +100,8 @@ describe("createCommandContext", () => {
   });
 
   it("resumeSession surfaces a missing session as {loaded:false}", async () => {
-    const { SessionPersistence } = await import(
-      "../../services/session-persistence.js"
-    );
+    const { SessionPersistence } =
+      await import("../../services/session-persistence.js");
     (SessionPersistence.load as ReturnType<typeof vi.fn>).mockResolvedValue(
       null,
     );
