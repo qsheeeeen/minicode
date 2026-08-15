@@ -139,7 +139,7 @@ describe("Builtin commands", () => {
       } as any,
       contextManager: contextManager as any,
       isAgentRunning: vi.fn().mockReturnValue(false),
-      loadContext: vi.fn(),
+      resumeSession: vi.fn().mockResolvedValue({ loaded: true }),
       switchSession: vi.fn().mockResolvedValue(undefined),
       renameCurrentSession: vi.fn().mockResolvedValue(undefined),
       presentInput: vi.fn(),
@@ -324,16 +324,14 @@ describe("Builtin commands", () => {
         ctx as CommandContext,
       );
       expect(result.handled).toBe(true);
-      expect(sessionPersistenceMock.load).toHaveBeenCalledWith("session-1");
-      expect(ctx.loadContext).toHaveBeenCalledWith([], 100);
-      expect(ctx.switchSession).toHaveBeenCalledWith("session-1", {
-        statusMessage: "Loaded session: session-1",
-      });
+      expect(ctx.resumeSession).toHaveBeenCalledWith("session-1");
     });
 
     it("/resume with unknown session shows error", async () => {
-      sessionPersistenceMock.load.mockResolvedValue(null);
       const { ctx, sessionManager } = makeCtx();
+      (ctx.resumeSession as ReturnType<typeof vi.fn>).mockResolvedValue({
+        loaded: false,
+      });
 
       const result = await executeCommand(
         "resume",

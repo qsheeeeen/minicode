@@ -82,7 +82,8 @@ export interface CommandContext {
   modelSwitchService: ModelSwitchService;
   contextManager: ContextManager;
   isAgentRunning: () => boolean;
-  loadContext: (blocks: LLMBlock[], totalTokens?: number) => void;
+  /** Load a persisted session and activate it (session-lifecycle owns it). */
+  resumeSession: (name: string) => Promise<{ loaded: boolean }>;
   switchSession: (
     name: string,
     opts?: { statusMessage?: string },

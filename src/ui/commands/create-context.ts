@@ -4,9 +4,11 @@ import type { ContextManager } from "../../services/context-manager.js";
 import type { ModelSwitchService } from "../../services/model-switcher.js";
 import type { RuntimeState } from "../../services/runtime-state.js";
 import type { SessionStats } from "../../services/session-stats.js";
-import { SessionPersistence } from "../../services/session-persistence.js";
-import { switchSession } from "../../services/session-lifecycle.js";
-import { createLogger } from "../../utils/logger.js";
+import {
+  renameSession,
+  resumeSession,
+  switchSession,
+} from "../../services/session-lifecycle.js";
 import type { SkillRegistry } from "../../skills/index.js";
 import type { InputRouter } from "../routing.js";
 import type { CommandContext, InputRequest } from "./index.js";
@@ -69,9 +71,15 @@ export function createCommandContext(
     modelSwitchService,
     contextManager,
     isAgentRunning: bridges.isAgentRunning,
-    loadContext: (blocks, totalTokens = 0) => {
-      context.replaceBlocks(blocks);
-      contextManager.setTokenCount(totalTokens);
+    resumeSession: async (name) => {
+      const result = await resumeSession({
+        sessionManager,
+        contextManager,
+        runtimeState,
+        sessionStats,
+        name,
+      });
+      return result;
     },
     switchSession: async (name, opts2) => {
       await switchSession({
@@ -83,18 +91,11 @@ export function createCommandContext(
       });
     },
     renameCurrentSession: async (newName: string) => {
-      const oldName = sessionManager.getSessionName();
-      await SessionPersistence.rename(oldName, newName);
-      const newLogger = await createLogger(
-        SessionPersistence.getProjectHash(),
+      await renameSession({
+        sessionManager,
+        runtimeState,
+        oldName: sessionManager.getSessionName(),
         newName,
-      );
-      sessionManager.setSession(newName);
-      runtimeState.setLogger(newLogger);
-      sessionManager.reportStatus({
-        role: "status",
-        content: `Renamed: ${oldName} -> ${newName}`,
-        timestamp: new Date(),
       });
     },
     presentInput: bridges.presentInput,

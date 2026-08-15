@@ -44,6 +44,22 @@ export interface RestoreSessionResult {
   loaded: boolean;
 }
 
+/** Load persisted blocks/token count into the live context. */
+async function loadInto(
+  sessionManager: SessionManager,
+  contextManager: ContextManager,
+  name: string,
+): Promise<boolean> {
+  const data = await SessionPersistence.load(name);
+  if (!data) return false;
+
+  sessionManager.getContext().replaceBlocks(data.blocks);
+  if ((data.totalTokens ?? 0) > 0) {
+    contextManager.setTokenCount(data.totalTokens!);
+  }
+  return true;
+}
+
 /**
  * Bootstrap a session into the runtime: activate the name, and when `load` is
  * set, restore persisted blocks/token count and point the logger at the
@@ -57,14 +73,65 @@ export async function restoreSession(
   sessionManager.setSession(name);
   if (!load) return { loaded: false };
 
-  const data = await SessionPersistence.load(name);
-  if (!data) return { loaded: false };
-
-  sessionManager.getContext().replaceBlocks(data.blocks);
-  if ((data.totalTokens ?? 0) > 0) {
-    contextManager.setTokenCount(data.totalTokens!);
+  if (!(await loadInto(sessionManager, contextManager, name))) {
+    return { loaded: false };
   }
   const logger = await createLogger(SessionPersistence.getProjectHash(), name);
   runtimeState.setLogger(logger);
   return { loaded: true };
+}
+
+export interface ResumeSessionOptions {
+  sessionManager: SessionManager;
+  contextManager: ContextManager;
+  runtimeState: RuntimeState;
+  sessionStats: SessionStats;
+  name: string;
+}
+
+/**
+ * Load a persisted session into the runtime and activate it — the single
+ * path for switching to an existing session (blocks, tokens, logger, stats,
+ * status all owned here).
+ */
+export async function resumeSession(
+  opts: ResumeSessionOptions,
+): Promise<RestoreSessionResult> {
+  const { sessionManager, contextManager, runtimeState, sessionStats, name } =
+    opts;
+  if (!(await loadInto(sessionManager, contextManager, name))) {
+    return { loaded: false };
+  }
+  await switchSession({
+    sessionManager,
+    sessionName: name,
+    runtimeState,
+    sessionStats,
+    statusMessage: `Loaded session: ${name}`,
+  });
+  return { loaded: true };
+}
+
+export interface RenameSessionOptions {
+  sessionManager: SessionManager;
+  runtimeState: RuntimeState;
+  oldName: string;
+  newName: string;
+}
+
+/** Rename the active session: persistence, logger, and status in one place. */
+export async function renameSession(opts: RenameSessionOptions): Promise<void> {
+  const { sessionManager, runtimeState, oldName, newName } = opts;
+  await SessionPersistence.rename(oldName, newName);
+  const logger = await createLogger(
+    SessionPersistence.getProjectHash(),
+    newName,
+  );
+  sessionManager.setSession(newName);
+  runtimeState.setLogger(logger);
+  sessionManager.reportStatus({
+    role: "status",
+    content: `Renamed: ${oldName} -> ${newName}`,
+    timestamp: new Date(),
+  });
 }

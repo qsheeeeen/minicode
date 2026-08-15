@@ -10,13 +10,8 @@ export const resumeCommand: CommandHandler = {
       ctx.presentInput({ type: "session-picker", sessions });
     } else {
       const name = args[0];
-      const data = await SessionPersistence.load(name);
-      if (data) {
-        ctx.loadContext(data.blocks, data.totalTokens);
-        await ctx.switchSession(name, {
-          statusMessage: `Loaded session: ${name}`,
-        });
-      } else {
+      const { loaded } = await ctx.resumeSession(name);
+      if (!loaded) {
         ctx.sessionManager.reportStatus({
           role: "error",
           content: `Session not found: ${name}`,
