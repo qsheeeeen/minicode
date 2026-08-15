@@ -117,16 +117,8 @@ export async function executeCommand(
     }
   }
 
-  // Dynamic skill commands: if no builtin command matched, check skills
-  const body = context.skills.getBody(name);
-  if (body) {
-    return {
-      handled: true,
-      promptText: `Activate and execute the '${name}' skill.\n\n${body}`,
-      displayContent: `/${name}`,
-    };
-  }
-
+  // Skill commands are registered upfront (registerSkillCommands in the
+  // composition root) — no dynamic fallback, so only one prompt format exists.
   return { handled: false };
 }
 

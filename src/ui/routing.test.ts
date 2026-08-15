@@ -58,7 +58,7 @@ describe("InputRouter.route", () => {
     });
 
     const result = await router.route("/clear", cmdContext);
-    expect(result).toEqual({ action: "command" });
+    expect(result).toEqual({ action: "none" });
   });
 
   it("routes plain text to llm", async () => {

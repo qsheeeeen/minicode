@@ -5,6 +5,8 @@ export interface RouteResult {
   action: "none" | "shell" | "command" | "llm";
   promptText?: string;
   displayContent?: string;
+  /** The command name for action:"command" (used in unknown-command errors). */
+  command?: string;
 }
 
 export interface InputHandler {
@@ -74,14 +76,16 @@ class CommandInputHandler implements InputHandler {
   ): Promise<RouteResult> {
     const parts = input.slice(1).split(/\s+/);
     const result = await executeCommand(parts[0], parts.slice(1), cmdContext);
-    if (result.handled && result.promptText) {
+    if (result.promptText) {
       return {
         action: "command",
         promptText: result.promptText,
         displayContent: result.displayContent,
       };
     }
-    return { action: "command" };
+    // Handled without a prompt (handler command) is done; unhandled is
+    // unknown — route-handler reports it.
+    return result.handled ? { action: "none" } : { action: "command", command: parts[0] };
   }
 }
 

@@ -7,7 +7,10 @@ export type { PromptOption, Prompt, UserPrompter } from "../core/prompt.js";
 
 import type { ToolRequirementDef } from "./requirements.js";
 export type { ToolRequirementDef } from "./requirements.js";
-export { agentRegistryRequirement, python3Requirement } from "./requirements.js";
+export {
+  agentRegistryRequirement,
+  python3Requirement,
+} from "./requirements.js";
 
 export interface ToolConfig {
   client: LLMClient;

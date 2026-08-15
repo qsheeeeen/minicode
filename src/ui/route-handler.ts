@@ -49,6 +49,13 @@ export function processRoute(
   }
 
   if (route.action === "command" && !route.promptText) {
+    // A slash command that resolved to nothing — say so instead of
+    // silently swallowing the input.
+    reportStatus?.({
+      role: "error",
+      content: `Unknown command: /${route.command ?? ""}`,
+      timestamp: new Date(),
+    });
     return { type: "done" };
   }
 

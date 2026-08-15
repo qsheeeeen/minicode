@@ -65,10 +65,7 @@ describe("ToolRegistry.resolveTools", () => {
     registry.register({ ...noPython, requires: [makeReq(false)] });
     registry.register({ ...ask, interactive: true });
 
-    const tools = await registry.resolveTools(
-      {} as any,
-      { headless: true },
-    );
+    const tools = await registry.resolveTools({} as any, { headless: true });
 
     expect(tools.has("keep")).toBe(true);
     expect(tools.has("no-python")).toBe(false);
