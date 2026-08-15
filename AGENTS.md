@@ -75,6 +75,7 @@ Forced by root constraints, not convention. Before adding code or a module, conf
 main → app → agent → (tools, services, llm)
 ui → (agent, services)
 llm / tools never import ui
+core depends on nothing (block types, LLMContext, failure doctrine, prompt port — everyone may depend on it)
 utils depends on nothing but stdlib
 ```
 
