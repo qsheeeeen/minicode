@@ -1,6 +1,7 @@
 // Thin tool: resolves the SubAgentSpawnerCapability and forwards. All service
 // wiring lives in app/sub-agent-runtime.ts.
 
+import { agentRegistryRequirement } from "../requirements.js";
 import type {
   ToolDef,
   ToolRunResult,
@@ -28,7 +29,7 @@ export function createAgentTool(agentTypes: AgentTypeRegistry): ToolDef {
       "Pick the agentType that matches the task:\n" +
       availableTypesDescription(agentTypes),
     readOnly: false,
-    requires: ["agentRegistry"],
+    requires: [agentRegistryRequirement],
     input_schema: {
       type: "object" as const,
       properties: {

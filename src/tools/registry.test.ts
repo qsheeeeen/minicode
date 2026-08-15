@@ -47,6 +47,45 @@ describe("ToolRegistry.register", () => {
   });
 });
 
+describe("ToolRegistry.resolveTools", () => {
+  const makeReq = (ok: boolean) => ({
+    name: `req-${ok}`,
+    probe: async () => ok,
+  });
+
+  it("drops tools whose requirement probe fails and interactive tools when headless", async () => {
+    const registry = new ToolRegistry();
+    const keep = makeTool("keep");
+    const noPython = makeTool("no-python");
+    const ask = makeTool("ask");
+    registry.register(keep);
+    registry.register(noPython);
+    registry.register(ask);
+    // patch requires/interactive via re-registration
+    registry.register({ ...noPython, requires: [makeReq(false)] });
+    registry.register({ ...ask, interactive: true });
+
+    const tools = await registry.resolveTools(
+      {} as any,
+      { headless: true },
+    );
+
+    expect(tools.has("keep")).toBe(true);
+    expect(tools.has("no-python")).toBe(false);
+    expect(tools.has("ask")).toBe(false);
+  });
+
+  it("keeps interactive tools when not headless", async () => {
+    const registry = new ToolRegistry();
+    const ask = makeTool("ask");
+    registry.register({ ...ask, interactive: true });
+
+    const tools = await registry.resolveTools({} as any, { headless: false });
+
+    expect(tools.has("ask")).toBe(true);
+  });
+});
+
 describe("ToolRegistry.getAll", () => {
   it("returns all registered tools as Map", () => {
     const registry = new ToolRegistry();

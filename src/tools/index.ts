@@ -7,7 +7,7 @@ export type {
   ToolDef,
   ToolRunResult,
   ToolExecutionContext,
-  ToolRequirement,
+  ToolRequirementDef,
   UserPrompter,
   Prompt,
   PromptOption,

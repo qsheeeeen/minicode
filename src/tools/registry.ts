@@ -5,7 +5,9 @@ import type { AppConfig } from "../config.js";
 import type { UserPrompter } from "../core/prompt.js";
 export type { PromptOption, Prompt, UserPrompter } from "../core/prompt.js";
 
-export type ToolRequirement = "agentRegistry" | "python3";
+import type { ToolRequirementDef } from "./requirements.js";
+export type { ToolRequirementDef } from "./requirements.js";
+export { agentRegistryRequirement, python3Requirement } from "./requirements.js";
 
 export interface ToolConfig {
   client: LLMClient;
@@ -105,7 +107,7 @@ export interface ToolDef<TArgs = Record<string, unknown>> {
     args: TArgs,
     context?: ToolExecutionContext,
   ) => Promise<ToolRunResult>;
-  requires?: ToolRequirement[];
+  requires?: ToolRequirementDef[];
   requiresPermission?: boolean;
   readOnly?: boolean;
   interactive?: boolean;
@@ -156,5 +158,33 @@ export class ToolRegistry {
 
   reset(): void {
     this.tools.clear();
+  }
+
+  /**
+   * The tool-set for a run: drops tools whose declared requirements the
+   * environment fails (each requirement carries its own probe) and
+   * interactive tools in headless runs.
+   */
+  async resolveTools(
+    env: import("./requirements.js").RequirementEnv,
+    opts: { headless: boolean },
+  ): Promise<Map<string, ToolDef<any>>> {
+    const satisfied = new Map<string, boolean>();
+    const tools = this.getAll();
+    for (const tool of tools.values()) {
+      for (const requirement of tool.requires ?? []) {
+        if (satisfied.has(requirement.name)) continue;
+        satisfied.set(requirement.name, await requirement.probe(env));
+      }
+    }
+    for (const [name, tool] of tools) {
+      const failed = (tool.requires ?? []).some(
+        (requirement) => !satisfied.get(requirement.name),
+      );
+      if (failed || (opts.headless && tool.interactive)) {
+        tools.delete(name);
+      }
+    }
+    return tools;
   }
 }
