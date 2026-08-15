@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Box, Text, useInput } from "ink";
 import { useTuiState, type TuiState } from "./state.js";
-import type { PromptOption } from "../../tools/registry.js";
+import type { PromptOption } from "../../core/prompt.js";
 
 function OptionList({
   options,

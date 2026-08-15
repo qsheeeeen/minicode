@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { DisplayMessage } from "../display.js";
-import type { Prompt } from "../../tools/registry.js";
+import type { Prompt } from "../../core/prompt.js";
 import type { AgentSession, PermissionMode } from "../../services/index.js";
 
 export interface InputState {

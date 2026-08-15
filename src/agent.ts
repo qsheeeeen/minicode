@@ -1,11 +1,19 @@
 import { TurnFaultError } from "./core/results.js";
+import type { AppConfig } from "./config.js";
 import type { Model } from "./llm/model.js";
 import type { LLMClient, LLMToolDef, LLMStreamOk } from "./llm/client.js";
 import type { ToolExecutor, ToolCall } from "./tools/executor.js";
-import type { UserPrompter } from "./tools/registry.js";
+import type {
+  UserPrompter,
+  ToolDef,
+  Capabilities,
+} from "./tools/registry.js";
 import type { PromptManager } from "./services/prompt-manager.js";
 import type { SessionManager } from "./services/session-manager.js";
 import type { ContextManager } from "./services/context-manager.js";
+import type { PermissionService } from "./services/permission.js";
+import type { RuntimeEvents } from "./services/runtime-events.js";
+import type { SessionStats } from "./services/session-stats.js";
 import type pino from "pino";
 
 export { isAbortError } from "./core/results.js";
@@ -25,6 +33,46 @@ export interface AgentDeps {
   contextManager: ContextManager;
   toolExecutor: ToolExecutor;
   promptManager: PromptManager;
+}
+
+/**
+ * AgentRuntimeOpts — the unified contract for building an agent runtime.
+ * The main agent and every sub-agent go through the same factory
+ * (app/create-agent-runtime.ts); only the parameters differ.
+ */
+export interface AgentRuntimeOpts {
+  client: LLMClient;
+  model: Model;
+  userPrompt: string;
+  projectPromptFile?: string;
+  roleSystemPrompt?: string;
+  skills?: ReadonlyArray<{ name: string; description: string }>;
+  tools: Map<string, ToolDef<any>>;
+  permissionService: PermissionService;
+  currentAgentId: string;
+  appConfig?: AppConfig;
+  sessionStats?: SessionStats;
+  /** Shared event bus; omitted → the runtime creates its own (sub-agents). */
+  events?: RuntimeEvents;
+  compressionThresholdRatio?: number;
+  /**
+   * Capability assembly, evaluated after the runtime's own SessionManager
+   * exists (so changeJournal can come from the fresh session).
+   */
+  capabilities: (parts: { sessionManager: SessionManager }) => Capabilities;
+  /** Live handles for client/model/logger (main follows RuntimeState). */
+  getClient?: () => LLMClient;
+  getModel?: () => Model;
+  getLogger?: () => pino.Logger | undefined;
+  /** Persist the session to disk (main: true; sub-agents: false). */
+  persistent?: boolean;
+}
+
+export interface AgentRuntime {
+  deps: AgentDeps;
+  sessionManager: SessionManager;
+  contextManager: ContextManager;
+  runtimeEvents: RuntimeEvents;
 }
 
 export interface RunAgentOpts {

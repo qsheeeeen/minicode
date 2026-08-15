@@ -2,22 +2,8 @@ import type { LLMClient } from "../llm/client.js";
 import type { Model } from "../llm/model.js";
 import type { AppConfig } from "../config.js";
 
-export interface PromptOption {
-  label: string;
-  value: string;
-  description?: string;
-}
-
-export interface Prompt {
-  message: string;
-  options: PromptOption[];
-  multiSelect?: boolean;
-}
-
-/** Agent asks, human answers (resolved via the injected prompter). */
-export interface UserPrompter {
-  prompt(req: Prompt): Promise<string>;
-}
+import type { UserPrompter } from "../core/prompt.js";
+export type { PromptOption, Prompt, UserPrompter } from "../core/prompt.js";
 
 export type ToolRequirement = "agentRegistry" | "python3";
 

@@ -4,7 +4,11 @@
 // agent — a sub-agent is the same agent loop, parameterized by tools, role
 // prompt, and lifecycle.
 
-import { runAgent, type AgentDeps } from "./agent.js";
+import {
+  runAgent,
+  type AgentRuntimeOpts,
+  type AgentRuntime,
+} from "./agent.js";
 import { PermissionService } from "./services/permission.js";
 import type { SessionManager } from "./services/session-manager.js";
 import type { ContextManager } from "./services/context-manager.js";
@@ -35,46 +39,6 @@ import type { LLMClient } from "./llm/client.js";
 import type { LLMBlock } from "./llm/context.js";
 import type { AppConfig } from "./config.js";
 import type pino from "pino";
-
-/**
- * AgentRuntimeOpts — the unified contract for building an agent runtime.
- * The main agent and every sub-agent go through the same factory
- * (app/create-agent-runtime.ts); only the parameters differ.
- */
-export interface AgentRuntimeOpts {
-  client: LLMClient;
-  model: Model;
-  userPrompt: string;
-  projectPromptFile?: string;
-  roleSystemPrompt?: string;
-  skills?: ReadonlyArray<{ name: string; description: string }>;
-  tools: Map<string, ToolDef<any>>;
-  permissionService: PermissionService;
-  currentAgentId: string;
-  appConfig?: AppConfig;
-  sessionStats?: SessionStats;
-  /** Shared event bus; omitted → the runtime creates its own (sub-agents). */
-  events?: RuntimeEvents;
-  compressionThresholdRatio?: number;
-  /**
-   * Capability assembly, evaluated after the runtime's own SessionManager
-   * exists (so changeJournal can come from the fresh session).
-   */
-  capabilities: (parts: { sessionManager: SessionManager }) => Capabilities;
-  /** Live handles for client/model/logger (main follows RuntimeState). */
-  getClient?: () => LLMClient;
-  getModel?: () => Model;
-  getLogger?: () => pino.Logger | undefined;
-  /** Persist the session to disk (main: true; sub-agents: false). */
-  persistent?: boolean;
-}
-
-export interface AgentRuntime {
-  deps: AgentDeps;
-  sessionManager: SessionManager;
-  contextManager: ContextManager;
-  runtimeEvents: RuntimeEvents;
-}
 
 // ── Spawn ─────────────────────────────────────────────────────────────────
 

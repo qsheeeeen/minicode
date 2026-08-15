@@ -10,7 +10,7 @@
  */
 import type { AgentRegistry } from "../../services/index.js";
 import type { SessionManager } from "../../services/session-manager.js";
-import type { UserPrompter, Prompt } from "../../tools/registry.js";
+import type { UserPrompter, Prompt } from "../../core/prompt.js";
 import type { RuntimeEvents } from "../../services/runtime-events.js";
 import { useTuiState } from "./state.js";
 import type { SessionTimeline } from "../timeline.js";

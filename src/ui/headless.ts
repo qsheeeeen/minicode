@@ -1,6 +1,6 @@
 import fs from "fs";
 import type { AgentDeps } from "../agent.js";
-import type { UserPrompter, Prompt } from "../tools/registry.js";
+import type { UserPrompter, Prompt } from "../core/prompt.js";
 import type { CommandContext } from "./commands/index.js";
 import type { ShellService } from "../services/shell-service.js";
 import type { RuntimeEvents } from "../services/runtime-events.js";

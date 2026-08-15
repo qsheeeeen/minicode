@@ -2,7 +2,7 @@ import { describeFault } from "../core/results.js";
 import type { LLMClient } from "../llm/client.js";
 import type { LLMStreamResult } from "../llm/client.js";
 import type { Model } from "../llm/model.js";
-import type { UserPrompter } from "../tools/registry.js";
+import type { UserPrompter } from "../core/prompt.js";
 import type { RuntimeEvents } from "./runtime-events.js";
 
 export type PermissionMode = "manual" | "yolo" | "auto";

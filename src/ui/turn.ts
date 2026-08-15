@@ -2,7 +2,7 @@ import { runAgent, isAbortError, type AgentDeps } from "../agent.js";
 import type { LLMContext } from "../llm/context.js";
 import type { ShellService } from "../services/shell-service.js";
 import type { StatusReporter } from "../services/session-manager.js";
-import type { UserPrompter } from "../tools/registry.js";
+import type { UserPrompter } from "../core/prompt.js";
 import type { CommandContext } from "./commands/index.js";
 import { processRoute, type ProcessedRoute } from "./route-handler.js";
 import type { SessionTimeline } from "./timeline.js";

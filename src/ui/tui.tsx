@@ -2,7 +2,7 @@ import React, { useCallback, useRef, useEffect } from "react";
 import { Box, useInput, useApp } from "ink";
 import type { AgentDeps } from "../agent.js";
 import type { AppConfig } from "../config.js";
-import type { UserPrompter } from "../tools/registry.js";
+import type { UserPrompter } from "../core/prompt.js";
 import {
   inputRequestToState,
   createCommandContext,

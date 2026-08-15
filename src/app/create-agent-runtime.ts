@@ -8,7 +8,7 @@ import { ContextManager } from "../services/context-manager.js";
 import { PromptManager } from "../services/prompt-manager.js";
 import { RuntimeEvents } from "../services/runtime-events.js";
 import { ToolExecutor } from "../tools/executor.js";
-import type { AgentRuntime, AgentRuntimeOpts } from "../sub-agent.js";
+import type { AgentRuntime, AgentRuntimeOpts } from "../agent.js";
 
 export function createAgentRuntime(opts: AgentRuntimeOpts): AgentRuntime {
   const events = opts.events ?? new RuntimeEvents();
