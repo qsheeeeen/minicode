@@ -27,6 +27,7 @@ const mockSubscribe = vi.fn().mockReturnValue(() => {});
 
 const mockContext = {
   onChange: mockOnChange,
+  getBlocks: vi.fn().mockReturnValue([]),
   getUserMessageCount: vi.fn().mockReturnValue(0),
   replaceBlocks: vi.fn(),
 };
@@ -125,7 +126,6 @@ describe("runHeadless", () => {
     const abortErr = new Error("aborted");
     abortErr.name = "AbortError";
     mockRun.mockRejectedValueOnce(abortErr);
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     await runHeadless(
       mockDeps,
       "test prompt",
@@ -133,13 +133,13 @@ describe("runHeadless", () => {
       mockShellService,
       mockRuntimeState as any,
     );
-    expect(logSpy).toHaveBeenCalledWith("(Aborted)");
-    logSpy.mockRestore();
+    expect(mockSessionManager.reportStatus).toHaveBeenCalledWith(
+      expect.objectContaining({ role: "status", content: "(Aborted)" }),
+    );
   });
 
   it("handles generic error", async () => {
     mockRun.mockRejectedValueOnce(new Error("test error"));
-    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     await runHeadless(
       mockDeps,
       "test prompt",
@@ -147,8 +147,9 @@ describe("runHeadless", () => {
       mockShellService,
       mockRuntimeState as any,
     );
-    expect(errSpy).toHaveBeenCalledWith("(Error: test error)");
-    errSpy.mockRestore();
+    expect(mockSessionManager.reportStatus).toHaveBeenCalledWith(
+      expect.objectContaining({ role: "error", content: "(Error: test error)" }),
+    );
   });
 
   it("throws non-Error objects", async () => {

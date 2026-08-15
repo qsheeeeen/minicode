@@ -1,5 +1,5 @@
 import fs from "fs";
-import { runAgent, isAbortError, type AgentDeps } from "../agent.js";
+import type { AgentDeps } from "../agent.js";
 import type { UserPrompter, Prompt } from "../tools/registry.js";
 import type { CommandContext } from "./commands/index.js";
 import { restoreSession } from "../services/session-lifecycle.js";
@@ -9,7 +9,7 @@ import type { RuntimeEvents } from "../services/runtime-events.js";
 import type { RuntimeState } from "../services/runtime-state.js";
 import { HeadlessRenderer } from "./headless-renderer.js";
 import { SessionTimeline } from "./timeline.js";
-import { processRoutedInput } from "./turn.js";
+import { processRoutedInput, runAgentTurn } from "./turn.js";
 
 export async function runHeadless(
   deps: AgentDeps,
@@ -79,47 +79,39 @@ export async function runHeadless(
 
   try {
     const ctrl = new AbortController();
+    let promptText = initialPrompt;
+
     // Route input: without cmdContext, run agent directly
-    if (!cmdContext) {
-      await runAgent(deps, initialPrompt, ctrl.signal, {
-        prompter: headlessPrompter,
+    if (cmdContext) {
+      const processed = await processRoutedInput({
+        input: initialPrompt,
+        cmdContext,
+        context,
+        shellService,
+        reportStatus: sessionManager.reportStatus.bind(sessionManager),
+        timeline,
       });
-      renderer.renderFinal();
-      return;
-    }
 
-    const processed = await processRoutedInput({
-      input: initialPrompt,
-      cmdContext,
-      context,
-      shellService,
-      reportStatus: sessionManager.reportStatus.bind(sessionManager),
-      timeline,
-    });
-
-    if (processed.type === "done") {
-      if (processed.shellOutput) {
-        console.log(
-          `$ ${processed.shellOutput.command}\n${processed.shellOutput.output}`,
-        );
+      if (processed.type === "done") {
+        if (processed.shellOutput) {
+          console.log(
+            `$ ${processed.shellOutput.command}\n${processed.shellOutput.output}`,
+          );
+        }
+        return;
       }
-      renderer.renderFinal();
-      return;
+      promptText = processed.promptText;
     }
 
-    await runAgent(deps, processed.promptText, ctrl.signal, {
+    await runAgentTurn({
+      deps,
+      promptText,
+      signal: ctrl.signal,
       prompter: headlessPrompter,
+      reportStatus: sessionManager.reportStatus.bind(sessionManager),
     });
-    renderer.renderFinal();
-  } catch (e) {
-    if (isAbortError(e)) {
-      console.log("(Aborted)");
-    } else if (e instanceof Error) {
-      console.error(`(Error: ${e.message})`);
-    } else {
-      throw e;
-    }
   } finally {
+    renderer.renderFinal();
     unsubscribeRuntimeEvents();
     renderer.stop();
   }

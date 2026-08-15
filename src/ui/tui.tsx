@@ -1,6 +1,6 @@
 import React, { useCallback, useRef, useEffect } from "react";
 import { Box, useInput, useApp } from "ink";
-import { runAgent, isAbortError, type AgentDeps } from "../agent.js";
+import type { AgentDeps } from "../agent.js";
 import type { AppConfig } from "../config.js";
 import type { UserPrompter } from "../tools/registry.js";
 import {
@@ -8,7 +8,7 @@ import {
   createCommandContext,
   type CommandContext,
 } from "./commands/index.js";
-import { processRoutedInput } from "./turn.js";
+import { processRoutedInput, runAgentTurn } from "./turn.js";
 import { AgentRegistry } from "../services/index.js";
 import type { RuntimeEvents } from "../services/runtime-events.js";
 import type { SessionStats } from "../services/session-stats.js";
@@ -185,27 +185,14 @@ function AppContent({
       const ctrl = new AbortController();
       abortRef.current = ctrl;
       try {
-        await runAgent(deps, processed.promptText, ctrl.signal, {
+        const outcome = await runAgentTurn({
+          deps,
+          promptText: processed.promptText,
+          signal: ctrl.signal,
           prompter: prompterRef.current ?? undefined,
+          reportStatus: sessionManager.reportStatus.bind(sessionManager),
         });
-        return true;
-      } catch (e) {
-        if (isAbortError(e)) {
-          sessionManager.reportStatus({
-            role: "status",
-            content: "(Aborted)",
-            timestamp: new Date(),
-          });
-        } else if (e instanceof Error) {
-          sessionManager.reportStatus({
-            role: "error",
-            content: `(Error: ${e.message})`,
-            timestamp: new Date(),
-          });
-        } else {
-          throw e;
-        }
-        return false;
+        return outcome === "completed";
       } finally {
         loadingRef.current = false;
         abortRef.current = null;
