@@ -31,11 +31,12 @@ function createContextManager(overrides?: {
     incrementSessionCount: vi.fn(),
   } as any;
   const cm = new ContextManager({
-    client: {} as any,
-    model: model(
-      overrides?.modelName ?? "test-model",
-      overrides?.contextLength ?? 200000,
-    ),
+    getClient: () => ({}) as any,
+    getModel: () =>
+      model(
+        overrides?.modelName ?? "test-model",
+        overrides?.contextLength ?? 200000,
+      ),
     getContext: () => context,
     getChangeJournal: () => journal,
     setActiveUserMessageOrdinal: (ordinal) => {

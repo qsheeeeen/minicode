@@ -52,8 +52,8 @@ function createTestDeps(options?: {
     runtimeEvents,
   );
   const contextManager = new ContextManager({
-    client,
-    model,
+    getClient: () => client,
+    getModel: () => model,
     getContext: () => sessionManager.getContext(),
     getChangeJournal: () => sessionManager.getChangeJournal(),
     setActiveUserMessageOrdinal: (ordinal) =>
@@ -236,8 +236,8 @@ describe("runAgent virtual integration", () => {
       runtimeEvents,
     );
     const contextManager = new ContextManager({
-      client,
-      model,
+      getClient: () => client,
+      getModel: () => model,
       getContext: () => sessionManager.getContext(),
       getChangeJournal: () => sessionManager.getChangeJournal(),
       setActiveUserMessageOrdinal: (ordinal) =>

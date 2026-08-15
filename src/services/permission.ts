@@ -59,15 +59,17 @@ export class ManualPermissionStrategy implements PermissionStrategy {
 
 export class AutoPermissionStrategy implements PermissionStrategy {
   constructor(
-    private readonly client?: LLMClient,
-    private readonly model?: Model,
+    private readonly getClient?: () => LLMClient,
+    private readonly getModel?: () => Model,
   ) {}
 
   async check(
     toolName: string,
     toolInput: Record<string, unknown>,
   ): Promise<PermissionCheckResult> {
-    if (!this.client) {
+    const client = this.getClient?.();
+    const model = this.getModel?.();
+    if (!client) {
       return {
         allowed: false,
         reason: "No LLM client configured for auto-permission",
@@ -91,10 +93,10 @@ Reply with exactly one of:
 - "yes"
 - "no: <reason explaining why it was denied>"`;
 
-      const stream = this.client.chatStream(
+      const stream = client.chatStream(
         [{ type: "user", text: prompt }],
         [],
-        { model: this.model, maxTokens: 100 },
+        { model, maxTokens: 100 },
       );
       let result: LLMStreamResult | undefined;
       while (true) {
@@ -142,8 +144,8 @@ export class PermissionService {
 
   constructor(
     initialMode: PermissionMode,
-    client?: LLMClient,
-    model?: Model,
+    getClient?: () => LLMClient,
+    getModel?: () => Model,
     events?: RuntimeEvents,
   ) {
     this.mode = initialMode;
@@ -151,7 +153,7 @@ export class PermissionService {
     this.strategies = new Map<PermissionMode, PermissionStrategy>([
       ["yolo", new YoloPermissionStrategy()],
       ["manual", new ManualPermissionStrategy()],
-      ["auto", new AutoPermissionStrategy(client, model)],
+      ["auto", new AutoPermissionStrategy(getClient, getModel)],
     ]);
   }
 
@@ -170,10 +172,6 @@ export class PermissionService {
 
   getStrategy(mode: PermissionMode): PermissionStrategy | undefined {
     return this.strategies.get(mode);
-  }
-
-  updateAutoGate(client?: LLMClient, model?: Model): void {
-    this.strategies.set("auto", new AutoPermissionStrategy(client, model));
   }
 
   cycleMode(): PermissionMode {

@@ -12,8 +12,9 @@ import type { LLMContext } from "../llm/context.js";
 import type { RuntimeEvents, RuntimeStatusInput } from "./runtime-events.js";
 
 export interface ContextManagerOpts {
-  readonly client: LLMClient;
-  readonly model: Model;
+  /** Live handles — always resolved at use, never a stale copy. */
+  readonly getClient: () => LLMClient;
+  readonly getModel: () => Model;
   readonly getContext: () => LLMContext;
   readonly getChangeJournal: () => ChangeJournal;
   readonly setActiveUserMessageOrdinal: (ordinal: number) => void;
@@ -51,13 +52,12 @@ export class DefaultThresholdPolicy implements ThresholdPolicy {
 export class ContextManager {
   private compressionService: CompressionStrategy;
   private isCompressing = false;
-  private client: LLMClient;
-  private model: Model;
+  private getClient: () => LLMClient;
+  private getModel: () => Model;
   private getContext: () => LLMContext;
   private getChangeJournal: () => ChangeJournal;
   private setActiveUserMessageOrdinal: (ordinal: number) => void;
   private events: RuntimeEvents;
-  private contextLength: number;
   private compressionThresholdRatio: number;
   private sessionStats?: SessionStats;
   private thresholdPolicy: ThresholdPolicy;
@@ -65,13 +65,12 @@ export class ContextManager {
   private lastShownThreshold = 0;
 
   constructor(opts: ContextManagerOpts) {
-    this.client = opts.client;
-    this.model = opts.model;
+    this.getClient = opts.getClient;
+    this.getModel = opts.getModel;
     this.getContext = opts.getContext;
     this.getChangeJournal = opts.getChangeJournal;
     this.setActiveUserMessageOrdinal = opts.setActiveUserMessageOrdinal;
     this.events = opts.events;
-    this.contextLength = opts.model.getContextLength();
     this.compressionThresholdRatio = opts.compressionThresholdRatio;
     this.sessionStats = opts.sessionStats;
     this.thresholdPolicy = opts.thresholdPolicy ?? new DefaultThresholdPolicy();
@@ -81,7 +80,7 @@ export class ContextManager {
 
   /** Process token usage and compress context if the configured threshold is exceeded. */
   async processUsage(usage: TokenUsage): Promise<ProcessUsageResult> {
-    const usageResult = this.updateTokenUsage(this.model.getName(), usage);
+    const usageResult = this.updateTokenUsage(this.getModel().getName(), usage);
     if (!usageResult.shouldCompress) {
       return {
         ...usageResult,
@@ -103,7 +102,8 @@ export class ContextManager {
     this.tokenCount = totalTokens;
     this.emitTokenCount();
 
-    const ratio = totalTokens / this.contextLength;
+    const contextLength = this.getModel().getContextLength();
+    const ratio = totalTokens / contextLength;
     const percentage = Math.floor(ratio * 100);
 
     for (const threshold of this.thresholdPolicy.thresholds) {
@@ -120,7 +120,7 @@ export class ContextManager {
 
     const shouldCompress = this.thresholdPolicy.shouldCompress(
       totalTokens,
-      this.contextLength,
+      this.getModel().getContextLength(),
       this.compressionThresholdRatio,
     );
 
@@ -156,8 +156,8 @@ export class ContextManager {
 
       const compressed = await this.compressionService.compress(
         context,
-        this.client,
-        this.model,
+        this.getClient(),
+        this.getModel(),
       );
 
       const originalKept = recentCount + 1; // compression adds 1 summary user message
@@ -209,12 +209,6 @@ export class ContextManager {
     this.tokenCount = 0;
     this.lastShownThreshold = 0;
     this.emitTokenCount();
-  }
-
-  setModel(client: LLMClient, model: Model): void {
-    this.client = client;
-    this.model = model;
-    this.contextLength = model.getContextLength();
   }
 
   getIsCompressing(): boolean {

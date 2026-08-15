@@ -173,7 +173,7 @@ describe("PermissionService", () => {
       });
     });
 
-    it("can update the auto gate client and model", async () => {
+    it("auto gate resolves client and model through getters", async () => {
       const mockClient = {
         chatStream: vi.fn().mockReturnValue({
           next: vi.fn().mockResolvedValue({
@@ -182,10 +182,15 @@ describe("PermissionService", () => {
           }),
         }),
       } as unknown as LLMClient;
-      const service = new PermissionService("auto");
       const model = new Model("new-model", "test-provider", 1000);
+      let currentClient: LLMClient = mockClient;
+      const service = new PermissionService(
+        "auto",
+        () => currentClient,
+        () => model,
+      );
+      currentClient = mockClient;
 
-      service.updateAutoGate(mockClient, model);
       const result = await service.check(
         "Shell",
         { command: "ls" },
@@ -251,7 +256,7 @@ describe("PermissionService", () => {
         }),
       } as unknown as LLMClient;
       const model = new Model("claude-3", "test-provider", 1000);
-      const strategy = new AutoPermissionStrategy(mockClient, model);
+      const strategy = new AutoPermissionStrategy(() => mockClient, () => model);
 
       const result = await strategy.check("Read", {
         path: "a.txt",
@@ -279,7 +284,7 @@ describe("PermissionService", () => {
           }),
         }),
       } as unknown as LLMClient;
-      const strategy = new AutoPermissionStrategy(mockClient);
+      const strategy = new AutoPermissionStrategy(() => mockClient);
 
       const result = await strategy.check("Shell", {
         command: "rm -rf /",
@@ -303,7 +308,7 @@ describe("PermissionService", () => {
           }),
         }),
       } as unknown as LLMClient;
-      const strategy = new AutoPermissionStrategy(mockClient);
+      const strategy = new AutoPermissionStrategy(() => mockClient);
 
       const result = await strategy.check("Shell", {
         command: "echo hello",
@@ -324,7 +329,7 @@ describe("PermissionService", () => {
           }),
         }),
       } as unknown as LLMClient;
-      const strategy = new AutoPermissionStrategy(mockClient);
+      const strategy = new AutoPermissionStrategy(() => mockClient);
 
       const result = await strategy.check("Shell", {
         command: "ls",
@@ -339,7 +344,7 @@ describe("PermissionService", () => {
           next: vi.fn().mockRejectedValue(new Error("API error")),
         }),
       } as unknown as LLMClient;
-      const strategy = new AutoPermissionStrategy(mockClient);
+      const strategy = new AutoPermissionStrategy(() => mockClient);
 
       const result = await strategy.check("Shell", {
         command: "ls",

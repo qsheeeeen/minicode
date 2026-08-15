@@ -32,8 +32,8 @@ function makeDeps(overrides?: {
   );
   const context = sessionManager.getContext();
   const contextManager = new ContextManager({
-    client,
-    model,
+    getClient: () => client,
+    getModel: () => model,
     getContext: () => sessionManager.getContext(),
     getChangeJournal: () => sessionManager.getChangeJournal(),
     setActiveUserMessageOrdinal: (ordinal) =>

@@ -134,8 +134,8 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
 
   const permissionService = new PermissionService(
     permissionMode,
-    initialClient,
-    initialModel,
+    () => runtimeState.client,
+    () => runtimeState.model,
     runtimeEvents,
   );
 
@@ -201,14 +201,6 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
   });
   const { deps, sessionManager, contextManager } = runtime;
   void deps.promptManager.refreshEnvironment();
-
-  // One sync point for model switches: runtimeState emits, consumers follow.
-  runtimeEvents.subscribe((event) => {
-    if (event.type === "model.changed") {
-      contextManager.setModel(event.client, event.model);
-      permissionService.updateAutoGate(event.client, event.model);
-    }
-  });
 
   const commandRegistry = new CommandRegistry();
   registerBuiltinCommands(commandRegistry);

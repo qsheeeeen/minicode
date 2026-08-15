@@ -38,8 +38,8 @@ function createTestDeps(responses = [defaultTextResponse("OK")]) {
     runtimeEvents,
   );
   const contextManager = new ContextManager({
-    client,
-    model,
+    getClient: () => client,
+    getModel: () => model,
     getContext: () => sessionManager.getContext(),
     getChangeJournal: () => sessionManager.getChangeJournal(),
     setActiveUserMessageOrdinal: (ordinal) =>
@@ -100,11 +100,8 @@ describe("connectAgent", () => {
 
     const result = connectAgent({
       sessionManager,
-      contextManager,
-      runtimeState,
       runtimeEvents,
       uiTimeline: makeTimeline(sessionManager),
-      initialSession: "test-session",
       registry,
     });
     cleanup = result.cleanup;
@@ -146,11 +143,8 @@ describe("connectAgent", () => {
 
     const result = connectAgent({
       sessionManager,
-      contextManager,
-      runtimeState,
       runtimeEvents,
       uiTimeline: makeTimeline(sessionManager),
-      initialSession: "test-session",
       registry,
     });
     cleanup = result.cleanup;
@@ -173,11 +167,8 @@ describe("connectAgent", () => {
 
     const result = connectAgent({
       sessionManager,
-      contextManager,
-      runtimeState,
       runtimeEvents,
       uiTimeline: makeTimeline(sessionManager),
-      initialSession: "test-session",
       registry,
     });
     cleanup = result.cleanup;
@@ -195,11 +186,8 @@ describe("connectAgent", () => {
 
     const result = connectAgent({
       sessionManager,
-      contextManager,
-      runtimeState,
       runtimeEvents,
       uiTimeline: makeTimeline(sessionManager),
-      initialSession: "test-session",
       registry,
     });
     cleanup = result.cleanup;
@@ -216,11 +204,8 @@ describe("connectAgent", () => {
 
     const result = connectAgent({
       sessionManager,
-      contextManager,
-      runtimeState,
       runtimeEvents,
       uiTimeline: makeTimeline(sessionManager),
-      initialSession: "test-session",
       registry,
     });
     cleanup = result.cleanup;
@@ -237,11 +222,8 @@ describe("connectAgent", () => {
 
     const result = connectAgent({
       sessionManager,
-      contextManager,
-      runtimeState,
       runtimeEvents,
       uiTimeline: makeTimeline(sessionManager),
-      initialSession: "test-session",
       registry,
     });
     cleanup = result.cleanup;
@@ -265,11 +247,8 @@ describe("connectAgent", () => {
 
     const result = connectAgent({
       sessionManager,
-      contextManager,
-      runtimeState,
       runtimeEvents,
       uiTimeline: makeTimeline(sessionManager),
-      initialSession: "test-session",
       registry,
     });
 

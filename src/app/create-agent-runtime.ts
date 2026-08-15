@@ -19,8 +19,9 @@ export function createAgentRuntime(opts: AgentRuntimeOpts): AgentRuntime {
     opts.persistent ?? true,
   );
   const contextManager = new ContextManager({
-    client: opts.client,
-    model: opts.model,
+    // Fixed for sub-agents, live for the main agent (RuntimeState getters).
+    getClient: opts.getClient ?? (() => opts.client),
+    getModel: opts.getModel ?? (() => opts.model),
     getContext: () => sessionManager.getContext(),
     getChangeJournal: () => sessionManager.getChangeJournal(),
     setActiveUserMessageOrdinal: (ordinal) =>
