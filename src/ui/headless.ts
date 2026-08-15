@@ -2,11 +2,8 @@ import fs from "fs";
 import type { AgentDeps } from "../agent.js";
 import type { UserPrompter, Prompt } from "../tools/registry.js";
 import type { CommandContext } from "./commands/index.js";
-import { restoreSession } from "../services/session-lifecycle.js";
-import { SessionPersistence } from "../services/session-persistence.js";
 import type { ShellService } from "../services/shell-service.js";
 import type { RuntimeEvents } from "../services/runtime-events.js";
-import type { RuntimeState } from "../services/runtime-state.js";
 import { HeadlessRenderer } from "./headless-renderer.js";
 import { SessionTimeline } from "./timeline.js";
 import { processRoutedInput, runAgentTurn } from "./turn.js";
@@ -16,12 +13,9 @@ export async function runHeadless(
   initialPrompt: string | undefined,
   runtimeEvents: RuntimeEvents,
   shellService: ShellService,
-  runtimeState: RuntimeState,
-  sessionName?: string,
-  resumeRecent?: boolean,
   cmdContext?: CommandContext,
 ): Promise<void> {
-  const { sessionManager, contextManager } = deps;
+  const { sessionManager } = deps;
 
   // Read piped stdin (non-TTY) and append to the prompt
   if (!process.stdin.isTTY) {
@@ -51,19 +45,6 @@ export async function runHeadless(
     if (event.type === "status.added") {
       timeline.appendStatus(event.status);
     }
-  });
-
-  // Load session if requested.
-  const name =
-    sessionName ??
-    (resumeRecent ? await SessionPersistence.getMostRecent() : undefined) ??
-    `session-${Date.now()}`;
-  await restoreSession({
-    sessionManager,
-    contextManager,
-    runtimeState,
-    name,
-    load: !!(sessionName || resumeRecent),
   });
 
   const headlessPrompter: UserPrompter = {

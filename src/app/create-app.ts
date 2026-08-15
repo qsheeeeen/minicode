@@ -13,6 +13,7 @@ import {
 } from "../services/index.js";
 import { ModelSwitchService } from "../services/model-switcher.js";
 import { PermissionService } from "../services/permission.js";
+import { restoreSession } from "../services/session-lifecycle.js";
 import { RuntimeState } from "../services/runtime-state.js";
 import { SessionPersistence } from "../services/session-persistence.js";
 import { ShellService } from "../services/shell-service.js";
@@ -221,7 +222,22 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
     runtimeState,
   });
 
-  sessionManager.setSession(initialSession);
+  // Bootstrap the initial session — the single restore site. Entry points
+  // (TUI/headless) only wire rendering on top of the restored runtime.
+  const restored = await restoreSession({
+    sessionManager,
+    contextManager,
+    runtimeState,
+    name: initialSession,
+    load: !!(sessionName || resumeRecent),
+  });
+  if (sessionName && !restored.loaded) {
+    sessionManager.reportStatus({
+      role: "status",
+      content: `Created new session: ${sessionName}`,
+      timestamp: new Date(),
+    });
+  }
 
   const commandContext = createCommandContext({
     deps,

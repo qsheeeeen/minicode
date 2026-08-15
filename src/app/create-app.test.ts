@@ -52,6 +52,7 @@ describe("createApp", () => {
     vi.spyOn(SessionPersistence, "getSessionDir").mockReturnValue(
       "/tmp/minicode-app-test",
     );
+    vi.spyOn(SessionPersistence, "load").mockResolvedValue(null);
   });
 
   it("creates the application app object graph", async () => {
@@ -155,6 +156,29 @@ describe("createApp", () => {
 
     expect(runtime.deps.model.getName()).toBe("next-model");
     expect(runtime.runtimeState.model.getName()).toBe("next-model");
+  });
+
+  it("restores the initial session at composition time", async () => {
+    vi.spyOn(SessionPersistence, "load").mockResolvedValue({
+      blocks: [{ type: "user", text: "old" }],
+      totalTokens: 10,
+    });
+
+    const runtime = await createApp({
+      args: makeArgs(),
+      config: new AppConfig({}),
+      version: "1.0.0",
+      cwd: "/tmp",
+      programStartTime: 123,
+      stdinIsTTY: false,
+    });
+
+    expect(SessionPersistence.load).toHaveBeenCalledWith("test-session");
+    expect(
+      runtime.sessionManager.getContext().getBlocks(),
+    ).toEqual([{ type: "user", text: "old" }]);
+    expect(runtime.contextManager.getTokenCount()).toBe(10);
+    expect(runtime.runtimeState.logger).toBeDefined();
   });
 
   it("exposes the latest change journal through command context", async () => {

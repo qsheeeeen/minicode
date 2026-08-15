@@ -303,19 +303,14 @@ export function App(props: AppProps) {
   const [connected, setConnected] = React.useState(false);
 
   useEffect(() => {
-    const { cleanup, prompter, ready } = connectAgent({
+    const { cleanup, prompter } = connectAgent({
       sessionManager: props.sessionManager,
-      contextManager: props.contextManager,
-      runtimeState: props.runtimeState,
       runtimeEvents: props.runtimeEvents,
       uiTimeline: uiTimelineRef.current!,
-      initialSession: props.initialSession,
-      sessionName: props.sessionName,
-      resumeRecent: props.resumeRecent,
       registry: props.agentRegistry,
     });
     prompterRef.current = prompter;
-    void ready.finally(() => setConnected(true));
+    setConnected(true);
     return cleanup;
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

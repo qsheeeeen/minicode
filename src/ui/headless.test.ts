@@ -86,7 +86,6 @@ describe("runHeadless", () => {
       "test prompt",
       mockRuntimeEvents as any,
       mockShellService,
-      mockRuntimeState as any,
     );
 
     expect(mockRun).toHaveBeenCalledWith(
@@ -112,7 +111,6 @@ describe("runHeadless", () => {
       "test prompt",
       mockRuntimeEvents as any,
       mockShellService,
-      mockRuntimeState as any,
     );
     expect(mockRun).toHaveBeenCalledWith(
       mockDeps,
@@ -131,7 +129,6 @@ describe("runHeadless", () => {
       "test prompt",
       mockRuntimeEvents as any,
       mockShellService,
-      mockRuntimeState as any,
     );
     expect(mockSessionManager.reportStatus).toHaveBeenCalledWith(
       expect.objectContaining({ role: "status", content: "(Aborted)" }),
@@ -145,7 +142,6 @@ describe("runHeadless", () => {
       "test prompt",
       mockRuntimeEvents as any,
       mockShellService,
-      mockRuntimeState as any,
     );
     expect(mockSessionManager.reportStatus).toHaveBeenCalledWith(
       expect.objectContaining({ role: "error", content: "(Error: test error)" }),
@@ -155,39 +151,7 @@ describe("runHeadless", () => {
   it("throws non-Error objects", async () => {
     mockRun.mockRejectedValueOnce("string error");
     await expect(
-      runHeadless(
-        mockDeps,
-        "test prompt",
-        mockRuntimeEvents as any,
-        mockShellService,
-        mockRuntimeState as any,
-      ),
+      runHeadless(mockDeps, "test prompt", mockRuntimeEvents as any, mockShellService),
     ).rejects.toBe("string error");
-  });
-
-  it("loads a resumed session and swaps the logger via runtimeState", async () => {
-    mockRun.mockResolvedValueOnce(true);
-    sessionPersistenceMock.getMostRecent.mockResolvedValue("resumed-session");
-    sessionPersistenceMock.load.mockResolvedValue({
-      blocks: [{ type: "user", text: "old" }],
-      totalTokens: 10,
-    });
-
-    await runHeadless(
-      mockDeps,
-      "prompt",
-      mockRuntimeEvents as any,
-      mockShellService,
-      mockRuntimeState as any,
-      undefined,
-      true,
-    );
-
-    expect(sessionPersistenceMock.load).toHaveBeenCalledWith("resumed-session");
-    expect(mockContext.replaceBlocks).toHaveBeenCalledWith([
-      { type: "user", text: "old" },
-    ]);
-    expect(mockContextManager.setTokenCount).toHaveBeenCalledWith(10);
-    expect(mockRuntimeState.setLogger).toHaveBeenCalled();
   });
 });
