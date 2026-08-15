@@ -30,7 +30,8 @@ vi.mock("./protocols/openai-responses.js", () => ({
   },
 }));
 
-import { createClient, registerProtocol, resetProtocols } from "./client.js";
+import { createClient, registerProtocol } from "./client.js";
+import { resetProtocols } from "./protocols/index.js";
 
 describe("createClient", () => {
   beforeEach(() => {

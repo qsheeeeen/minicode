@@ -5,9 +5,6 @@
 
 import type { Model } from "./model.js";
 import type { TurnFault } from "../core/results.js";
-import { AnthropicClient } from "./protocols/anthropic.js";
-import { OpenAIChatClient } from "./protocols/openai-chat.js";
-import { OpenAIResponsesClient } from "./protocols/openai-responses.js";
 
 // Protocol registry
 
@@ -20,6 +17,11 @@ export function registerProtocol(
   factory: LLMClientFactory,
 ): void {
   protocols.set(name, factory);
+}
+
+/** Remove all registered protocols (registration site rebuilds builtins). */
+export function clearProtocols(): void {
+  protocols.clear();
 }
 
 // The conversation block vocabulary is owned by core; this port adapts it.
@@ -114,27 +116,4 @@ export function createClient(
   throw new Error(
     `Unknown LLM protocol: "${protocol}". Registered: ${[...protocols.keys()].join(", ")}`,
   );
-}
-
-function registerBuiltinProtocols(): void {
-  registerProtocol(
-    "anthropic",
-    (apiKey, baseURL) => new AnthropicClient(apiKey, baseURL),
-  );
-  registerProtocol(
-    "openai",
-    (apiKey, baseURL) => new OpenAIChatClient(apiKey, baseURL),
-  );
-  registerProtocol(
-    "openai-responses",
-    (apiKey, baseURL) => new OpenAIResponsesClient(apiKey, baseURL),
-  );
-}
-
-registerBuiltinProtocols();
-
-/** Reset to the built-in protocol set (test isolation). */
-export function resetProtocols(): void {
-  protocols.clear();
-  registerBuiltinProtocols();
 }

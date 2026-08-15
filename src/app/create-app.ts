@@ -2,6 +2,7 @@ import path from "path";
 import os from "os";
 import type { Args } from "../args.js";
 import type { AppConfig } from "../config.js";
+import "../llm/protocols/index.js";
 import { createClient } from "../llm/client.js";
 import { Model } from "../llm/model.js";
 import { SkillManager } from "../skills/skill-manager.js";
