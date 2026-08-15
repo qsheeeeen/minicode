@@ -18,7 +18,11 @@ import { RuntimeState } from "../services/runtime-state.js";
 import { SessionPersistence } from "../services/session-persistence.js";
 import { ShellService } from "../services/shell-service.js";
 import { createDefaultToolRegistry } from "../tools/index.js";
-import { createCapabilities, type SubAgentSpawner } from "../tools/registry.js";
+import {
+  createCapabilities,
+  lazy,
+  type SubAgentSpawner,
+} from "../tools/registry.js";
 import {
   ShellCapability,
   RegistryCapability,
@@ -188,7 +192,9 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
       createCapabilities([
         [ShellCapability, shellService],
         [RegistryCapability, agentRegistry],
-        [ChangeJournalCapability, sessionManager.getChangeJournal()],
+        // The journal is recreated when a session is cleared — resolve it
+        // at read time so tools never hold a closed handle.
+        [ChangeJournalCapability, lazy(() => sessionManager.getChangeJournal())],
         [SubAgentSpawnerCapability, spawnSubAgent],
         [SkillRegistryCapability, skillRegistry],
       ]),

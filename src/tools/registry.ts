@@ -41,8 +41,18 @@ export interface Capabilities {
   require<T>(capability: Capability<T>): T;
 }
 
+const LAZY = Symbol("capability-lazy");
+
+/** Defer a capability value to read time — for handles the owner may swap
+ *  (e.g. the change journal is recreated when a session is cleared). */
+export function lazy<T>(factory: () => T): { [LAZY]: () => T } {
+  return { [LAZY]: factory };
+}
+
 export function createCapabilities(
-  entries: ReadonlyArray<[Capability<unknown>, unknown]>,
+  entries: ReadonlyArray<
+    [Capability<unknown>, unknown | { [LAZY]: () => unknown }]
+  >,
 ): Capabilities {
   const map = new Map<string, unknown>();
   for (const [cap, value] of entries) {
@@ -51,16 +61,22 @@ export function createCapabilities(
     }
     map.set(cap.key, value);
   }
+  const resolve = (value: unknown): unknown =>
+    typeof value === "object" && value !== null && LAZY in value
+      ? (value as { [LAZY]: () => unknown })[LAZY]()
+      : value;
   return {
-    get: <T>(capability: Capability<T>) =>
-      map.get(capability.key) as T | undefined,
-    require: <T>(capability: Capability<T>) => {
+    get: <T>(capability: Capability<T>): T | undefined => {
+      if (!map.has(capability.key)) return undefined;
+      return resolve(map.get(capability.key)) as T;
+    },
+    require: <T>(capability: Capability<T>): T => {
       if (!map.has(capability.key)) {
         throw new Error(
           `Required capability not provided: "${capability.key}"`,
         );
       }
-      return map.get(capability.key) as T;
+      return resolve(map.get(capability.key)) as T;
     },
   };
 }

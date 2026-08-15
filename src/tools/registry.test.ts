@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { ToolRegistry, capability, createCapabilities } from "./registry.js";
+import {
+  ToolRegistry,
+  capability,
+  createCapabilities,
+  lazy,
+} from "./registry.js";
 import type { ToolDef } from "./index.js";
 
 function makeTool(name: string): ToolDef {
@@ -126,6 +131,22 @@ describe("capabilities", () => {
     expect(() => createCapabilities([]).require(Foo)).toThrow(
       'Required capability not provided: "foo"',
     );
+  });
+
+  it("lazy capabilities resolve at read time", () => {
+    const Foo = capability<{ v: number }>("foo-lazy");
+    let current = { v: 1 };
+    const caps = createCapabilities([[Foo, lazy(() => current)]]);
+    expect(caps.require(Foo)).toEqual({ v: 1 });
+    current = { v: 2 };
+    expect(caps.require(Foo)).toEqual({ v: 2 });
+  });
+
+  it("function capabilities are not treated as lazy factories", () => {
+    const Fn = capability<() => string>("foo-fn");
+    const fn = () => "value";
+    const caps = createCapabilities([[Fn, fn]]);
+    expect(caps.require(Fn)).toBe(fn);
   });
 
   it("rejects duplicate capability keys at construction", () => {
