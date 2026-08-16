@@ -77,9 +77,11 @@ export class SessionPersistence {
   }
 
   static async load(name: string): Promise<SessionData | null> {
-    const dir = SessionPersistence.getSessionDir();
-    await fs.mkdir(dir, { recursive: true });
-    const filePath = path.join(dir, `${name}${SessionPersistence.EXT}`);
+    // Read path — no mkdir side effect. null means "no such session".
+    const filePath = path.join(
+      SessionPersistence.getSessionDir(),
+      `${name}${SessionPersistence.EXT}`,
+    );
     try {
       const content = await fs.readFile(filePath, "utf-8");
       const lines = content.split("\n").filter((l) => l.trim());
@@ -104,8 +106,8 @@ export class SessionPersistence {
   }
 
   static async list(): Promise<SessionInfo[]> {
+    // Read path — no mkdir side effect.
     const dir = SessionPersistence.getSessionDir();
-    await fs.mkdir(dir, { recursive: true });
     const entries = await fs.readdir(dir).catch(() => []);
     const sessions: SessionInfo[] = [];
     for (const entry of entries) {
@@ -137,8 +139,8 @@ export class SessionPersistence {
   }
 
   static async rename(oldName: string, newName: string): Promise<void> {
+    // The old file must already exist for a rename — no mkdir needed.
     const dir = SessionPersistence.getSessionDir();
-    await fs.mkdir(dir, { recursive: true });
     const oldPath = path.join(dir, `${oldName}${SessionPersistence.EXT}`);
     const newPath = path.join(dir, `${newName}${SessionPersistence.EXT}`);
     await fs.rename(oldPath, newPath).catch(() => {});

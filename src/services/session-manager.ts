@@ -8,7 +8,6 @@ import { LLMContext } from "../core/context.js";
 import { ChangeJournal } from "./change-journal.js";
 import { SessionPersistence } from "./session-persistence.js";
 import type { SessionStats } from "./session-stats.js";
-import type { LLMBlock } from "../core/blocks.js";
 import { RuntimeEvents, type RuntimeStatusInput } from "./runtime-events.js";
 
 export type StatusReporter = (msg: RuntimeStatusInput) => void;
@@ -63,18 +62,26 @@ export class SessionManager {
     this.activeUserMessageOrdinal = 0;
   }
 
-  /** Persist session to disk. Caller provides model name and token count. */
+  private saveChain: Promise<void> = Promise.resolve();
+
+  /** Persist session to disk. Caller provides model name and token count.
+   *  Saves are serialized: the agent fires some without awaiting, and
+   *  concurrent tmp-write/rename pairs on one file would interleave. */
   async saveStore(meta: { model: string; totalTokens: number }): Promise<void> {
     if (meta.model !== undefined) this._meta.model = meta.model;
     if (meta.totalTokens !== undefined)
       this._meta.totalTokens = meta.totalTokens;
     // Ephemeral sessions (sub-agents) never touch disk.
     if (!this.persistent) return;
-    return SessionPersistence.save(
-      this._currentSession,
-      this.context.getBlocks(),
-      { model: this._meta.model, totalTokens: this._meta.totalTokens },
+    const run = this.saveChain.then(() =>
+      SessionPersistence.save(this._currentSession, this.context.getBlocks(), {
+        model: this._meta.model,
+        totalTokens: this._meta.totalTokens,
+      }),
     );
+    // A failed save must not poison the chain for the next one.
+    this.saveChain = run.catch(() => {});
+    return run;
   }
 
   // -- Context accessors --
@@ -99,16 +106,6 @@ export class SessionManager {
 
   setActiveUserMessageOrdinal(idx: number): void {
     this.activeUserMessageOrdinal = idx;
-  }
-
-  // -- Convenience shortcuts for common context operations --
-
-  getMessages(): LLMBlock[] {
-    return this.context.getBlocks();
-  }
-
-  setMessages(messages: LLMBlock[]): void {
-    this.context.replaceBlocks(messages);
   }
 
   getSessionStats(): SessionStats | undefined {

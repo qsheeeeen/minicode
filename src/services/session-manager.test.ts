@@ -73,14 +73,14 @@ describe("SessionManager", () => {
   describe("messages", () => {
     it("starts with empty messages", () => {
       const sm = new SessionManager();
-      expect(sm.getMessages()).toEqual([]);
+      expect(sm.getContext().getBlocks()).toEqual([]);
     });
 
     it("stores and retrieves messages", () => {
       const sm = new SessionManager();
       const msgs = [{ type: "user" as const, text: "hello" }];
-      sm.setMessages(msgs);
-      expect(sm.getMessages()).toEqual(msgs);
+      sm.getContext().replaceBlocks(msgs);
+      expect(sm.getContext().getBlocks()).toEqual(msgs);
     });
   });
 
@@ -94,16 +94,16 @@ describe("SessionManager", () => {
 
     it("clears messages", () => {
       const sm = new SessionManager();
-      sm.setMessages([{ type: "user", text: "hello" }]);
+      sm.getContext().replaceBlocks([{ type: "user", text: "hello" }]);
       sm.clearSession();
-      expect(sm.getMessages()).toEqual([]);
+      expect(sm.getContext().getBlocks()).toEqual([]);
     });
   });
 
   describe("saveStore", () => {
     it("persists to disk by default", async () => {
       const sm = new SessionManager("persistent-session");
-      sm.setMessages([{ type: "user", text: "hi" }]);
+      sm.getContext().replaceBlocks([{ type: "user", text: "hi" }]);
       const saveSpy = vi
         .spyOn(SessionPersistence, "save")
         .mockResolvedValue(undefined);
@@ -125,5 +125,29 @@ describe("SessionManager", () => {
       expect(saveSpy).not.toHaveBeenCalled();
       saveSpy.mockRestore();
     });
+  });
+});
+
+describe("saveStore serialization", () => {
+  it("runs concurrent saves sequentially (no interleaved writes)", async () => {
+    const order: string[] = [];
+    let inFlight = false;
+    const save = vi.fn(async () => {
+      if (inFlight) throw new Error("overlapping save");
+      inFlight = true;
+      order.push("start");
+      await new Promise((r) => setTimeout(r, 5));
+      order.push("end");
+      inFlight = false;
+    });
+    vi.spyOn(SessionPersistence, "save").mockImplementation(save);
+
+    const sm = new SessionManager("s", undefined, new RuntimeEvents());
+    await Promise.all([
+      sm.saveStore({ model: "m", totalTokens: 1 }),
+      sm.saveStore({ model: "m", totalTokens: 2 }),
+    ]);
+
+    expect(order).toEqual(["start", "end", "start", "end"]);
   });
 });

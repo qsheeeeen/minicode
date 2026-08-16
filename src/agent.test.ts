@@ -236,21 +236,6 @@ describe("runAgent", () => {
     });
   });
 
-  describe("getMessages and setMessages", () => {
-    it("setMessages stores blocks directly", () => {
-      const { context, sessionManager } = makeDeps();
-      const messages: any[] = [{ type: "user", text: "hello" }];
-      sessionManager.setMessages(messages);
-      expect(context.getBlocks()).toEqual(messages);
-    });
-
-    it("getMessages returns context blocks", () => {
-      const { context } = makeDeps();
-      context.startUserMessage("hello");
-      expect(context.getBlocks()).toEqual([{ type: "user", text: "hello" }]);
-    });
-  });
-
   describe("run", () => {
     it("handles a basic text interaction", async () => {
       const stream = new MockStream();
