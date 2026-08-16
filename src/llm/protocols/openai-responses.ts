@@ -7,7 +7,7 @@
 // of items rather than the chat-completions message array.
 
 import OpenAI from "openai";
-import { terminalFromError } from "./shared.js";
+import { DEFAULT_OPENAI_MODEL, terminalFromError } from "./shared.js";
 
 import type {
   LLMClient,
@@ -43,7 +43,6 @@ interface StreamCompletedEvent {
 
 // Constants
 
-const DEFAULT_MODEL = "gpt-4.1";
 
 // Effort mapping
 
@@ -277,7 +276,7 @@ export class OpenAIResponsesClient implements LLMClient {
     tools: LLMToolDef[],
     options: ChatOptions = {},
   ): LLMStream {
-    const model = options.model?.getName() || DEFAULT_MODEL;
+    const model = options.model?.getName() || DEFAULT_OPENAI_MODEL;
     const input = toSdkMessages(blocks);
     const oaiTools = tools.length > 0 ? toSdkTools(tools) : undefined;
     const abortController = new AbortController();

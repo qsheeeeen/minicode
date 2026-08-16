@@ -126,8 +126,12 @@ function toLLMAssistantBlock(block: Anthropic.ContentBlock): LLMAssistantBlock {
       input: block.input as Record<string, unknown>,
     };
   }
-  // Fallback for unknown block types (server_tool_use, etc.)
-  return { type: "text", text: JSON.stringify(block) };
+  // Fallback for unknown block types (server_tool_use, etc.) — marked, so
+  // silent data mutation is visible in the transcript.
+  return {
+    type: "text",
+    text: `[unsupported block: ${JSON.stringify(block)}]`,
+  };
 }
 
 // Anthropic usage includes cache token fields not in the standard type.

@@ -4,7 +4,7 @@
 // converts between internal types and the OpenAI Chat Completions API format.
 
 import OpenAI from "openai";
-import { terminalFromError } from "./shared.js";
+import { DEFAULT_OPENAI_MODEL, terminalFromError } from "./shared.js";
 import type {
   LLMClient,
   LLMStream,
@@ -22,7 +22,6 @@ import type {
 
 // Constants
 
-const DEFAULT_MODEL = "gpt-4.1";
 const DEFAULT_MAX_TOKENS = 8192;
 
 // Effort mapping (internal → SDK reasoning_effort)
@@ -169,7 +168,7 @@ export class OpenAIChatClient implements LLMClient {
     tools: LLMToolDef[],
     options: ChatOptions = {},
   ): LLMStream {
-    const model = options.model?.getName() ?? DEFAULT_MODEL;
+    const model = options.model?.getName() ?? DEFAULT_OPENAI_MODEL;
     const oaiMessages = toSdkMessages(blocks, options.system);
     const oaiTools = toSdkTools(tools);
     const abortController = new AbortController();
@@ -305,8 +304,12 @@ export class OpenAIChatClient implements LLMClient {
           usage: {
             input: {
               total: usage?.prompt_tokens ?? 0,
-              cache_miss: 0,
-              cache_hit: 0,
+              // OpenAI reports cached prompt tokens separately; treat the
+              // remainder as cache misses (mirror of the Anthropic mapping).
+              cache_hit: usage?.prompt_tokens_details?.cached_tokens ?? 0,
+              cache_miss:
+                (usage?.prompt_tokens ?? 0) -
+                (usage?.prompt_tokens_details?.cached_tokens ?? 0),
             },
             output: usage?.completion_tokens ?? 0,
           },

@@ -8,6 +8,9 @@ import type { LLMStreamResult } from "../client.js";
 
 const RETRYABLE_STATUS = new Set([408, 429, 500, 502, 503, 504, 529]);
 
+/** Fallback when the caller provides no model name. */
+export const DEFAULT_OPENAI_MODEL = "gpt-4.1";
+
 /** Classify a caught (non-abort) error from a provider SDK. */
 export function faultFromError(e: unknown): TurnFault {
   const err = e as { status?: unknown; name?: unknown };

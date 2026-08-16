@@ -84,7 +84,7 @@ describe("OpenAIChatClient", () => {
         { type: "text", text: "Hello world" },
       ]);
       expect(collected.result.usage).toEqual({
-        input: { total: 10, cache_miss: 0, cache_hit: 0 },
+        input: { total: 10, cache_miss: 10, cache_hit: 0 },
         output: 5,
       });
     });
