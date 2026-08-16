@@ -4,7 +4,12 @@
 // agent — a sub-agent is the same agent loop, parameterized by tools, role
 // prompt, and lifecycle.
 
-import { runAgent, type AgentRuntimeOpts, type AgentRuntime } from "./agent.js";
+import {
+  runAgent,
+  MAIN_AGENT_ID,
+  type AgentRuntimeOpts,
+  type AgentRuntime,
+} from "./agent.js";
 import { PermissionService } from "./services/permission.js";
 import type { SessionManager } from "./services/session-manager.js";
 import type { ContextManager } from "./services/context-manager.js";
@@ -100,7 +105,7 @@ export async function runSubAgent(
   }
 
   const subId = registry.allocateSubId();
-  const parentId = parent.currentAgentId || "1";
+  const parentId = parent.currentAgentId || MAIN_AGENT_ID;
 
   const { deps, sessionManager, contextManager, runtimeEvents } = createRuntime(
     {

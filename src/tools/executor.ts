@@ -10,6 +10,7 @@ import type { LLMToolUseBlock } from "../core/blocks.js";
 import type { LLMContext } from "../core/context.js";
 import type { AppConfig } from "../config.js";
 import { isAbortError, isTurnFaultError } from "../core/results.js";
+import { MAIN_AGENT_ID } from "../agent.js";
 import { PermissionService } from "../services/permission.js";
 import { callContent } from "../utils/tool-format.js";
 import type pino from "pino";
@@ -75,7 +76,7 @@ export class ToolExecutor {
 
     const context: ToolExecutionContext = {
       appConfig: this.appConfig,
-      currentAgentId: this.currentAgentId ?? "1",
+      currentAgentId: this.currentAgentId ?? MAIN_AGENT_ID,
       signal: dynamic.signal,
       config: dynamic.config,
       prompter: dynamic.prompter,

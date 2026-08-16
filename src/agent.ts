@@ -69,6 +69,9 @@ export interface AgentRuntime {
   runtimeEvents: RuntimeEvents;
 }
 
+/** The main agent's registry id; sub-agents allocate their own. */
+export const MAIN_AGENT_ID = "1";
+
 export interface RunAgentOpts {
   prompter?: UserPrompter;
 }
@@ -189,9 +192,10 @@ export async function runAgent(
 ): Promise<void> {
   const context = deps.sessionManager.getContext();
   context.startUserMessage(userMessage);
-  deps.sessionManager.setActiveUserMessageOrdinal(
-    context.getUserMessageCount(),
-  );
+  // Ordinal identity for this run's user message — abort cleanup truncates
+  // from here, no content matching.
+  const userOrdinal = context.getUserMessageCount();
+  deps.sessionManager.setActiveUserMessageOrdinal(userOrdinal);
 
   deps.logger?.info(
     { session: deps.sessionManager.getSessionName(), userMessage },
@@ -249,10 +253,9 @@ export async function runAgent(
     }
   } finally {
     if (signal.aborted) {
-      // Remove the last user message that triggered this aborted run
-      context.removeFromLastUserMessage(
-        (last) => last[0]?.type === "user" && last[0].text === userMessage,
-      );
+      // Drop the user message that triggered this aborted run (and
+      // everything after it) — by ordinal, not by content matching.
+      context.truncateBeforeUserMessageOrdinal(userOrdinal);
     }
     deps.logger?.info(
       {

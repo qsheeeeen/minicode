@@ -163,19 +163,6 @@ describe("LLMContext", () => {
     ).toThrow("Duplicate tool use id");
   });
 
-  it("removes blocks from the last user message when the predicate matches", () => {
-    const context = new LLMContext();
-    context.startUserMessage("keep");
-    context.startUserMessage("remove");
-
-    expect(
-      context.removeFromLastUserMessage(
-        (blocks) => blocks[0]?.type === "user" && blocks[0].text === "remove",
-      ),
-    ).toBe(true);
-    expect(context.getBlocks()).toEqual([{ type: "user", text: "keep" }]);
-  });
-
   it("truncates before a user message ordinal", () => {
     const context = new LLMContext();
     context.replaceBlocks([

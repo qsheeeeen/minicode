@@ -162,20 +162,6 @@ export class LLMContext {
       .map((block) => block.text);
   }
 
-  removeFromLastUserMessage(
-    predicate: (blocks: LLMBlock[]) => boolean,
-  ): boolean {
-    const start = this.findLastUserIndex();
-    if (start < 0) return false;
-
-    const blocks = this.blocks.slice(start).map(cloneBlock);
-    if (!predicate(blocks)) return false;
-
-    this.blocks = this.blocks.slice(0, start);
-    this.notify();
-    return true;
-  }
-
   truncateBeforeUserMessageOrdinal(ordinal: number): void {
     const start = this.findUserOrdinalIndex(ordinal);
     if (start < 0) {

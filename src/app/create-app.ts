@@ -32,6 +32,7 @@ import {
   SkillRegistryCapability,
 } from "../tools/capabilities.js";
 import { createDefaultAgentTypes } from "../tools/agent-types.js";
+import { MAIN_AGENT_ID } from "../agent.js";
 import { runSubAgent } from "../sub-agent.js";
 import { loadGlobalPrompt } from "../utils/prompts.js";
 import {
@@ -171,7 +172,7 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
     tools,
     permissionService,
     appConfig: config,
-    currentAgentId: "1",
+    currentAgentId: MAIN_AGENT_ID,
     capabilities: ({ sessionManager }) =>
       createCapabilities([
         [ShellCapability, shellService],
