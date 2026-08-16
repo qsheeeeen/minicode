@@ -37,7 +37,7 @@ describe("InputRouter.route", () => {
   it("routes '/' prefix to command", async () => {
     const { executeCommand } = await import("./commands/index.js");
     (executeCommand as ReturnType<typeof vi.fn>).mockResolvedValue({
-      handled: true,
+      kind: "prompt",
       promptText: "command result",
       displayContent: "display",
     });
@@ -54,7 +54,7 @@ describe("InputRouter.route", () => {
   it("routes command without promptText as plain command", async () => {
     const { executeCommand } = await import("./commands/index.js");
     (executeCommand as ReturnType<typeof vi.fn>).mockResolvedValue({
-      handled: true,
+      kind: "handled",
     });
 
     const result = await router.route("/clear", cmdContext);

@@ -1,6 +1,6 @@
 import type { Model } from "../../llm/model.js";
 import type { EffortLevel } from "../../llm/client.js";
-import type { AppConfig } from "../../config.js";
+import { TIERS, type AppConfig } from "../../config.js";
 import type { ModelSwitchService } from "../../services/model-switcher.js";
 import type { SessionManager } from "../../services/session-manager.js";
 
@@ -11,6 +11,8 @@ export interface ModeHandlerDeps {
   sessionManager: SessionManager;
   handleSubmit: (value: string) => Promise<boolean>;
 }
+
+const TIER_VALUE = new RegExp(`^(${TIERS.join("|")}):(.*)$`);
 
 export type ModeHandler = (
   value: string,
@@ -44,7 +46,7 @@ export async function modelSelectHandler(
   value: string,
   { config, modelSwitchService, sessionManager }: ModeHandlerDeps,
 ): Promise<void> {
-  const tierMatch = value.match(/^(pro|flash):(.*)$/);
+  const tierMatch = value.match(TIER_VALUE);
   if (tierMatch) {
     const tier = tierMatch[1];
     let modelSpec = tierMatch[2];

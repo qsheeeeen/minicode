@@ -7,8 +7,7 @@
 // of items rather than the chat-completions message array.
 
 import OpenAI from "openai";
-import { isAbortError } from "../../core/results.js";
-import { faultFromError } from "./shared.js";
+import { terminalFromError } from "./shared.js";
 
 import type {
   LLMClient,
@@ -400,8 +399,7 @@ export class OpenAIResponsesClient implements LLMClient {
           },
         };
       } catch (e) {
-        if (isAbortError(e)) throw e;
-        return { ok: false, fault: faultFromError(e) };
+        return terminalFromError(e);
       }
     }
 

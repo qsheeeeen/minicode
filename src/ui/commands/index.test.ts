@@ -161,7 +161,7 @@ describe("Builtin commands", () => {
     it("/exit calls ctx.exit()", async () => {
       const { ctx } = makeCtx();
       const result = await executeCommand("exit", [], ctx as CommandContext);
-      expect(result.handled).toBe(true);
+      expect(result.kind).not.toBe("unknown");
       expect(ctx.exit).toHaveBeenCalled();
     });
 
@@ -182,7 +182,7 @@ describe("Builtin commands", () => {
 
       const result = await executeCommand("undo", ["2"], ctx as CommandContext);
 
-      expect(result.handled).toBe(true);
+      expect(result.kind).not.toBe("unknown");
       expect(context.truncateBeforeUserMessageOrdinal).toHaveBeenCalledWith(2);
       expect(journal.pruneFromUserMessage).toHaveBeenCalledWith(2);
       expect(ctx.presentInput).not.toHaveBeenCalled();
@@ -243,7 +243,7 @@ describe("Builtin commands", () => {
         [],
         ctx as CommandContext,
       );
-      expect(result.handled).toBe(true);
+      expect(result.kind).not.toBe("unknown");
       expect(contextManager.compress).toHaveBeenCalled();
       expect(sessionManager.reportStatus).toHaveBeenCalledWith(
         expect.objectContaining({ role: "status" }),
@@ -254,7 +254,7 @@ describe("Builtin commands", () => {
       const { ctx, sessionManager, contextManager } = makeCtx();
 
       const result = await executeCommand("clear", [], ctx as CommandContext);
-      expect(result.handled).toBe(true);
+      expect(result.kind).not.toBe("unknown");
       expect(sessionManager.clearSession).toHaveBeenCalled();
       expect(contextManager.reset).toHaveBeenCalled();
       expect(ctx.switchSession).toHaveBeenCalledWith(
@@ -271,7 +271,7 @@ describe("Builtin commands", () => {
         ["my", "new", "session"],
         ctx as CommandContext,
       );
-      expect(result.handled).toBe(true);
+      expect(result.kind).not.toBe("unknown");
       expect(sessionManager.clearSession).toHaveBeenCalled();
       expect(contextManager.reset).toHaveBeenCalled();
       expect(ctx.switchSession).toHaveBeenCalledWith("my new session", {
@@ -287,7 +287,7 @@ describe("Builtin commands", () => {
         ["new-session"],
         ctx as CommandContext,
       );
-      expect(result.handled).toBe(true);
+      expect(result.kind).not.toBe("unknown");
       expect(ctx.renameCurrentSession).toHaveBeenCalledWith("new-session");
     });
 
@@ -299,7 +299,7 @@ describe("Builtin commands", () => {
       const { ctx } = makeCtx();
 
       const result = await executeCommand("resume", [], ctx as CommandContext);
-      expect(result.handled).toBe(true);
+      expect(result.kind).not.toBe("unknown");
       expect(sessionPersistenceMock.list).toHaveBeenCalled();
       expect(ctx.presentInput).toHaveBeenCalledWith({
         type: "session-picker",
@@ -319,7 +319,7 @@ describe("Builtin commands", () => {
         ["session-1"],
         ctx as CommandContext,
       );
-      expect(result.handled).toBe(true);
+      expect(result.kind).not.toBe("unknown");
       expect(ctx.resumeSession).toHaveBeenCalledWith("session-1");
     });
 
@@ -334,7 +334,7 @@ describe("Builtin commands", () => {
         ["unknown"],
         ctx as CommandContext,
       );
-      expect(result.handled).toBe(true);
+      expect(result.kind).not.toBe("unknown");
       expect(sessionManager.reportStatus).toHaveBeenCalledWith(
         expect.objectContaining({ role: "error" }),
       );
@@ -343,21 +343,21 @@ describe("Builtin commands", () => {
     it("/plan returns prompt text", async () => {
       const { ctx } = makeCtx();
       const result = await executeCommand("plan", [], ctx as CommandContext);
-      expect(result.handled).toBe(true);
+      expect(result.kind).not.toBe("unknown");
       expect(result.promptText).toContain("executable plan");
     });
 
     it("/test returns prompt text", async () => {
       const { ctx } = makeCtx();
       const result = await executeCommand("test", [], ctx as CommandContext);
-      expect(result.handled).toBe(true);
+      expect(result.kind).not.toBe("unknown");
       expect(result.promptText).toContain("smoke test of your available tools");
     });
 
     it("/effort with no args shows effort select UI", async () => {
       const { ctx } = makeCtx();
       const result = await executeCommand("effort", [], ctx as CommandContext);
-      expect(result.handled).toBe(true);
+      expect(result.kind).not.toBe("unknown");
       expect(ctx.presentInput).toHaveBeenCalledWith({ type: "effort-picker" });
     });
 
@@ -368,7 +368,7 @@ describe("Builtin commands", () => {
         ["invalid"],
         ctx as CommandContext,
       );
-      expect(result.handled).toBe(true);
+      expect(result.kind).not.toBe("unknown");
       expect(ctx.presentInput).toHaveBeenCalledWith({ type: "effort-picker" });
     });
 
@@ -379,7 +379,7 @@ describe("Builtin commands", () => {
         ["high"],
         ctx as CommandContext,
       );
-      expect(result.handled).toBe(true);
+      expect(result.kind).not.toBe("unknown");
       expect(model.setEffort).toHaveBeenCalledWith("high");
       expect(configMock.setEffort).toHaveBeenCalledWith("high");
       expect(sessionManager.reportStatus).toHaveBeenCalledWith(
@@ -396,7 +396,7 @@ describe("Builtin commands", () => {
       });
 
       const result = await executeCommand("skills", [], ctx as CommandContext);
-      expect(result.handled).toBe(true);
+      expect(result.kind).not.toBe("unknown");
       expect(sessionManager.reportStatus).toHaveBeenCalledWith(
         expect.objectContaining({
           role: "status",
@@ -420,7 +420,7 @@ describe("Builtin commands", () => {
       const { ctx, sessionManager } = makeCtx({ skills: withSkills });
 
       const result = await executeCommand("skills", [], ctx as CommandContext);
-      expect(result.handled).toBe(true);
+      expect(result.kind).not.toBe("unknown");
       expect(sessionManager.reportStatus).toHaveBeenCalledWith(
         expect.objectContaining({
           role: "status",
@@ -435,7 +435,7 @@ describe("Builtin commands", () => {
       configMock.tiers = {};
       const { ctx } = makeCtx();
       const result = await executeCommand("model", [], ctx as CommandContext);
-      expect(result.handled).toBe(true);
+      expect(result.kind).not.toBe("unknown");
       expect(ctx.presentInput).toHaveBeenCalledWith({
         type: "model-picker",
         providers: { anthropic: {}, openai: {} },

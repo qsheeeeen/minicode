@@ -2,7 +2,7 @@ import path from "path";
 import os from "os";
 import type { Args } from "../args.js";
 import type { AppConfig } from "../config.js";
-import "../llm/protocols/index.js";
+import { registerBuiltinProtocols } from "../llm/protocols/index.js";
 import { createClient } from "../llm/client.js";
 import { Model } from "../llm/model.js";
 import { SkillManager } from "../skills/skill-manager.js";
@@ -73,6 +73,9 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
 
   const headless = args.headless ?? !stdinIsTTY;
 
+  // Composition, not import side effects: built-in protocols register here.
+  registerBuiltinProtocols();
+
   const globalPrompt = await loadGlobalPrompt();
   const promptFiles: string[] = [];
   if (globalPrompt) promptFiles.push("~/.minicode/AGENTS.md");
@@ -102,7 +105,9 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
   // Prefetch the persisted session so the disk read overlaps skill loading
   // and the tool-availability probes instead of blocking first paint.
   const restoring = !!(sessionName || resumeRecent);
-  const preload = restoring ? SessionPersistence.load(initialSession) : undefined;
+  const preload = restoring
+    ? SessionPersistence.load(initialSession)
+    : undefined;
 
   const skillRegistry = createDefaultSkillRegistry();
   const skillManager = new SkillManager(skillRegistry)

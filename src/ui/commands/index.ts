@@ -40,35 +40,6 @@ export type InputRequest =
       userMessages: string[];
     };
 
-export function inputRequestToState(request: InputRequest): {
-  mode: string;
-  props: Record<string, unknown>;
-} {
-  switch (request.type) {
-    case "effort-picker":
-      return { mode: "effort-select", props: {} };
-    case "session-picker":
-      return {
-        mode: "session-list",
-        props: { sessions: request.sessions },
-      };
-    case "model-picker":
-      return {
-        mode: "model-select",
-        props: { providers: request.providers, tiers: request.tiers },
-      };
-    case "rollback-picker":
-      return {
-        mode: "undo",
-        props: {
-          totalUserMessages: request.totalUserMessages,
-          entriesByUserMessage: request.entriesByUserMessage,
-          userMessages: request.userMessages,
-        },
-      };
-  }
-}
-
 export interface CommandContext {
   model: Model;
   config: AppConfig;
@@ -93,33 +64,33 @@ export interface CommandContext {
   exit: () => void;
 }
 
+/** What happened when a command ran — self-describing, not encoded in
+ *  which optional fields are present. */
+export type ExecuteCommandResult =
+  | { kind: "prompt"; promptText: string; displayContent?: string }
+  | { kind: "handled" }
+  | { kind: "unknown" };
+
 export async function executeCommand(
   name: string,
   args: string[],
   context: CommandContext,
-): Promise<{
-  handled: boolean;
-  promptText?: string;
-  displayContent?: string;
-}> {
+): Promise<ExecuteCommandResult> {
   const cmd = context.commands.get(name);
-  if (cmd) {
-    if (cmd.handler) {
-      await cmd.handler(args, context);
-      return { handled: true };
-    }
-    if (cmd.prompt) {
-      return {
-        handled: true,
-        promptText: cmd.prompt(args),
-        displayContent: `/${name}`,
-      };
-    }
+  if (cmd?.handler) {
+    await cmd.handler(args, context);
+    return { kind: "handled" };
   }
-
+  if (cmd?.prompt) {
+    return {
+      kind: "prompt",
+      promptText: cmd.prompt(args),
+      displayContent: `/${name}`,
+    };
+  }
   // Skill commands are registered upfront (registerSkillCommands in the
   // composition root) — no dynamic fallback, so only one prompt format exists.
-  return { handled: false };
+  return { kind: "unknown" };
 }
 
 export function getCommandList(

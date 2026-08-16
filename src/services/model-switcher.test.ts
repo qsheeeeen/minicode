@@ -1,7 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
 import { AppConfig } from "../config.js";
 import { ModelSwitchService } from "./model-switcher.js";
-import "../llm/protocols/index.js";
+import { registerBuiltinProtocols } from "../llm/protocols/index.js";
+
+registerBuiltinProtocols();
 
 function createService() {
   const appConfig = new AppConfig({

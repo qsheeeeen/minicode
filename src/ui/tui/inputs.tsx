@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Box, Text, useInput } from "ink";
 import { Select, TextInput } from "@inkjs/ui";
-import type { ProviderConfig } from "../../config.js";
+import { TIERS, type ProviderConfig } from "../../config.js";
 import type { ChangeEntry } from "../../services/change-journal.js";
 
 export interface InputComponentProps {
@@ -122,7 +122,7 @@ export function ModelSelectInput({
 
   // ── Main: tiers + edit entry ──
   if (step === "main") {
-    const tierLabels = ["pro", "flash"];
+    const tierLabels = TIERS as readonly string[];
     const options = [
       ...tierLabels.map((t) => ({
         label: `${capitalize(t)} → ${tiers[t] || "(unset)"}`,
@@ -153,7 +153,7 @@ export function ModelSelectInput({
 
   // ── Edit: pick tier to reconfigure ──
   if (step === "edit-tier") {
-    const tierLabels = ["pro", "flash"];
+    const tierLabels = TIERS as readonly string[];
     const options = tierLabels.map((t) => ({
       label: `${capitalize(t)} → ${tiers[t] || "(unset)"}`,
       value: t,

@@ -90,6 +90,11 @@ export function resolveModel(
  * disk) and every consumer sees the change immediately — replacing the old
  * module-level cache.
  */
+/** Tier names recognized in model config and pickers (pro = primary,
+ *  flash = fast/cheap). One definition; pickers and parsers follow. */
+export const TIERS = ["pro", "flash"] as const;
+export type Tier = (typeof TIERS)[number];
+
 export class AppConfig {
   private raw: Config;
   private readonly configPath: string;

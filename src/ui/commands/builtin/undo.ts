@@ -1,9 +1,9 @@
 import type { CommandHandler } from "../registry.js";
 import type { CommandContext } from "../index.js";
-import { RollbackExecutor } from "../../../services/rollback-executor.js";
-
-const SCOPES = ["conversation", "both"] as const;
-type Scope = (typeof SCOPES)[number];
+import {
+  RollbackExecutor,
+  isRollbackScope,
+} from "../../../services/rollback-executor.js";
 
 function report(
   ctx: CommandContext,
@@ -33,7 +33,7 @@ export const undoCommand: CommandHandler = {
     // parameterized command back through the input pipeline.
     if (args.length > 0) {
       const ordinal = Number(args[0]);
-      const scope = (args[1] ?? "conversation") as Scope;
+      const scope = args[1] ?? "conversation";
 
       if (
         !Number.isInteger(ordinal) ||
@@ -43,7 +43,7 @@ export const undoCommand: CommandHandler = {
         report(ctx, "error", `(Invalid message number: ${args[0]})`);
         return;
       }
-      if (!SCOPES.includes(scope)) {
+      if (!isRollbackScope(scope)) {
         report(
           ctx,
           "error",
@@ -53,18 +53,12 @@ export const undoCommand: CommandHandler = {
       }
 
       const executor = new RollbackExecutor();
-      const outcome =
-        scope === "both"
-          ? await executor.rollbackFilesAndConversation(
-              ctx.changeJournal,
-              ctx.context,
-              ordinal,
-            )
-          : await executor.rollbackConversation(
-              ctx.changeJournal,
-              ctx.context,
-              ordinal,
-            );
+      const outcome = await executor.rollback(
+        ctx.changeJournal,
+        ctx.context,
+        ordinal,
+        scope,
+      );
 
       if (!outcome.ok) {
         const { filesRestored, filesDeleted } = outcome.partial;
@@ -80,16 +74,14 @@ export const undoCommand: CommandHandler = {
         return;
       }
 
+      // Derived from the outcome alone — conversation-only rollbacks report
+      // empty file lists, so no scope guard is needed.
       const summary: string[] = [];
-      if (scope === "both") {
-        if (outcome.result.filesRestored.length > 0) {
-          summary.push(
-            `restored ${outcome.result.filesRestored.length} file(s)`,
-          );
-        }
-        if (outcome.result.filesDeleted.length > 0) {
-          summary.push(`deleted ${outcome.result.filesDeleted.length} file(s)`);
-        }
+      if (outcome.result.filesRestored.length > 0) {
+        summary.push(`restored ${outcome.result.filesRestored.length} file(s)`);
+      }
+      if (outcome.result.filesDeleted.length > 0) {
+        summary.push(`deleted ${outcome.result.filesDeleted.length} file(s)`);
       }
       summary.push("conversation rolled back");
       report(ctx, "status", `(Rollback: ${summary.join(", ")})`);

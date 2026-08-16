@@ -26,7 +26,11 @@ export interface SessionSwitchOptions {
 }
 
 export async function switchSession(opts: SessionSwitchOptions): Promise<void> {
-  await activateSession(opts.sessionManager, opts.runtimeState, opts.sessionName);
+  await activateSession(
+    opts.sessionManager,
+    opts.runtimeState,
+    opts.sessionName,
+  );
   opts.sessionStats.incrementSessionCount(opts.sessionName);
   if (opts.statusMessage) {
     opts.sessionManager.reportStatus({

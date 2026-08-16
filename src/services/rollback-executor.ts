@@ -13,6 +13,14 @@ export type RollbackOutcome =
   | { ok: true; result: RollbackResult }
   | { ok: false; reason: string; partial: RollbackResult };
 
+/** Legal rollback scopes — the executor's vocabulary, not the UI's. */
+export const ROLLBACK_SCOPES = ["conversation", "both"] as const;
+export type RollbackScope = (typeof ROLLBACK_SCOPES)[number];
+
+export function isRollbackScope(value: string): value is RollbackScope {
+  return (ROLLBACK_SCOPES as readonly string[]).includes(value);
+}
+
 const EMPTY_RESULT: RollbackResult = { filesRestored: [], filesDeleted: [] };
 
 function fail(
@@ -39,6 +47,26 @@ export class RollbackExecutor {
     } catch (e) {
       return fail(e);
     }
+  }
+
+  /** Dispatch on scope — the single place that knows what "both" means. */
+  async rollback(
+    changeJournal: ChangeJournal,
+    context: LLMContext,
+    fromUserMessageOrdinal: number,
+    scope: RollbackScope,
+  ): Promise<RollbackOutcome> {
+    return scope === "both"
+      ? this.rollbackFilesAndConversation(
+          changeJournal,
+          context,
+          fromUserMessageOrdinal,
+        )
+      : this.rollbackConversation(
+          changeJournal,
+          context,
+          fromUserMessageOrdinal,
+        );
   }
 
   async rollbackFilesAndConversation(

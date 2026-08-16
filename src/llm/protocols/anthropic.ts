@@ -3,8 +3,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import type { MessageStreamEvent } from "@anthropic-ai/sdk/resources/messages.js";
-import { isAbortError } from "../../core/results.js";
-import { faultFromError } from "./shared.js";
+import { terminalFromError } from "./shared.js";
 import type { LLMStream } from "../client.js";
 import type { MessageCreateParamsStreaming } from "@anthropic-ai/sdk/resources/messages.js";
 
@@ -277,8 +276,7 @@ export class AnthropicClient implements LLMClient {
         const finalMsg = await stream.finalMessage();
         return toLLMStreamResult(finalMsg);
       } catch (e) {
-        if (isAbortError(e)) throw e;
-        return { ok: false, fault: faultFromError(e) };
+        return terminalFromError(e);
       }
     }
 

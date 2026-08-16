@@ -1,4 +1,4 @@
-import { describeFault } from "../core/results.js";
+import { TurnFaultError, isTurnFaultError } from "../core/results.js";
 import type { LLMClient, LLMStreamOk } from "../llm/client.js";
 import type { LLMContext } from "../core/context.js";
 import type { LLMBlock } from "../core/blocks.js";
@@ -51,11 +51,9 @@ ${conversationText}`;
         const next = await stream.next();
         if (next.done) {
           const terminal = next.value;
-          if (!terminal.ok) {
-            throw new Error(
-              `Compression failed: ${describeFault(terminal.fault)}`,
-            );
-          }
+          // The fault stays typed: the turn boundary sees a TurnFaultError,
+          // and the status line keeps kind/retryable information.
+          if (!terminal.ok) throw new TurnFaultError(terminal.fault);
           result = terminal;
           break;
         }
@@ -70,6 +68,7 @@ ${conversationText}`;
         ...suffix,
       ];
     } catch (e) {
+      if (isTurnFaultError(e)) throw e;
       throw new Error(`Compression failed: ${(e as Error).message}`);
     }
   }

@@ -87,6 +87,25 @@ describe("runAgent virtual integration", () => {
     );
   });
 
+  it("converts a provider fault terminal into a TurnFaultError", async () => {
+    const { deps } = createTestDeps({
+      responses: [
+        VirtualLLMClient.faultResponse({
+          kind: "llm",
+          reason: "rate limited",
+          retryable: true,
+        }),
+      ],
+    });
+
+    await expect(
+      runAgent(deps, "Hi", new AbortController().signal),
+    ).rejects.toMatchObject({
+      name: "TurnFaultError",
+      message: "LLM error (retryable): rate limited",
+    });
+  });
+
   it("scenario 1: pure text — LLM returns text, run ends, context has correct messages", async () => {
     const { deps, context } = createTestDeps({
       responses: [defaultTextResponse("Hello, I am the agent.")],

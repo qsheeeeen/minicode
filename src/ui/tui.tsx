@@ -3,11 +3,8 @@ import { Box, useInput, useApp } from "ink";
 import type { AgentDeps } from "../agent.js";
 import type { AppConfig } from "../config.js";
 import type { UserPrompter } from "../core/prompt.js";
-import {
-  inputRequestToState,
-  createCommandContext,
-  type CommandContext,
-} from "./commands/index.js";
+import { createCommandContext, type CommandContext } from "./commands/index.js";
+import { inputRequestToState } from "./tui/input-modes.js";
 import { processRoutedInput, runAgentTurn } from "./turn.js";
 import { AgentRegistry } from "../services/index.js";
 import type { RuntimeEvents } from "../services/runtime-events.js";

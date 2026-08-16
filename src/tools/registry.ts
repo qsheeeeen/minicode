@@ -4,12 +4,7 @@ import type { AppConfig } from "../config.js";
 
 import type { UserPrompter } from "../core/prompt.js";
 
-import type { ToolRequirementDef } from "./requirements.js";
-export type { ToolRequirementDef } from "./requirements.js";
-export {
-  agentRegistryRequirement,
-  python3Requirement,
-} from "./requirements.js";
+import type { RequirementEnv, ToolRequirementDef } from "./requirements.js";
 
 export interface ToolConfig {
   client: LLMClient;
@@ -164,28 +159,28 @@ export class ToolRegistry {
 
   /**
    * The tool-set for a run: drops tools whose declared requirements the
-   * environment fails (each requirement carries its own probe) and
-   * interactive tools in headless runs.
+   * environment fails (each requirement carries its own probe; probed once
+   * per distinct requirement) and interactive tools in headless runs.
    */
   async resolveTools(
-    env: import("./requirements.js").RequirementEnv,
+    env: RequirementEnv,
     opts: { headless: boolean },
   ): Promise<Map<string, ToolDef<any>>> {
     const satisfied = new Map<string, boolean>();
-    const tools = this.getAll();
-    for (const tool of tools.values()) {
+    const tools = new Map<string, ToolDef<any>>();
+    for (const [name, tool] of this.tools) {
+      if (opts.headless && tool.interactive) continue;
+      let ok = true;
       for (const requirement of tool.requires ?? []) {
-        if (satisfied.has(requirement.name)) continue;
-        satisfied.set(requirement.name, await requirement.probe(env));
+        if (!satisfied.has(requirement.name)) {
+          satisfied.set(requirement.name, await requirement.probe(env));
+        }
+        if (!satisfied.get(requirement.name)) {
+          ok = false;
+          break;
+        }
       }
-    }
-    for (const [name, tool] of tools) {
-      const failed = (tool.requires ?? []).some(
-        (requirement) => !satisfied.get(requirement.name),
-      );
-      if (failed || (opts.headless && tool.interactive)) {
-        tools.delete(name);
-      }
+      if (ok) tools.set(name, tool);
     }
     return tools;
   }

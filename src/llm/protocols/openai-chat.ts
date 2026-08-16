@@ -4,8 +4,7 @@
 // converts between internal types and the OpenAI Chat Completions API format.
 
 import OpenAI from "openai";
-import { isAbortError } from "../../core/results.js";
-import { faultFromError } from "./shared.js";
+import { terminalFromError } from "./shared.js";
 import type {
   LLMClient,
   LLMStream,
@@ -313,8 +312,7 @@ export class OpenAIChatClient implements LLMClient {
           },
         };
       } catch (e) {
-        if (isAbortError(e)) throw e;
-        return { ok: false, fault: faultFromError(e) };
+        return terminalFromError(e);
       }
     }
 

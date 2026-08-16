@@ -7,6 +7,7 @@ import { AnthropicClient } from "./anthropic.js";
 import { OpenAIChatClient } from "./openai-chat.js";
 import { OpenAIResponsesClient } from "./openai-responses.js";
 
+/** Called once by the composition root (and by resetProtocols). */
 export function registerBuiltinProtocols(): void {
   registerProtocol(
     "anthropic",
@@ -21,8 +22,6 @@ export function registerBuiltinProtocols(): void {
     (apiKey, baseURL) => new OpenAIResponsesClient(apiKey, baseURL),
   );
 }
-
-registerBuiltinProtocols();
 
 /** Reset to the built-in protocol set (test isolation). */
 export function resetProtocols(): void {
