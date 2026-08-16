@@ -13,8 +13,8 @@ export type MessageRole =
 
 export type DisplayMessage =
   | { role: "user"; content: string }
-  | { role: "text"; content: string; isStreaming?: boolean }
-  | { role: "thinking"; content: string; isStreaming?: boolean }
+  | { role: "text"; content: string }
+  | { role: "thinking"; content: string }
   | {
       role: "tool";
       name: string;

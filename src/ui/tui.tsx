@@ -193,7 +193,7 @@ function AppContent({
         abortRef.current = null;
         // Ensure final messages are always synced to UI state after run.
         uiTimeline.sync();
-        useTuiState.setState({ isLoading: false, status: "" });
+        useTuiState.setState({ isLoading: false });
       }
     },
     [cmdContext, deps, context, sessionManager, uiTimeline, prompterRef],

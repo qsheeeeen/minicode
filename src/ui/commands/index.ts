@@ -110,14 +110,3 @@ export function getCommandList(
   );
 }
 
-export function getHelp(
-  commands: CommandRegistry,
-  skills: SkillRegistry,
-): string {
-  const lines = ["Available commands:"];
-  for (const cmd of getCommandList(commands, skills)) {
-    lines.push(`  /${cmd.name} - ${cmd.description}`);
-  }
-  lines.push("  !<command> - Run a shell command directly");
-  return lines.join("\n");
-}

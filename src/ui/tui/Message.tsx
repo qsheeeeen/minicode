@@ -41,7 +41,7 @@ export function Message({ msg }: { msg: DisplayMessage }) {
           </Text>
           <Box>
             <Text dimColor>
-              {msg.isStreaming ? msg.content : msg.content.trim()}
+              {msg.content.trim()}
             </Text>
           </Box>
         </Box>

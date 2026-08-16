@@ -18,7 +18,6 @@ export interface TuiState {
   tokenCount: number;
   currentSession: string;
   isLoading: boolean;
-  status: string;
   permissionMode: PermissionMode;
   pendingPrompt: (Prompt & { resolve: (value: string) => void }) | null;
   showReceipt: boolean;
@@ -37,7 +36,6 @@ export const initialState: TuiState = {
   tokenCount: 0,
   currentSession: "",
   isLoading: false,
-  status: "",
   permissionMode: "manual",
   pendingPrompt: null,
   showReceipt: false,

@@ -55,7 +55,6 @@ function Demo() {
     currentSession: "session-1231231123123",
     isLoading: true,
     permissionMode: "manual" as const,
-    status: "",
     pendingPrompt: null,
     input: { mode, value: "", props: {}, key: 0 },
   });

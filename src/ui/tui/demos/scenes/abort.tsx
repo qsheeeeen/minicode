@@ -11,7 +11,6 @@ function Scene() {
     useTuiState.setState({
       messages: [{ role: "user", content: "Run the full migration." }],
       isLoading: true,
-      status: "",
     });
     const steps = [
       setTimeout(
@@ -27,10 +26,7 @@ function Scene() {
           })),
         800,
       ),
-      setTimeout(
-        () => useTuiState.setState({ status: "(Aborted)", isLoading: false }),
-        2500,
-      ),
+      setTimeout(() => useTuiState.setState({ isLoading: false }), 2500),
     ];
     return () => steps.forEach(clearTimeout);
   }, []);

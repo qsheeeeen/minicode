@@ -9,7 +9,6 @@ useTuiState.setState({
   tokenCount: 24000,
   currentSession: "debug-auth",
   permissionMode: "manual",
-  status: "",
 });
 render(
   <Box flexDirection="column" padding={1}>
@@ -23,13 +22,11 @@ useTuiState.setState({
   tokenCount: 110000,
   currentSession: "refactor-db",
   permissionMode: "yolo",
-  status: "",
 });
 render(<Panel model={new Model("claude-opus-4-7", "anthropic", 200000)} />);
 useTuiState.setState({
   tokenCount: 178000,
   currentSession: "feature-x",
   permissionMode: "auto",
-  status: "Compressing...",
 });
 render(<Panel model={new Model("gpt-4o", "openai", 200000)} />);

@@ -13,7 +13,6 @@ export function Panel({ model, promptFiles = [] }: PanelProps) {
   const tokenCount = useTuiState((s) => s.tokenCount);
   const permissionMode = useTuiState((s) => s.permissionMode);
   const currentSession = useTuiState((s) => s.currentSession);
-  const status = useTuiState((s) => s.status);
 
   const currentModel = model;
   const contextLength = currentModel.getContextLength();
@@ -50,17 +49,6 @@ export function Panel({ model, promptFiles = [] }: PanelProps) {
               {promptFiles.join(", ")}
             </Text>
           </>
-        )}
-        {status && (
-          <Text wrap="truncate" dimColor>
-            {" "}
-            |{" "}
-          </Text>
-        )}
-        {status && (
-          <Text wrap="truncate" color="magenta">
-            {status}
-          </Text>
         )}
       </Box>
 

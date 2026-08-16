@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   executeCommand,
   getCommandList,
-  getHelp,
   registerBuiltinCommands,
   registerSkillCommands,
   CommandRegistry,
@@ -450,8 +449,5 @@ describe("Builtin commands", () => {
       expect(names).toContain("skill-creator");
     });
 
-    it("getHelp includes shell hint", () => {
-      expect(getHelp(commands, skills)).toContain("!<command>");
-    });
   });
 });

@@ -27,7 +27,6 @@ export const sampleMessages: DisplayMessage[] = [
   {
     role: "text",
     content: "Reading the entry point and preparing edits...",
-    isStreaming: true,
   },
   {
     role: "tool",
