@@ -48,7 +48,7 @@ export class ModelSwitchService {
     const { client, model } = selection;
 
     // runtimeState is the single source of truth; ContextManager and the
-    // permission gate subscribe to model.changed in the composition root.
+    // permission gate resolve client/model through its getters.
     this.runtimeState.setClientModel(client, model);
 
     if (opts.tier) {

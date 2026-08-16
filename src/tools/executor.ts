@@ -3,10 +3,10 @@ import type {
   ToolExecutionContext,
   ToolConfig,
   ToolRunResult,
-  UserPrompter,
   Capabilities,
 } from "./registry.js";
-import type { LLMToolUseBlock } from "../llm/client.js";
+import type { UserPrompter } from "../core/prompt.js";
+import type { LLMToolUseBlock } from "../core/blocks.js";
 import type { LLMContext } from "../core/context.js";
 import type { AppConfig } from "../config.js";
 import { isAbortError, isTurnFaultError } from "../core/results.js";

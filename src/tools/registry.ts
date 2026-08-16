@@ -3,7 +3,6 @@ import type { Model } from "../llm/model.js";
 import type { AppConfig } from "../config.js";
 
 import type { UserPrompter } from "../core/prompt.js";
-export type { PromptOption, Prompt, UserPrompter } from "../core/prompt.js";
 
 import type { ToolRequirementDef } from "./requirements.js";
 export type { ToolRequirementDef } from "./requirements.js";

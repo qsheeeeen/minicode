@@ -3,7 +3,8 @@ import type { AppConfig } from "./config.js";
 import type { Model } from "./llm/model.js";
 import type { LLMClient, LLMToolDef, LLMStreamOk } from "./llm/client.js";
 import type { ToolExecutor, ToolCall } from "./tools/executor.js";
-import type { UserPrompter, ToolDef, Capabilities } from "./tools/registry.js";
+import type { UserPrompter } from "./core/prompt.js";
+import type { ToolDef, Capabilities } from "./tools/registry.js";
 import type { PromptManager } from "./services/prompt-manager.js";
 import type { SessionManager } from "./services/session-manager.js";
 import type { ContextManager } from "./services/context-manager.js";
@@ -11,9 +12,6 @@ import type { PermissionService } from "./services/permission.js";
 import type { RuntimeEvents } from "./services/runtime-events.js";
 import type { SessionStats } from "./services/session-stats.js";
 import type pino from "pino";
-
-export { isAbortError } from "./core/results.js";
-export { TurnFaultError, isTurnFaultError } from "./core/results.js";
 
 /**
  * Dependencies for runAgent. This is a mutable parameter bag owned by the

@@ -2,7 +2,7 @@ import type { Model } from "../../llm/model.js";
 import type { SessionStats } from "../../services/session-stats.js";
 import type { SessionManager } from "../../services/session-manager.js";
 import type { ChangeJournal } from "../../services/change-journal.js";
-import type { LLMBlock, LLMContext } from "../../core/context.js";
+import type { LLMContext } from "../../core/context.js";
 import type { AppConfig, Providers } from "../../config.js";
 import type { SkillRegistry } from "../../skills/index.js";
 import type { ModelSwitchService } from "../../services/model-switcher.js";

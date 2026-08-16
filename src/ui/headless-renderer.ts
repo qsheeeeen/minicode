@@ -1,4 +1,5 @@
-import type { LLMBlock, LLMContext } from "../core/context.js";
+import type { LLMContext } from "../core/context.js";
+import type { LLMBlock } from "../core/blocks.js";
 import { callContent } from "../utils/tool-format.js";
 import type { SessionTimeline } from "./timeline.js";
 

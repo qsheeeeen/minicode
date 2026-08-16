@@ -24,17 +24,6 @@ export function clearProtocols(): void {
   protocols.clear();
 }
 
-// The conversation block vocabulary is owned by core; this port adapts it.
-
-export type {
-  LLMUserBlock,
-  LLMTextBlock,
-  LLMThinkingBlock,
-  LLMToolUseBlock,
-  LLMToolResultBlock,
-  LLMAssistantBlock,
-  LLMBlock,
-} from "../core/blocks.js";
 import type { LLMAssistantBlock, LLMBlock } from "../core/blocks.js";
 
 export type EffortLevel =

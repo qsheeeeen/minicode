@@ -32,7 +32,7 @@ import {
 import { ModelFactory } from "./llm/model.js";
 import type { Model } from "./llm/model.js";
 import type { LLMClient } from "./llm/client.js";
-import type { LLMBlock } from "./core/context.js";
+import type { LLMBlock } from "./core/blocks.js";
 import type { AppConfig } from "./config.js";
 import type pino from "pino";
 

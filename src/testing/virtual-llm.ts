@@ -12,9 +12,8 @@ import type {
   LLMToolDef,
   ChatOptions,
   TokenUsage,
-  LLMAssistantBlock,
-  LLMBlock,
 } from "../llm/client.js";
+import type { LLMAssistantBlock, LLMBlock } from "../core/blocks.js";
 import type { TurnFault } from "../core/results.js";
 
 // Types

@@ -1,4 +1,4 @@
-import type { LLMBlock } from "../core/context.js";
+import type { LLMBlock } from "../core/blocks.js";
 import type { RuntimeStatus } from "../services/runtime-events.js";
 
 export type StatusMessage = RuntimeStatus;

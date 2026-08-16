@@ -19,9 +19,8 @@ import type {
   StopReason,
   TokenUsage,
   EffortLevel,
-  LLMBlock,
 } from "../client.js";
-import type { LLMAssistantBlock } from "../client.js";
+import type { LLMAssistantBlock, LLMBlock } from "../../core/blocks.js";
 
 // The OpenAI SDK's ResponseStreamEvent union doesn't cover all streaming event
 // types (delta, output_item.done, etc.). These interfaces fill the gap.

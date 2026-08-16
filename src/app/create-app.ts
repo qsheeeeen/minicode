@@ -128,14 +128,8 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
   );
 
   // RuntimeState is the single owner of the mutable client/model/logger
-  // handles; downstream services follow model.changed instead of being
-  // manually synced by each mutator.
-  const runtimeState = new RuntimeState(
-    initialClient,
-    initialModel,
-    logger,
-    runtimeEvents,
-  );
+  // handles; consumers resolve them through getters at use time.
+  const runtimeState = new RuntimeState(initialClient, initialModel, logger);
 
   const permissionService = new PermissionService(
     permissionMode,

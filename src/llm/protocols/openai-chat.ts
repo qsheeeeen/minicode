@@ -14,9 +14,12 @@ import type {
   LLMStreamResult,
   StopReason,
   EffortLevel,
-  LLMBlock,
 } from "../client.js";
-import type { LLMAssistantBlock, LLMToolUseBlock } from "../client.js";
+import type {
+  LLMBlock,
+  LLMAssistantBlock,
+  LLMToolUseBlock,
+} from "../../core/blocks.js";
 
 // Constants
 

@@ -8,7 +8,7 @@ import { LLMContext } from "../core/context.js";
 import { ChangeJournal } from "./change-journal.js";
 import { SessionPersistence } from "./session-persistence.js";
 import type { SessionStats } from "./session-stats.js";
-import type { LLMBlock } from "../core/context.js";
+import type { LLMBlock } from "../core/blocks.js";
 import { RuntimeEvents, type RuntimeStatusInput } from "./runtime-events.js";
 
 export type StatusReporter = (msg: RuntimeStatusInput) => void;

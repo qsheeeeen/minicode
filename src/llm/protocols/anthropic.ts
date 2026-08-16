@@ -15,9 +15,8 @@ import type {
   LLMStreamResult,
   StopReason,
   EffortLevel,
-  LLMBlock,
 } from "../client.js";
-import type { LLMAssistantBlock } from "../client.js";
+import type { LLMAssistantBlock, LLMBlock } from "../../core/blocks.js";
 
 function toSdkEffort(
   effort: EffortLevel,

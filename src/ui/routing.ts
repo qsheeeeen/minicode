@@ -85,7 +85,9 @@ class CommandInputHandler implements InputHandler {
     }
     // Handled without a prompt (handler command) is done; unhandled is
     // unknown — route-handler reports it.
-    return result.handled ? { action: "none" } : { action: "command", command: parts[0] };
+    return result.handled
+      ? { action: "none" }
+      : { action: "command", command: parts[0] };
   }
 }
 
