@@ -11,8 +11,6 @@ export async function runTuiApp(app: AppRuntime): Promise<void> {
     promptFiles: app.promptFiles,
     initialSession: app.initialSession,
     initialPrompt: app.initialPrompt,
-    sessionName: app.sessionName,
-    resumeRecent: app.resumeRecent,
     agentRegistry: app.agentRegistry,
     runtimeEvents: app.runtimeEvents,
     programStartTime: app.programStartTime,

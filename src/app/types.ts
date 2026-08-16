@@ -21,8 +21,6 @@ export interface AppRuntime {
   readonly promptFiles: string[];
   readonly initialSession: string;
   readonly initialPrompt?: string;
-  readonly sessionName?: string;
-  readonly resumeRecent: boolean;
   readonly headless: boolean;
   readonly programStartTime: number;
   readonly agentRegistry: AgentRegistry;

@@ -33,7 +33,6 @@ import {
 } from "../tools/capabilities.js";
 import { createDefaultAgentTypes } from "../tools/agent-types.js";
 import { runSubAgent } from "../sub-agent.js";
-import { createLogger } from "../utils/logger.js";
 import { loadGlobalPrompt } from "../utils/prompts.js";
 import {
   CommandRegistry,
@@ -100,10 +99,10 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
     initialSession = `session-${Date.now()}`;
   }
 
-  const logger = await createLogger(
-    SessionPersistence.getProjectHash(),
-    initialSession,
-  );
+  // Prefetch the persisted session so the disk read overlaps skill loading
+  // and the tool-availability probes instead of blocking first paint.
+  const restoring = !!(sessionName || resumeRecent);
+  const preload = restoring ? SessionPersistence.load(initialSession) : undefined;
 
   const skillRegistry = createDefaultSkillRegistry();
   const skillManager = new SkillManager(skillRegistry)
@@ -129,7 +128,8 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
 
   // RuntimeState is the single owner of the mutable client/model/logger
   // handles; consumers resolve them through getters at use time.
-  const runtimeState = new RuntimeState(initialClient, initialModel, logger);
+  // The logger arrives with the session restore below (same name).
+  const runtimeState = new RuntimeState(initialClient, initialModel);
 
   const permissionService = new PermissionService(
     permissionMode,
@@ -209,7 +209,8 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
     contextManager,
     runtimeState,
     name: initialSession,
-    load: !!(sessionName || resumeRecent),
+    load: restoring,
+    preload,
   });
   if (sessionName && !restored.loaded) {
     sessionManager.reportStatus({
@@ -244,8 +245,6 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
     promptFiles,
     initialSession,
     initialPrompt,
-    sessionName,
-    resumeRecent,
     headless,
     programStartTime,
     agentRegistry,

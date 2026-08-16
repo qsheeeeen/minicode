@@ -44,8 +44,6 @@ export interface AppProps {
   promptFiles: string[];
   initialSession: string;
   initialPrompt?: string;
-  sessionName?: string;
-  resumeRecent: boolean;
   agentRegistry: AgentRegistry;
   runtimeEvents: RuntimeEvents;
   programStartTime: number;

@@ -71,16 +71,14 @@ export function createCommandContext(
     modelSwitchService,
     contextManager,
     isAgentRunning: bridges.isAgentRunning,
-    resumeSession: async (name) => {
-      const result = await resumeSession({
+    resumeSession: (name) =>
+      resumeSession({
         sessionManager,
         contextManager,
         runtimeState,
         sessionStats,
         name,
-      });
-      return result;
-    },
+      }),
     switchSession: async (name, opts2) => {
       await switchSession({
         sessionManager,

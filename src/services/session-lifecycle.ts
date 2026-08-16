@@ -1,9 +1,21 @@
 import type { SessionStats } from "./session-stats.js";
 import type { SessionManager } from "./session-manager.js";
 import { createLogger } from "../utils/logger.js";
-import { SessionPersistence } from "./session-persistence.js";
+import { SessionPersistence, type SessionData } from "./session-persistence.js";
 import type { RuntimeState } from "./runtime-state.js";
 import type { ContextManager } from "./context-manager.js";
+
+/** Activate a session: fresh logger, name, journal — the one triple every
+ *  switch/restore/rename needs. */
+async function activateSession(
+  sessionManager: SessionManager,
+  runtimeState: RuntimeState,
+  name: string,
+): Promise<void> {
+  const logger = await createLogger(SessionPersistence.getProjectHash(), name);
+  sessionManager.setSession(name);
+  runtimeState.setLogger(logger);
+}
 
 export interface SessionSwitchOptions {
   sessionManager: SessionManager;
@@ -14,12 +26,7 @@ export interface SessionSwitchOptions {
 }
 
 export async function switchSession(opts: SessionSwitchOptions): Promise<void> {
-  const logger = await createLogger(
-    SessionPersistence.getProjectHash(),
-    opts.sessionName,
-  );
-  opts.sessionManager.setSession(opts.sessionName);
-  opts.runtimeState.setLogger(logger);
+  await activateSession(opts.sessionManager, opts.runtimeState, opts.sessionName);
   opts.sessionStats.incrementSessionCount(opts.sessionName);
   if (opts.statusMessage) {
     opts.sessionManager.reportStatus({
@@ -38,26 +45,12 @@ export interface RestoreSessionOptions {
   name: string;
   /** Whether to attempt loading persisted blocks for this session. */
   load: boolean;
+  /** Prefetched session data (started earlier to overlap other startup I/O). */
+  preload?: Promise<SessionData | null>;
 }
 
 export interface RestoreSessionResult {
   loaded: boolean;
-}
-
-/** Load persisted blocks/token count into the live context. */
-async function loadInto(
-  sessionManager: SessionManager,
-  contextManager: ContextManager,
-  name: string,
-): Promise<boolean> {
-  const data = await SessionPersistence.load(name);
-  if (!data) return false;
-
-  sessionManager.getContext().replaceBlocks(data.blocks);
-  if ((data.totalTokens ?? 0) > 0) {
-    contextManager.setTokenCount(data.totalTokens!);
-  }
-  return true;
 }
 
 /**
@@ -69,16 +62,22 @@ async function loadInto(
 export async function restoreSession(
   opts: RestoreSessionOptions,
 ): Promise<RestoreSessionResult> {
-  const { sessionManager, contextManager, runtimeState, name, load } = opts;
-  sessionManager.setSession(name);
-  if (!load) return { loaded: false };
+  const { sessionManager, contextManager, runtimeState, name, load, preload } =
+    opts;
 
-  if (!(await loadInto(sessionManager, contextManager, name))) {
-    return { loaded: false };
+  if (load) {
+    const data = await (preload ?? SessionPersistence.load(name));
+    if (data) {
+      sessionManager.getContext().replaceBlocks(data.blocks);
+      if ((data.totalTokens ?? 0) > 0) {
+        contextManager.setTokenCount(data.totalTokens!);
+      }
+      await activateSession(sessionManager, runtimeState, name);
+      return { loaded: true };
+    }
   }
-  const logger = await createLogger(SessionPersistence.getProjectHash(), name);
-  runtimeState.setLogger(logger);
-  return { loaded: true };
+  await activateSession(sessionManager, runtimeState, name);
+  return { loaded: false };
 }
 
 export interface ResumeSessionOptions {
@@ -99,8 +98,11 @@ export async function resumeSession(
 ): Promise<RestoreSessionResult> {
   const { sessionManager, contextManager, runtimeState, sessionStats, name } =
     opts;
-  if (!(await loadInto(sessionManager, contextManager, name))) {
-    return { loaded: false };
+  const data = await SessionPersistence.load(name);
+  if (!data) return { loaded: false };
+  sessionManager.getContext().replaceBlocks(data.blocks);
+  if ((data.totalTokens ?? 0) > 0) {
+    contextManager.setTokenCount(data.totalTokens!);
   }
   await switchSession({
     sessionManager,
@@ -123,12 +125,7 @@ export interface RenameSessionOptions {
 export async function renameSession(opts: RenameSessionOptions): Promise<void> {
   const { sessionManager, runtimeState, oldName, newName } = opts;
   await SessionPersistence.rename(oldName, newName);
-  const logger = await createLogger(
-    SessionPersistence.getProjectHash(),
-    newName,
-  );
-  sessionManager.setSession(newName);
-  runtimeState.setLogger(logger);
+  await activateSession(sessionManager, runtimeState, newName);
   sessionManager.reportStatus({
     role: "status",
     content: `Renamed: ${oldName} -> ${newName}`,
