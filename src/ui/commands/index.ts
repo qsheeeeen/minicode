@@ -109,4 +109,3 @@ export function getCommandList(
     a.name.localeCompare(b.name),
   );
 }
-

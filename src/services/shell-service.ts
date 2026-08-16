@@ -1,4 +1,4 @@
-import { execSync, spawn } from "child_process";
+import { spawn } from "child_process";
 import path from "path";
 
 export interface ShellServiceOpts {
@@ -122,45 +122,6 @@ export class ShellService {
         });
       });
     });
-  }
-
-  runSync(command: string, timeoutMs?: number): string {
-    const clean = (s: unknown): string =>
-      this.truncate(stripAnsiCodes(String(s ?? ""))).trim();
-    try {
-      const output = clean(
-        execSync(command, {
-          encoding: "utf-8",
-          timeout: timeoutMs ?? this.defaultTimeoutMs,
-          cwd: this.cwd,
-        }),
-      );
-      return this.formatResult({
-        stdout: output,
-        stderr: "",
-        exitCode: 0,
-        timedOut: false,
-        aborted: false,
-      });
-    } catch (error) {
-      // execSync throws on non-zero exit with { status, stdout, stderr }.
-      const e = error as {
-        status?: number;
-        stdout?: string;
-        stderr?: string;
-        message?: string;
-      };
-      if (typeof e.status === "number") {
-        return this.formatResult({
-          stdout: clean(e.stdout),
-          stderr: clean(e.stderr),
-          exitCode: e.status,
-          timedOut: false,
-          aborted: false,
-        });
-      }
-      return `Error: ${e.message ?? String(error)}`;
-    }
   }
 
   formatResult(result: ShellResult): string {

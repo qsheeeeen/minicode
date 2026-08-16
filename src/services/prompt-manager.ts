@@ -4,7 +4,7 @@
 // Agent calls refreshEnvironment() on init and getSystemPrompt() before each
 // chatStream call.
 
-import { buildSystemPrompt, getEnvironmentContext } from "../utils/prompts.js";
+import { buildSystemPrompt } from "../utils/prompts.js";
 
 export class PromptManager {
   private userPrompt: string;
@@ -27,9 +27,10 @@ export class PromptManager {
     this.refreshSystemPrompt();
   }
 
-  /** Fetch runtime environment (git status, cwd) and rebuild system prompt. */
-  async refreshEnvironment(): Promise<void> {
-    this.environmentContext = await getEnvironmentContext();
+  /** Adopt a fresh environment snapshot (gathered by the caller through the
+   *  shell port) and rebuild the system prompt. */
+  refreshEnvironment(environmentContext = ""): void {
+    this.environmentContext = environmentContext;
     this.refreshSystemPrompt();
   }
 

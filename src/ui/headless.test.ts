@@ -55,7 +55,18 @@ const mockDeps = {
   promptManager: {},
 } as any;
 
-const mockShellService = { runSync: vi.fn().mockReturnValue("output") };
+const mockShellService = {
+  run: vi
+    .fn()
+    .mockResolvedValue({
+      stdout: "output",
+      stderr: "",
+      exitCode: 0,
+      timedOut: false,
+      aborted: false,
+    }),
+  formatResult: vi.fn(() => "output"),
+};
 
 const mockRuntimeState = { setLogger: vi.fn() };
 

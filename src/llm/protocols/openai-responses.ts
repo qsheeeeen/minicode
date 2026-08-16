@@ -43,7 +43,6 @@ interface StreamCompletedEvent {
 
 // Constants
 
-
 // Effort mapping
 
 // Map our five-level effort to OpenAI's three-level reasoning effort.

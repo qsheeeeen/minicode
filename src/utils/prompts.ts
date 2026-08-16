@@ -63,29 +63,13 @@ export function buildSystemPrompt(opts: SystemPromptOptions): string {
   return prompt;
 }
 
-/**
- * Gather environment context (working directory, git status).
- * Returns the context string.
- */
-export async function getEnvironmentContext(): Promise<string> {
+/** Format the environment snapshot for the system prompt. The caller
+ *  gathers the git status through the shell port; this stays pure. */
+export function formatEnvironmentContext(gitStatus?: string): string {
   let ctx = `Working directory: ${process.cwd()}\n`;
-  try {
-    const { execFile } = await import("child_process");
-    const status = await new Promise<string>((resolve, reject) => {
-      execFile(
-        "git",
-        ["status"],
-        { encoding: "utf-8", timeout: 5000 },
-        (err, stdout) => {
-          if (err) reject(err);
-          else resolve(stdout);
-        },
-      );
-    });
-    ctx += `\n${status.trim()}\n`;
+  if (gitStatus?.trim()) {
+    ctx += `\n${gitStatus.trim()}\n`;
     ctx += `\nThis is the git status at the start of the conversation. Note that this status is a snapshot in time, and will not update during the conversation.`;
-  } catch {
-    // Not a git repo or git unavailable — skip
   }
   return ctx;
 }

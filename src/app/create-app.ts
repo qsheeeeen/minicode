@@ -34,7 +34,10 @@ import {
 import { createDefaultAgentTypes } from "../tools/agent-types.js";
 import { MAIN_AGENT_ID } from "../agent.js";
 import { runSubAgent } from "../sub-agent.js";
-import { loadGlobalPrompt } from "../utils/prompts.js";
+import {
+  formatEnvironmentContext,
+  loadGlobalPrompt,
+} from "../utils/prompts.js";
 import {
   CommandRegistry,
   createCommandContext,
@@ -194,7 +197,18 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
     getLogger: () => runtimeState.logger,
   });
   const { deps, sessionManager, contextManager } = runtime;
-  void deps.promptManager.refreshEnvironment();
+  // Environment snapshot for the system prompt, gathered through the shell
+  // port (git is an uncontrolled side effect like any other command).
+  void shellService
+    .runProcess("git", ["status"], { timeoutMs: 5000 })
+    .then((r) =>
+      deps.promptManager.refreshEnvironment(
+        formatEnvironmentContext(r.exitCode === 0 ? r.stdout : undefined),
+      ),
+    )
+    .catch(() =>
+      deps.promptManager.refreshEnvironment(formatEnvironmentContext()),
+    );
 
   const commandRegistry = new CommandRegistry();
   registerBuiltinCommands(commandRegistry);

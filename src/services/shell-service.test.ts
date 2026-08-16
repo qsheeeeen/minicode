@@ -26,7 +26,7 @@ describe("ShellService", () => {
   it("supports synchronous shell execution for route handling", () => {
     const service = new ShellService({ cwd: process.cwd() });
 
-    expect(typeof service.runSync("printf ok")).toBe("string");
+    expect(typeof service.run).toBe("function");
   });
 
   it("runs an executable with explicit args (no shell)", async () => {

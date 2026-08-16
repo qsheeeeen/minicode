@@ -448,6 +448,5 @@ describe("Builtin commands", () => {
       expect(names).toContain("exit");
       expect(names).toContain("skill-creator");
     });
-
   });
 });

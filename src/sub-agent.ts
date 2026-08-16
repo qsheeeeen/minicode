@@ -179,12 +179,9 @@ export async function runSubAgent(
     const blocks = subContext.getBlocks();
     const finalResponse = extractFinalResponse(blocks);
     const summary = generateSummary(blocks);
-    registry.updateProgress(subId, {
-      tokenCount: contextManager.getTokenCount(),
-      toolCalls: toolCallCount,
-    });
-    registry.updateStatus(subId, "completed");
-    registry.updateSummary(subId, summary);
+    // No status/summary writes before removal — a removed entry is
+    // unobservable, so those writes only implied a history that doesn't
+    // exist.
     registry.remove(subId);
     return {
       outcome: "success",
@@ -192,8 +189,6 @@ export async function runSubAgent(
     };
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
-    registry.updateStatus(subId, "error");
-    registry.updateSummary(subId, `Error: ${msg}`);
     registry.remove(subId);
     return { outcome: "error", reason: `Agent #${subId} failed: ${msg}` };
   } finally {

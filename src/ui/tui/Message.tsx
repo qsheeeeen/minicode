@@ -40,9 +40,7 @@ export function Message({ msg }: { msg: DisplayMessage }) {
             Thinking
           </Text>
           <Box>
-            <Text dimColor>
-              {msg.content.trim()}
-            </Text>
+            <Text dimColor>{msg.content.trim()}</Text>
           </Box>
         </Box>
       );

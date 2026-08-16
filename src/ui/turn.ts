@@ -32,7 +32,12 @@ export async function processRoutedInput(
   const route = cmdContext
     ? await cmdContext.router.route(input, cmdContext)
     : { action: "llm" as const, promptText: input };
-  const processed = processRoute(route, context, shellService, reportStatus);
+  const processed = await processRoute(
+    route,
+    context,
+    shellService,
+    reportStatus,
+  );
   if (processed.type === "run" && processed.displayContent) {
     timeline.setDisplay(
       context.getUserMessageCount(),

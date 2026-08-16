@@ -19,19 +19,20 @@ export type ProcessedRoute =
  * Shell results are always injected into the agent's context so
  * the LLM can see them in future user messages, regardless of display mode.
  */
-export function processRoute(
+export async function processRoute(
   route: RouteResult,
   context: LLMContext,
   shellService: ShellService,
   reportStatus?: StatusReporter,
-): ProcessedRoute {
+): Promise<ProcessedRoute> {
   if (route.action === "none") {
     return { type: "done" };
   }
 
   if (route.action === "shell") {
     const command = route.promptText!;
-    const output = shellService.runSync(command);
+    // Async spawn — a long `!command` must not freeze the TUI's event loop.
+    const output = shellService.formatResult(await shellService.run(command));
 
     // Inject into LLM context so the agent sees the command + result
     context.startUserMessage(`Ran: ${command}\n\n\`\`\`\n${output}\n\`\`\``);
