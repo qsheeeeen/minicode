@@ -8,9 +8,9 @@ import { LLMContext } from "../core/context.js";
 import { ChangeJournal } from "./change-journal.js";
 import { SessionPersistence } from "./session-persistence.js";
 import type { SessionStats } from "./session-stats.js";
-import { RuntimeEvents, type RuntimeStatusInput } from "./runtime-events.js";
+import { RuntimeEvents, type RuntimeStatus } from "./runtime-events.js";
 
-export type StatusReporter = (msg: RuntimeStatusInput) => void;
+export type StatusReporter = (msg: RuntimeStatus) => void;
 
 export class SessionManager {
   private _currentSession: string;
@@ -33,7 +33,7 @@ export class SessionManager {
   }
 
   /** Report a status event. */
-  reportStatus(status: RuntimeStatusInput): void {
+  reportStatus(status: RuntimeStatus): void {
     this.events.emit({
       type: "status.added",
       status: {

@@ -41,21 +41,9 @@ describe("toDisplayMessages", () => {
     ];
 
     expect(toDisplayMessages(blocks, statuses)).toEqual([
-      {
-        role: "status",
-        content: "before",
-        element: undefined,
-        toolDisplay: undefined,
-        timestamp,
-      },
+      { role: "status", content: "before", timestamp },
       { role: "user", content: "internal" },
-      {
-        role: "error",
-        content: "after",
-        element: undefined,
-        toolDisplay: undefined,
-        timestamp,
-      },
+      { role: "error", content: "after", timestamp },
     ]);
   });
 });

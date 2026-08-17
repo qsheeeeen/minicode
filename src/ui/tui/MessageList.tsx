@@ -17,10 +17,7 @@ export function MessageList() {
     <Box flexGrow={1} flexDirection="column" paddingX={1}>
       <Box flexDirection="column">
         {messages
-          .filter((msg) => {
-            if (msg.role === "tool") return true;
-            return !!msg.content;
-          })
+          .filter((msg) => msg.role === "tool" || !!msg.content)
           .map((msg, i) => (
             <Box key={i}>
               <Message msg={msg} />

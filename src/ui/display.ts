@@ -22,17 +22,17 @@ export type DisplayMessage =
       output?: string;
       slotId: string;
     }
-  | {
-      role: "status";
-      content: string;
-      toolDisplay?: {
-        name: string;
-        input: Record<string, unknown>;
-        output?: string;
-      };
-      timestamp?: Date;
-    }
-  | { role: "error"; content: string; timestamp?: Date };
+  // Statuses flow through unchanged except for the placement index —
+  // display order comes from interleaving below, not from the field.
+  | Omit<RuntimeStatus, "userMessageIndex">;
+
+/** Strip the placement index; keep everything else as-is. */
+function toStatusDisplay({
+  userMessageIndex: _placed,
+  ...msg
+}: StatusMessage): DisplayMessage {
+  return msg;
+}
 
 export function toDisplayMessages(
   blocks: LLMBlock[],
@@ -42,23 +42,31 @@ export function toDisplayMessages(
   const userMessageCount = blocks.filter(
     (block) => block.type === "user",
   ).length;
+
+  // Bucket statuses by the user message they follow; unindexed ones belong
+  // after the latest. Statuses indexed past the end (a user message that
+  // doesn't exist yet) carry over to the very end of the transcript.
   const byUserMessageIndex = new Map<number, StatusMessage[]>();
+  const trailing: StatusMessage[] = [];
   for (const s of statuses) {
     const idx = s.userMessageIndex ?? userMessageCount;
-    if (!byUserMessageIndex.has(idx)) byUserMessageIndex.set(idx, []);
-    byUserMessageIndex.get(idx)!.push(s);
+    if (idx > userMessageCount) {
+      trailing.push(s);
+    } else {
+      const bucket = byUserMessageIndex.get(idx);
+      if (bucket) bucket.push(s);
+      else byUserMessageIndex.set(idx, [s]);
+    }
   }
 
   const result: DisplayMessage[] = [];
+  const pushStatuses = (idx: number): void => {
+    for (const s of byUserMessageIndex.get(idx) ?? []) {
+      result.push(toStatusDisplay(s));
+    }
+  };
 
-  for (const s of byUserMessageIndex.get(0) ?? []) {
-    result.push({
-      role: s.role,
-      content: s.content,
-      toolDisplay: s.toolDisplay,
-      timestamp: s.timestamp,
-    });
-  }
+  pushStatuses(0);
 
   let userMessagesSeen = 0;
   let toolMessages = new Map<
@@ -68,16 +76,7 @@ export function toDisplayMessages(
 
   for (const block of blocks) {
     if (block.type === "user") {
-      if (userMessagesSeen > 0) {
-        for (const s of byUserMessageIndex.get(userMessagesSeen) ?? []) {
-          result.push({
-            role: s.role,
-            content: s.content,
-            toolDisplay: s.toolDisplay,
-            timestamp: s.timestamp,
-          });
-        }
-      }
+      if (userMessagesSeen > 0) pushStatuses(userMessagesSeen);
       result.push({
         role: "user",
         content: displays?.get(userMessagesSeen) ?? block.text,
@@ -103,28 +102,8 @@ export function toDisplayMessages(
     }
   }
 
-  if (userMessagesSeen > 0) {
-    for (const s of byUserMessageIndex.get(userMessagesSeen) ?? []) {
-      result.push({
-        role: s.role,
-        content: s.content,
-        toolDisplay: s.toolDisplay,
-        timestamp: s.timestamp,
-      });
-    }
-  }
-
-  for (const s of statuses) {
-    const idx = s.userMessageIndex;
-    if (idx !== undefined && idx > userMessageCount) {
-      result.push({
-        role: s.role,
-        content: s.content,
-        toolDisplay: s.toolDisplay,
-        timestamp: s.timestamp,
-      });
-    }
-  }
+  if (userMessagesSeen > 0) pushStatuses(userMessagesSeen);
+  for (const s of trailing) result.push(toStatusDisplay(s));
 
   return result;
 }

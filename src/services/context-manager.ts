@@ -9,7 +9,7 @@ import {
 } from "./compression-service.js";
 import { ChangeJournal } from "./change-journal.js";
 import type { LLMContext } from "../core/context.js";
-import type { RuntimeEvents, RuntimeStatusInput } from "./runtime-events.js";
+import type { RuntimeEvents, RuntimeStatus } from "./runtime-events.js";
 
 export interface ContextManagerOpts {
   /** Live handles — always resolved at use, never a stale copy. */
@@ -222,7 +222,7 @@ export class ContextManager {
     });
   }
 
-  private reportStatus(status: RuntimeStatusInput): void {
+  private reportStatus(status: RuntimeStatus): void {
     this.events.emit({
       type: "status.added",
       status: {

@@ -13,10 +13,6 @@ export interface RuntimeStatus {
   };
 }
 
-export type RuntimeStatusInput = Omit<RuntimeStatus, "userMessageIndex"> & {
-  userMessageIndex?: number;
-};
-
 export type RuntimeEvent =
   | { type: "context.tokens_changed"; tokenCount: number }
   | {
