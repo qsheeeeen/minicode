@@ -22,12 +22,6 @@ export interface ContextManagerOpts {
   readonly compressionThresholdRatio: number;
   readonly sessionStats?: SessionStats;
   readonly compressionStrategy?: CompressionStrategy;
-  readonly thresholdPolicy?: ThresholdPolicy;
-}
-
-export interface ThresholdPolicy {
-  readonly thresholds: readonly number[];
-  shouldCompress(total: number, contextLength: number, ratio: number): boolean;
 }
 
 export interface TokenUsageResult {
@@ -40,14 +34,8 @@ export interface ProcessUsageResult extends TokenUsageResult {
   compressed: boolean;
 }
 
-export class DefaultThresholdPolicy implements ThresholdPolicy {
-  readonly thresholds = [25, 50, 75, 90] as const;
-
-  shouldCompress(total: number, contextLength: number, ratio: number): boolean {
-    const threshold = Math.floor(contextLength * ratio);
-    return total > threshold;
-  }
-}
+/** Context-percentage milestones that earn a status line. */
+const TOKEN_THRESHOLDS = [25, 50, 75, 90] as const;
 
 export class ContextManager {
   private compressionService: CompressionStrategy;
@@ -60,7 +48,6 @@ export class ContextManager {
   private events: RuntimeEvents;
   private compressionThresholdRatio: number;
   private sessionStats?: SessionStats;
-  private thresholdPolicy: ThresholdPolicy;
   private tokenCount = 0;
   private lastShownThreshold = 0;
 
@@ -73,7 +60,6 @@ export class ContextManager {
     this.events = opts.events;
     this.compressionThresholdRatio = opts.compressionThresholdRatio;
     this.sessionStats = opts.sessionStats;
-    this.thresholdPolicy = opts.thresholdPolicy ?? new DefaultThresholdPolicy();
     this.compressionService =
       opts.compressionStrategy ?? new SummaryCompressionStrategy();
   }
@@ -106,23 +92,19 @@ export class ContextManager {
     const ratio = totalTokens / contextLength;
     const percentage = Math.floor(ratio * 100);
 
-    for (const threshold of this.thresholdPolicy.thresholds) {
+    for (const threshold of TOKEN_THRESHOLDS) {
       if (percentage >= threshold && this.lastShownThreshold < threshold) {
         this.reportStatus({
           role: "status",
           content: `[${percentage}% context]`,
-          timestamp: new Date(),
         });
         this.lastShownThreshold = threshold;
         break;
       }
     }
 
-    const shouldCompress = this.thresholdPolicy.shouldCompress(
-      totalTokens,
-      this.getModel().getContextLength(),
-      this.compressionThresholdRatio,
-    );
+    const shouldCompress =
+      totalTokens > Math.floor(contextLength * this.compressionThresholdRatio);
 
     return { totalTokens, percentage, shouldCompress };
   }
@@ -140,7 +122,6 @@ export class ContextManager {
         this.reportStatus({
           role: "status",
           content: "Not enough conversation to compress.",
-          timestamp: new Date(),
         });
         return false;
       }
@@ -149,19 +130,16 @@ export class ContextManager {
       this.reportStatus({
         role: "status",
         content: `Compressing ${userMessageCount - recentCount} user messages (${totalTokens} tokens)...`,
-        timestamp: new Date(),
       });
 
-      const originalUserPrompts = userMessageCount;
+      const { blocks: compressed, keptUserMessages } =
+        await this.compressionService.compress(
+          context,
+          this.getClient(),
+          this.getModel(),
+        );
 
-      const compressed = await this.compressionService.compress(
-        context,
-        this.getClient(),
-        this.getModel(),
-      );
-
-      const originalKept = recentCount + 1; // compression adds 1 summary user message
-      const prunedCount = originalUserPrompts - originalKept;
+      const prunedCount = userMessageCount - keptUserMessages;
 
       if (prunedCount > 0) {
         await this.getChangeJournal().pruneAndRenumberUserMessages(
@@ -179,7 +157,6 @@ export class ContextManager {
       this.reportStatus({
         role: "status",
         content: `Compressed: ${prunedCount} user messages removed, ${newActiveIdx} remaining.`,
-        timestamp: new Date(),
       });
 
       return true;
@@ -187,7 +164,6 @@ export class ContextManager {
       this.reportStatus({
         role: "error",
         content: `Compression failed: ${error instanceof Error ? error.message : String(error)}`,
-        timestamp: new Date(),
       });
       return false;
     } finally {
@@ -211,10 +187,6 @@ export class ContextManager {
     this.emitTokenCount();
   }
 
-  getIsCompressing(): boolean {
-    return this.isCompressing;
-  }
-
   private emitTokenCount(): void {
     this.events.emit({
       type: "context.tokens_changed",
@@ -223,13 +195,6 @@ export class ContextManager {
   }
 
   private reportStatus(status: RuntimeStatus): void {
-    this.events.emit({
-      type: "status.added",
-      status: {
-        ...status,
-        userMessageIndex:
-          status.userMessageIndex ?? this.getContext().getUserMessageCount(),
-      },
-    });
+    this.events.emitStatus(status, this.getContext().getUserMessageCount());
   }
 }

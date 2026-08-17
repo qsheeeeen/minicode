@@ -41,22 +41,18 @@ export const sampleMessages: DisplayMessage[] = [
     content:
       "Done! Project scaffolded. Markdown showcase:\n\n# Heading\n\n**bold**, *italic*, `code`\n\n- item 1\n- item 2\n",
   },
-  { role: "status", content: "Project scaffolded", timestamp: new Date() },
+  { role: "status", content: "Project scaffolded" },
   {
-    role: "status",
-    content: "",
-    timestamp: new Date(),
-    toolDisplay: {
-      name: "Edit",
-      input: { path: "src/app.ts" },
-      output:
-        "--- src/app.ts\n+++ src/app.ts\n  3 - const port = 3000;\n  3 + const port = 8080;",
-    },
+    role: "tool",
+    name: "Edit",
+    input: { path: "src/app.ts" },
+    output:
+      "--- src/app.ts\n+++ src/app.ts\n  3 - const port = 3000;\n  3 + const port = 8080;",
+    slotId: "s4",
   },
   {
     role: "error",
     content: "npm ERR! peer dependency conflict",
-    timestamp: new Date(),
   },
 ];
 

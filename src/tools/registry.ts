@@ -1,4 +1,4 @@
-import type { LLMClient } from "../llm/client.js";
+import type { LLMClient, LLMToolDef } from "../llm/client.js";
 import type { Model } from "../llm/model.js";
 import type { AppConfig } from "../config.js";
 
@@ -96,10 +96,9 @@ export type SubAgentSpawner = (
   params: SubAgentSpawnParams,
 ) => Promise<ToolRunResult>;
 
-export interface ToolDef<TArgs = Record<string, unknown>> {
-  name: string;
-  description: string;
-  input_schema: Record<string, unknown>;
+/** A registered tool: the port-level declaration (name/description/schema —
+ *  exactly LLMToolDef) plus the executor-side metadata. */
+export interface ToolDef<TArgs = Record<string, unknown>> extends LLMToolDef {
   execute: (
     args: TArgs,
     context?: ToolExecutionContext,

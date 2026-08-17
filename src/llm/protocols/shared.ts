@@ -4,12 +4,48 @@
 
 import type { TurnFault } from "../../core/results.js";
 import { isAbortError } from "../../core/results.js";
-import type { LLMStreamResult } from "../client.js";
+import type { EffortLevel, LLMStreamResult } from "../client.js";
 
 const RETRYABLE_STATUS = new Set([408, 429, 500, 502, 503, 504, 529]);
 
 /** Fallback when the caller provides no model name. */
 export const DEFAULT_OPENAI_MODEL = "gpt-4.1";
+export const DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-5";
+
+/** Fallback when the caller provides no output-token budget. */
+export const DEFAULT_MAX_TOKENS = 8192;
+
+/** Map our effort ladder to OpenAI's `reasoning_effort` vocabulary (the
+ *  Responses API caps at xhigh). */
+export function toOpenAiEffort(
+  effort: EffortLevel,
+): "none" | "minimal" | "low" | "medium" | "high" | "xhigh" {
+  switch (effort) {
+    case "none":
+      return "none";
+    case "minimal":
+      return "minimal";
+    case "low":
+      return "low";
+    case "medium":
+      return "medium";
+    case "high":
+      return "high";
+    case "xhigh":
+    case "max":
+      return "xhigh";
+  }
+}
+
+/** Parse streamed tool-call arguments. Truncated or invalid JSON keeps the
+ *  raw string under `_raw` rather than silently dropping it. */
+export function parseToolArgs(raw: string): Record<string, unknown> {
+  try {
+    return JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    return { _raw: raw };
+  }
+}
 
 /** Classify a caught (non-abort) error from a provider SDK. */
 export function faultFromError(e: unknown): TurnFault {

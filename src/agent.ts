@@ -1,7 +1,13 @@
-import { TurnFaultError } from "./core/results.js";
+import { TurnFaultError, abortError } from "./core/results.js";
 import type { AppConfig } from "./config.js";
 import type { Model } from "./llm/model.js";
-import type { LLMClient, LLMToolDef, LLMStreamOk } from "./llm/client.js";
+import type {
+  LLMClient,
+  LLMToolDef,
+  LLMStreamOk,
+  LLMStreamResult,
+} from "./llm/client.js";
+import type { LLMAssistantBlock } from "./core/blocks.js";
 import type { ToolExecutor, ToolCall } from "./tools/executor.js";
 import type { UserPrompter } from "./core/prompt.js";
 import type { ToolDef, Capabilities } from "./tools/registry.js";
@@ -76,39 +82,17 @@ export interface RunAgentOpts {
   prompter?: UserPrompter;
 }
 
-function abortError(): Error {
-  const err = new Error("Aborted");
-  err.name = "AbortError";
-  return err;
-}
-
 /**
- * Await the next stream chunk, but reject as AbortError as soon as the
- * signal fires — even if the underlying stream never settles (a stalled
- * provider must not make the run un-abortable).
+ * A promise that rejects as AbortError the moment the signal fires — even if
+ * the awaited promise never settles (a stalled provider must not make the run
+ * un-abortable). One promise serves the whole stream; each chunk races it.
  */
-function nextWithAbort<T>(
-  next: Promise<IteratorResult<T>>,
-  signal: AbortSignal,
-): Promise<IteratorResult<T>> {
+function abortRace(signal: AbortSignal): Promise<never> {
   if (signal.aborted) return Promise.reject(abortError());
-  return new Promise<IteratorResult<T>>((resolve, reject) => {
-    const cleanup = () => signal.removeEventListener("abort", onAbort);
-    const onAbort = () => {
-      cleanup();
-      reject(abortError());
-    };
-    signal.addEventListener("abort", onAbort, { once: true });
-    next.then(
-      (value) => {
-        cleanup();
-        resolve(value);
-      },
-      (error) => {
-        cleanup();
-        reject(error);
-      },
-    );
+  return new Promise((_, reject) => {
+    signal.addEventListener("abort", () => reject(abortError()), {
+      once: true,
+    });
   });
 }
 
@@ -134,41 +118,42 @@ async function streamLLM(
   signal: AbortSignal,
 ): Promise<{ result: LLMStreamOk; toolCalls: ToolCall[] }> {
   const context = deps.sessionManager.getContext();
-  const stream = deps.client.chatStream(context.getBlocks(), toolDefs, {
+  const stream = deps.client.chatStream(context.getBlocksReadonly(), toolDefs, {
     system: deps.promptManager.getSystemPrompt(),
     model: deps.model,
     signal,
   });
 
   const toolCalls: ToolCall[] = [];
-
-  const handleDelta = (field: "text" | "thinking", delta: string) => {
-    if (field === "thinking") context.appendThinking(delta);
-    else context.appendAssistantText(delta);
-  };
+  const onAbort = abortRace(signal);
 
   let result: LLMStreamOk | undefined;
   try {
     while (true) {
       signal.throwIfAborted();
 
-      const next = await nextWithAbort(stream.next(), signal);
-      if (next.done) {
-        const terminal = next.value;
+      const next = stream.next();
+      next.catch(() => {}); // lose the race → no unhandled rejection
+      const raced = (await Promise.race([next, onAbort])) as IteratorResult<
+        LLMAssistantBlock,
+        LLMStreamResult
+      >;
+      if (raced.done) {
+        const terminal = raced.value;
         if (!terminal.ok) throw new TurnFaultError(terminal.fault);
         result = terminal;
         break;
       }
 
-      const chunk = next.value;
-      if (chunk.type === "text" || chunk.type === "thinking") {
-        // @ts-expect-error - text or thinking fields exist based on type
-        handleDelta(chunk.type, chunk[chunk.type]);
+      const chunk = raced.value;
+      if (chunk.type === "thinking") {
+        context.appendThinking(chunk.thinking);
+      } else if (chunk.type === "text") {
+        context.appendAssistantText(chunk.text);
       } else if (chunk.type === "tool_use") {
         const tool = deps.toolExecutor.getTools().get(chunk.name);
         toolCalls.push({ block: chunk, tool });
         context.startToolCall(chunk.id, chunk.name, chunk.input);
-        saveStore(deps);
       }
     }
 
@@ -204,11 +189,7 @@ export async function runAgent(
 
   try {
     // Tool set is fixed for the run — build once outside the loop.
-    const toolDefs = [...deps.toolExecutor.getTools().values()].map((t) => ({
-      name: t.name,
-      description: t.description,
-      input_schema: t.input_schema,
-    })) as LLMToolDef[];
+    const toolDefs: LLMToolDef[] = [...deps.toolExecutor.getTools().values()];
 
     while (true) {
       signal.throwIfAborted();
@@ -245,11 +226,8 @@ export async function runAgent(
         break;
       }
 
-      if (toolCalls.length > 0) {
-        await saveStore(deps);
-      }
-
       if (toolCalls.length === 0) break;
+      await saveStore(deps);
     }
   } finally {
     if (signal.aborted) {

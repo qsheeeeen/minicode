@@ -8,7 +8,6 @@ export const compressCommand: CommandHandler = {
     ctx.sessionManager.reportStatus({
       role: "status",
       content: "(Compression complete)",
-      timestamp: new Date(),
     });
   },
 };

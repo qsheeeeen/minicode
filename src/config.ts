@@ -1,9 +1,9 @@
 import fsPromises from "fs/promises";
 import path from "path";
-import os from "os";
 import type { EffortLevel } from "./llm/client.js";
+import { MINICODE_HOME } from "./utils/paths.js";
 
-const DEFAULT_CONFIG_PATH = path.join(os.homedir(), ".minicode", "config.json");
+const DEFAULT_CONFIG_PATH = path.join(MINICODE_HOME, "config.json");
 
 export interface ModelConfig {
   contextLength?: number;

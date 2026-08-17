@@ -3,13 +3,8 @@ import type { LLMContext } from "../core/context.js";
 import type { StatusReporter } from "../services/session-manager.js";
 import type { ShellService } from "../services/shell-service.js";
 
-export interface ShellOutput {
-  command: string;
-  output: string;
-}
-
 export type ProcessedRoute =
-  | { type: "done"; shellOutput?: ShellOutput }
+  | { type: "done"; shellOutput?: { command: string; output: string } }
   | { type: "run"; promptText: string; displayContent?: string };
 
 /**
@@ -23,46 +18,51 @@ export async function processRoute(
   route: RouteResult,
   context: LLMContext,
   shellService: ShellService,
-  reportStatus?: StatusReporter,
+  reportStatus: StatusReporter,
 ): Promise<ProcessedRoute> {
-  if (route.action === "none") {
-    return { type: "done" };
+  switch (route.action) {
+    case "none":
+      return { type: "done" };
+
+    case "shell": {
+      // Async spawn — a long `!command` must not freeze the TUI's event loop.
+      const output = shellService.formatResult(
+        await shellService.run(route.command),
+      );
+
+      // Inject into LLM context so the agent sees the command + result
+      context.startUserMessage(
+        `Ran: ${route.command}\n\n\`\`\`\n${output}\n\`\`\``,
+      );
+      reportStatus({
+        role: "status",
+        content: `$ ${route.command}\n${output}`,
+        toolDisplay: {
+          name: "Shell",
+          input: { command: route.command },
+          output,
+        },
+      });
+      return { type: "done", shellOutput: { command: route.command, output } };
+    }
+
+    case "unknown-command":
+      // A slash command that resolved to nothing — say so instead of
+      // silently swallowing the input.
+      reportStatus({
+        role: "error",
+        content: `Unknown command: /${route.command}`,
+      });
+      return { type: "done" };
+
+    case "command":
+      return {
+        type: "run",
+        promptText: route.promptText,
+        displayContent: route.displayContent,
+      };
+
+    case "llm":
+      return { type: "run", promptText: route.promptText };
   }
-
-  if (route.action === "shell") {
-    const command = route.promptText!;
-    // Async spawn — a long `!command` must not freeze the TUI's event loop.
-    const output = shellService.formatResult(await shellService.run(command));
-
-    // Inject into LLM context so the agent sees the command + result
-    context.startUserMessage(`Ran: ${command}\n\n\`\`\`\n${output}\n\`\`\``);
-    reportStatus?.({
-      role: "status",
-      content: `$ ${command}\n${output}`,
-      toolDisplay: {
-        name: "Shell",
-        input: { command },
-        output,
-      },
-      timestamp: new Date(),
-    });
-    return { type: "done", shellOutput: { command, output } };
-  }
-
-  if (route.action === "unknown-command") {
-    // A slash command that resolved to nothing — say so instead of
-    // silently swallowing the input.
-    reportStatus?.({
-      role: "error",
-      content: `Unknown command: /${route.command ?? ""}`,
-      timestamp: new Date(),
-    });
-    return { type: "done" };
-  }
-
-  return {
-    type: "run",
-    promptText: route.promptText!,
-    displayContent: route.displayContent,
-  };
 }

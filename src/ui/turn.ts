@@ -74,7 +74,6 @@ export async function runAgentTurn(
       reportStatus({
         role: "status",
         content: "(Aborted)",
-        timestamp: new Date(),
       });
       return "aborted";
     }
@@ -82,7 +81,6 @@ export async function runAgentTurn(
       reportStatus({
         role: "error",
         content: `(Error: ${e.message})`,
-        timestamp: new Date(),
       });
       return "failed";
     }

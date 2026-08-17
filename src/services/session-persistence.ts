@@ -7,8 +7,8 @@
  */
 import fs from "fs/promises";
 import path from "path";
-import os from "os";
 import crypto from "crypto";
+import { MINICODE_HOME } from "../utils/paths.js";
 import type { LLMBlock } from "../core/blocks.js";
 
 export interface SessionData {
@@ -31,11 +31,7 @@ interface SessionHeader {
 }
 
 export class SessionPersistence {
-  private static readonly BASE_DIR = path.join(
-    os.homedir(),
-    ".minicode",
-    "sessions",
-  );
+  private static readonly BASE_DIR = path.join(MINICODE_HOME, "sessions");
   private static readonly EXT = ".context.jsonl";
 
   static getProjectHash(): string {
@@ -55,7 +51,7 @@ export class SessionPersistence {
 
   static async save(
     sessionName: string,
-    blocks: LLMBlock[],
+    blocks: readonly LLMBlock[],
     meta: { model: string; totalTokens: number },
   ): Promise<void> {
     if (!sessionName) return;
@@ -109,18 +105,22 @@ export class SessionPersistence {
     // Read path — no mkdir side effect.
     const dir = SessionPersistence.getSessionDir();
     const entries = await fs.readdir(dir).catch(() => []);
-    const sessions: SessionInfo[] = [];
-    for (const entry of entries) {
-      if (!entry.endsWith(SessionPersistence.EXT)) continue;
-      const name = entry.replace(SessionPersistence.EXT, "");
-      try {
-        const stat = await fs.stat(path.join(dir, entry));
-        sessions.push({ name, updatedAt: stat.mtime.toISOString() });
-      } catch {
-        // skip unreadable files
-      }
-    }
-    return sessions.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    const sessions = await Promise.all(
+      entries
+        .filter((entry) => entry.endsWith(SessionPersistence.EXT))
+        .map(async (entry) => {
+          const name = entry.replace(SessionPersistence.EXT, "");
+          try {
+            const stat = await fs.stat(path.join(dir, entry));
+            return { name, updatedAt: stat.mtime.toISOString() };
+          } catch {
+            return null; // skip unreadable files
+          }
+        }),
+    );
+    return sessions
+      .filter((s): s is SessionInfo => s !== null)
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }
 
   static async delete(name: string): Promise<void> {

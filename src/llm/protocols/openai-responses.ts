@@ -7,7 +7,13 @@
 // of items rather than the chat-completions message array.
 
 import OpenAI from "openai";
-import { DEFAULT_OPENAI_MODEL, terminalFromError } from "./shared.js";
+import {
+  DEFAULT_MAX_TOKENS,
+  DEFAULT_OPENAI_MODEL,
+  parseToolArgs,
+  terminalFromError,
+  toOpenAiEffort,
+} from "./shared.js";
 
 import type {
   LLMClient,
@@ -17,7 +23,6 @@ import type {
   LLMStreamResult,
   StopReason,
   TokenUsage,
-  EffortLevel,
 } from "../client.js";
 import type { LLMAssistantBlock, LLMBlock } from "../../core/blocks.js";
 
@@ -43,27 +48,6 @@ interface StreamCompletedEvent {
 
 // Constants
 
-// Effort mapping
-
-// Map our five-level effort to OpenAI's three-level reasoning effort.
-function toSdkEffort(effort: EffortLevel): OpenAI.ReasoningEffort {
-  switch (effort) {
-    case "none":
-      return "none";
-    case "minimal":
-      return "minimal";
-    case "low":
-      return "low";
-    case "medium":
-      return "medium";
-    case "high":
-      return "high";
-    case "xhigh":
-    case "max":
-      return "xhigh";
-  }
-}
-
 // Tool definition conversion
 
 // Convert LLMToolDef[] to OpenAI Responses function tools.
@@ -81,7 +65,7 @@ function toSdkTools(tools: LLMToolDef[]): OpenAI.Responses.FunctionTool[] {
 
 type ResponseInputItem = OpenAI.Responses.ResponseInputItem;
 
-function toSdkMessages(blocks: LLMBlock[]): ResponseInputItem[] {
+function toSdkMessages(blocks: readonly LLMBlock[]): ResponseInputItem[] {
   const input: ResponseInputItem[] = [];
   let assistantBlocks: LLMAssistantBlock[] = [];
 
@@ -175,13 +159,6 @@ function toLLMStreamResult(
       }
       case "function_call": {
         hasToolCalls = true;
-        let parsedArgs: Record<string, unknown> = {};
-        try {
-          parsedArgs = JSON.parse(item.arguments) as Record<string, unknown>;
-        } catch {
-          // If parsing fails, wrap raw string
-          parsedArgs = { _raw: item.arguments };
-        }
         content.push({
           type: "tool_use",
           // The provider's `call_id` is the identifier function_call_output
@@ -189,7 +166,7 @@ function toLLMStreamResult(
           // becomes the internal tool id. `item.id` is only an item locator.
           id: item.call_id ?? item.id,
           name: item.name,
-          input: parsedArgs,
+          input: parseToolArgs(item.arguments),
         });
         break;
       }
@@ -278,28 +255,20 @@ export class OpenAIResponsesClient implements LLMClient {
     const model = options.model?.getName() || DEFAULT_OPENAI_MODEL;
     const input = toSdkMessages(blocks);
     const oaiTools = tools.length > 0 ? toSdkTools(tools) : undefined;
-    const abortController = new AbortController();
-
-    // If the caller provided a signal, forward abort
-    if (options.signal) {
-      options.signal.addEventListener("abort", () => abortController.abort(), {
-        once: true,
-      });
-    }
 
     const params: OpenAI.Responses.ResponseCreateParamsStreaming = {
       model,
       input,
       stream: true,
       ...(oaiTools && { tools: oaiTools }),
-      ...(options.maxTokens && { max_output_tokens: options.maxTokens }),
+      max_output_tokens: options.maxTokens ?? DEFAULT_MAX_TOKENS,
       ...(options.system && { instructions: options.system }),
     };
 
     // Reasoning effort
     const effort = options.model?.getEffort();
     if (effort) {
-      params.reasoning = { effort: toSdkEffort(effort) };
+      params.reasoning = { effort: toOpenAiEffort(effort) };
     }
 
     // Lazy start: the request begins on the first next(), so a stream that is
@@ -313,11 +282,9 @@ export class OpenAIResponsesClient implements LLMClient {
     > {
       try {
         const stream = (await client.responses.create(params, {
-          signal: abortController.signal,
+          signal: options.signal,
         })) as unknown as AsyncIterable<OpenAI.Responses.ResponseStreamEvent>;
 
-        let currentText = "";
-        let currentThinking = "";
         let finalResult: LLMStreamResult | null = null;
 
         for await (const event of stream) {
@@ -325,13 +292,8 @@ export class OpenAIResponsesClient implements LLMClient {
             case "response.output_text.delta": {
               const delta = (event as unknown as StreamDeltaEvent).delta;
               if (delta) {
-                currentText += delta;
                 yield { type: "text", text: delta };
               }
-              break;
-            }
-            case "response.output_text.done": {
-              currentText = "";
               break;
             }
             case "response.reasoning.delta":
@@ -339,34 +301,18 @@ export class OpenAIResponsesClient implements LLMClient {
             case "response.reasoning_summary_text.delta": {
               const delta = (event as unknown as StreamDeltaEvent).delta;
               if (delta) {
-                currentThinking += delta;
                 yield { type: "thinking", thinking: delta };
               }
-              break;
-            }
-            case "response.reasoning.done":
-            case "response.reasoning_text.done":
-            case "response.reasoning_summary_text.done": {
-              currentThinking = "";
               break;
             }
             case "response.output_item.done": {
               const item = (event as unknown as StreamOutputItemDoneEvent).item;
               if (item && item.type === "function_call") {
-                let parsedArgs: Record<string, unknown> = {};
-                try {
-                  parsedArgs = JSON.parse(item.arguments) as Record<
-                    string,
-                    unknown
-                  >;
-                } catch {
-                  parsedArgs = { _raw: item.arguments };
-                }
                 yield {
                   type: "tool_use",
                   id: item.call_id ?? item.id ?? "",
                   name: item.name,
-                  input: parsedArgs,
+                  input: parseToolArgs(item.arguments),
                 };
               }
               break;

@@ -14,7 +14,6 @@ export function createAgentRuntime(opts: AgentRuntimeOpts): AgentRuntime {
   const events = opts.events ?? new RuntimeEvents();
   const sessionManager = new SessionManager(
     undefined,
-    opts.sessionStats,
     events,
     opts.persistent ?? true,
   );

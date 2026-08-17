@@ -38,3 +38,10 @@ export function isAbortError(e: unknown): boolean {
     (e as { name: unknown }).name === "AbortError"
   );
 }
+
+/** Construct the AbortError vocabulary `isAbortError` recognizes. */
+export function abortError(): Error {
+  const err = new Error("Aborted");
+  err.name = "AbortError";
+  return err;
+}

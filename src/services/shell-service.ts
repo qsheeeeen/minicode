@@ -29,6 +29,29 @@ function stripAnsiCodes(text: string): string {
   return text.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");
 }
 
+/** Accumulates chunks without re-copying the whole output per chunk; once
+ *  the byte cap is reached further chunks are dropped. */
+class OutputCollector {
+  private parts: string[] = [];
+  private bytes = 0;
+
+  constructor(private readonly maxBytes: number) {}
+
+  push(data: Buffer): void {
+    if (this.bytes >= this.maxBytes) return;
+    const text = stripAnsiCodes(data.toString());
+    this.parts.push(text);
+    this.bytes += Buffer.byteLength(text, "utf-8");
+  }
+
+  result(): string {
+    const output = this.parts.join("");
+    return Buffer.byteLength(output, "utf-8") <= this.maxBytes
+      ? output
+      : `${output.slice(0, this.maxBytes)}\n[output truncated]`;
+  }
+}
+
 export class ShellService {
   private readonly cwd: string;
   private readonly defaultTimeoutMs: number;
@@ -71,18 +94,9 @@ export class ShellService {
         shell: opts.shell,
         cwd: opts.cwd,
       });
-      let stdout = "";
-      let stderr = "";
+      const stdout = new OutputCollector(this.maxOutputBytes);
+      const stderr = new OutputCollector(this.maxOutputBytes);
       let timedOut = false;
-
-      const append = (target: "stdout" | "stderr", data: Buffer) => {
-        const next = this.truncate(
-          (target === "stdout" ? stdout : stderr) +
-            stripAnsiCodes(data.toString()),
-        );
-        if (target === "stdout") stdout = next;
-        else stderr = next;
-      };
 
       const timeout = setTimeout(() => {
         timedOut = true;
@@ -108,14 +122,14 @@ export class ShellService {
         });
       });
 
-      proc.stdout?.on("data", (d) => append("stdout", d));
-      proc.stderr?.on("data", (d) => append("stderr", d));
+      proc.stdout?.on("data", (d) => stdout.push(d));
+      proc.stderr?.on("data", (d) => stderr.push(d));
       proc.on("close", (code) => {
         clearTimeout(timeout);
         opts.signal?.removeEventListener("abort", abort);
         resolve({
-          stdout: stdout.trim(),
-          stderr: stderr.trim(),
+          stdout: stdout.result().trim(),
+          stderr: stderr.result().trim(),
           exitCode: code,
           timedOut,
           aborted: opts.signal?.aborted ?? false,
@@ -136,11 +150,5 @@ export class ShellService {
         : `Exit code ${result.exitCode}: ${output}`;
     }
     return `(no output, exit code ${result.exitCode})`;
-  }
-
-  private truncate(output: string): string {
-    if (Buffer.byteLength(output, "utf-8") <= this.maxOutputBytes)
-      return output;
-    return `${output.slice(0, this.maxOutputBytes)}\n[output truncated]`;
   }
 }

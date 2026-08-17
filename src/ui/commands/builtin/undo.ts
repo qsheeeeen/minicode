@@ -10,7 +10,7 @@ function report(
   role: "status" | "error",
   content: string,
 ): void {
-  ctx.sessionManager.reportStatus({ role, content, timestamp: new Date() });
+  ctx.sessionManager.reportStatus({ role, content });
 }
 
 export const undoCommand: CommandHandler = {

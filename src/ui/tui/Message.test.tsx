@@ -20,9 +20,7 @@ describe("Message Component", () => {
 
   it("renders streaming text without trimming", () => {
     const { lastFrame } = render(
-      <Message
-        msg={{ role: "text", content: "streaming...", isStreaming: true }}
-      />,
+      <Message msg={{ role: "text", content: "streaming..." }} />,
     );
     expect(lastFrame()).toContain("streaming...");
   });
@@ -43,6 +41,7 @@ describe("Message Component", () => {
           name: "Shell",
           input: { command: "ls" },
           output: "file1",
+          slotId: "t1",
         }}
       />,
     );
@@ -51,9 +50,7 @@ describe("Message Component", () => {
 
   it("renders status message", () => {
     const { lastFrame } = render(
-      <Message
-        msg={{ role: "status", content: "loading...", timestamp: new Date() }}
-      />,
+      <Message msg={{ role: "status", content: "loading..." }} />,
     );
     expect(lastFrame()).toContain("loading...");
   });
@@ -64,33 +61,9 @@ describe("Message Component", () => {
         msg={{
           role: "error",
           content: "something failed",
-          timestamp: new Date(),
         }}
       />,
     );
     expect(lastFrame()).toContain("something failed");
-  });
-
-  it("renders status with toolDisplay", () => {
-    const { lastFrame } = render(
-      <Message
-        msg={{
-          role: "status",
-          content: "",
-          timestamp: new Date(),
-          toolDisplay: {
-            name: "Read",
-            input: { path: "f.ts" },
-            output: "content",
-          },
-        }}
-      />,
-    );
-    expect(lastFrame()).toContain("Read(f.ts)");
-  });
-
-  it("returns null for unknown role", () => {
-    const { lastFrame } = render(<Message msg={{ role: "unknown" } as any} />);
-    expect(lastFrame()).toBe("");
   });
 });

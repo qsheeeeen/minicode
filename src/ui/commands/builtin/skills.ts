@@ -5,8 +5,6 @@ export const skillsCommand: CommandHandler = {
   description: "List available skills",
   handler: async (_args, ctx): Promise<void> => {
     const skills = ctx.skills.getAvailable();
-    // Data only — how a status renders is the renderer's business, and a
-    // React element would be dead weight in the service-layer event bus.
     const content =
       skills.length === 0
         ? "(No skills available)"
@@ -17,7 +15,6 @@ export const skillsCommand: CommandHandler = {
     ctx.sessionManager.reportStatus({
       role: "status",
       content,
-      timestamp: new Date(),
     });
   },
 };

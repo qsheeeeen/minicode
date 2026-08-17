@@ -15,7 +15,6 @@ export const resumeCommand: CommandHandler = {
         ctx.sessionManager.reportStatus({
           role: "error",
           content: `Session not found: ${name}`,
-          timestamp: new Date(),
         });
       }
     }

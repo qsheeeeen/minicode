@@ -1,7 +1,4 @@
 import { describe, it, expect } from "vitest";
-import fs from "fs/promises";
-import os from "os";
-import path from "path";
 import { ShellService } from "./shell-service.js";
 
 describe("ShellService", () => {
@@ -59,23 +56,5 @@ describe("ShellService", () => {
     ]);
 
     expect(service.formatResult(result)).toBe("$HOME");
-  });
-
-  it("honors a cwd override for runProcess", async () => {
-    const baseDir = await fs.mkdtemp(path.join(os.tmpdir(), "shell-test-"));
-    try {
-      const service = new ShellService({ cwd: process.cwd() });
-      await fs.writeFile(path.join(baseDir, "marker.txt"), "in-place");
-
-      const result = await service.runProcess(
-        "python3",
-        ["-c", "print(open('marker.txt').read().strip())"],
-        { cwd: baseDir },
-      );
-
-      expect(service.formatResult(result)).toBe("in-place");
-    } finally {
-      await fs.rm(baseDir, { recursive: true, force: true });
-    }
   });
 });

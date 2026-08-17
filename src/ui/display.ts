@@ -1,41 +1,36 @@
 import type { LLMBlock } from "../core/blocks.js";
-import type { RuntimeStatus } from "../services/runtime-events.js";
+import type {
+  RuntimeStatus,
+  ToolDisplayPayload,
+} from "../services/runtime-events.js";
 
 export type StatusMessage = RuntimeStatus;
-
-export type MessageRole =
-  | "user"
-  | "text"
-  | "thinking"
-  | "tool"
-  | "status"
-  | "error";
 
 export type DisplayMessage =
   | { role: "user"; content: string }
   | { role: "text"; content: string }
   | { role: "thinking"; content: string }
-  | {
+  | (ToolDisplayPayload & {
       role: "tool";
-      name: string;
-      input: Record<string, unknown>;
-      output?: string;
+      /** Pairs the tool_use with its tool_result for output backfill. */
       slotId: string;
-    }
+    })
   // Statuses flow through unchanged except for the placement index —
   // display order comes from interleaving below, not from the field.
-  | Omit<RuntimeStatus, "userMessageIndex">;
+  | Omit<RuntimeStatus, "userMessageIndex" | "toolDisplay">;
 
-/** Strip the placement index; keep everything else as-is. */
-function toStatusDisplay({
-  userMessageIndex: _placed,
-  ...msg
-}: StatusMessage): DisplayMessage {
+/** Strip the placement index; a status carrying a tool payload becomes a
+ *  plain tool message so the renderers only know one tool shape. */
+function toStatusDisplay(s: StatusMessage, slotId: string): DisplayMessage {
+  if (s.toolDisplay) {
+    return { role: "tool", ...s.toolDisplay, slotId };
+  }
+  const { userMessageIndex: _placed, toolDisplay: _tool, ...msg } = s;
   return msg;
 }
 
 export function toDisplayMessages(
-  blocks: LLMBlock[],
+  blocks: readonly LLMBlock[],
   statuses: StatusMessage[],
   displays?: Map<number, string>,
 ): DisplayMessage[] {
@@ -46,23 +41,26 @@ export function toDisplayMessages(
   // Bucket statuses by the user message they follow; unindexed ones belong
   // after the latest. Statuses indexed past the end (a user message that
   // doesn't exist yet) carry over to the very end of the transcript.
-  const byUserMessageIndex = new Map<number, StatusMessage[]>();
-  const trailing: StatusMessage[] = [];
-  for (const s of statuses) {
+  // `statuses` is append-only, so its indexes make stable slot ids.
+  const byUserMessageIndex = new Map<number, [StatusMessage, string][]>();
+  const trailing: [StatusMessage, string][] = [];
+  for (let i = 0; i < statuses.length; i++) {
+    const s = statuses[i];
+    const slotId = `status-${i}`;
     const idx = s.userMessageIndex ?? userMessageCount;
     if (idx > userMessageCount) {
-      trailing.push(s);
+      trailing.push([s, slotId]);
     } else {
       const bucket = byUserMessageIndex.get(idx);
-      if (bucket) bucket.push(s);
-      else byUserMessageIndex.set(idx, [s]);
+      if (bucket) bucket.push([s, slotId]);
+      else byUserMessageIndex.set(idx, [[s, slotId]]);
     }
   }
 
   const result: DisplayMessage[] = [];
   const pushStatuses = (idx: number): void => {
-    for (const s of byUserMessageIndex.get(idx) ?? []) {
-      result.push(toStatusDisplay(s));
+    for (const [s, slotId] of byUserMessageIndex.get(idx) ?? []) {
+      result.push(toStatusDisplay(s, slotId));
     }
   };
 
@@ -103,7 +101,7 @@ export function toDisplayMessages(
   }
 
   if (userMessagesSeen > 0) pushStatuses(userMessagesSeen);
-  for (const s of trailing) result.push(toStatusDisplay(s));
+  for (const [s, slotId] of trailing) result.push(toStatusDisplay(s, slotId));
 
   return result;
 }

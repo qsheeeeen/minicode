@@ -4,7 +4,13 @@
 // converts between internal types and the OpenAI Chat Completions API format.
 
 import OpenAI from "openai";
-import { DEFAULT_OPENAI_MODEL, terminalFromError } from "./shared.js";
+import {
+  DEFAULT_MAX_TOKENS,
+  DEFAULT_OPENAI_MODEL,
+  parseToolArgs,
+  terminalFromError,
+  toOpenAiEffort,
+} from "./shared.js";
 import type {
   LLMClient,
   LLMStream,
@@ -12,37 +18,12 @@ import type {
   ChatOptions,
   LLMStreamResult,
   StopReason,
-  EffortLevel,
 } from "../client.js";
 import type {
   LLMBlock,
   LLMAssistantBlock,
   LLMToolUseBlock,
 } from "../../core/blocks.js";
-
-// Constants
-
-const DEFAULT_MAX_TOKENS = 8192;
-
-// Effort mapping (internal → SDK reasoning_effort)
-
-function toSdkEffort(effort: EffortLevel): OpenAI.ReasoningEffort {
-  switch (effort) {
-    case "none":
-      return "none";
-    case "minimal":
-      return "minimal";
-    case "low":
-      return "low";
-    case "medium":
-      return "medium";
-    case "high":
-      return "high";
-    case "xhigh":
-    case "max":
-      return "xhigh";
-  }
-}
 
 // Stop reason mapping (OpenAI → internal)
 
@@ -71,7 +52,10 @@ type OpenAIMessage =
   | OpenAI.ChatCompletionAssistantMessageParam
   | OpenAI.ChatCompletionToolMessageParam;
 
-function toSdkMessages(blocks: LLMBlock[], system?: string): OpenAIMessage[] {
+function toSdkMessages(
+  blocks: readonly LLMBlock[],
+  system?: string,
+): OpenAIMessage[] {
   const out: OpenAIMessage[] = [];
   let assistantBlocks: LLMAssistantBlock[] = [];
 
@@ -171,14 +155,6 @@ export class OpenAIChatClient implements LLMClient {
     const model = options.model?.getName() ?? DEFAULT_OPENAI_MODEL;
     const oaiMessages = toSdkMessages(blocks, options.system);
     const oaiTools = toSdkTools(tools);
-    const abortController = new AbortController();
-
-    // Wire external signal into our controller
-    if (options.signal) {
-      options.signal.addEventListener("abort", () => abortController.abort(), {
-        once: true,
-      });
-    }
 
     const params: OpenAI.ChatCompletionCreateParamsStreaming = {
       model,
@@ -194,7 +170,7 @@ export class OpenAIChatClient implements LLMClient {
 
     const effort = options.model?.getEffort();
     if (effort) {
-      params.reasoning_effort = toSdkEffort(effort);
+      params.reasoning_effort = toOpenAiEffort(effort);
     }
 
     // The request starts lazily inside the generator: a stream that is never
@@ -209,11 +185,11 @@ export class OpenAIChatClient implements LLMClient {
     > {
       try {
         const stream = await client.chat.completions.create(params, {
-          signal: abortController.signal,
+          signal: options.signal,
         });
 
-        let textContent = "";
-        let thinkingContent = "";
+        const textParts: string[] = [];
+        const thinkingParts: string[] = [];
         const pendingToolCalls: Map<
           number,
           { id: string; name: string; arguments: string }
@@ -239,14 +215,14 @@ export class OpenAIChatClient implements LLMClient {
           }
 
           if (delta.content) {
-            textContent += delta.content;
+            textParts.push(delta.content);
             yield { type: "text", text: delta.content };
           }
 
           // @ts-expect-error - reasoning_content not yet in types
           const reasoning = delta.reasoning_content;
           if (typeof reasoning === "string" && reasoning.length > 0) {
-            thinkingContent += reasoning;
+            thinkingParts.push(reasoning);
             yield { type: "thinking", thinking: reasoning };
           }
 
@@ -274,24 +250,20 @@ export class OpenAIChatClient implements LLMClient {
 
         const content: LLMAssistantBlock[] = [];
 
-        if (thinkingContent.length > 0) {
-          content.push({ type: "thinking", thinking: thinkingContent });
+        if (thinkingParts.length > 0) {
+          content.push({ type: "thinking", thinking: thinkingParts.join("") });
         }
 
-        if (textContent.length > 0) {
-          content.push({ type: "text", text: textContent });
+        if (textParts.length > 0) {
+          content.push({ type: "text", text: textParts.join("") });
         }
 
         for (const [, pending] of pendingToolCalls) {
-          let input: Record<string, unknown> = {};
-          try {
-            input = JSON.parse(pending.arguments);
-          } catch {}
           const block: LLMToolUseBlock = {
             type: "tool_use",
             id: pending.id,
             name: pending.name,
-            input,
+            input: parseToolArgs(pending.arguments),
           };
           content.push(block);
           yield block;

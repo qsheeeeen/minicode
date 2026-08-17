@@ -1,26 +1,23 @@
 import pino from "pino";
 import path from "path";
-import os from "os";
 import fs from "fs/promises";
 
-function getLogFilePath(projectHash: string, sessionName: string): string {
-  const logDir = path.join(os.homedir(), ".minicode", "sessions", projectHash);
-  return path.join(logDir, `${sessionName}.log`);
-}
-
+/** Create a pino logger writing into the session's directory (owned by
+ *  SessionPersistence — the logger knows no path layout of its own). */
 export async function createLogger(
-  projectHash: string,
+  logDir: string,
   sessionName: string,
 ): Promise<pino.Logger> {
-  const logDir = path.join(os.homedir(), ".minicode", "sessions", projectHash);
   await fs.mkdir(logDir, { recursive: true });
 
-  const logFile = getLogFilePath(projectHash, sessionName);
-  const destination = pino.destination({ dest: logFile, sync: true });
+  const destination = pino.destination({
+    dest: path.join(logDir, `${sessionName}.log`),
+    sync: true,
+  });
   return pino(
     {
       level: "info",
-      base: { session: sessionName, projectHash },
+      base: { session: sessionName },
       timestamp: pino.stdTimeFunctions.isoTime,
     },
     destination,

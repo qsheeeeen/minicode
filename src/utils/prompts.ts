@@ -1,6 +1,6 @@
 import fs from "fs/promises";
 import path from "path";
-import os from "os";
+import { MINICODE_HOME } from "./paths.js";
 
 export const SYSTEM_PROMPT = `You are an interactive CLI coding agent that helps users with software engineering tasks. Use the following instructions and available tools to assist the user.
 
@@ -84,6 +84,5 @@ export async function readPromptFile(filePath: string): Promise<string> {
 }
 
 export async function loadGlobalPrompt(): Promise<string> {
-  const globalPromptPath = path.join(os.homedir(), ".minicode", "AGENTS.md");
-  return readPromptFile(globalPromptPath);
+  return readPromptFile(path.join(MINICODE_HOME, "AGENTS.md"));
 }

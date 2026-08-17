@@ -16,7 +16,6 @@ export const effortCommand: CommandHandler = {
     ctx.sessionManager.reportStatus({
       role: "status",
       content: `(Effort set to: ${value})`,
-      timestamp: new Date(),
     });
   },
 };

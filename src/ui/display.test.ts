@@ -33,17 +33,38 @@ describe("toDisplayMessages", () => {
   });
 
   it("interleaves statuses by user message index", () => {
-    const timestamp = new Date("2026-01-01T00:00:00.000Z");
     const blocks: LLMBlock[] = [{ type: "user", text: "internal" }];
     const statuses: StatusMessage[] = [
-      { role: "status", content: "before", timestamp, userMessageIndex: 0 },
-      { role: "error", content: "after", timestamp, userMessageIndex: 1 },
+      { role: "status", content: "before", userMessageIndex: 0 },
+      { role: "error", content: "after", userMessageIndex: 1 },
     ];
 
     expect(toDisplayMessages(blocks, statuses)).toEqual([
-      { role: "status", content: "before", timestamp },
+      { role: "status", content: "before" },
       { role: "user", content: "internal" },
-      { role: "error", content: "after", timestamp },
+      { role: "error", content: "after" },
+    ]);
+  });
+
+  it("projects a status carrying toolDisplay into a tool message", () => {
+    const blocks: LLMBlock[] = [{ type: "user", text: "run it" }];
+    const statuses: StatusMessage[] = [
+      {
+        role: "status",
+        content: "",
+        toolDisplay: { name: "Shell", input: { command: "ls" }, output: "a b" },
+      },
+    ];
+
+    expect(toDisplayMessages(blocks, statuses)).toEqual([
+      { role: "user", content: "run it" },
+      {
+        role: "tool",
+        name: "Shell",
+        input: { command: "ls" },
+        output: "a b",
+        slotId: "status-0",
+      },
     ]);
   });
 });

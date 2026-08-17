@@ -1,5 +1,4 @@
 import path from "path";
-import os from "os";
 import type { Args } from "../args.js";
 import type { AppConfig } from "../config.js";
 import { registerBuiltinProtocols } from "../llm/protocols/index.js";
@@ -15,6 +14,7 @@ import {
 import { ModelSwitchService } from "../services/model-switcher.js";
 import { PermissionService } from "../services/permission.js";
 import { restoreSession } from "../services/session-lifecycle.js";
+import { newSessionName } from "../services/session-manager.js";
 import { RuntimeState } from "../services/runtime-state.js";
 import { SessionPersistence } from "../services/session-persistence.js";
 import { ShellService } from "../services/shell-service.js";
@@ -38,6 +38,7 @@ import {
   formatEnvironmentContext,
   loadGlobalPrompt,
 } from "../utils/prompts.js";
+import { MINICODE_HOME } from "../utils/paths.js";
 import {
   CommandRegistry,
   createCommandContext,
@@ -80,31 +81,24 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
   // Composition, not import side effects: built-in protocols register here.
   registerBuiltinProtocols();
 
-  const globalPrompt = await loadGlobalPrompt();
+  // Independent startup reads run concurrently — they only feed wiring below.
+  const [globalPrompt, hasProjectPrompt, recentSession] = await Promise.all([
+    loadGlobalPrompt(),
+    import("fs/promises").then((fs) =>
+      fs.access(path.resolve(cwd, "AGENTS.md")).then(
+        () => true,
+        () => false,
+      ),
+    ),
+    resumeRecent ? SessionPersistence.getMostRecent() : undefined,
+  ]);
+
   const promptFiles: string[] = [];
   if (globalPrompt) promptFiles.push("~/.minicode/AGENTS.md");
+  const projectPromptFile = hasProjectPrompt ? "./AGENTS.md" : "";
+  if (hasProjectPrompt) promptFiles.push(projectPromptFile);
 
-  const projectPromptPath = path.resolve(cwd, "AGENTS.md");
-  let projectPromptFile = "";
-  try {
-    const fs = await import("fs/promises");
-    await fs.access(projectPromptPath);
-    projectPromptFile = "./AGENTS.md";
-    promptFiles.push(projectPromptFile);
-  } catch {
-    // Project prompt file doesn't exist — skip
-  }
-  const userPrompt = globalPrompt || "";
-
-  let initialSession: string;
-  if (sessionName) {
-    initialSession = sessionName;
-  } else if (resumeRecent) {
-    const recent = await SessionPersistence.getMostRecent();
-    initialSession = recent || `session-${Date.now()}`;
-  } else {
-    initialSession = `session-${Date.now()}`;
-  }
+  const initialSession = sessionName ?? recentSession ?? newSessionName();
 
   // Prefetch the persisted session so the disk read overlaps skill loading
   // and the tool-availability probes instead of blocking first paint.
@@ -115,9 +109,9 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
 
   const skillRegistry = createDefaultSkillRegistry();
   const skillManager = new SkillManager(skillRegistry)
-    .addDirectory(path.join(os.homedir(), ".minicode", "skills"))
+    .addDirectory(path.join(MINICODE_HOME, "skills"))
     .addDirectory(path.resolve(cwd, ".agents", "skills"));
-  await skillManager.loadAll();
+  await Promise.all([skillManager.loadAll(), restoring && preload]);
 
   const agentRegistry = new AgentRegistry();
   const runtimeEvents = new RuntimeEvents();
@@ -169,7 +163,7 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
   const runtime = createAgentRuntime({
     client: initialClient,
     model: initialModel,
-    userPrompt,
+    userPrompt: globalPrompt,
     projectPromptFile,
     skills: skillRegistry.getAvailable(),
     tools,
@@ -199,15 +193,13 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
   const { deps, sessionManager, contextManager } = runtime;
   // Environment snapshot for the system prompt, gathered through the shell
   // port (git is an uncontrolled side effect like any other command).
+  // runProcess resolves spawn errors as values, so there is no reject path.
   void shellService
     .runProcess("git", ["status"], { timeoutMs: 5000 })
     .then((r) =>
       deps.promptManager.refreshEnvironment(
         formatEnvironmentContext(r.exitCode === 0 ? r.stdout : undefined),
       ),
-    )
-    .catch(() =>
-      deps.promptManager.refreshEnvironment(formatEnvironmentContext()),
     );
 
   const commandRegistry = new CommandRegistry();
@@ -236,7 +228,6 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
     sessionManager.reportStatus({
       role: "status",
       content: `Created new session: ${sessionName}`,
-      timestamp: new Date(),
     });
   }
 

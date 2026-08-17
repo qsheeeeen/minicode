@@ -1,3 +1,4 @@
+import { newSessionName } from "../../../services/session-manager.js";
 import type { CommandHandler } from "../registry.js";
 
 export const clearCommand: CommandHandler = {
@@ -6,7 +7,6 @@ export const clearCommand: CommandHandler = {
   handler: async (_args, ctx): Promise<void> => {
     ctx.sessionManager.clearSession();
     ctx.contextManager.reset();
-    const newSession = `session-${Date.now()}`;
-    await ctx.switchSession(newSession, { statusMessage: "(Cleared)" });
+    await ctx.switchSession(newSessionName(), { statusMessage: "(Cleared)" });
   },
 };

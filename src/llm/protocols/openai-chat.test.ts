@@ -268,7 +268,7 @@ describe("OpenAIChatClient", () => {
 
       const toolBlock = collected.events[0];
       if (toolBlock.type !== "tool_use") throw new Error("expected tool_use");
-      expect(toolBlock.input).toEqual({});
+      expect(toolBlock.input).toEqual({ _raw: "not-json" });
     });
 
     it("maps stop reasons correctly", async () => {

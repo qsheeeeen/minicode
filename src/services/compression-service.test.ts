@@ -34,7 +34,8 @@ describe("SummaryCompressionStrategy", () => {
         mockClient,
         model,
       );
-      expect(result).toEqual(blocks);
+      expect(result.blocks).toEqual(blocks);
+      expect(result.keptUserMessages).toBe(12);
     });
 
     it("compresses when above threshold (more than 12 user messages)", async () => {
@@ -58,11 +59,12 @@ describe("SummaryCompressionStrategy", () => {
         model,
       );
 
-      expect(result.length).toBeLessThan(blocks.length);
-      expect(result[0]).toEqual({
+      expect(result.blocks.length).toBeLessThan(blocks.length);
+      expect(result.blocks[0]).toEqual({
         type: "user",
         text: expect.stringContaining("Summary"),
       });
+      expect(result.keptUserMessages).toBe(11);
     });
 
     it("throws error when compression fails", async () => {
@@ -122,7 +124,7 @@ describe("SummaryCompressionStrategy", () => {
         undefined,
       );
 
-      expect(result.slice(-10)).toEqual(blocks.slice(-10));
+      expect(result.blocks.slice(-10)).toEqual(blocks.slice(-10));
     });
   });
 });

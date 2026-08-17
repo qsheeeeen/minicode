@@ -26,7 +26,7 @@ describe("InputRouter.route", () => {
 
   it("routes '!' prefix to shell", async () => {
     const result = await router.route("!echo hello", cmdContext);
-    expect(result).toEqual({ action: "shell", promptText: "echo hello" });
+    expect(result).toEqual({ action: "shell", command: "echo hello" });
   });
 
   it("returns 'none' for '!' with no command", async () => {

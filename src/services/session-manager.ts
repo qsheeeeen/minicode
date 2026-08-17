@@ -7,41 +7,35 @@
 import { LLMContext } from "../core/context.js";
 import { ChangeJournal } from "./change-journal.js";
 import { SessionPersistence } from "./session-persistence.js";
-import type { SessionStats } from "./session-stats.js";
 import { RuntimeEvents, type RuntimeStatus } from "./runtime-events.js";
 
 export type StatusReporter = (msg: RuntimeStatus) => void;
+
+/** Single owner of the default session-name scheme. */
+export function newSessionName(): string {
+  return `session-${Date.now()}`;
+}
 
 export class SessionManager {
   private _currentSession: string;
   private context = new LLMContext();
   private changeJournal = new ChangeJournal();
   private activeUserMessageOrdinal = 0;
-  private sessionStats?: SessionStats;
   private _meta = { model: "unknown", totalTokens: 0 };
   private events: RuntimeEvents;
 
   constructor(
     sessionName?: string,
-    sessionStats?: SessionStats,
     events = new RuntimeEvents(),
     private persistent = true,
   ) {
-    this._currentSession = sessionName ?? `session-${Date.now()}`;
-    this.sessionStats = sessionStats;
+    this._currentSession = sessionName ?? newSessionName();
     this.events = events;
   }
 
   /** Report a status event. */
   reportStatus(status: RuntimeStatus): void {
-    this.events.emit({
-      type: "status.added",
-      status: {
-        ...status,
-        userMessageIndex:
-          status.userMessageIndex ?? this.context.getUserMessageCount(),
-      },
-    });
+    this.events.emitStatus(status, this.context.getUserMessageCount());
   }
 
   /** Switch to a new session. Coordinates context + journal. */
@@ -68,16 +62,18 @@ export class SessionManager {
    *  Saves are serialized: the agent fires some without awaiting, and
    *  concurrent tmp-write/rename pairs on one file would interleave. */
   async saveStore(meta: { model: string; totalTokens: number }): Promise<void> {
-    if (meta.model !== undefined) this._meta.model = meta.model;
-    if (meta.totalTokens !== undefined)
-      this._meta.totalTokens = meta.totalTokens;
+    this._meta = meta;
     // Ephemeral sessions (sub-agents) never touch disk.
     if (!this.persistent) return;
     const run = this.saveChain.then(() =>
-      SessionPersistence.save(this._currentSession, this.context.getBlocks(), {
-        model: this._meta.model,
-        totalTokens: this._meta.totalTokens,
-      }),
+      SessionPersistence.save(
+        this._currentSession,
+        this.context.getBlocksReadonly(),
+        {
+          model: this._meta.model,
+          totalTokens: this._meta.totalTokens,
+        },
+      ),
     );
     // A failed save must not poison the chain for the next one.
     this.saveChain = run.catch(() => {});
@@ -106,9 +102,5 @@ export class SessionManager {
 
   setActiveUserMessageOrdinal(idx: number): void {
     this.activeUserMessageOrdinal = idx;
-  }
-
-  getSessionStats(): SessionStats | undefined {
-    return this.sessionStats;
   }
 }

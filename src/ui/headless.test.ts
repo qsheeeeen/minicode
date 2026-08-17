@@ -28,6 +28,7 @@ const mockSubscribe = vi.fn().mockReturnValue(() => {});
 const mockContext = {
   onChange: mockOnChange,
   getBlocks: vi.fn().mockReturnValue([]),
+  getBlocksReadonly: vi.fn().mockReturnValue([]),
   getUserMessageCount: vi.fn().mockReturnValue(0),
   replaceBlocks: vi.fn(),
 };

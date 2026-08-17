@@ -147,9 +147,7 @@ export async function runSubAgent(
   });
   let toolCallCount = 0;
   const unsubBlocks = subContext.onChange(() => {
-    const tc = subContext
-      .getBlocks()
-      .filter((b) => b.type === "tool_use").length;
+    const tc = subContext.getToolUseCount();
     if (tc !== toolCallCount) {
       toolCallCount = tc;
       registry.updateProgress(subId, { toolCalls: tc });

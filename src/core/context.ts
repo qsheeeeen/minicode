@@ -1,6 +1,5 @@
 import type {
   LLMBlock,
-  LLMThinkingBlock,
   LLMToolResultBlock,
   LLMToolUseBlock,
 } from "./blocks.js";
@@ -15,21 +14,37 @@ function cloneBlock(block: LLMBlock): LLMBlock {
 export class LLMContext {
   private blocks: LLMBlock[] = [];
   private listeners = new Set<() => void>();
+  // Maintained incrementally so the per-token append paths never rescan.
+  private userCount = 0;
+  private toolUseCount = 0;
 
   private notify(): void {
     for (const cb of this.listeners) cb();
   }
 
+  private recount(): void {
+    this.userCount = 0;
+    this.toolUseCount = 0;
+    for (const block of this.blocks) {
+      if (block.type === "user") this.userCount++;
+      else if (block.type === "tool_use") this.toolUseCount++;
+    }
+  }
+
   private ensureActiveUserMessage(): void {
-    if (!this.blocks.some((block) => block.type === "user")) {
+    if (this.userCount === 0) {
       throw new Error("No active user message");
     }
   }
 
-  private currentUserMessageBlocks(): LLMBlock[] {
+  /** Test a predicate over the current (last) user message's blocks without
+   *  slicing — the per-tool-call guards run on every tool call. */
+  private currentMessageHas(pred: (block: LLMBlock) => boolean): boolean {
     this.ensureActiveUserMessage();
-    const start = this.findLastUserIndex();
-    return this.blocks.slice(start);
+    for (let i = this.findLastUserIndex(); i < this.blocks.length; i++) {
+      if (pred(this.blocks[i])) return true;
+    }
+    return false;
   }
 
   private findLastUserIndex(): number {
@@ -140,6 +155,13 @@ export class LLMContext {
     };
   }
 
+  /** Read view for projections, persistence, and protocol serialization.
+   *  O(1): callers must not mutate the blocks or the array. */
+  getBlocksReadonly(): readonly LLMBlock[] {
+    return this.blocks;
+  }
+
+  /** Ownership copy — for callers that rework the blocks (compression). */
   getBlocks(): LLMBlock[] {
     return this.blocks.map(cloneBlock);
   }
@@ -147,11 +169,16 @@ export class LLMContext {
   replaceBlocks(blocks: LLMBlock[]): void {
     LLMContext.validateBlocks(blocks);
     this.blocks = blocks.map(cloneBlock);
+    this.recount();
     this.notify();
   }
 
   getUserMessageCount(): number {
-    return this.blocks.filter((block) => block.type === "user").length;
+    return this.userCount;
+  }
+
+  getToolUseCount(): number {
+    return this.toolUseCount;
   }
 
   getUserMessages(): string[] {
@@ -167,12 +194,14 @@ export class LLMContext {
     if (start < 0) {
       if (ordinal <= 1) {
         this.blocks = [];
+        this.recount();
         this.notify();
       }
       return;
     }
 
     this.blocks = this.blocks.slice(0, start);
+    this.recount();
     this.notify();
   }
 
@@ -189,11 +218,13 @@ export class LLMContext {
 
   clear(): void {
     this.blocks = [];
+    this.recount();
     this.notify();
   }
 
   startUserMessage(userText: string): void {
     this.blocks.push({ type: "user", text: userText });
+    this.userCount++;
     this.notify();
   }
 
@@ -213,9 +244,8 @@ export class LLMContext {
     name: string,
     input: Record<string, unknown>,
   ): void {
-    const currentUserMessage = this.currentUserMessageBlocks();
     if (
-      currentUserMessage.some(
+      this.currentMessageHas(
         (block): block is LLMToolUseBlock =>
           block.type === "tool_use" && block.id === id,
       )
@@ -223,12 +253,12 @@ export class LLMContext {
       throw new Error(`Duplicate tool use id: ${id}`);
     }
     this.blocks.push({ type: "tool_use", id, name, input });
+    this.toolUseCount++;
     this.notify();
   }
 
   completeToolCall(id: string, result: string): void {
-    const currentUserMessage = this.currentUserMessageBlocks();
-    const hasToolUse = currentUserMessage.some(
+    const hasToolUse = this.currentMessageHas(
       (block): block is LLMToolUseBlock =>
         block.type === "tool_use" && block.id === id,
     );

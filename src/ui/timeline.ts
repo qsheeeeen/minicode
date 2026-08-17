@@ -43,7 +43,7 @@ export class SessionTimeline {
 
   getMessages(): DisplayMessage[] {
     return toDisplayMessages(
-      this.context.getBlocks(),
+      this.context.getBlocksReadonly(),
       this.statuses,
       this.displays,
     );

@@ -12,7 +12,7 @@ async function activateSession(
   runtimeState: RuntimeState,
   name: string,
 ): Promise<void> {
-  const logger = await createLogger(SessionPersistence.getProjectHash(), name);
+  const logger = await createLogger(SessionPersistence.getSessionDir(), name);
   sessionManager.setSession(name);
   runtimeState.setLogger(logger);
 }
@@ -36,7 +36,6 @@ export async function switchSession(opts: SessionSwitchOptions): Promise<void> {
     opts.sessionManager.reportStatus({
       role: "status",
       content: opts.statusMessage,
-      timestamp: new Date(),
     });
   }
 }
@@ -133,6 +132,5 @@ export async function renameSession(opts: RenameSessionOptions): Promise<void> {
   sessionManager.reportStatus({
     role: "status",
     content: `Renamed: ${oldName} -> ${newName}`,
-    timestamp: new Date(),
   });
 }

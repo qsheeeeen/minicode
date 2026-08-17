@@ -35,7 +35,7 @@ export class PromptManager {
   }
 
   /** Rebuild system prompt from current state. */
-  refreshSystemPrompt(): void {
+  private refreshSystemPrompt(): void {
     this.systemPrompt = buildSystemPrompt({
       environmentContext: this.environmentContext,
       userPrompt: this.userPrompt,
@@ -51,20 +51,5 @@ export class PromptManager {
 
   getUserPrompt(): string {
     return this.userPrompt;
-  }
-
-  setUserPrompt(prompt: string): void {
-    this.userPrompt = prompt;
-    this.refreshSystemPrompt();
-  }
-
-  /** Set the sub-agent role prompt and rebuild. Empty clears it. */
-  setRolePrompt(prompt: string): void {
-    this.roleSystemPrompt = prompt;
-    this.refreshSystemPrompt();
-  }
-
-  getProjectPromptFile(): string {
-    return this.projectPromptFile;
   }
 }

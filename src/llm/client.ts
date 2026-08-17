@@ -86,8 +86,9 @@ export type LLMStream = AsyncGenerator<
 
 export interface LLMClient {
   // Streaming completion — returns immediately, emits events as tokens arrive.
+  // Blocks are a read view of the conversation; adapters must not mutate.
   chatStream(
-    blocks: LLMBlock[],
+    blocks: readonly LLMBlock[],
     tools: LLMToolDef[],
     options?: ChatOptions,
   ): LLMStream;

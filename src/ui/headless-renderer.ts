@@ -46,7 +46,7 @@ export class HeadlessRenderer {
   }
 
   render(isFinal = false): void {
-    const blocks = this.context.getBlocks();
+    const blocks = this.context.getBlocksReadonly();
     const stableCount = this.getStableBlockCount(blocks, isFinal);
 
     for (let i = this.printedBlocks; i < blocks.length; i++) {
@@ -57,7 +57,10 @@ export class HeadlessRenderer {
     this.renderStatuses();
   }
 
-  private getStableBlockCount(blocks: LLMBlock[], isFinal: boolean): number {
+  private getStableBlockCount(
+    blocks: readonly LLMBlock[],
+    isFinal: boolean,
+  ): number {
     if (isFinal || blocks.length === 0) return blocks.length;
     const last = blocks[blocks.length - 1];
     return last.type === "thinking" || last.type === "text"

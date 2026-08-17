@@ -1,6 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
 import { SessionManager } from "./session-manager.js";
-import { SessionStats } from "./session-stats.js";
 import { RuntimeEvents } from "./runtime-events.js";
 import { SessionPersistence } from "./session-persistence.js";
 
@@ -14,17 +13,6 @@ describe("SessionManager", () => {
     it("accepts a custom session name", () => {
       const sm = new SessionManager("my-session");
       expect(sm.getSessionName()).toBe("my-session");
-    });
-
-    it("accepts session stats", () => {
-      const stats = new SessionStats();
-      const sm = new SessionManager(undefined, stats);
-      expect(sm.getSessionStats()).toBe(stats);
-    });
-
-    it("defaults session stats to undefined", () => {
-      const sm = new SessionManager();
-      expect(sm.getSessionStats()).toBeUndefined();
     });
   });
 
@@ -47,7 +35,7 @@ describe("SessionManager", () => {
       events.subscribe((event) => {
         if (event.type === "session.changed") seen.push(event.sessionName);
       });
-      const sm = new SessionManager(undefined, undefined, events);
+      const sm = new SessionManager(undefined, events);
       const spy = vi
         .spyOn(SessionPersistence, "getSessionDir")
         .mockReturnValue("/tmp/minicode-session-manager-test");
@@ -117,7 +105,7 @@ describe("SessionManager", () => {
     });
 
     it("skips disk for non-persistent sessions", async () => {
-      const sm = new SessionManager(undefined, undefined, undefined, false);
+      const sm = new SessionManager(undefined, undefined, false);
       const saveSpy = vi
         .spyOn(SessionPersistence, "save")
         .mockResolvedValue(undefined);

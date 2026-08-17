@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import path from "path";
-import os from "os";
 
 // Mock dependencies before importing the module to be tested
 vi.mock("fs/promises", () => ({
@@ -33,32 +32,24 @@ describe("createLogger", () => {
     const fs = await import("fs/promises");
     const pino = await import("pino");
 
-    const projectHash = "testhash123";
+    const logDir = "/tmp/minicode-logger-test/sessions/abc123";
     const sessionName = "test-session";
 
-    await createLogger(projectHash, sessionName);
+    await createLogger(logDir, sessionName);
 
-    const expectedLogDir = path.join(
-      os.homedir(),
-      ".minicode",
-      "sessions",
-      projectHash,
-    );
-    const expectedLogFile = path.join(expectedLogDir, `${sessionName}.log`);
-
-    expect(fs.default.mkdir).toHaveBeenCalledWith(expectedLogDir, {
+    expect(fs.default.mkdir).toHaveBeenCalledWith(logDir, {
       recursive: true,
     });
 
     expect(pino.default.destination).toHaveBeenCalledWith({
-      dest: expectedLogFile,
+      dest: path.join(logDir, `${sessionName}.log`),
       sync: true,
     });
 
     expect(pino.default).toHaveBeenCalledWith(
       expect.objectContaining({
         level: "info",
-        base: { session: sessionName, projectHash },
+        base: { session: sessionName },
       }),
       expect.any(Object),
     );

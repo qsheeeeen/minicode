@@ -4,12 +4,20 @@ import type { LLMContext } from "../core/context.js";
 import type { LLMBlock } from "../core/blocks.js";
 import type { Model } from "../llm/model.js";
 
+/** Compression outcome metadata — the strategy reports what it kept, so the
+ *  caller never re-derives counts from a private implementation invariant. */
+export interface CompressionOutcome {
+  blocks: LLMBlock[];
+  /** How many of the original user messages survive in `blocks`. */
+  keptUserMessages: number;
+}
+
 export interface CompressionStrategy {
   compress(
     context: LLMContext,
     client: LLMClient,
     model: Model | undefined,
-  ): Promise<LLMBlock[]>;
+  ): Promise<CompressionOutcome>;
 }
 
 export class SummaryCompressionStrategy implements CompressionStrategy {
@@ -19,9 +27,12 @@ export class SummaryCompressionStrategy implements CompressionStrategy {
     context: LLMContext,
     client: LLMClient,
     model: Model | undefined,
-  ): Promise<LLMBlock[]> {
+  ): Promise<CompressionOutcome> {
     if (context.getUserMessageCount() <= this.recentCount + 2) {
-      return context.getBlocks();
+      return {
+        blocks: context.getBlocks(),
+        keptUserMessages: context.getUserMessageCount(),
+      };
     }
 
     const { prefix, suffix } = context.splitAtRecentUserMessages(
@@ -60,13 +71,17 @@ ${conversationText}`;
       }
 
       const summaryText = this.extractSummaryText(result);
-      return [
-        {
-          type: "user",
-          text: `[Previous conversation summary]\n${summaryText}`,
-        },
-        ...suffix,
-      ];
+      // [summary user message, ...the recent suffix]
+      return {
+        blocks: [
+          {
+            type: "user",
+            text: `[Previous conversation summary]\n${summaryText}`,
+          },
+          ...suffix,
+        ],
+        keptUserMessages: this.recentCount + 1,
+      };
     } catch (e) {
       if (isTurnFaultError(e)) throw e;
       throw new Error(`Compression failed: ${(e as Error).message}`);

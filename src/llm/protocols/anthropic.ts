@@ -3,7 +3,12 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import type { MessageStreamEvent } from "@anthropic-ai/sdk/resources/messages.js";
-import { terminalFromError } from "./shared.js";
+import {
+  DEFAULT_ANTHROPIC_MODEL,
+  DEFAULT_MAX_TOKENS,
+  parseToolArgs,
+  terminalFromError,
+} from "./shared.js";
 import type { LLMStream } from "../client.js";
 import type { MessageCreateParamsStreaming } from "@anthropic-ai/sdk/resources/messages.js";
 
@@ -42,7 +47,9 @@ type AnthropicContentBlockParam = Anthropic.Messages.ContentBlockParam;
 // Convert internal messages to Anthropic SDK format.
 // Thinking blocks are filtered out — they're output-only and not accepted
 // as input by the API (adaptive thinking reconstructs context automatically).
-function toSdkMessages(blocks: LLMBlock[]): Anthropic.Messages.MessageParam[] {
+function toSdkMessages(
+  blocks: readonly LLMBlock[],
+): Anthropic.Messages.MessageParam[] {
   const out: Anthropic.Messages.MessageParam[] = [];
   let assistantBlocks: LLMAssistantBlock[] = [];
   // Anthropic requires ALL tool_result blocks for one assistant message to
@@ -196,8 +203,8 @@ export class AnthropicClient implements LLMClient {
     options: ChatOptions = {},
   ): LLMStream {
     const params: MessageCreateParamsStreaming = {
-      model: options.model?.getName() || "claude-sonnet-4-5",
-      max_tokens: options.maxTokens || 8192,
+      model: options.model?.getName() || DEFAULT_ANTHROPIC_MODEL,
+      max_tokens: options.maxTokens || DEFAULT_MAX_TOKENS,
       stream: true,
       system: options.system,
       messages: toSdkMessages(blocks),
@@ -226,8 +233,6 @@ export class AnthropicClient implements LLMClient {
         name: string;
         arguments: string;
       } | null = null;
-      let currentText = "";
-      let currentThinking = "";
 
       try {
         const stream = client.messages.stream(params, {
@@ -247,10 +252,8 @@ export class AnthropicClient implements LLMClient {
           } else if (event.type === "content_block_delta") {
             if (event.delta.type === "text_delta") {
               yield { type: "text", text: event.delta.text };
-              currentText += event.delta.text;
             } else if (event.delta.type === "thinking_delta") {
               yield { type: "thinking", thinking: event.delta.thinking };
-              currentThinking += event.delta.thinking;
             } else if (event.delta.type === "input_json_delta") {
               if (currentToolCall) {
                 currentToolCall.arguments += event.delta.partial_json;
@@ -258,21 +261,13 @@ export class AnthropicClient implements LLMClient {
             }
           } else if (event.type === "content_block_stop") {
             if (currentToolCall) {
-              let input = {};
-              try {
-                input = JSON.parse(currentToolCall.arguments);
-              } catch {}
               yield {
                 type: "tool_use",
                 id: currentToolCall.id,
                 name: currentToolCall.name,
-                input,
+                input: parseToolArgs(currentToolCall.arguments),
               };
               currentToolCall = null;
-            } else if (currentThinking) {
-              currentThinking = "";
-            } else if (currentText) {
-              currentText = "";
             }
           }
         }

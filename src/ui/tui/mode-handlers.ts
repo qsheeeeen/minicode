@@ -31,7 +31,6 @@ export async function effortSelectHandler(
   sessionManager.reportStatus({
     role: "status",
     content: `(Effort set to: ${value})`,
-    timestamp: new Date(),
   });
 }
 
@@ -64,7 +63,6 @@ export async function modelSelectHandler(
         sessionManager.reportStatus({
           role: "error",
           content: `(Error: ${result.reason})`,
-          timestamp: new Date(),
         });
       }
     }

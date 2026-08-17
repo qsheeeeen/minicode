@@ -15,15 +15,11 @@ export function MessageList() {
 
   return (
     <Box flexGrow={1} flexDirection="column" paddingX={1}>
-      <Box flexDirection="column">
-        {messages
-          .filter((msg) => msg.role === "tool" || !!msg.content)
-          .map((msg, i) => (
-            <Box key={i}>
-              <Message msg={msg} />
-            </Box>
-          ))}
-      </Box>
+      {messages
+        .filter((msg) => msg.role === "tool" || !!msg.content)
+        .map((msg, i) => (
+          <Message key={i} msg={msg} />
+        ))}
     </Box>
   );
 }

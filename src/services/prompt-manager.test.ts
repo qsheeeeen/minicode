@@ -7,17 +7,11 @@ describe("PromptManager", () => {
       const pm = new PromptManager();
       expect(pm).toBeDefined();
       expect(pm.getUserPrompt()).toBe("");
-      expect(pm.getProjectPromptFile()).toBe("");
     });
 
     it("accepts userPrompt", () => {
       const pm = new PromptManager("my prompt");
       expect(pm.getUserPrompt()).toBe("my prompt");
-    });
-
-    it("accepts projectPromptFile", () => {
-      const pm = new PromptManager("", "AGENTS.md");
-      expect(pm.getProjectPromptFile()).toBe("AGENTS.md");
     });
   });
 
@@ -33,41 +27,21 @@ describe("PromptManager", () => {
       const pm = new PromptManager("test-user-prompt");
       expect(pm.getSystemPrompt()).toContain("test-user-prompt");
     });
-  });
 
-  describe("setUserPrompt", () => {
-    it("updates the user prompt", () => {
-      const pm = new PromptManager();
-      pm.setUserPrompt("new prompt");
-      expect(pm.getUserPrompt()).toBe("new prompt");
-    });
-
-    it("rebuilds system prompt after update", () => {
-      const pm = new PromptManager();
-      const before = pm.getSystemPrompt();
-      pm.setUserPrompt("updated-prompt");
-      const after = pm.getSystemPrompt();
-      expect(after).toContain("updated-prompt");
-      expect(after).not.toBe(before);
-    });
-  });
-
-  describe("setRolePrompt", () => {
-    it("injects role prompt into system prompt", () => {
-      const pm = new PromptManager();
-      pm.setRolePrompt("you are a researcher");
-      expect(pm.getSystemPrompt()).toContain("you are a researcher");
-    });
-
-    it("constructor accepts roleSystemPrompt", () => {
+    it("includes roleSystemPrompt from the constructor", () => {
       const pm = new PromptManager("", "", "you are a planner");
       expect(pm.getSystemPrompt()).toContain("you are a planner");
     });
+  });
 
-    it("clears role prompt when set to empty", () => {
-      const pm = new PromptManager("", "", "role-text");
-      pm.setRolePrompt("");
-      expect(pm.getSystemPrompt()).not.toContain("role-text");
+  describe("refreshEnvironment", () => {
+    it("rebuilds system prompt with the environment snapshot", () => {
+      const pm = new PromptManager();
+      const before = pm.getSystemPrompt();
+      pm.refreshEnvironment("os=linux");
+      const after = pm.getSystemPrompt();
+      expect(after).toContain("os=linux");
+      expect(after).not.toBe(before);
     });
   });
 });

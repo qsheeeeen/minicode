@@ -67,7 +67,6 @@ export class ModelSwitchService {
       this.sessionManager.reportStatus({
         role: "status",
         content: `(Model set to: ${opts.modelSpec})`,
-        timestamp: new Date(),
       });
     }
 

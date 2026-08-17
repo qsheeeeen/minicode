@@ -195,7 +195,10 @@ describe("ContextManager", () => {
         { type: "text" as const, text: "kept" },
       ];
       const compressionStrategy = {
-        compress: vi.fn().mockResolvedValue(compressedBlocks),
+        compress: vi.fn().mockResolvedValue({
+          blocks: compressedBlocks,
+          keptUserMessages: 11,
+        }),
       };
       const { cm, context, journal, getActiveUserMessageOrdinal } =
         createContextManager({

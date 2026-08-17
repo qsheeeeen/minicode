@@ -13,7 +13,7 @@ vi.mock("../../utils/logger.js", () => ({
 
 vi.mock("../../services/session-persistence.js", () => ({
   SessionPersistence: {
-    getProjectHash: vi.fn().mockReturnValue("testhash"),
+    getSessionDir: vi.fn().mockReturnValue("/tmp/minicode-create-context-test"),
     rename: vi.fn().mockResolvedValue(undefined),
     load: vi.fn().mockResolvedValue(null),
   },

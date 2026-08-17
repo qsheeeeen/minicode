@@ -1,13 +1,14 @@
 import type { CommandContext } from "./commands/index.js";
 import { executeCommand } from "./commands/index.js";
 
-export interface RouteResult {
-  action: "none" | "shell" | "command" | "llm" | "unknown-command";
-  promptText?: string;
-  displayContent?: string;
-  /** The command name for action:"command" (used in unknown-command errors). */
-  command?: string;
-}
+/** Self-describing outcomes — what each action carries is part of the type,
+ *  not encoded in which optional fields are present. */
+export type RouteResult =
+  | { action: "none" }
+  | { action: "shell"; command: string }
+  | { action: "command"; promptText: string; displayContent?: string }
+  | { action: "llm"; promptText: string }
+  | { action: "unknown-command"; command: string };
 
 export interface InputHandler {
   matches(input: string): boolean;
@@ -59,9 +60,9 @@ class ShellInputHandler implements InputHandler {
   }
 
   handle(input: string): RouteResult {
-    const cmd = input.slice(1).trim();
-    if (!cmd) return { action: "none" };
-    return { action: "shell", promptText: cmd };
+    const command = input.slice(1).trim();
+    if (!command) return { action: "none" };
+    return { action: "shell", command };
   }
 }
 

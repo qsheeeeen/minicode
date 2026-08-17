@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Box, Text } from "ink";
 import { StatusMessage } from "@inkjs/ui";
 import Markdown from "ink-markdown-es";
@@ -13,7 +14,7 @@ const markdownStyles = {
   h6: { bold: true, color: undefined },
 };
 
-export function Message({ msg }: { msg: DisplayMessage }) {
+function MessageImpl({ msg }: { msg: DisplayMessage }) {
   switch (msg.role) {
     case "user":
       return (
@@ -53,17 +54,6 @@ export function Message({ msg }: { msg: DisplayMessage }) {
       );
 
     case "status":
-      if (msg.toolDisplay) {
-        return (
-          <Box marginBottom={1}>
-            <ToolDisplay
-              name={msg.toolDisplay.name}
-              input={msg.toolDisplay.input}
-              output={msg.toolDisplay.output}
-            />
-          </Box>
-        );
-      }
       return (
         <Box marginBottom={1}>
           <StatusMessage variant="info">{msg.content}</StatusMessage>
@@ -76,8 +66,9 @@ export function Message({ msg }: { msg: DisplayMessage }) {
           <StatusMessage variant="error">{msg.content}</StatusMessage>
         </Box>
       );
-
-    default:
-      return null;
   }
 }
+
+/** Memoized: a per-token sync re-renders the whole list, but a finished
+ *  message renders the same output every time — skip re-executing it. */
+export const Message = memo(MessageImpl);
