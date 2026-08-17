@@ -56,15 +56,13 @@ const mockDeps = {
 } as any;
 
 const mockShellService = {
-  run: vi
-    .fn()
-    .mockResolvedValue({
-      stdout: "output",
-      stderr: "",
-      exitCode: 0,
-      timedOut: false,
-      aborted: false,
-    }),
+  run: vi.fn().mockResolvedValue({
+    stdout: "output",
+    stderr: "",
+    exitCode: 0,
+    timedOut: false,
+    aborted: false,
+  }),
   formatResult: vi.fn(() => "output"),
 };
 

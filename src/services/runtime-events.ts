@@ -6,7 +6,6 @@ export interface RuntimeStatus {
   content: string;
   timestamp: Date;
   userMessageIndex?: number;
-  element?: unknown;
   toolDisplay?: {
     name: string;
     input: Record<string, unknown>;

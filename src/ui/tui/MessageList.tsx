@@ -19,7 +19,6 @@ export function MessageList() {
         {messages
           .filter((msg) => {
             if (msg.role === "tool") return true;
-            if (msg.role === "status" && msg.element) return true;
             return !!msg.content;
           })
           .map((msg, i) => (

@@ -25,7 +25,6 @@ export type DisplayMessage =
   | {
       role: "status";
       content: string;
-      element?: unknown;
       toolDisplay?: {
         name: string;
         input: Record<string, unknown>;
@@ -56,7 +55,6 @@ export function toDisplayMessages(
     result.push({
       role: s.role,
       content: s.content,
-      element: s.element,
       toolDisplay: s.toolDisplay,
       timestamp: s.timestamp,
     });
@@ -75,7 +73,6 @@ export function toDisplayMessages(
           result.push({
             role: s.role,
             content: s.content,
-            element: s.element,
             toolDisplay: s.toolDisplay,
             timestamp: s.timestamp,
           });
@@ -111,7 +108,6 @@ export function toDisplayMessages(
       result.push({
         role: s.role,
         content: s.content,
-        element: s.element,
         toolDisplay: s.toolDisplay,
         timestamp: s.timestamp,
       });
@@ -124,7 +120,6 @@ export function toDisplayMessages(
       result.push({
         role: s.role,
         content: s.content,
-        element: s.element,
         toolDisplay: s.toolDisplay,
         timestamp: s.timestamp,
       });

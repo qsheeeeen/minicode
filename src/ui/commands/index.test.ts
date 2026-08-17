@@ -37,15 +37,6 @@ vi.mock("../../utils/logger.js", () => ({
   createLogger: vi.fn().mockResolvedValue({ info: vi.fn(), error: vi.fn() }),
 }));
 
-vi.mock("react", () => ({
-  createElement: vi.fn((...args: any[]) => args),
-}));
-
-vi.mock("ink", () => ({
-  Box: "Box",
-  Text: "Text",
-}));
-
 describe("Builtin commands", () => {
   let commands: CommandRegistry;
   let skills: SkillRegistry;
