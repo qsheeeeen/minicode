@@ -3,7 +3,7 @@ import type { SessionStats } from "../../services/session-stats.js";
 import type { SessionManager } from "../../services/session-manager.js";
 import type { ChangeJournal } from "../../services/change-journal.js";
 import type { LLMContext } from "../../core/context.js";
-import type { AppConfig, Providers } from "../../config.js";
+import type { AppConfig, Providers, Tier } from "../../config.js";
 import type { SkillRegistry } from "../../skills/index.js";
 import type { ModelSwitchService } from "../../services/model-switcher.js";
 import type { ContextManager } from "../../services/context-manager.js";
@@ -28,7 +28,8 @@ export type InputRequest =
   | {
       type: "model-picker";
       providers: Providers;
-      tiers: Record<string, string>;
+      tiers: Partial<Record<Tier, string>>;
+      activeTier: Tier;
     }
   | {
       type: "rollback-picker";

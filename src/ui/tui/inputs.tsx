@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Box, Text, useInput } from "ink";
 import { Select, TextInput } from "@inkjs/ui";
-import { TIERS, type ProviderConfig } from "../../config.js";
+import { TIERS, type ProviderConfig, type Tier } from "../../config.js";
 import type { ChangeEntry } from "../../services/change-journal.js";
 
 export interface InputComponentProps {
@@ -96,9 +96,11 @@ export function ModelSelectInput({
   onCancel,
   providers = {},
   tiers = {},
+  activeTier,
 }: InputComponentProps & {
   providers?: Record<string, ProviderConfig>;
-  tiers?: Record<string, string>;
+  tiers?: Partial<Record<Tier, string>>;
+  activeTier?: Tier;
 }) {
   const [step, setStep] = useState<"main" | "edit-tier" | "provider" | "model">(
     "main",
@@ -122,10 +124,9 @@ export function ModelSelectInput({
 
   // ── Main: tiers + edit entry ──
   if (step === "main") {
-    const tierLabels = TIERS as readonly string[];
     const options = [
-      ...tierLabels.map((t) => ({
-        label: `${capitalize(t)} → ${tiers[t] || "(unset)"}`,
+      ...TIERS.map((t) => ({
+        label: `${capitalize(t)} → ${tiers[t] || "(unset)"}${t === activeTier ? " (active)" : ""}`,
         value: `${t}:`,
       })),
       { label: "Edit tier mapping...", value: "_edit_" },
@@ -153,8 +154,7 @@ export function ModelSelectInput({
 
   // ── Edit: pick tier to reconfigure ──
   if (step === "edit-tier") {
-    const tierLabels = TIERS as readonly string[];
-    const options = tierLabels.map((t) => ({
+    const options = TIERS.map((t) => ({
       label: `${capitalize(t)} → ${tiers[t] || "(unset)"}`,
       value: t,
     }));

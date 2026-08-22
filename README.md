@@ -34,7 +34,11 @@ A minimal coding agent powered by LLMs with TUI. Simple, opinionated, hackable.
          }
        }
      },
-     "model": "claude-sonnet-4-5@anthropic",
+     "tiers": {
+       "pro": "claude-opus-4@anthropic",
+       "flash": "claude-sonnet-4-5@anthropic"
+     },
+     "activeTier": "pro",
      "compressionThreshold": 0.8,
      "thinking": true,
      "thinkingTokens": 20000,
@@ -42,9 +46,9 @@ A minimal coding agent powered by LLMs with TUI. Simple, opinionated, hackable.
    }
    ```
 
-   Model specifier format: `model@provider`. Each provider can define multiple models with per-model overrides (e.g. `contextLength`).
+   Model specifier format: `model@provider`. Each provider can define multiple models with per-model overrides (e.g. `contextLength`). Model config is two tiers (`tiers.pro` / `tiers.flash`) plus `activeTier` — the current model is always `tiers[activeTier]`.
 
-   Priority: CLI `--model` > `MODEL` env var > config `model` field.
+   `--model` is session-only: a tier name (`--model flash`) selects that tier, a full spec (`--model glm-4.7@zhipu`) overrides the model for the run. It is never persisted.
 
 2. Install and run:
 
@@ -60,14 +64,12 @@ A minimal coding agent powered by LLMs with TUI. Simple, opinionated, hackable.
 ```bash
 minicode                          # Start TUI with new session
 minicode "list files"             # Start with initial prompt
-minicode --model glm-4.7@zhipu   # Override model
+minicode --model glm-4.7@zhipu   # Override model for this run (spec or tier)
 minicode --session my-project     # Use named session
 minicode --resume                 # Resume most recent session
 minicode -H "ls -la"              # Headless mode (no TUI)
 minicode -H --perm yolo "ls"     # Headless with permission mode
 ```
-
-Model priority: CLI `--model` > `MODEL` env var > config `model` field.
 
 ### Slash Commands
 

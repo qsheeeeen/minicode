@@ -73,7 +73,11 @@ export function inputRequestToState(request: InputRequest): {
     case "model-picker":
       return {
         mode: "model-select",
-        props: { providers: request.providers, tiers: request.tiers },
+        props: {
+          providers: request.providers,
+          tiers: request.tiers,
+          activeTier: request.activeTier,
+        },
       };
     case "rollback-picker":
       return {

@@ -1,4 +1,4 @@
-import type { AppConfig } from "../config.js";
+import type { AppConfig, Tier } from "../config.js";
 import { ModelFactory, type ModelSelection } from "../llm/model.js";
 import type { ContextManager } from "./context-manager.js";
 import type { SessionManager } from "./session-manager.js";
@@ -11,17 +11,10 @@ export interface ModelSwitchServiceOpts {
   readonly runtimeState: RuntimeState;
 }
 
-export interface SwitchAgentModelOpts {
-  readonly modelSpec: string;
-  readonly persistDefault?: boolean;
-  readonly tier?: string;
-  readonly reportStatus?: boolean;
-}
-
 /** Switch outcome as a value — an unresolvable spec is user-input validation,
  *  not an exceptional condition. */
-export type SwitchModelResult =
-  | { ok: true; selection: ModelSelection }
+export type ModelSwitchResult =
+  | { ok: true; spec: string }
   | { ok: false; reason: string };
 
 export class ModelSwitchService {
@@ -37,39 +30,63 @@ export class ModelSwitchService {
     this.runtimeState = opts.runtimeState;
   }
 
-  async switchAgentModel(
-    opts: SwitchAgentModelOpts,
-  ): Promise<SwitchModelResult> {
-    const factory = new ModelFactory(this.appConfig);
-    const selection = factory.fromSpec(opts.modelSpec);
-    if (!selection) {
-      return { ok: false, reason: `Could not resolve "${opts.modelSpec}".` };
+  /** Switch the session to a tier's current mapping and persist the choice. */
+  async switchTier(tier: Tier): Promise<ModelSwitchResult> {
+    const spec = this.appConfig.tiers[tier];
+    if (!spec) {
+      return {
+        ok: false,
+        reason: `Tier "${tier}" has no model configured. Set tiers.${tier} in ~/.minicode/config.json.`,
+      };
     }
-    const { client, model } = selection;
+    const selection = new ModelFactory(this.appConfig).fromSpec(spec);
+    if (!selection) {
+      return { ok: false, reason: `Could not resolve "${spec}".` };
+    }
 
     // runtimeState is the single source of truth; ContextManager and the
     // permission gate resolve client/model through its getters.
-    this.runtimeState.setClientModel(client, model);
+    await this.appConfig.setActiveTier(tier);
+    await this.applySelection(spec, selection);
+    return { ok: true, spec };
+  }
 
-    if (opts.tier) {
-      await this.appConfig.setTier(opts.tier, opts.modelSpec);
+  /** Point a tier at a new model@provider. Hot-swaps only when that tier is
+   *  the active one; otherwise the live model is untouched. */
+  async remapTier(tier: Tier, modelSpec: string): Promise<ModelSwitchResult> {
+    const selection = new ModelFactory(this.appConfig).fromSpec(modelSpec);
+    if (!selection) {
+      return { ok: false, reason: `Could not resolve "${modelSpec}".` };
     }
-    if (opts.persistDefault ?? true) {
-      await this.appConfig.setModel(opts.modelSpec);
-    }
 
-    await this.sessionManager.saveStore({
-      model: model.getName(),
-      totalTokens: this.contextManager.getTokenCount(),
-    });
+    await this.appConfig.setTier(tier, modelSpec);
 
-    if (opts.reportStatus ?? true) {
+    if (tier !== this.appConfig.activeTier) {
       this.sessionManager.reportStatus({
         role: "status",
-        content: `(Model set to: ${opts.modelSpec})`,
+        content: `(${tier} tier set to: ${modelSpec})`,
       });
+      return { ok: true, spec: modelSpec };
     }
 
-    return { ok: true, selection };
+    await this.applySelection(modelSpec, selection);
+    return { ok: true, spec: modelSpec };
+  }
+
+  /** Make a resolved selection live: swap the runtime handles, persist the
+   *  session metadata, and announce it. */
+  private async applySelection(
+    spec: string,
+    selection: ModelSelection,
+  ): Promise<void> {
+    this.runtimeState.setClientModel(selection.client, selection.model);
+    await this.sessionManager.saveStore({
+      model: selection.model.getName(),
+      totalTokens: this.contextManager.getTokenCount(),
+    });
+    this.sessionManager.reportStatus({
+      role: "status",
+      content: `(Model set to: ${spec})`,
+    });
   }
 }

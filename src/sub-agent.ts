@@ -94,7 +94,7 @@ export async function runSubAgent(
   let subClient: LLMClient = config.client;
   let subModel: Model = config.model;
   if (type.tier && appConfig) {
-    const spec = appConfig.tiers?.[type.tier];
+    const spec = appConfig.tiers[type.tier];
     if (spec) {
       const selection = new ModelFactory(appConfig).fromSpec(spec);
       if (selection) {

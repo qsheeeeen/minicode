@@ -62,6 +62,7 @@ function Demo() {
             pro: "claude-sonnet-4-5@anthropic",
             flash: "claude-haiku-4-5@anthropic",
           }}
+          activeTier="pro"
           onExecute={(v) => console.log(v)}
           onCancel={() => {}}
         />

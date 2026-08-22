@@ -127,16 +127,19 @@ describe("createApp", () => {
   });
 
   it("runtime deps follow model switches through RuntimeState", async () => {
-    const config = new AppConfig({
-      providers: {
-        test: {
-          apiKey: "test-key",
-          protocol: "anthropic",
-          models: { "next-model": { contextLength: 1234 } },
+    const config = new AppConfig(
+      {
+        providers: {
+          test: {
+            apiKey: "test-key",
+            protocol: "anthropic",
+            models: { "next-model": { contextLength: 1234 } },
+          },
         },
+        model: "test-model@test",
       },
-      model: "test-model@test",
-    });
+      "/tmp/minicode-app-test/config.json", // remapTier persists; keep off the real home
+    );
 
     const runtime = await createApp({
       args: makeArgs(),
@@ -149,13 +152,39 @@ describe("createApp", () => {
 
     expect(runtime.deps.model).toBe(runtime.runtimeState.model);
 
-    await runtime.modelSwitchService.switchAgentModel({
-      modelSpec: "next-model@test",
-      persistDefault: false,
-    });
+    await runtime.modelSwitchService.remapTier("pro", "next-model@test");
 
     expect(runtime.deps.model.getName()).toBe("next-model");
     expect(runtime.runtimeState.model.getName()).toBe("next-model");
+  });
+
+  it("throws a tiers-pointing error when no model is configured", async () => {
+    await expect(
+      createApp({
+        args: makeArgs({ model: null }),
+        config: new AppConfig({}),
+        version: "1.0.0",
+        cwd: "/tmp",
+        programStartTime: 123,
+        stdinIsTTY: false,
+      }),
+    ).rejects.toThrow(/tiers\.pro/);
+  });
+
+  it("surfaces the -m modelError verbatim", async () => {
+    await expect(
+      createApp({
+        args: makeArgs({
+          model: null,
+          modelError: '-m flash: tier "flash" has no resolvable model.',
+        }),
+        config: new AppConfig({}),
+        version: "1.0.0",
+        cwd: "/tmp",
+        programStartTime: 123,
+        stdinIsTTY: false,
+      }),
+    ).rejects.toThrow('tier "flash" has no resolvable model');
   });
 
   it("restores the initial session at composition time", async () => {

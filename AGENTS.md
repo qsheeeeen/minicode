@@ -22,7 +22,7 @@ bun run src/main.ts -H --perm yolo "<prompt>"   # with permission mode
 
 ## Config
 
-`~/.minicode/config.json`. Model specifier is `model@provider` (e.g. `claude-sonnet-4-5@anthropic`); resolution: CLI `-m` > `MODEL` env > config `model`. Tiers `"pro"`/`"flash"` each map to a `model@provider`. Providers support arbitrary keys — any `model@provider` resolves via `createClient()` protocol registry or falls back to Anthropic-compatible. See `config.example.json`.
+`~/.minicode/config.json`. Model config is two tiers — `tiers.pro` / `tiers.flash`, each a `model@provider` specifier (e.g. `claude-sonnet-4-5@anthropic`) — plus `activeTier` (`"pro"` default). The current model is always `tiers[activeTier]`; switching tiers via `/model` persists `activeTier`. CLI `-m` is session-only: `-m pro`/`-m flash` selects a tier, `-m model@provider` overrides for the run; never persisted. Providers support arbitrary keys — any `model@provider` resolves via `createClient()` protocol registry or falls back to Anthropic-compatible. See `config.example.json`.
 
 Tests must not depend on real config files — mock or inject.
 

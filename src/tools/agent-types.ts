@@ -2,6 +2,8 @@
 // sub-agent-runtime reads it to configure the child. Pure data, zero deps.
 // An explicit instance owned by the composition root, not a module global.
 
+import type { Tier } from "../config.js";
+
 export type SubAgentToolSet = "readonly" | "all" | string[];
 
 export interface SubAgentType {
@@ -10,7 +12,7 @@ export interface SubAgentType {
   systemPrompt: string;
   /** "readonly" | "all" | explicit name list. */
   tools: SubAgentToolSet;
-  tier?: "pro" | "flash";
+  tier?: Tier;
 }
 
 export class AgentTypeRegistry {

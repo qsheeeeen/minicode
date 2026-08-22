@@ -1,6 +1,6 @@
 import type { Model } from "../../llm/model.js";
 import type { EffortLevel } from "../../llm/client.js";
-import { TIERS, type AppConfig } from "../../config.js";
+import { TIERS, type AppConfig, type Tier } from "../../config.js";
 import type { ModelSwitchService } from "../../services/model-switcher.js";
 import type { SessionManager } from "../../services/session-manager.js";
 
@@ -43,28 +43,19 @@ export async function sessionListHandler(
 
 export async function modelSelectHandler(
   value: string,
-  { config, modelSwitchService, sessionManager }: ModeHandlerDeps,
+  { modelSwitchService, sessionManager }: ModeHandlerDeps,
 ): Promise<void> {
   const tierMatch = value.match(TIER_VALUE);
-  if (tierMatch) {
-    const tier = tierMatch[1];
-    let modelSpec = tierMatch[2];
+  if (!tierMatch) return;
+  const tier = tierMatch[1] as Tier; // regex constrains members to TIERS
 
-    if (!modelSpec) {
-      modelSpec = config.tiers[tier] || "";
-    }
-
-    if (modelSpec) {
-      const result = await modelSwitchService.switchAgentModel({
-        modelSpec,
-        tier: tierMatch[2] ? tier : undefined,
-      });
-      if (!result.ok) {
-        sessionManager.reportStatus({
-          role: "error",
-          content: `(Error: ${result.reason})`,
-        });
-      }
-    }
+  const result = tierMatch[2]
+    ? await modelSwitchService.remapTier(tier, tierMatch[2])
+    : await modelSwitchService.switchTier(tier);
+  if (!result.ok) {
+    sessionManager.reportStatus({
+      role: "error",
+      content: `(Error: ${result.reason})`,
+    });
   }
 }

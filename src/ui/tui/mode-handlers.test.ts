@@ -10,13 +10,10 @@ function makeDeps(overrides?: Partial<ModeHandlerDeps>): ModeHandlerDeps {
     } as any,
     config: {
       setEffort: vi.fn(),
-      tiers: { pro: "m@p", flash: "f@p" },
     } as any,
     modelSwitchService: {
-      switchAgentModel: vi.fn().mockResolvedValue({
-        ok: true,
-        selection: {},
-      }),
+      switchTier: vi.fn().mockResolvedValue({ ok: true, spec: "m@p" }),
+      remapTier: vi.fn().mockResolvedValue({ ok: true, spec: "m@p" }),
     } as any,
     sessionManager: {
       reportStatus: vi.fn(),
@@ -42,10 +39,11 @@ describe("modeHandlers", () => {
     );
   });
 
-  it("model-select reports switch failures through the session manager", async () => {
+  it("model-select reports remap failures through the session manager", async () => {
     const deps = makeDeps({
       modelSwitchService: {
-        switchAgentModel: vi.fn().mockResolvedValue({
+        switchTier: vi.fn(),
+        remapTier: vi.fn().mockResolvedValue({
           ok: false,
           reason: 'Could not resolve "x@y".',
         }),
@@ -62,15 +60,25 @@ describe("modeHandlers", () => {
     );
   });
 
-  it("model-select with bare tier resolves from config and switches", async () => {
+  it("model-select with a bare tier switches to it", async () => {
     const deps = makeDeps();
 
     await getInputModeHandler("model-select")!("pro:", deps);
 
-    expect(deps.modelSwitchService.switchAgentModel).toHaveBeenCalledWith({
-      modelSpec: "m@p",
-      tier: undefined,
-    });
+    expect(deps.modelSwitchService.switchTier).toHaveBeenCalledWith("pro");
+    expect(deps.modelSwitchService.remapTier).not.toHaveBeenCalled();
+  });
+
+  it("model-select with tier:spec remaps the tier", async () => {
+    const deps = makeDeps();
+
+    await getInputModeHandler("model-select")!("flash:x@y", deps);
+
+    expect(deps.modelSwitchService.remapTier).toHaveBeenCalledWith(
+      "flash",
+      "x@y",
+    );
+    expect(deps.modelSwitchService.switchTier).not.toHaveBeenCalled();
   });
 
   it("session-list re-feeds the command layer", async () => {

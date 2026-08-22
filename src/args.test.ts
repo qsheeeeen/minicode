@@ -28,6 +28,34 @@ describe("Args", () => {
     );
     expect(args.model?.model).toBe("claude-3");
     expect(args.model?.provider).toBe("anthropic");
+    expect(args.modelError).toBeUndefined();
+  });
+
+  it("-m <tier> selects that tier's model for the run without persisting", () => {
+    const config = new AppConfig({
+      providers: { anthropic: { apiKey: "key" } },
+      tiers: { pro: "claude-3@anthropic", flash: "claude-haiku@anthropic" },
+    });
+    const args = new Args(["node", "minicode", "-m", "flash"], config);
+    expect(args.model?.model).toBe("claude-haiku");
+    expect(args.modelError).toBeUndefined();
+    // Session-only: the persisted active tier is untouched.
+    expect(config.activeTier).toBe("pro");
+  });
+
+  it("-m <tier> with an unset tier reports modelError", () => {
+    const args = new Args(["node", "minicode", "-m", "flash"], baseConfig);
+    expect(args.model).toBeNull();
+    expect(args.modelError).toContain("tiers.flash");
+  });
+
+  it("-m with an unresolvable spec reports modelError", () => {
+    const args = new Args(
+      ["node", "minicode", "-m", "junk@nowhere"],
+      baseConfig,
+    );
+    expect(args.model).toBeNull();
+    expect(args.modelError).toContain("junk@nowhere");
   });
 
   it("uses config model when --model not given", () => {

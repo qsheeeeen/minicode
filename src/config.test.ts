@@ -83,6 +83,8 @@ describe("AppConfig.load", () => {
     const config = await AppConfig.load();
     expect(config.model?.model).toBe("claude-3");
     expect(config.compressionThreshold).toBe(0.9);
+    // legacy top-level model migrated to tiers.pro
+    expect(config.tiers.pro).toBe("claude-3@anthropic");
   });
 
   it("does not cache — each load re-reads", async () => {
@@ -103,18 +105,66 @@ describe("AppConfig getters", () => {
     expect(config.thinking.effort).toBeUndefined();
     expect(config.permissionMode).toBe("manual");
     expect(config.tiers).toEqual({});
+    expect(config.activeTier).toBe("pro");
   });
 
-  it("exposes providers, tiers, modelSpec from raw", () => {
+  it("exposes providers, tiers, activeTier, modelSpec from raw", () => {
     const config = new AppConfig({
       providers: { anthropic: { apiKey: "key" } },
-      model: "claude-3@anthropic",
-      tiers: { pro: "claude-3@anthropic" },
+      tiers: { pro: "claude-3@anthropic", flash: "claude-haiku@anthropic" },
+      activeTier: "flash",
     });
     expect(config.providers.anthropic?.apiKey).toBe("key");
-    expect(config.modelSpec).toBe("claude-3@anthropic");
+    expect(config.activeTier).toBe("flash");
+    expect(config.modelSpec).toBe("claude-haiku@anthropic");
+    expect(config.model?.model).toBe("claude-haiku");
+  });
+
+  it("activeTier falls back when the preferred tier has no spec", () => {
+    const config = new AppConfig({
+      tiers: { flash: "claude-haiku@anthropic" },
+      activeTier: "flash",
+    });
+    expect(config.activeTier).toBe("flash");
+
+    const proPreferred = new AppConfig({
+      tiers: { flash: "claude-haiku@anthropic" },
+    });
+    expect(proPreferred.activeTier).toBe("flash");
+    expect(proPreferred.modelSpec).toBe("claude-haiku@anthropic");
+  });
+
+  it("activeTier treats invalid raw values as pro", () => {
+    const config = new AppConfig({ activeTier: "garbage" });
+    expect(config.activeTier).toBe("pro");
+  });
+
+  it("folds legacy top-level model into tiers.pro", () => {
+    const raw = {
+      providers: { anthropic: { apiKey: "key" } },
+      model: "claude-3@anthropic",
+    };
+    const config = new AppConfig(raw);
     expect(config.tiers.pro).toBe("claude-3@anthropic");
-    expect(config.model?.model).toBe("claude-3");
+    expect(config.modelSpec).toBe("claude-3@anthropic");
+    expect(raw.model).toBeUndefined();
+  });
+
+  it("legacy model does not overwrite an existing tiers.pro", () => {
+    const config = new AppConfig({
+      providers: { anthropic: { apiKey: "key" } },
+      model: "legacy@anthropic",
+      tiers: { pro: "claude-3@anthropic" },
+    });
+    expect(config.tiers.pro).toBe("claude-3@anthropic");
+  });
+
+  it("model is null when the active spec cannot be resolved", () => {
+    const config = new AppConfig({
+      providers: {},
+      tiers: { pro: "claude-3@nowhere" },
+    });
+    expect(config.model).toBeNull();
   });
 
   it("resolves legacy top-level effort into thinking", () => {
@@ -135,17 +185,17 @@ describe("AppConfig mutators", () => {
     vi.clearAllMocks();
   });
 
-  it("setModel updates in-memory state and persists", async () => {
+  it("setActiveTier updates in-memory state and persists", async () => {
     const fs = await import("fs/promises");
     const config = new AppConfig({
-      providers: { anthropic: { apiKey: "key" } },
+      tiers: { pro: "claude-3@anthropic", flash: "claude-haiku@anthropic" },
     });
-    await config.setModel("claude-3@anthropic");
-    expect(config.modelSpec).toBe("claude-3@anthropic");
-    expect(config.model?.model).toBe("claude-3");
+    await config.setActiveTier("flash");
+    expect(config.activeTier).toBe("flash");
+    expect(config.modelSpec).toBe("claude-haiku@anthropic");
     expect(fs.default.writeFile).toHaveBeenCalledWith(
       expect.any(String),
-      expect.stringContaining('"claude-3@anthropic"'),
+      expect.stringContaining('"activeTier": "flash"'),
       "utf-8",
     );
   });

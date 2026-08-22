@@ -26,11 +26,22 @@ export interface ThinkingConfig {
   effort?: EffortLevel;
 }
 
+/** Tier names recognized in model config and pickers (pro = primary,
+ *  flash = fast/cheap). One definition; pickers and parsers follow. */
+export const TIERS = ["pro", "flash"] as const;
+export type Tier = (typeof TIERS)[number];
+
+export function isTier(v: string): v is Tier {
+  return (TIERS as readonly string[]).includes(v);
+}
+
 /** Raw on-disk config shape (all fields optional). */
 export interface Config {
   providers?: Providers;
-  model?: string; // format: model@provider, e.g. "claude-sonnet-4-5@anthropic"
-  tiers?: Record<string, string>; // tier -> model@provider
+  tiers?: Partial<Record<Tier, string>>; // tier -> model@provider
+  activeTier?: string; // raw/unvalidated; the getter validates and falls back
+  /** @deprecated legacy top-level model — folded into tiers.pro at construction */
+  model?: string;
   compressionThreshold?: number; // 0-1, compress at this ratio of context
   thinking?: ThinkingConfig;
   effort?: EffortLevel; // legacy: top-level effort, now nested under thinking
@@ -90,17 +101,19 @@ export function resolveModel(
  * disk) and every consumer sees the change immediately — replacing the old
  * module-level cache.
  */
-/** Tier names recognized in model config and pickers (pro = primary,
- *  flash = fast/cheap). One definition; pickers and parsers follow. */
-export const TIERS = ["pro", "flash"] as const;
-export type Tier = (typeof TIERS)[number];
-
 export class AppConfig {
   private raw: Config;
   private readonly configPath: string;
   private writeChain: Promise<void> = Promise.resolve();
 
   constructor(raw: Config = {}, configPath: string = DEFAULT_CONFIG_PATH) {
+    // Lazy legacy migration: fold a top-level `model` into tiers.pro (tiers
+    // win). In-memory only; the next mutator write persists the new shape.
+    if (raw.model) {
+      raw.tiers ??= {};
+      raw.tiers.pro ??= raw.model;
+      delete raw.model;
+    }
     this.raw = raw;
     this.configPath = configPath;
   }
@@ -127,12 +140,29 @@ export class AppConfig {
     return this.raw.providers ?? {};
   }
 
+  /** Active tier: validates the raw value, then falls back to the first
+   *  tier that has a spec so "current model = tiers[activeTier]" holds. */
+  get activeTier(): Tier {
+    const preferred: Tier =
+      this.raw.activeTier && isTier(this.raw.activeTier)
+        ? this.raw.activeTier
+        : "pro";
+    if (this.tiers[preferred]) return preferred;
+    return TIERS.find((t) => this.tiers[t]) ?? preferred;
+  }
+
+  get tiers(): Partial<Record<Tier, string>> {
+    return this.raw.tiers ?? {};
+  }
+
   get modelSpec(): string | undefined {
-    return this.raw.model;
+    return this.tiers[this.activeTier];
   }
 
   get model(): ResolvedModel | null {
-    return this.raw.model ? resolveModel(this.raw.model, this.providers) : null;
+    return this.modelSpec
+      ? resolveModel(this.modelSpec, this.providers)
+      : null;
   }
 
   get compressionThreshold(): number {
@@ -151,10 +181,6 @@ export class AppConfig {
     return this.raw.permissionMode ?? "manual";
   }
 
-  get tiers(): Record<string, string> {
-    return this.raw.tiers ?? {};
-  }
-
   /** Resolve an arbitrary model@provider spec against current providers. */
   resolveModel(spec: string): ResolvedModel | null {
     return resolveModel(spec, this.providers);
@@ -162,8 +188,8 @@ export class AppConfig {
 
   // --- mutators: update in-memory synchronously, then persist ---
 
-  async setModel(modelSpec: string): Promise<void> {
-    this.raw.model = modelSpec;
+  async setActiveTier(tier: Tier): Promise<void> {
+    this.raw.activeTier = tier;
     await this.persist();
   }
 
@@ -175,7 +201,7 @@ export class AppConfig {
     await this.persist();
   }
 
-  async setTier(tier: string, modelSpec: string): Promise<void> {
+  async setTier(tier: Tier, modelSpec: string): Promise<void> {
     if (!this.raw.tiers) this.raw.tiers = {};
     this.raw.tiers[tier] = modelSpec;
     await this.persist();

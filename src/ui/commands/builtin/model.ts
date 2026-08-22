@@ -8,6 +8,7 @@ export const modelCommand: CommandHandler = {
       type: "model-picker",
       providers: ctx.config.providers,
       tiers: ctx.config.tiers,
+      activeTier: ctx.config.activeTier,
     });
   },
 };

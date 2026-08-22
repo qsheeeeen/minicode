@@ -25,7 +25,9 @@ render(
       }}
       loadingRef={loadingRef}
       config={{} as any}
-      modelSwitchService={{ switchAgentModel: async () => null } as any}
+      modelSwitchService={
+        { switchTier: async () => ({ ok: true, spec: "" }) } as any
+      }
       sessionManager={{ reportStatus: () => {} } as any}
       commandRegistry={new CommandRegistry()}
       skillRegistry={createDefaultSkillRegistry()}

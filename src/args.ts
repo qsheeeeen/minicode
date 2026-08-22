@@ -1,6 +1,6 @@
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
-import type { AppConfig, ResolvedModel } from "./config.js";
+import { isTier, type AppConfig, type ResolvedModel } from "./config.js";
 
 export type PermissionMode = "manual" | "yolo" | "auto";
 import type { EffortLevel } from "./llm/client.js";
@@ -11,6 +11,8 @@ import type { EffortLevel } from "./llm/client.js";
  */
 export class Args {
   readonly model: ResolvedModel | null;
+  /** Why `model` is null when a -m value failed to resolve (thrown by createApp). */
+  readonly modelError: string | undefined;
   readonly permissionMode: PermissionMode;
   readonly compressionThreshold: number;
   readonly thinking: { effort?: EffortLevel };
@@ -27,7 +29,8 @@ export class Args {
       .option("model", {
         alias: "m",
         type: "string",
-        description: "Model specification (e.g., claude-sonnet-4-5@anthropic)",
+        description:
+          "Model spec (model@provider) or tier name (pro|flash) for this run",
       })
       .option("session", {
         alias: "s",
@@ -68,11 +71,24 @@ export class Args {
 
     const parsed = parser.parseSync();
 
-    // Overlay args onto config (one-time; args are never persisted)
+    // Overlay args onto config (one-time; args are never persisted). A tier
+    // name selects that tier for this run; anything else is a raw spec. A
+    // failed -m surfaces as `modelError` data — Args must never throw.
     const modelOverride = parsed.model as string | undefined;
-    this.model = modelOverride
-      ? config.resolveModel(modelOverride)
-      : config.model;
+    if (modelOverride && isTier(modelOverride)) {
+      const spec = config.tiers[modelOverride];
+      this.model = spec ? config.resolveModel(spec) : null;
+      this.modelError = this.model
+        ? undefined
+        : `-m ${modelOverride}: tier "${modelOverride}" has no resolvable model. Set tiers.${modelOverride} in ~/.minicode/config.json.`;
+    } else if (modelOverride) {
+      this.model = config.resolveModel(modelOverride);
+      this.modelError = this.model
+        ? undefined
+        : `Could not resolve model "${modelOverride}" — check providers/apiKey in ~/.minicode/config.json.`;
+    } else {
+      this.model = config.model;
+    }
     this.permissionMode =
       (parsed.permission as PermissionMode | undefined) ??
       config.permissionMode;

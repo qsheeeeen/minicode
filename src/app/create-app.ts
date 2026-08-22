@@ -72,7 +72,8 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
 
   if (!model) {
     throw new Error(
-      "No valid model configuration found. Please set model in config.json",
+      args.modelError ??
+        'No model configured. Set "tiers.pro" (and optionally "tiers.flash") in ~/.minicode/config.json — see config.example.json — or run with -m <model@provider|pro|flash>.',
     );
   }
 
