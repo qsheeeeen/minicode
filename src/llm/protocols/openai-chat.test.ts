@@ -44,6 +44,7 @@ vi.mock("openai", () => {
 });
 
 import { OpenAIChatClient } from "./openai-chat.js";
+import { Model } from "../model.js";
 
 describe("OpenAIChatClient", () => {
   beforeEach(() => {
@@ -370,6 +371,113 @@ describe("OpenAIChatClient", () => {
         tool_call_id: "call_1",
         content: "file content",
       });
+    });
+
+    it("flushes tool_result images into a following user message for vision models", async () => {
+      chatCreateMock.mockReturnValue(
+        mockStream([
+          {
+            choices: [{ delta: { content: "ok" }, finish_reason: null }],
+          },
+          {
+            choices: [{ delta: {}, finish_reason: "stop" }],
+            usage: { prompt_tokens: 5, completion_tokens: 1 },
+          },
+        ]),
+      );
+
+      const blocks = [
+        { type: "user" as const, text: "look" },
+        { type: "tool_use" as const, id: "call_1", name: "Read", input: {} },
+        {
+          type: "tool_result" as const,
+          tool_use_id: "call_1",
+          content: "[image: shot.png]",
+          images: [
+            { mediaType: "image/png" as const, base64: "AAAA" },
+            { mediaType: "image/jpeg" as const, base64: "BBBB" },
+          ],
+        },
+        { type: "text" as const, text: "the answer" },
+      ];
+
+      const client = new OpenAIChatClient("test-key");
+      const stream = client.chatStream(blocks, [], {
+        model: new Model("m", "p", 1000, undefined, undefined, true),
+      });
+      await collectStream(stream);
+
+      const params = chatCreateMock.mock.calls[0][0];
+      // Text response follows the image user message, never the reverse.
+      expect(params.messages).toEqual([
+        { role: "user", content: "look" },
+        {
+          role: "assistant",
+          content: null,
+          tool_calls: [
+            {
+              id: "call_1",
+              type: "function",
+              function: { name: "Read", arguments: "{}" },
+            },
+          ],
+        },
+        { role: "tool", tool_call_id: "call_1", content: "[image: shot.png]" },
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "[images from tool results]" },
+            {
+              type: "image_url",
+              image_url: { url: "data:image/png;base64,AAAA" },
+            },
+            {
+              type: "image_url",
+              image_url: { url: "data:image/jpeg;base64,BBBB" },
+            },
+          ],
+        },
+        { role: "assistant", content: "the answer" },
+      ]);
+    });
+
+    it("strips tool_result images for non-vision models", async () => {
+      chatCreateMock.mockReturnValue(
+        mockStream([
+          {
+            choices: [{ delta: { content: "ok" }, finish_reason: null }],
+          },
+          {
+            choices: [{ delta: {}, finish_reason: "stop" }],
+            usage: { prompt_tokens: 5, completion_tokens: 1 },
+          },
+        ]),
+      );
+
+      const blocks = [
+        { type: "user" as const, text: "look" },
+        {
+          type: "tool_result" as const,
+          tool_use_id: "call_1",
+          content: "[image: shot.png]",
+          images: [{ mediaType: "image/png" as const, base64: "AAAA" }],
+        },
+      ];
+
+      const client = new OpenAIChatClient("test-key");
+      const stream = client.chatStream(blocks, [], {
+        model: new Model("m", "p", 1000, undefined, undefined, false),
+      });
+      await collectStream(stream);
+
+      const params = chatCreateMock.mock.calls[0][0];
+      expect(
+        params.messages.some(
+          (m: any) =>
+            Array.isArray(m.content) &&
+            m.content.some((p: any) => p.type === "image_url"),
+        ),
+      ).toBe(false);
     });
 
     it("drops thinking blocks from assistant messages", async () => {

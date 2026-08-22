@@ -24,10 +24,25 @@ export interface LLMToolUseBlock {
   input: Record<string, unknown>;
 }
 
+/** Media types both the Anthropic and OpenAI image parts accept. */
+export type LLMMediaType =
+  | "image/png"
+  | "image/jpeg"
+  | "image/gif"
+  | "image/webp";
+
+/** An image attached to a block — decoded base64, vendor-neutral. */
+export interface LLMImage {
+  mediaType: LLMMediaType;
+  base64: string;
+}
+
 export interface LLMToolResultBlock {
   type: "tool_result";
   tool_use_id: string;
   content: string;
+  /** Images shown to vision-capable models alongside `content`. */
+  images?: LLMImage[];
 }
 
 export type LLMAssistantBlock =

@@ -9,6 +9,7 @@ import {
   DEFAULT_OPENAI_MODEL,
   parseToolArgs,
   terminalFromError,
+  toDataUrl,
   toOpenAiEffort,
 } from "./shared.js";
 import type {
@@ -55,6 +56,7 @@ type OpenAIMessage =
 function toSdkMessages(
   blocks: readonly LLMBlock[],
   system?: string,
+  vision = false,
 ): OpenAIMessage[] {
   const out: OpenAIMessage[] = [];
   let assistantBlocks: LLMAssistantBlock[] = [];
@@ -63,6 +65,24 @@ function toSdkMessages(
   if (system) {
     out.push({ role: "system", content: system });
   }
+
+  // Tool-result images can't ride on `role:"tool"` messages (string-only on
+  // OpenAI-compatible endpoints) — they flush into a user message after the
+  // tool batch, before any later assistant content, so the model sees each
+  // image before its response to it.
+  let pendingImages: OpenAI.ChatCompletionContentPartImage[] = [];
+
+  const flushImages = () => {
+    if (pendingImages.length === 0) return;
+    out.push({
+      role: "user",
+      content: [
+        { type: "text", text: "[images from tool results]" },
+        ...pendingImages,
+      ],
+    });
+    pendingImages = [];
+  };
 
   const flushAssistant = () => {
     if (assistantBlocks.length === 0) return;
@@ -108,6 +128,7 @@ function toSdkMessages(
   for (const block of blocks) {
     if (block.type === "user") {
       flushAssistant();
+      flushImages();
       out.push({ role: "user", content: block.text });
     } else if (block.type === "tool_result") {
       flushAssistant();
@@ -116,12 +137,22 @@ function toSdkMessages(
         tool_call_id: block.tool_use_id,
         content: block.content,
       });
+      if (vision && block.images) {
+        pendingImages.push(
+          ...block.images.map((img) => ({
+            type: "image_url" as const,
+            image_url: { url: toDataUrl(img) },
+          })),
+        );
+      }
     } else {
+      flushImages();
       assistantBlocks.push(block);
     }
   }
 
   flushAssistant();
+  flushImages();
   return out;
 }
 
@@ -153,7 +184,11 @@ export class OpenAIChatClient implements LLMClient {
     options: ChatOptions = {},
   ): LLMStream {
     const model = options.model?.getName() ?? DEFAULT_OPENAI_MODEL;
-    const oaiMessages = toSdkMessages(blocks, options.system);
+    const oaiMessages = toSdkMessages(
+      blocks,
+      options.system,
+      options.model?.supportsVision() ?? false,
+    );
     const oaiTools = toSdkTools(tools);
 
     const params: OpenAI.ChatCompletionCreateParamsStreaming = {

@@ -4,8 +4,8 @@
       "apiKey": "your-anthropic-api-key",
       "baseURL": "https://api.anthropic.com",
       "models": {
-        "claude-sonnet-4-5": { "contextLength": 200000, "name": "Claude Sonnet 4.5" },
-        "claude-opus-4": { "contextLength": 200000, "name": "Claude Opus 4" }
+        "claude-sonnet-4-5": { "contextLength": 200000, "name": "Claude Sonnet 4.5", "vision": true },
+        "claude-opus-4": { "contextLength": 200000, "name": "Claude Opus 4", "vision": true }
       }
     },
     "zhipu": {

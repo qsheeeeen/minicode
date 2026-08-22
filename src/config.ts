@@ -8,6 +8,8 @@ const DEFAULT_CONFIG_PATH = path.join(MINICODE_HOME, "config.json");
 export interface ModelConfig {
   contextLength?: number;
   name?: string;
+  /** The model accepts image inputs (Read tool sends images only then). */
+  vision?: boolean;
 }
 
 export interface ProviderConfig {
@@ -57,6 +59,7 @@ export interface ResolvedModel {
   baseURL?: string;
   contextLength?: number;
   displayName?: string;
+  vision?: boolean;
 }
 
 export function parseModelSpecifier(
@@ -91,6 +94,7 @@ export function resolveModel(
     baseURL: parsed.providerConfig.baseURL,
     contextLength: modelConfig?.contextLength,
     displayName: modelConfig?.name,
+    vision: modelConfig?.vision,
   };
 }
 
@@ -160,9 +164,7 @@ export class AppConfig {
   }
 
   get model(): ResolvedModel | null {
-    return this.modelSpec
-      ? resolveModel(this.modelSpec, this.providers)
-      : null;
+    return this.modelSpec ? resolveModel(this.modelSpec, this.providers) : null;
   }
 
   get compressionThreshold(): number {

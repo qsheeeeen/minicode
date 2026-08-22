@@ -16,6 +16,7 @@ export class Model {
     private readonly _contextLength: number,
     effort?: EffortLevel,
     private readonly _displayName?: string,
+    private readonly _vision?: boolean,
   ) {
     this._effort = effort;
   }
@@ -38,6 +39,11 @@ export class Model {
   /** Human-readable name for display (e.g. "Claude Sonnet"). */
   getDisplayName(): string {
     return this._displayName || this._name;
+  }
+
+  /** Whether the model accepts image inputs (config `vision: true`). */
+  supportsVision(): boolean {
+    return this._vision ?? false;
   }
 
   /** Reasoning effort level (e.g. "low", "high"). */
@@ -82,6 +88,7 @@ export class ModelFactory {
         modelConfig?.contextLength ?? 200000,
         undefined, // effort — resolved per-session, not per-model
         modelConfig?.name,
+        modelConfig?.vision,
       ),
     };
   }

@@ -94,6 +94,75 @@ describe("LLMContext", () => {
     ]);
   });
 
+  it("stores images on completed tool calls", () => {
+    const context = new LLMContext();
+    context.startUserMessage("task");
+    context.startToolCall("t1", "Read", { path: "a.png" });
+    context.completeToolCall("t1", "[image: a.png]", [
+      { mediaType: "image/png", base64: "AAAA" },
+    ]);
+
+    expect(context.getBlocksReadonly()[2]).toEqual({
+      type: "tool_result",
+      tool_use_id: "t1",
+      content: "[image: a.png]",
+      images: [{ mediaType: "image/png", base64: "AAAA" }],
+    });
+  });
+
+  it("overwrites a tool result without images when none are given", () => {
+    const context = new LLMContext();
+    context.startUserMessage("task");
+    context.startToolCall("t1", "Read", {});
+    context.completeToolCall("t1", "one", [
+      { mediaType: "image/png", base64: "AAAA" },
+    ]);
+    context.completeToolCall("t1", "two");
+
+    expect(context.getBlocksReadonly()[2]).toEqual({
+      type: "tool_result",
+      tool_use_id: "t1",
+      content: "two",
+    });
+  });
+
+  it("rejects invalid images on replacement", () => {
+    const context = new LLMContext();
+
+    expect(() =>
+      context.replaceBlocks([
+        {
+          type: "user",
+          text: "task",
+        },
+        {
+          type: "tool_use",
+          id: "t1",
+          name: "Read",
+          input: {},
+        },
+        {
+          type: "tool_result",
+          tool_use_id: "t1",
+          content: "out",
+          images: [{ mediaType: "image/bmp", base64: "AAAA" }],
+        },
+      ]),
+    ).toThrow("Invalid tool result block: images");
+
+    expect(() =>
+      context.replaceBlocks([
+        { type: "user", text: "task" },
+        {
+          type: "tool_result",
+          tool_use_id: "t1",
+          content: "out",
+          images: [{ mediaType: "image/png", base64: "" }],
+        },
+      ]),
+    ).toThrow("Invalid tool result block: images");
+  });
+
   it("rejects duplicate tool use ids in the current user message", () => {
     const context = new LLMContext();
     context.startUserMessage("task");

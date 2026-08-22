@@ -1,6 +1,7 @@
 import type { LLMClient, LLMToolDef } from "../llm/client.js";
 import type { Model } from "../llm/model.js";
 import type { AppConfig } from "../config.js";
+import type { LLMImage } from "../core/blocks.js";
 
 import type { UserPrompter } from "../core/prompt.js";
 
@@ -83,7 +84,7 @@ export interface ToolExecutionContext {
  * - denied:  deny aborts the batch.
  */
 export type ToolRunResult =
-  | { outcome: "success"; result: string }
+  | { outcome: "success"; result: string; images?: LLMImage[] }
   | { outcome: "error"; reason: string }
   | { outcome: "denied"; reason: string };
 

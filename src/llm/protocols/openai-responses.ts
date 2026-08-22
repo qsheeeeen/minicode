@@ -12,6 +12,7 @@ import {
   DEFAULT_OPENAI_MODEL,
   parseToolArgs,
   terminalFromError,
+  toDataUrl,
   toOpenAiEffort,
 } from "./shared.js";
 
@@ -65,9 +66,29 @@ function toSdkTools(tools: LLMToolDef[]): OpenAI.Responses.FunctionTool[] {
 
 type ResponseInputItem = OpenAI.Responses.ResponseInputItem;
 
-function toSdkMessages(blocks: readonly LLMBlock[]): ResponseInputItem[] {
+function toSdkMessages(
+  blocks: readonly LLMBlock[],
+  vision = false,
+): ResponseInputItem[] {
   const input: ResponseInputItem[] = [];
   let assistantBlocks: LLMAssistantBlock[] = [];
+
+  // function_call_output items are string-only — tool-result images flush
+  // into a user item after the call outputs, before any later assistant
+  // content, so the model sees each image before its response to it.
+  let pendingImages: OpenAI.Responses.ResponseInputImage[] = [];
+
+  const flushImages = () => {
+    if (pendingImages.length === 0) return;
+    input.push({
+      role: "user",
+      content: [
+        { type: "input_text", text: "[images from tool results]" },
+        ...pendingImages,
+      ],
+    });
+    pendingImages = [];
+  };
 
   const flushAssistant = () => {
     if (assistantBlocks.length === 0) return;
@@ -121,6 +142,7 @@ function toSdkMessages(blocks: readonly LLMBlock[]): ResponseInputItem[] {
   for (const block of blocks) {
     if (block.type === "user") {
       flushAssistant();
+      flushImages();
       input.push({ role: "user", content: block.text });
     } else if (block.type === "tool_result") {
       flushAssistant();
@@ -129,12 +151,23 @@ function toSdkMessages(blocks: readonly LLMBlock[]): ResponseInputItem[] {
         call_id: block.tool_use_id,
         output: block.content,
       });
+      if (vision && block.images) {
+        pendingImages.push(
+          ...block.images.map((img) => ({
+            type: "input_image" as const,
+            image_url: toDataUrl(img),
+            detail: "auto" as const,
+          })),
+        );
+      }
     } else {
+      flushImages();
       assistantBlocks.push(block);
     }
   }
 
   flushAssistant();
+  flushImages();
   return input;
 }
 
@@ -253,7 +286,10 @@ export class OpenAIResponsesClient implements LLMClient {
     options: ChatOptions = {},
   ): LLMStream {
     const model = options.model?.getName() || DEFAULT_OPENAI_MODEL;
-    const input = toSdkMessages(blocks);
+    const input = toSdkMessages(
+      blocks,
+      options.model?.supportsVision() ?? false,
+    );
     const oaiTools = tools.length > 0 ? toSdkTools(tools) : undefined;
 
     const params: OpenAI.Responses.ResponseCreateParamsStreaming = {

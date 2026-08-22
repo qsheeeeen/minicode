@@ -47,8 +47,10 @@ type AnthropicContentBlockParam = Anthropic.Messages.ContentBlockParam;
 // Convert internal messages to Anthropic SDK format.
 // Thinking blocks are filtered out — they're output-only and not accepted
 // as input by the API (adaptive thinking reconstructs context automatically).
+// Images ride on tool_results; models without vision get text only.
 function toSdkMessages(
   blocks: readonly LLMBlock[],
+  vision: boolean,
 ): Anthropic.Messages.MessageParam[] {
   const out: Anthropic.Messages.MessageParam[] = [];
   let assistantBlocks: LLMAssistantBlock[] = [];
@@ -91,10 +93,24 @@ function toSdkMessages(
       flushAssistant();
       out.push({ role: "user" as const, content: block.text });
     } else if (block.type === "tool_result") {
+      const images = vision ? block.images : undefined;
       pendingToolResults.push({
         type: "tool_result" as const,
         tool_use_id: block.tool_use_id,
-        content: block.content,
+        content:
+          images && images.length > 0
+            ? [
+                { type: "text" as const, text: block.content },
+                ...images.map((img) => ({
+                  type: "image" as const,
+                  source: {
+                    type: "base64" as const,
+                    media_type: img.mediaType,
+                    data: img.base64,
+                  },
+                })),
+              ]
+            : block.content,
       });
     } else {
       flushToolResults();
@@ -207,7 +223,7 @@ export class AnthropicClient implements LLMClient {
       max_tokens: options.maxTokens || DEFAULT_MAX_TOKENS,
       stream: true,
       system: options.system,
-      messages: toSdkMessages(blocks),
+      messages: toSdkMessages(blocks, options.model?.supportsVision() ?? false),
       tools: toSdkTools(tools),
       thinking: { type: "adaptive" },
     };

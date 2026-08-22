@@ -1,12 +1,36 @@
 import type {
+  LLMMediaType,
+  LLMImage,
   LLMBlock,
   LLMToolResultBlock,
   LLMToolUseBlock,
 } from "./blocks.js";
 
+const MEDIA_TYPES: readonly LLMMediaType[] = [
+  "image/png",
+  "image/jpeg",
+  "image/gif",
+  "image/webp",
+];
+
+function isValidImages(images: unknown): boolean {
+  if (!Array.isArray(images)) return false;
+  return images.every(
+    (img) =>
+      img !== null &&
+      typeof img === "object" &&
+      MEDIA_TYPES.includes((img as LLMImage).mediaType) &&
+      typeof (img as LLMImage).base64 === "string" &&
+      (img as LLMImage).base64.length > 0,
+  );
+}
+
 function cloneBlock(block: LLMBlock): LLMBlock {
   if (block.type === "tool_use") {
     return { ...block, input: { ...block.input } };
+  }
+  if (block.type === "tool_result" && block.images) {
+    return { ...block, images: block.images.slice() };
   }
   return { ...block };
 }
@@ -142,6 +166,11 @@ export class LLMContext {
             "Invalid tool result block: content must be a string",
           );
         }
+        if (block.images !== undefined && !isValidImages(block.images)) {
+          throw new Error(
+            "Invalid tool result block: images must be { mediaType, base64 }[]",
+          );
+        }
       } else {
         throw new Error("Invalid LLM block type");
       }
@@ -257,29 +286,27 @@ export class LLMContext {
     this.notify();
   }
 
-  completeToolCall(id: string, result: string): void {
+  completeToolCall(id: string, result: string, images?: LLMImage[]): void {
     const hasToolUse = this.currentMessageHas(
       (block): block is LLMToolUseBlock =>
         block.type === "tool_use" && block.id === id,
     );
     if (!hasToolUse) throw new Error(`Tool use not found: ${id}`);
 
+    const block: LLMToolResultBlock = {
+      type: "tool_result",
+      tool_use_id: id,
+      content: result,
+      ...(images && images.length > 0 ? { images } : {}),
+    };
     const existingResultIndex = this.blocks.findIndex(
-      (block): block is LLMToolResultBlock =>
-        block.type === "tool_result" && block.tool_use_id === id,
+      (b): b is LLMToolResultBlock =>
+        b.type === "tool_result" && b.tool_use_id === id,
     );
     if (existingResultIndex >= 0) {
-      this.blocks[existingResultIndex] = {
-        type: "tool_result",
-        tool_use_id: id,
-        content: result,
-      };
+      this.blocks[existingResultIndex] = block;
     } else {
-      this.blocks.push({
-        type: "tool_result",
-        tool_use_id: id,
-        content: result,
-      });
+      this.blocks.push(block);
     }
     this.notify();
   }

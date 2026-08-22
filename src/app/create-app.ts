@@ -128,6 +128,7 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
     model.contextLength ?? 200000,
     thinking.effort,
     model.displayName,
+    model.vision,
   );
 
   // RuntimeState is the single owner of the mutable client/model/logger

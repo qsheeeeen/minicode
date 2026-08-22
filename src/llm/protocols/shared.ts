@@ -5,6 +5,7 @@
 import type { TurnFault } from "../../core/results.js";
 import { isAbortError } from "../../core/results.js";
 import type { EffortLevel, LLMStreamResult } from "../client.js";
+import type { LLMImage } from "../../core/blocks.js";
 
 const RETRYABLE_STATUS = new Set([408, 429, 500, 502, 503, 504, 529]);
 
@@ -45,6 +46,11 @@ export function parseToolArgs(raw: string): Record<string, unknown> {
   } catch {
     return { _raw: raw };
   }
+}
+
+/** Encode an image as the data URL OpenAI endpoints accept. */
+export function toDataUrl(image: LLMImage): string {
+  return `data:${image.mediaType};base64,${image.base64}`;
 }
 
 /** Classify a caught (non-abort) error from a provider SDK. */

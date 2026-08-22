@@ -1,16 +1,34 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readTool } from "./read.js";
 import { unwrapSuccess, unwrapError } from "../../testing/index.js";
+import type { ToolExecutionContext } from "../registry.js";
 
 vi.mock("fs/promises", () => ({
   default: {
     readFile: vi.fn(),
+    stat: vi.fn(),
   },
 }));
 
 async function mockReadFile(content: string): Promise<void> {
   const fs = (await import("fs/promises")).default;
   (fs.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(content);
+}
+
+async function mockImageFile(sizeBytes: number, base64: string): Promise<void> {
+  const fs = (await import("fs/promises")).default;
+  (fs.stat as ReturnType<typeof vi.fn>).mockResolvedValue({ size: sizeBytes });
+  (fs.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(
+    Buffer.from(base64, "base64"),
+  );
+}
+
+function visionContext(vision: boolean): ToolExecutionContext {
+  return {
+    config: {
+      model: { supportsVision: () => vision },
+    },
+  } as unknown as ToolExecutionContext;
 }
 
 describe("readTool", () => {
@@ -75,6 +93,76 @@ describe("readTool", () => {
       const result = await readTool.execute({ path: "test.txt", limit: 2 });
 
       expect(unwrapSuccess(result)).toBe("line1\nline2");
+    });
+  });
+
+  describe("images", () => {
+    it("returns image data for a vision model", async () => {
+      await mockImageFile(2048, "AAAA");
+
+      const result = await readTool.execute(
+        { path: "shot.png" },
+        visionContext(true),
+      );
+
+      expect(result).toEqual({
+        outcome: "success",
+        result: "[image: shot.png (image/png, 2KB)]",
+        images: [{ mediaType: "image/png", base64: "AAAA" }],
+      });
+    });
+
+    it("maps jpg to image/jpeg", async () => {
+      await mockImageFile(2048, "AAAA");
+
+      const result = await readTool.execute(
+        { path: "photo.JPG" },
+        visionContext(true),
+      );
+
+      expect(result.outcome).toBe("success");
+      if (result.outcome !== "success") return;
+      expect(result.images?.[0].mediaType).toBe("image/jpeg");
+    });
+
+    it("returns a text placeholder without loading data for non-vision models", async () => {
+      await mockImageFile(2048, "AAAA");
+
+      const result = await readTool.execute(
+        { path: "shot.png" },
+        visionContext(false),
+      );
+
+      expect(result.outcome).toBe("success");
+      if (result.outcome !== "success") return;
+      expect(result.images).toBeUndefined();
+      expect(result.result).toContain("shot.png");
+      expect(result.result).toContain("does not support vision");
+      const fs = (await import("fs/promises")).default;
+      // Only stat ran — the image bytes were never read into context.
+      expect(fs.readFile).not.toHaveBeenCalled();
+    });
+
+    it("defaults to no vision when context is missing", async () => {
+      await mockImageFile(2048, "AAAA");
+
+      const result = await readTool.execute({ path: "shot.png" });
+
+      expect(result.outcome).toBe("success");
+      if (result.outcome !== "success") return;
+      expect(result.images).toBeUndefined();
+    });
+
+    it("rejects images over 5MB", async () => {
+      await mockImageFile(6 * 1024 * 1024, "AAAA");
+
+      const result = await readTool.execute(
+        { path: "big.png" },
+        visionContext(true),
+      );
+
+      expect(result.outcome).toBe("error");
+      expect(unwrapError(result)).toContain("big.png");
     });
   });
 });

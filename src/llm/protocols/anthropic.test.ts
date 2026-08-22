@@ -207,5 +207,96 @@ describe("AnthropicClient", () => {
         expect.anything(),
       );
     });
+
+    it("embeds tool_result images as base64 image blocks for vision models", async () => {
+      const client = new AnthropicClient();
+      const s = client.chatStream(
+        [
+          { type: "user", text: "look" },
+          { type: "tool_use", id: "call_1", name: "Read", input: {} },
+          {
+            type: "tool_result",
+            tool_use_id: "call_1",
+            content: "[image: shot.png]",
+            images: [{ mediaType: "image/png", base64: "AAAA" }],
+          },
+        ],
+        [],
+        { model: new Model("m", "p", 1000, undefined, undefined, true) },
+      );
+      await s.next();
+
+      expect(mockStream).toHaveBeenCalledWith(
+        expect.objectContaining({
+          messages: [
+            { role: "user", content: "look" },
+            {
+              role: "assistant",
+              content: [
+                { type: "tool_use", id: "call_1", name: "Read", input: {} },
+              ],
+            },
+            {
+              role: "user",
+              content: [
+                {
+                  type: "tool_result",
+                  tool_use_id: "call_1",
+                  content: [
+                    { type: "text", text: "[image: shot.png]" },
+                    {
+                      type: "image",
+                      source: {
+                        type: "base64",
+                        media_type: "image/png",
+                        data: "AAAA",
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        }),
+        expect.anything(),
+      );
+    });
+
+    it("keeps tool_result content as a string and strips images for non-vision models", async () => {
+      const client = new AnthropicClient();
+      const s = client.chatStream(
+        [
+          { type: "user", text: "look" },
+          {
+            type: "tool_result",
+            tool_use_id: "call_1",
+            content: "[image: shot.png]",
+            images: [{ mediaType: "image/png", base64: "AAAA" }],
+          },
+        ],
+        [],
+        { model: new Model("m", "p", 1000, undefined, undefined, false) },
+      );
+      await s.next();
+
+      expect(mockStream).toHaveBeenCalledWith(
+        expect.objectContaining({
+          messages: [
+            { role: "user", content: "look" },
+            {
+              role: "user",
+              content: [
+                {
+                  type: "tool_result",
+                  tool_use_id: "call_1",
+                  content: "[image: shot.png]",
+                },
+              ],
+            },
+          ],
+        }),
+        expect.anything(),
+      );
+    });
   });
 });

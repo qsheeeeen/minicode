@@ -6,7 +6,7 @@ import type {
   Capabilities,
 } from "./registry.js";
 import type { UserPrompter } from "../core/prompt.js";
-import type { LLMToolUseBlock } from "../core/blocks.js";
+import type { LLMImage, LLMToolUseBlock } from "../core/blocks.js";
 import type { LLMContext } from "../core/context.js";
 import type { AppConfig } from "../config.js";
 import { isAbortError, isTurnFaultError } from "../core/results.js";
@@ -136,14 +136,17 @@ export class ToolExecutor {
     }
 
     // Phase 2 — run approved tools concurrently, keep results in order.
-    const results: Array<{ toolUseId: string; content: string }> = new Array(
-      toolCalls.length,
-    );
+    const results: Array<{
+      toolUseId: string;
+      content: string;
+      images?: LLMImage[];
+    }> = new Array(toolCalls.length);
     let batchDenied = false;
     await Promise.all(
       toolCalls.map(async (call, i) => {
         const { block, tool } = call;
         let content: string;
+        let images: LLMImage[] | undefined;
         if (!tool) {
           content = `Error: Tool '${block.name}' not found or not available.`;
         } else if (approvals[i].autoDenied) {
@@ -165,6 +168,7 @@ export class ToolExecutor {
               );
             } else {
               content = result.result;
+              images = result.images;
             }
           } catch (reason) {
             // Turn failures (abort, fatal) must reach the turn boundary —
@@ -178,12 +182,16 @@ export class ToolExecutor {
             );
           }
         }
-        results[i] = { toolUseId: block.id, content };
+        results[i] = { toolUseId: block.id, content, images };
       }),
     );
 
     for (const result of results) {
-      this.context.completeToolCall(result.toolUseId, result.content);
+      this.context.completeToolCall(
+        result.toolUseId,
+        result.content,
+        ...(result.images ? [result.images] : []),
+      );
     }
     return batchDenied ? "denied" : null;
   }

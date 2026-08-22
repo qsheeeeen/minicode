@@ -116,6 +116,25 @@ describe("ToolExecutor", () => {
       expect(spy).toHaveBeenCalledWith("call_1", "ok");
     });
 
+    it("passes tool result images through to the context", async () => {
+      const images = [{ mediaType: "image/png" as const, base64: "AAAA" }];
+      const tool = makeTool({
+        execute: vi
+          .fn()
+          .mockResolvedValue({ outcome: "success", result: "ok", images }),
+      });
+      const { executor, context } = makeExecutor({
+        tools: new Map([["testTool", tool]]),
+      });
+      const call = makeToolCall(tool);
+      prepareToolCalls(context, [call]);
+      const spy = vi.spyOn(context, "completeToolCall");
+
+      await executor.execute([call], makeDynamic());
+
+      expect(spy).toHaveBeenCalledWith("call_1", "ok", images);
+    });
+
     it("handles tool not found", async () => {
       const { executor, context } = makeExecutor({ tools: new Map() });
       const call = makeToolCall(undefined);

@@ -42,6 +42,7 @@ vi.mock("openai", () => {
 });
 
 import { OpenAIResponsesClient } from "./openai-responses.js";
+import { Model } from "../model.js";
 
 describe("OpenAIResponsesClient", () => {
   beforeEach(() => {
@@ -379,6 +380,107 @@ describe("OpenAIResponsesClient", () => {
         call_id: "call_1",
         output: "file content",
       });
+    });
+
+    it("flushes tool_result images into a following user item for vision models", async () => {
+      responsesCreateMock.mockReturnValue(
+        mockStream([
+          {
+            type: "response.completed",
+            response: {
+              output: [],
+              status: "completed",
+              usage: { input_tokens: 5, output_tokens: 0 },
+            },
+          },
+        ]),
+      );
+
+      const blocks = [
+        { type: "user" as const, text: "look" },
+        { type: "tool_use" as const, id: "call_1", name: "Read", input: {} },
+        {
+          type: "tool_result" as const,
+          tool_use_id: "call_1",
+          content: "[image: shot.png]",
+          images: [{ mediaType: "image/png" as const, base64: "AAAA" }],
+        },
+        { type: "text" as const, text: "the answer" },
+      ];
+
+      const client = new OpenAIResponsesClient("test-key");
+      const stream = client.chatStream(blocks, [], {
+        model: new Model("m", "p", 1000, undefined, undefined, true),
+      });
+      await collectStream(stream);
+
+      const params = responsesCreateMock.mock.calls[0][0];
+      expect(params.input).toEqual([
+        { role: "user", content: "look" },
+        {
+          type: "function_call",
+          id: "call_1",
+          name: "Read",
+          arguments: "{}",
+          call_id: "call_1",
+        },
+        {
+          type: "function_call_output",
+          call_id: "call_1",
+          output: "[image: shot.png]",
+        },
+        {
+          role: "user",
+          content: [
+            { type: "input_text", text: "[images from tool results]" },
+            {
+              type: "input_image",
+              image_url: "data:image/png;base64,AAAA",
+              detail: "auto",
+            },
+          ],
+        },
+        { role: "assistant", content: "the answer" },
+      ]);
+    });
+
+    it("strips tool_result images for non-vision models", async () => {
+      responsesCreateMock.mockReturnValue(
+        mockStream([
+          {
+            type: "response.completed",
+            response: {
+              output: [],
+              status: "completed",
+              usage: { input_tokens: 5, output_tokens: 0 },
+            },
+          },
+        ]),
+      );
+
+      const blocks = [
+        { type: "user" as const, text: "look" },
+        {
+          type: "tool_result" as const,
+          tool_use_id: "call_1",
+          content: "[image: shot.png]",
+          images: [{ mediaType: "image/png" as const, base64: "AAAA" }],
+        },
+      ];
+
+      const client = new OpenAIResponsesClient("test-key");
+      const stream = client.chatStream(blocks, [], {
+        model: new Model("m", "p", 1000, undefined, undefined, false),
+      });
+      await collectStream(stream);
+
+      const params = responsesCreateMock.mock.calls[0][0];
+      const imageItems = params.input.filter(
+        (i: any) =>
+          Array.isArray(i.content) &&
+          i.content.some((p: any) => p.type === "input_image"),
+      );
+      expect(imageItems).toHaveLength(0);
     });
 
     it("drops thinking blocks from assistant messages", async () => {
