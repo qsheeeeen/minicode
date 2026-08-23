@@ -25,7 +25,7 @@ function createContextManager(overrides?: {
   const context = new LLMContext();
   const journal = changeJournal();
   const events = new RuntimeEvents();
-  let activeUserMessageOrdinal = 3;
+  let activeMessageId = "initial";
   const sessionStats = {
     recordUsage: vi.fn(),
     incrementSessionCount: vi.fn(),
@@ -39,8 +39,8 @@ function createContextManager(overrides?: {
       ),
     getContext: () => context,
     getChangeJournal: () => journal,
-    setActiveUserMessageOrdinal: (ordinal) => {
-      activeUserMessageOrdinal = ordinal;
+    setActiveMessageId: (id) => {
+      activeMessageId = id;
     },
     events,
     compressionThresholdRatio: overrides?.compressionThresholdRatio ?? 0.8,
@@ -53,7 +53,7 @@ function createContextManager(overrides?: {
     journal,
     events,
     sessionStats,
-    getActiveUserMessageOrdinal: () => activeUserMessageOrdinal,
+    getActiveMessageId: () => activeMessageId,
   };
 }
 
@@ -66,7 +66,7 @@ function model(name = "test-model", contextLength = 200000) {
 
 function changeJournal() {
   return {
-    pruneAndRenumberUserMessages: vi.fn().mockResolvedValue(undefined),
+    pruneByMessageIds: vi.fn().mockResolvedValue(undefined),
   } as any;
 }
 
@@ -195,12 +195,17 @@ describe("ContextManager", () => {
         { type: "text" as const, text: "kept" },
       ];
       const compressionStrategy = {
-        compress: vi.fn().mockResolvedValue({
+        compress: vi.fn().mockImplementation(async (ctx) => ({
           blocks: compressedBlocks,
           keptUserMessages: 11,
-        }),
+          // Report the first two (oldest) messages as folded into the summary.
+          droppedMessageIds: ctx
+            .getUserMessageSummaries()
+            .slice(0, 2)
+            .map((s: { id: string }) => s.id),
+        })),
       };
-      const { cm, context, journal, getActiveUserMessageOrdinal } =
+      const { cm, context, journal, getActiveMessageId } =
         createContextManager({
           contextLength: 100,
           compressionThresholdRatio: 0.5,
@@ -209,18 +214,30 @@ describe("ContextManager", () => {
       for (let i = 0; i < 13; i += 1) {
         context.startUserMessage(`message ${i}`);
       }
+      const originalIds = context
+        .getUserMessageSummaries()
+        .map((s) => s.id);
 
       const result = await processUsage(cm, usage(80, 0));
 
       expect(compressionStrategy.compress).toHaveBeenCalled();
-      expect(journal.pruneAndRenumberUserMessages).toHaveBeenCalledWith(2, 1);
-      expect(context.getBlocks()).toEqual(compressedBlocks);
+      // The two dropped ids are exactly what the journal prunes.
+      expect(journal.pruneByMessageIds).toHaveBeenCalledWith(
+        new Set(originalIds.slice(0, 2)),
+      );
+      expect(context.getBlocks()).toEqual([
+        expect.objectContaining({ type: "user", text: "summary" }),
+        { type: "text", text: "kept" },
+      ]);
       expect(result).toMatchObject({
         totalTokens: 0,
         shouldCompress: true,
         compressed: true,
       });
-      expect(getActiveUserMessageOrdinal()).toBe(1);
+      // Active id follows the new last user message (the summary).
+      expect(getActiveMessageId()).toBe(
+        (context.getBlocksReadonly()[0] as { id?: string }).id,
+      );
     });
   });
 
@@ -248,14 +265,13 @@ describe("ContextManager", () => {
 
   describe("compress", () => {
     it("returns false when not enough user messages", async () => {
-      const { cm, events, getActiveUserMessageOrdinal } =
-        createContextManager();
+      const { cm, events, getActiveMessageId } = createContextManager();
       const listener = vi.fn();
       events.subscribe(listener);
 
       const compressed = await cm.compress();
       expect(compressed).toBe(false);
-      expect(getActiveUserMessageOrdinal()).toBe(3);
+      expect(getActiveMessageId()).toBe("initial");
       expect(listener).toHaveBeenCalledWith({
         type: "status.added",
         status: expect.objectContaining({

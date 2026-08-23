@@ -2,6 +2,10 @@ import { describe, it, expect, vi } from "vitest";
 import { askUserTool } from "./ask-user.js";
 
 describe("askUserTool", () => {
+  it("declares sequential execution (a single modal cannot host concurrent prompts)", () => {
+    expect(askUserTool.executionMode).toBe("sequential");
+  });
+
   describe("execute", () => {
     it("returns user selection on answer", async () => {
       const mockPrompt = vi.fn().mockResolvedValue("Option A");

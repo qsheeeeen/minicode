@@ -9,6 +9,7 @@ import { PermissionService } from "./services/permission.js";
 import { SessionPersistence } from "./services/session-persistence.js";
 import { createDefaultToolRegistry } from "./tools/index.js";
 import { createCapabilities } from "./tools/registry.js";
+import { createPermissionGate } from "./app/tool-gates.js";
 
 function makeTestModel() {
   return new Model("test-model", "test-provider", 200000);
@@ -36,8 +37,7 @@ function makeDeps(overrides?: {
     getModel: () => model,
     getContext: () => sessionManager.getContext(),
     getChangeJournal: () => sessionManager.getChangeJournal(),
-    setActiveUserMessageOrdinal: (ordinal) =>
-      sessionManager.setActiveUserMessageOrdinal(ordinal),
+    setActiveMessageId: (id) => sessionManager.setActiveMessageId(id),
     events: runtimeEvents,
     compressionThresholdRatio: o.compressionThresholdRatio ?? 0.8,
   });
@@ -45,7 +45,7 @@ function makeDeps(overrides?: {
   const permissionService = new PermissionService(o.permissionMode ?? "manual");
   const toolExecutor = new ToolExecutor({
     tools: createDefaultToolRegistry().getAll(),
-    permissionService,
+    beforeHooks: [createPermissionGate(permissionService)],
     context,
     capabilities: createCapabilities([]),
   });
@@ -59,6 +59,11 @@ function makeDeps(overrides?: {
   };
   return { deps, context, sessionManager, contextManager, permissionService };
 }
+
+/** Expected-shape helper: user blocks now carry stable ids, so deep-equal
+ *  assertions match on the invariant fields only. */
+const userBlock = (text: string) =>
+  expect.objectContaining({ type: "user", text }) as any;
 
 class MockStream implements AsyncIterable<any> {
   private _promise: Promise<any>;
@@ -169,7 +174,9 @@ vi.mock("./services/compression-service.js", () => ({
     return {
       compress: vi
         .fn()
-        .mockResolvedValue([{ type: "user", text: "compressed" }]),
+        .mockResolvedValue([
+          { type: "user", text: "compressed", id: "summary-1" },
+        ]),
     };
   }),
 }));
@@ -258,7 +265,7 @@ describe("runAgent", () => {
       await runPromise;
       const blocks = context.getBlocks();
       expect(blocks).toEqual([
-        { type: "user", text: "Hello agent" },
+        userBlock("Hello agent"),
         { type: "text", text: "Hi there!" },
       ]);
     });
@@ -284,7 +291,7 @@ describe("runAgent", () => {
       await runPromise;
       const blocks = context.getBlocks();
       expect(blocks).toEqual([
-        { type: "user", text: "Solve this" },
+        userBlock("Solve this"),
         { type: "thinking", thinking: "Hmm..." },
       ]);
     });
@@ -326,7 +333,7 @@ describe("runAgent", () => {
       await runPromise;
       const blocks = context.getBlocks();
       expect(blocks).toEqual([
-        { type: "user", text: "Use tool" },
+        userBlock("Use tool"),
         {
           type: "tool_use",
           id: "call_1",
@@ -386,7 +393,7 @@ describe("runAgent", () => {
   });
 
   describe("rejection", () => {
-    it("in manual mode, rejection stops the conversation", async () => {
+    it("in manual mode, rejection fails the call and the conversation continues", async () => {
       const { deps, context, permissionService } = makeDeps();
       permissionService.setMode("manual");
 
@@ -395,20 +402,40 @@ describe("runAgent", () => {
         reason: "User rejected",
       });
 
-      const stream = new MockStream();
-      mockChatStream.mockReturnValueOnce(stream);
+      const stream1 = new MockStream();
+      const stream2 = new MockStream();
+
+      let callCount = 0;
+      mockChatStream.mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) return stream1;
+        if (callCount === 2) {
+          setImmediate(() => {
+            stream2.emit("text", "Understood, I will not run that tool.");
+            stream2.resolveFinal({
+              usage: {
+                input: { total: 5, cache_miss: 0, cache_hit: 0 },
+                output: 10,
+              },
+              stop_reason: "end_turn",
+            });
+          });
+          return stream2;
+        }
+        return new MockStream();
+      });
 
       const ctrl = new AbortController();
       const runPromise = runAgent(deps, "do something", ctrl.signal);
       await new Promise((r) => setTimeout(r, 10));
 
-      stream.emit("tool_use", {
+      stream1.emit("tool_use", {
         type: "tool_use",
         id: "call_1",
         name: "testTool",
         input: {},
       });
-      stream.resolveFinal({
+      stream1.resolveFinal({
         usage: {
           input: { total: 10, cache_miss: 0, cache_hit: 0 },
           output: 20,
@@ -419,20 +446,17 @@ describe("runAgent", () => {
       await runPromise;
 
       const blocks = context.getBlocks();
-      expect(blocks).toEqual([
-        { type: "user", text: "do something" },
-        {
-          type: "tool_use",
-          id: "call_1",
-          name: "testTool",
-          input: {},
-        },
-        {
+      expect(blocks).toContainEqual(
+        expect.objectContaining({
           type: "tool_result",
           tool_use_id: "call_1",
-          content: "User rejected",
-        },
-      ]);
+          content: expect.stringContaining("User rejected"),
+        }),
+      );
+      expect(blocks).toContainEqual({
+        type: "text",
+        text: "Understood, I will not run that tool.",
+      });
     });
 
     it("in auto mode, rejection continues the conversation", async () => {

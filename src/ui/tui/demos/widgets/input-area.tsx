@@ -23,6 +23,7 @@ render(
         console.log(v);
         return true;
       }}
+      onSteer={(t) => console.log("steer:", t)}
       loadingRef={loadingRef}
       config={{} as any}
       modelSwitchService={

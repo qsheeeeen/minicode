@@ -18,21 +18,36 @@ describe("LLMContext", () => {
 
   it("stores blocks and returns defensive copies", () => {
     const context = new LLMContext();
-    context.startUserMessage("hello");
+    context.startUserMessage("hello", "u1");
 
     const blocks = context.getBlocks();
-    expect(blocks).toEqual([{ type: "user", text: "hello" }]);
+    expect(blocks).toEqual([{ type: "user", text: "hello", id: "u1" }]);
 
     blocks.push({ type: "user", text: "injected" });
     expect(context.getBlocks()).toHaveLength(1);
   });
 
+  it("assigns stable ids to user messages and accepts explicit ones", () => {
+    const context = new LLMContext();
+    const auto = context.startUserMessage("one");
+    expect(typeof auto).toBe("string");
+    expect(auto.length).toBeGreaterThan(0);
+
+    const explicit = context.startUserMessage("two", "fixed-id");
+    expect(explicit).toBe("fixed-id");
+    expect(context.getBlocks()[1]).toEqual({
+      type: "user",
+      text: "two",
+      id: "fixed-id",
+    });
+  });
+
   it("counts and lists user messages", () => {
     const context = new LLMContext();
     const blocks: LLMBlock[] = [
-      { type: "user", text: "one" },
+      { type: "user", text: "one", id: "u1" },
       { type: "text", text: "reply" },
-      { type: "user", text: "two" },
+      { type: "user", text: "two", id: "u2" },
     ];
     context.replaceBlocks(blocks);
 
@@ -40,27 +55,63 @@ describe("LLMContext", () => {
     expect(context.getUserMessages()).toEqual(["one", "two"]);
   });
 
+  it("summarizes user messages with ids and ordinals", () => {
+    const context = new LLMContext();
+    context.replaceBlocks([
+      { type: "user", text: "one", id: "u1" },
+      { type: "text", text: "reply" },
+      { type: "user", text: "two", id: "u2" },
+    ]);
+
+    expect(context.getUserMessageSummaries()).toEqual([
+      { id: "u1", ordinal: 1, text: "one" },
+      { id: "u2", ordinal: 2, text: "two" },
+    ]);
+  });
+
+  it("assigns fresh ids to legacy blocks on replaceBlocks", () => {
+    const context = new LLMContext();
+    context.replaceBlocks([{ type: "user", text: "legacy" }]);
+    const first = context.getBlocksReadonly()[0] as { id?: string };
+    expect(typeof first.id).toBe("string");
+
+    context.replaceBlocks([{ type: "user", text: "legacy" }]);
+    const second = context.getBlocksReadonly()[0] as { id?: string };
+    expect(second.id).not.toBe(first.id);
+  });
+
+  it("rejects duplicate user message ids", () => {
+    const context = new LLMContext();
+
+    expect(() =>
+      context.replaceBlocks([
+        { type: "user", text: "one", id: "same" },
+        { type: "user", text: "two", id: "same" },
+      ]),
+    ).toThrow("Duplicate user message id");
+  });
+
   it("accumulates consecutive thinking deltas into one block", () => {
     const context = new LLMContext();
-    context.startUserMessage("task");
+    context.startUserMessage("task", "u1");
     context.appendThinking("plan");
     context.appendThinking(" more");
 
     expect(context.getBlocks()).toEqual([
-      { type: "user", text: "task" },
+      { type: "user", text: "task", id: "u1" },
       { type: "thinking", thinking: "plan more" },
     ]);
   });
 
   it("creates a new thinking block after a tool call", () => {
     const context = new LLMContext();
-    context.startUserMessage("task");
+    context.startUserMessage("task", "u1");
     context.appendThinking("first");
     context.startToolCall("t1", "read", { path: "a.ts" });
     context.appendThinking("second");
 
     expect(context.getBlocks()).toEqual([
-      { type: "user", text: "task" },
+      { type: "user", text: "task", id: "u1" },
       { type: "thinking", thinking: "first" },
       { type: "tool_use", id: "t1", name: "read", input: { path: "a.ts" } },
       { type: "thinking", thinking: "second" },
@@ -69,12 +120,12 @@ describe("LLMContext", () => {
 
   it("starts and completes tool calls", () => {
     const context = new LLMContext();
-    context.startUserMessage("task");
+    context.startUserMessage("task", "u1");
     context.startToolCall("t1", "read", { path: "a.ts" });
     context.completeToolCall("t1", "content");
 
     expect(context.getBlocks()).toEqual([
-      { type: "user", text: "task" },
+      { type: "user", text: "task", id: "u1" },
       { type: "tool_use", id: "t1", name: "read", input: { path: "a.ts" } },
       { type: "tool_result", tool_use_id: "t1", content: "content" },
     ]);
@@ -82,13 +133,13 @@ describe("LLMContext", () => {
 
   it("overwrites repeated tool results", () => {
     const context = new LLMContext();
-    context.startUserMessage("task");
+    context.startUserMessage("task", "u1");
     context.startToolCall("t1", "read", {});
     context.completeToolCall("t1", "one");
     context.completeToolCall("t1", "two");
 
     expect(context.getBlocks()).toEqual([
-      { type: "user", text: "task" },
+      { type: "user", text: "task", id: "u1" },
       { type: "tool_use", id: "t1", name: "read", input: {} },
       { type: "tool_result", tool_use_id: "t1", content: "two" },
     ]);
@@ -96,7 +147,7 @@ describe("LLMContext", () => {
 
   it("stores images on completed tool calls", () => {
     const context = new LLMContext();
-    context.startUserMessage("task");
+    context.startUserMessage("task", "u1");
     context.startToolCall("t1", "Read", { path: "a.png" });
     context.completeToolCall("t1", "[image: a.png]", [
       { mediaType: "image/png", base64: "AAAA" },
@@ -112,7 +163,7 @@ describe("LLMContext", () => {
 
   it("overwrites a tool result without images when none are given", () => {
     const context = new LLMContext();
-    context.startUserMessage("task");
+    context.startUserMessage("task", "u1");
     context.startToolCall("t1", "Read", {});
     context.completeToolCall("t1", "one", [
       { mediaType: "image/png", base64: "AAAA" },
@@ -165,7 +216,7 @@ describe("LLMContext", () => {
 
   it("rejects duplicate tool use ids in the current user message", () => {
     const context = new LLMContext();
-    context.startUserMessage("task");
+    context.startUserMessage("task", "u1");
     context.startToolCall("t1", "read", {});
 
     expect(() => context.startToolCall("t1", "read", {})).toThrow(
@@ -175,7 +226,7 @@ describe("LLMContext", () => {
 
   it("throws when completing a missing tool use", () => {
     const context = new LLMContext();
-    context.startUserMessage("task");
+    context.startUserMessage("task", "u1");
 
     expect(() => context.completeToolCall("missing", "result")).toThrow(
       "Tool use not found",
@@ -184,12 +235,12 @@ describe("LLMContext", () => {
 
   it("accumulates assistant text deltas", () => {
     const context = new LLMContext();
-    context.startUserMessage("task");
+    context.startUserMessage("task", "u1");
     context.appendAssistantText("hello");
     context.appendAssistantText(" world");
 
     expect(context.getBlocks()).toEqual([
-      { type: "user", text: "task" },
+      { type: "user", text: "task", id: "u1" },
       { type: "text", text: "hello world" },
     ]);
   });
@@ -212,7 +263,7 @@ describe("LLMContext", () => {
   it("replaces blocks after validation", () => {
     const context = new LLMContext();
     const blocks: LLMBlock[] = [
-      { type: "user", text: "task" },
+      { type: "user", text: "task", id: "u1" },
       { type: "tool_use", id: "t1", name: "read", input: {} },
     ];
 
@@ -225,46 +276,58 @@ describe("LLMContext", () => {
 
     expect(() =>
       context.replaceBlocks([
-        { type: "user", text: "task" },
+        { type: "user", text: "task", id: "u1" },
         { type: "tool_use", id: "t1", name: "read", input: {} },
         { type: "tool_use", id: "t1", name: "read", input: {} },
       ]),
     ).toThrow("Duplicate tool use id");
   });
 
-  it("truncates before a user message ordinal", () => {
+  it("truncates before a user message by stable id", () => {
     const context = new LLMContext();
     context.replaceBlocks([
-      { type: "user", text: "one" },
+      { type: "user", text: "one", id: "u1" },
       { type: "text", text: "reply" },
-      { type: "user", text: "two" },
+      { type: "user", text: "two", id: "u2" },
     ]);
 
-    context.truncateBeforeUserMessageOrdinal(2);
+    context.truncateBeforeUserMessageId("u2");
 
     expect(context.getBlocks()).toEqual([
-      { type: "user", text: "one" },
+      { type: "user", text: "one", id: "u1" },
       { type: "text", text: "reply" },
     ]);
+  });
+
+  it("truncating by an unknown id is a no-op", () => {
+    const context = new LLMContext();
+    context.replaceBlocks([
+      { type: "user", text: "one", id: "u1" },
+      { type: "user", text: "two", id: "u2" },
+    ]);
+
+    context.truncateBeforeUserMessageId("missing");
+
+    expect(context.getUserMessageCount()).toBe(2);
   });
 
   it("splits at recent user messages", () => {
     const context = new LLMContext();
     context.replaceBlocks([
-      { type: "user", text: "one" },
+      { type: "user", text: "one", id: "u1" },
       { type: "text", text: "reply" },
-      { type: "user", text: "two" },
-      { type: "user", text: "three" },
+      { type: "user", text: "two", id: "u2" },
+      { type: "user", text: "three", id: "u3" },
     ]);
 
     expect(context.splitAtRecentUserMessages(2)).toEqual({
       prefix: [
-        { type: "user", text: "one" },
+        { type: "user", text: "one", id: "u1" },
         { type: "text", text: "reply" },
       ],
       suffix: [
-        { type: "user", text: "two" },
-        { type: "user", text: "three" },
+        { type: "user", text: "two", id: "u2" },
+        { type: "user", text: "three", id: "u3" },
       ],
     });
   });

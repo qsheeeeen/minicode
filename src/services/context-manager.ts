@@ -17,7 +17,7 @@ export interface ContextManagerOpts {
   readonly getModel: () => Model;
   readonly getContext: () => LLMContext;
   readonly getChangeJournal: () => ChangeJournal;
-  readonly setActiveUserMessageOrdinal: (ordinal: number) => void;
+  readonly setActiveMessageId: (id: string) => void;
   readonly events: RuntimeEvents;
   readonly compressionThresholdRatio: number;
   readonly sessionStats?: SessionStats;
@@ -44,7 +44,7 @@ export class ContextManager {
   private getModel: () => Model;
   private getContext: () => LLMContext;
   private getChangeJournal: () => ChangeJournal;
-  private setActiveUserMessageOrdinal: (ordinal: number) => void;
+  private setActiveMessageId: (id: string) => void;
   private events: RuntimeEvents;
   private compressionThresholdRatio: number;
   private sessionStats?: SessionStats;
@@ -56,7 +56,7 @@ export class ContextManager {
     this.getModel = opts.getModel;
     this.getContext = opts.getContext;
     this.getChangeJournal = opts.getChangeJournal;
-    this.setActiveUserMessageOrdinal = opts.setActiveUserMessageOrdinal;
+    this.setActiveMessageId = opts.setActiveMessageId;
     this.events = opts.events;
     this.compressionThresholdRatio = opts.compressionThresholdRatio;
     this.sessionStats = opts.sessionStats;
@@ -132,7 +132,7 @@ export class ContextManager {
         content: `Compressing ${userMessageCount - recentCount} user messages (${totalTokens} tokens)...`,
       });
 
-      const { blocks: compressed, keptUserMessages } =
+      const { blocks: compressed, keptUserMessages, droppedMessageIds } =
         await this.compressionService.compress(
           context,
           this.getClient(),
@@ -141,22 +141,23 @@ export class ContextManager {
 
       const prunedCount = userMessageCount - keptUserMessages;
 
-      if (prunedCount > 0) {
-        await this.getChangeJournal().pruneAndRenumberUserMessages(
-          prunedCount,
-          1,
+      if (droppedMessageIds.length > 0) {
+        await this.getChangeJournal().pruneByMessageIds(
+          new Set(droppedMessageIds),
         );
       }
 
       context.replaceBlocks(compressed);
       this.reset();
 
-      const newActiveIdx = context.getUserMessageCount();
-      this.setActiveUserMessageOrdinal(newActiveIdx);
+      // Journal keying follows the (new) last user message.
+      const remaining = context.getUserMessageSummaries();
+      const lastId = remaining[remaining.length - 1]?.id;
+      if (lastId) this.setActiveMessageId(lastId);
 
       this.reportStatus({
         role: "status",
-        content: `Compressed: ${prunedCount} user messages removed, ${newActiveIdx} remaining.`,
+        content: `Compressed: ${prunedCount} user messages removed, ${remaining.length} remaining.`,
       });
 
       return true;

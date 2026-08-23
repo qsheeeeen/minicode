@@ -44,13 +44,13 @@ async function recordWriteChange(
   context: ToolExecutionContext | undefined,
   result: WriteTextResult,
 ): Promise<void> {
-  const userMessageOrdinal = context?.activeUserMessageOrdinal ?? 0;
+  const messageId = context?.activeMessageId;
   const changeJournal = context
     ? context.capabilities.require(ChangeJournalCapability)
     : undefined;
-  if (!changeJournal || userMessageOrdinal <= 0) return;
+  if (!changeJournal || !messageId) return;
   await changeJournal.recordChange(
-    userMessageOrdinal,
+    messageId,
     result.path,
     "write",
     result.beforeExists,

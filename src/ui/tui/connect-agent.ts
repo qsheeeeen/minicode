@@ -56,6 +56,11 @@ export function connectAgent(options: ConnectAgentOptions): {
 
     if (event.type === "permission.mode_changed") {
       useTuiState.setState({ permissionMode: event.mode });
+      return;
+    }
+
+    if (event.type === "queue.changed") {
+      useTuiState.setState({ steeringQueue: event.messages });
     }
   });
 

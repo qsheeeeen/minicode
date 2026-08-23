@@ -8,6 +8,7 @@ import { ContextManager } from "../services/context-manager.js";
 import { PromptManager } from "../services/prompt-manager.js";
 import { RuntimeEvents } from "../services/runtime-events.js";
 import { ToolExecutor } from "../tools/executor.js";
+import { createPermissionGate } from "./tool-gates.js";
 import type { AgentRuntime, AgentRuntimeOpts } from "../agent.js";
 
 export function createAgentRuntime(opts: AgentRuntimeOpts): AgentRuntime {
@@ -23,8 +24,7 @@ export function createAgentRuntime(opts: AgentRuntimeOpts): AgentRuntime {
     getModel: opts.getModel ?? (() => opts.model),
     getContext: () => sessionManager.getContext(),
     getChangeJournal: () => sessionManager.getChangeJournal(),
-    setActiveUserMessageOrdinal: (ordinal) =>
-      sessionManager.setActiveUserMessageOrdinal(ordinal),
+    setActiveMessageId: (id) => sessionManager.setActiveMessageId(id),
     events,
     compressionThresholdRatio: opts.compressionThresholdRatio ?? 0.8,
     sessionStats: opts.sessionStats,
@@ -38,7 +38,7 @@ export function createAgentRuntime(opts: AgentRuntimeOpts): AgentRuntime {
   const capabilities = opts.capabilities({ sessionManager });
   const toolExecutor = new ToolExecutor({
     tools: opts.tools,
-    permissionService: opts.permissionService,
+    beforeHooks: [createPermissionGate(opts.permissionService)],
     context: sessionManager.getContext(),
     appConfig: opts.appConfig,
     currentAgentId: opts.currentAgentId,
@@ -59,6 +59,7 @@ export function createAgentRuntime(opts: AgentRuntimeOpts): AgentRuntime {
     contextManager,
     toolExecutor,
     promptManager,
+    ...(opts.steering ? { steering: opts.steering } : {}),
   };
 
   return { deps, sessionManager, contextManager, runtimeEvents: events };

@@ -8,7 +8,10 @@ export interface ChangeRange {
 }
 
 export interface ChangeEntry {
-  userMessageOrdinal: number;
+  /** Stable id of the user message this change belongs to (matches the
+   *  user block's id in the conversation — survives truncation, forking,
+   *  and compression without renumbering). */
+  userMessageId: string;
   path: string;
   op: "edit" | "write";
   beforeExists: boolean;
@@ -28,15 +31,15 @@ export class ChangeJournal {
   }
 
   async recordChange(
-    userMessageOrdinal: number,
+    userMessageId: string | undefined,
     filePath: string,
     op: "edit" | "write",
     beforeExists: boolean,
     ranges: readonly ChangeRange[],
   ): Promise<void> {
-    if (!this.filePath) return;
+    if (!this.filePath || !userMessageId) return;
     const entry: ChangeEntry = {
-      userMessageOrdinal,
+      userMessageId,
       path: filePath,
       op,
       beforeExists,
@@ -54,35 +57,23 @@ export class ChangeJournal {
     }));
   }
 
-  async getEntriesByUserMessage(): Promise<Map<number, ChangeEntry[]>> {
+  async getEntriesByUserMessage(): Promise<Map<string, ChangeEntry[]>> {
     const entries = await this.getEntries();
-    const map = new Map<number, ChangeEntry[]>();
+    const map = new Map<string, ChangeEntry[]>();
     for (const e of entries) {
-      const list = map.get(e.userMessageOrdinal) ?? [];
+      const list = map.get(e.userMessageId) ?? [];
       list.push(e);
-      map.set(e.userMessageOrdinal, list);
+      map.set(e.userMessageId, list);
     }
     return map;
   }
 
-  async pruneFromUserMessage(userMessageOrdinal: number): Promise<void> {
-    const kept = this.entries.filter(
-      (e) => e.userMessageOrdinal < userMessageOrdinal,
-    );
-    await this.writeFile(kept);
-    this.entries = kept;
-  }
-
-  async pruneAndRenumberUserMessages(
-    prunedCount: number,
-    offsetAdded: number,
-  ): Promise<void> {
-    const kept = this.entries
-      .filter((e) => e.userMessageOrdinal > prunedCount)
-      .map((e) => ({
-        ...e,
-        userMessageOrdinal: e.userMessageOrdinal - prunedCount + offsetAdded,
-      }));
+  /** Drop every entry belonging to the given user messages (undo, abort,
+   *  compression). Entries are keyed by id, so callers pass exactly the
+   *  messages that disappeared. */
+  async pruneByMessageIds(removeIds: ReadonlySet<string>): Promise<void> {
+    if (removeIds.size === 0) return;
+    const kept = this.entries.filter((e) => !removeIds.has(e.userMessageId));
     await this.writeFile(kept);
     this.entries = kept;
   }
@@ -96,7 +87,12 @@ export class ChangeJournal {
       for (const line of content.split("\n")) {
         if (!line.trim()) continue;
         try {
-          entries.push(JSON.parse(line) as ChangeEntry);
+          const parsed = JSON.parse(line) as ChangeEntry;
+          // Legacy journals (pre-stable-id) keyed by ordinal — those ids
+          // cannot map to the new scheme, so the undo history starts fresh.
+          if (typeof parsed.userMessageId === "string" && parsed.userMessageId) {
+            entries.push(parsed);
+          }
         } catch {
           // Skip malformed lines
         }

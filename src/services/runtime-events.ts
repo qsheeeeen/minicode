@@ -20,7 +20,8 @@ export type RuntimeEvent =
       status: RuntimeStatus;
     }
   | { type: "session.changed"; sessionName: string }
-  | { type: "permission.mode_changed"; mode: "manual" | "yolo" | "auto" };
+  | { type: "permission.mode_changed"; mode: "manual" | "yolo" | "auto" }
+  | { type: "queue.changed"; messages: string[] };
 
 export type RuntimeEventListener = (event: RuntimeEvent) => void;
 

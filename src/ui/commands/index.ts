@@ -35,9 +35,17 @@ export type InputRequest =
       type: "rollback-picker";
       totalUserMessages: number;
       entriesByUserMessage: Array<{
-        userMessageOrdinal: number;
+        userMessageId: string;
         entries: ChangeEntry[];
       }>;
+      /** Stable message ids, parallel to `userMessages` by position. */
+      messageIds: string[];
+      userMessages: string[];
+    }
+  | {
+      type: "fork-picker";
+      /** Stable message ids, parallel to `userMessages` by position. */
+      messageIds: string[];
       userMessages: string[];
     };
 

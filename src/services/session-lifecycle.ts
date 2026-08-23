@@ -1,7 +1,10 @@
 import type { SessionStats } from "./session-stats.js";
 import type { SessionManager } from "./session-manager.js";
 import { createLogger } from "../utils/logger.js";
-import { SessionPersistence, type SessionData } from "./session-persistence.js";
+import {
+  SessionPersistence,
+  type LoadedSession,
+} from "./session-persistence.js";
 import type { RuntimeState } from "./runtime-state.js";
 import type { ContextManager } from "./context-manager.js";
 
@@ -49,7 +52,7 @@ export interface RestoreSessionOptions {
   /** Whether to attempt loading persisted blocks for this session. */
   load: boolean;
   /** Prefetched session data (started earlier to overlap other startup I/O). */
-  preload?: Promise<SessionData | null>;
+  preload?: Promise<LoadedSession | null>;
 }
 
 export interface RestoreSessionResult {
@@ -69,11 +72,11 @@ export async function restoreSession(
     opts;
 
   if (load) {
-    const data = await (preload ?? SessionPersistence.load(name));
-    if (data) {
-      sessionManager.getContext().replaceBlocks(data.blocks);
-      if ((data.totalTokens ?? 0) > 0) {
-        contextManager.setTokenCount(data.totalTokens!);
+    const loaded = await (preload ?? SessionPersistence.loadTree(name));
+    if (loaded) {
+      sessionManager.restoreFrom(loaded);
+      if (loaded.totalTokens > 0) {
+        contextManager.setTokenCount(loaded.totalTokens);
       }
       await activateSession(sessionManager, runtimeState, name);
       return { loaded: true };
@@ -101,11 +104,11 @@ export async function resumeSession(
 ): Promise<RestoreSessionResult> {
   const { sessionManager, contextManager, runtimeState, sessionStats, name } =
     opts;
-  const data = await SessionPersistence.load(name);
-  if (!data) return { loaded: false };
-  sessionManager.getContext().replaceBlocks(data.blocks);
-  if ((data.totalTokens ?? 0) > 0) {
-    contextManager.setTokenCount(data.totalTokens!);
+  const loaded = await SessionPersistence.loadTree(name);
+  if (!loaded) return { loaded: false };
+  sessionManager.restoreFrom(loaded);
+  if (loaded.totalTokens > 0) {
+    contextManager.setTokenCount(loaded.totalTokens);
   }
   await switchSession({
     sessionManager,

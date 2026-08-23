@@ -18,6 +18,7 @@ import { newSessionName } from "../services/session-manager.js";
 import { RuntimeState } from "../services/runtime-state.js";
 import { SessionPersistence } from "../services/session-persistence.js";
 import { ShellService } from "../services/shell-service.js";
+import { SteeringQueue } from "../services/steering-queue.js";
 import { createDefaultToolRegistry } from "../tools/index.js";
 import {
   createCapabilities,
@@ -105,7 +106,7 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
   // and the tool-availability probes instead of blocking first paint.
   const restoring = !!(sessionName || resumeRecent);
   const preload = restoring
-    ? SessionPersistence.load(initialSession)
+    ? SessionPersistence.loadTree(initialSession)
     : undefined;
 
   const skillRegistry = createDefaultSkillRegistry();
@@ -172,6 +173,7 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
     permissionService,
     appConfig: config,
     currentAgentId: MAIN_AGENT_ID,
+    steering: new SteeringQueue(runtimeEvents),
     capabilities: ({ sessionManager }) =>
       createCapabilities([
         [ShellCapability, shellService],

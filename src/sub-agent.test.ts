@@ -271,6 +271,7 @@ describe("sub-agent", () => {
       const registry = new AgentRegistry();
       const { parent } = makeParent(registry, [
         toolUseResponse("call_1", "Echo", { text: "hello" }),
+        defaultTextResponse("Permission denied; the tool did not run."),
       ]);
       const toolRegistry = createDefaultToolRegistry();
       toolRegistry.register(
@@ -291,7 +292,10 @@ describe("sub-agent", () => {
       });
 
       expect(result.outcome).toBe("success");
-      expect(unwrapSuccess(result)).toContain("User cancelled");
+      expect(unwrapSuccess(result)).toContain(
+        "Permission denied; the tool did not run.",
+      );
+      expect(unwrapSuccess(result)).not.toContain("echo:");
     });
   });
 });

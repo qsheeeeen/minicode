@@ -17,6 +17,7 @@ export const askUserTool: ToolDef<AskUserArgs> = {
   requiresPermission: false,
   readOnly: true,
   interactive: true,
+  executionMode: "sequential",
   input_schema: {
     type: "object" as const,
     properties: {

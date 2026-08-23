@@ -71,6 +71,7 @@ function Demo() {
             console.log(v);
             return true;
           }}
+          onSteer={(t) => console.log("steer:", t)}
           loadingRef={{ current: false }}
           config={{} as any}
           modelSwitchService={

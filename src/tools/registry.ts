@@ -67,12 +67,17 @@ export function createCapabilities(
   };
 }
 
+/** The main agent's registry id; sub-agents allocate their own. Lives here so
+ *  tools (executor) can default to it without importing agent. */
+export const MAIN_AGENT_ID = "1";
+
 export interface ToolExecutionContext {
   config: ToolConfig;
   appConfig?: AppConfig;
   currentAgentId: string;
   signal: AbortSignal | undefined;
-  activeUserMessageOrdinal?: number;
+  /** Stable id of the user message this turn belongs to (journal keying). */
+  activeMessageId?: string;
   prompter?: UserPrompter;
   capabilities: Capabilities;
 }
@@ -108,6 +113,13 @@ export interface ToolDef<TArgs = Record<string, unknown>> extends LLMToolDef {
   requiresPermission?: boolean;
   readOnly?: boolean;
   interactive?: boolean;
+  /**
+   * How this tool must run inside a batch. Defaults to "parallel"; a batch
+   * containing any sequential tool runs entirely sequential (pi rule).
+   * Sequential is for tools that must not overlap with anything — e.g. a
+   * modal prompter that can only host one prompt at a time.
+   */
+  executionMode?: "sequential" | "parallel";
 }
 
 /**

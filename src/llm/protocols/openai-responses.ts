@@ -237,17 +237,19 @@ function toLLMStreamResult(
     };
   }
 
-  // Determine stop reason
+  // Determine stop reason. Incomplete wins over tool calls: a truncated
+  // response may carry salvageable-but-partial call arguments, and the
+  // caller must know it was truncated (anthropic/openai-chat report the
+  // same way).
   let stop_reason: StopReason;
-  if (hasToolCalls) {
+  if (response.status === "incomplete") {
+    stop_reason = "max_tokens";
+  } else if (hasToolCalls) {
     stop_reason = "tool_use";
   } else {
     switch (response.status) {
       case "completed":
         stop_reason = "end_turn";
-        break;
-      case "incomplete":
-        stop_reason = "max_tokens";
         break;
       default:
         stop_reason = "unknown";

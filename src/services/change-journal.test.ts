@@ -38,12 +38,12 @@ describe("ChangeJournal", () => {
     await journal.startSession("/tmp/sess", "test");
 
     vi.spyOn(Date, "now").mockReturnValue(1000);
-    await journal.recordChange(1, "file.ts", "edit", true, [
+    await journal.recordChange("msg-1", "file.ts", "edit", true, [
       { start: 5, oldText: "old", newText: "new" },
     ]);
 
     const entry = {
-      userMessageOrdinal: 1,
+      userMessageId: "msg-1",
       path: "file.ts",
       op: "edit",
       beforeExists: true,
@@ -63,16 +63,27 @@ describe("ChangeJournal", () => {
     const { ChangeJournal } = await import("./change-journal.js");
     const journal = new ChangeJournal();
 
-    await journal.recordChange(1, "file.ts", "edit", true, []);
+    await journal.recordChange("msg-1", "file.ts", "edit", true, []);
 
     expect(fs.appendFile).not.toHaveBeenCalled();
   });
 
-  it("getEntries loads existing JSONL entries", async () => {
+  it("recordChange is a no-op without an active message id", async () => {
+    const fs = (await import("fs/promises")).default;
+    (fs.readFile as ReturnType<typeof vi.fn>).mockResolvedValue("");
+    const { ChangeJournal } = await import("./change-journal.js");
+    const journal = new ChangeJournal();
+    await journal.startSession("/tmp/sess", "test");
+
+    await journal.recordChange(undefined, "file.ts", "edit", true, []);
+    expect(fs.appendFile).not.toHaveBeenCalled();
+  });
+
+  it("getEntries loads existing JSONL entries and drops legacy ones", async () => {
     const fs = (await import("fs/promises")).default;
     const lines = [
       JSON.stringify({
-        userMessageOrdinal: 1,
+        userMessageId: "msg-1",
         path: "a.ts",
         op: "edit",
         beforeExists: true,
@@ -80,12 +91,21 @@ describe("ChangeJournal", () => {
         ts: 100,
       }),
       JSON.stringify({
-        userMessageOrdinal: 2,
+        userMessageId: "msg-2",
         path: "b.ts",
         op: "write",
         beforeExists: false,
         ranges: [{ start: 0, oldText: "", newText: "created" }],
         ts: 200,
+      }),
+      // Pre-stable-id journal (keyed by ordinal) — cannot map, dropped.
+      JSON.stringify({
+        userMessageOrdinal: 3,
+        path: "legacy.ts",
+        op: "edit",
+        beforeExists: true,
+        ranges: [],
+        ts: 300,
       }),
     ];
     (fs.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(
@@ -102,11 +122,11 @@ describe("ChangeJournal", () => {
     expect(entries[1].beforeExists).toBe(false);
   });
 
-  it("getEntriesByUserMessage groups entries by userMessageOrdinal", async () => {
+  it("getEntriesByUserMessage groups entries by userMessageId", async () => {
     const fs = (await import("fs/promises")).default;
     const lines = [
       JSON.stringify({
-        userMessageOrdinal: 1,
+        userMessageId: "msg-1",
         path: "a.ts",
         op: "edit",
         beforeExists: true,
@@ -114,7 +134,7 @@ describe("ChangeJournal", () => {
         ts: 100,
       }),
       JSON.stringify({
-        userMessageOrdinal: 1,
+        userMessageId: "msg-1",
         path: "b.ts",
         op: "write",
         beforeExists: false,
@@ -122,7 +142,7 @@ describe("ChangeJournal", () => {
         ts: 200,
       }),
       JSON.stringify({
-        userMessageOrdinal: 2,
+        userMessageId: "msg-2",
         path: "c.ts",
         op: "edit",
         beforeExists: true,
@@ -139,15 +159,15 @@ describe("ChangeJournal", () => {
     await journal.startSession("/tmp/sess", "test");
 
     const map = await journal.getEntriesByUserMessage();
-    expect(map.get(1)).toHaveLength(2);
-    expect(map.get(2)).toHaveLength(1);
+    expect(map.get("msg-1")).toHaveLength(2);
+    expect(map.get("msg-2")).toHaveLength(1);
   });
 
-  it("pruneFromUserMessage removes entries at or after user message", async () => {
+  it("pruneByMessageIds removes exactly the given messages' entries", async () => {
     const fs = (await import("fs/promises")).default;
     const lines = [
       JSON.stringify({
-        userMessageOrdinal: 1,
+        userMessageId: "msg-1",
         path: "a.ts",
         op: "edit",
         beforeExists: true,
@@ -155,7 +175,7 @@ describe("ChangeJournal", () => {
         ts: 100,
       }),
       JSON.stringify({
-        userMessageOrdinal: 2,
+        userMessageId: "msg-2",
         path: "b.ts",
         op: "edit",
         beforeExists: true,
@@ -170,41 +190,12 @@ describe("ChangeJournal", () => {
     const { ChangeJournal } = await import("./change-journal.js");
     const journal = new ChangeJournal();
     await journal.startSession("/tmp/sess", "test");
-    await journal.pruneFromUserMessage(2);
+    await journal.pruneByMessageIds(new Set(["msg-2"]));
 
     expect(fs.writeFile).toHaveBeenCalledWith(
       expect.stringContaining(".tmp"),
-      expect.stringContaining('"userMessageOrdinal":1'),
+      expect.stringContaining('"userMessageId":"msg-1"'),
     );
     await expect(journal.getEntries()).resolves.toHaveLength(1);
-  });
-
-  it("pruneAndRenumberUserMessages filters and renumbers entries", async () => {
-    const fs = (await import("fs/promises")).default;
-    const lines = [1, 2, 3].map((userMessageOrdinal) =>
-      JSON.stringify({
-        userMessageOrdinal,
-        path: `${userMessageOrdinal}.ts`,
-        op: "edit",
-        beforeExists: true,
-        ranges: [],
-        ts: userMessageOrdinal,
-      }),
-    );
-    (fs.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(
-      lines.join("\n"),
-    );
-
-    const { ChangeJournal } = await import("./change-journal.js");
-    const journal = new ChangeJournal();
-    await journal.startSession("/tmp/sess", "test");
-    await journal.pruneAndRenumberUserMessages(1, 0);
-
-    const kept = await journal.getEntries();
-    expect(kept.map((entry) => entry.userMessageOrdinal)).toEqual([1, 2]);
-    expect(fs.rename).toHaveBeenCalledWith(
-      "/tmp/sess/test.changes.jsonl.tmp",
-      "/tmp/sess/test.changes.jsonl",
-    );
   });
 });

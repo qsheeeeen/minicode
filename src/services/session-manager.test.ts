@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { SessionManager } from "./session-manager.js";
 import { RuntimeEvents } from "./runtime-events.js";
 import { SessionPersistence } from "./session-persistence.js";
@@ -29,7 +29,7 @@ describe("SessionManager", () => {
   });
 
   describe("events", () => {
-    it("emits session.changed on setSession", () => {
+    it("emits session.changed on setSession", async () => {
       const events = new RuntimeEvents();
       const seen: string[] = [];
       events.subscribe((event) => {
@@ -39,22 +39,22 @@ describe("SessionManager", () => {
       const spy = vi
         .spyOn(SessionPersistence, "getSessionDir")
         .mockReturnValue("/tmp/minicode-session-manager-test");
-      sm.setSession("next-session");
+      await sm.setSession("next-session");
       spy.mockRestore();
       expect(seen).toEqual(["next-session"]);
     });
   });
 
-  describe("user message ordinal", () => {
-    it("starts at 0", () => {
+  describe("active message id", () => {
+    it("starts undefined", () => {
       const sm = new SessionManager();
-      expect(sm.getActiveUserMessageOrdinal()).toBe(0);
+      expect(sm.getActiveMessageId()).toBeUndefined();
     });
 
     it("can be set and read back", () => {
       const sm = new SessionManager();
-      sm.setActiveUserMessageOrdinal(5);
-      expect(sm.getActiveUserMessageOrdinal()).toBe(5);
+      sm.setActiveMessageId("m5");
+      expect(sm.getActiveMessageId()).toBe("m5");
     });
   });
 
@@ -66,18 +66,18 @@ describe("SessionManager", () => {
 
     it("stores and retrieves messages", () => {
       const sm = new SessionManager();
-      const msgs = [{ type: "user" as const, text: "hello" }];
+      const msgs = [{ type: "user" as const, text: "hello", id: "u1" }];
       sm.getContext().replaceBlocks(msgs);
       expect(sm.getContext().getBlocks()).toEqual(msgs);
     });
   });
 
   describe("clearSession", () => {
-    it("resets user message ordinal to 0", () => {
+    it("clears the active message id", () => {
       const sm = new SessionManager();
-      sm.setActiveUserMessageOrdinal(10);
+      sm.setActiveMessageId("m10");
       sm.clearSession();
-      expect(sm.getActiveUserMessageOrdinal()).toBe(0);
+      expect(sm.getActiveMessageId()).toBeUndefined();
     });
 
     it("clears messages", () => {
@@ -88,30 +88,156 @@ describe("SessionManager", () => {
     });
   });
 
-  describe("saveStore", () => {
-    it("persists to disk by default", async () => {
-      const sm = new SessionManager("persistent-session");
-      sm.getContext().replaceBlocks([{ type: "user", text: "hi" }]);
-      const saveSpy = vi
-        .spyOn(SessionPersistence, "save")
+  describe("saveStore tree sync", () => {
+    let appendSpy: ReturnType<typeof vi.spyOn>;
+    let rewriteSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      appendSpy = vi
+        .spyOn(SessionPersistence, "appendEntries")
         .mockResolvedValue(undefined);
-      await sm.saveStore({ model: "m", totalTokens: 10 });
-      expect(saveSpy).toHaveBeenCalledWith(
-        "persistent-session",
-        [{ type: "user", text: "hi" }],
-        { model: "m", totalTokens: 10 },
-      );
-      saveSpy.mockRestore();
+      rewriteSpy = vi
+        .spyOn(SessionPersistence, "rewriteTree")
+        .mockResolvedValue(undefined);
+    });
+
+    afterEach(() => {
+      appendSpy.mockRestore();
+      rewriteSpy.mockRestore();
+    });
+
+    function turnIds(entries: readonly { type: string; id?: string }[]) {
+      return entries
+        .filter((e) => e.type === "turn")
+        .map((e) => (e as { id: string }).id);
+    }
+
+    it("final save appends the tail turn; mid-run saves skip it", async () => {
+      const sm = new SessionManager("s");
+      const context = sm.getContext();
+      context.replaceBlocks([
+        { type: "user", text: "one", id: "u1" },
+        { type: "text", text: "r1" },
+        { type: "user", text: "two", id: "u2" },
+        { type: "text", text: "r2" },
+      ]);
+
+      await sm.saveStore({ model: "m", totalTokens: 1 }); // mid-run
+      expect(appendSpy).toHaveBeenCalledTimes(1);
+      let entries = appendSpy.mock.calls[0][1];
+      expect(turnIds(entries)).toEqual(["u1"]); // u2 is still in flight
+      expect(entries[entries.length - 1]).toMatchObject({
+        type: "leaf",
+        activeTurnId: "u1",
+        model: "m",
+        totalTokens: 1,
+      });
+
+      await sm.saveStore({ model: "m", totalTokens: 2 }, { final: true });
+      entries = appendSpy.mock.calls[1][1];
+      expect(turnIds(entries)).toEqual(["u2"]);
+      const leaf = entries[entries.length - 1] as { activeTurnId: string };
+      expect(leaf.activeTurnId).toBe("u2");
+    });
+
+    it("context prefix (abort/undo) truncates the tree and rewrites", async () => {
+      const sm = new SessionManager("s");
+      const context = sm.getContext();
+      context.replaceBlocks([
+        { type: "user", text: "one", id: "u1" },
+        { type: "text", text: "r1" },
+        { type: "user", text: "two", id: "u2" },
+      ]);
+      await sm.saveStore({ model: "m", totalTokens: 1 }, { final: true });
+      expect(rewriteSpy).not.toHaveBeenCalled();
+
+      // Abort rolled the context back to before u2.
+      context.truncateBeforeUserMessageId("u2");
+      await sm.saveStore({ model: "m", totalTokens: 1 }, { final: true });
+
+      expect(rewriteSpy).toHaveBeenCalledTimes(1);
+      const entries = rewriteSpy.mock.calls[0][1];
+      expect(turnIds(entries)).toEqual(["u1"]);
+      const leaf = entries[entries.length - 1] as { activeTurnId: string };
+      expect(leaf.activeTurnId).toBe("u1");
+    });
+
+    it("divergence (compression) rebuilds the tree from context", async () => {
+      const sm = new SessionManager("s");
+      sm.getContext().replaceBlocks([
+        { type: "user", text: "one", id: "u1" },
+        { type: "user", text: "two", id: "u2" },
+      ]);
+      await sm.saveStore({ model: "m", totalTokens: 1 }, { final: true });
+
+      // Compression replaced the history with a summary block (fresh id).
+      sm.getContext().replaceBlocks([
+        { type: "user", text: "summary", id: "s1" },
+        { type: "text", text: "kept" },
+      ]);
+      await sm.saveStore({ model: "m", totalTokens: 1 }, { final: true });
+
+      expect(rewriteSpy).toHaveBeenCalledTimes(1);
+      const entries = rewriteSpy.mock.calls[0][1];
+      expect(turnIds(entries)).toEqual(["s1"]);
+    });
+
+    it("restoreFrom(v1) migrates: first save rewrites whole file as v2", async () => {
+      const sm = new SessionManager("s");
+      sm.restoreFrom({
+        version: 1,
+        blocks: [
+          { type: "user", text: "old" }, // no id yet — replaceBlocks assigns
+          { type: "text", text: "r" },
+        ],
+        model: "v1-model",
+        totalTokens: 5,
+      });
+
+      await sm.saveStore({ model: "m", totalTokens: 1 }, { final: true });
+
+      expect(rewriteSpy).toHaveBeenCalledTimes(1);
+      const entries = rewriteSpy.mock.calls[0][1];
+      const turns = entries.filter((e) => e.type === "turn");
+      expect(turns).toHaveLength(1);
+      const summary = sm.getContext().getBlocks()[0] as { id?: string };
+      expect((turns[0] as { id: string }).id).toBe(summary.id);
+
+      // Second save is a normal append — migration is done.
+      sm.getContext().replaceBlocks([
+        ...sm.getContext().getBlocks(),
+        { type: "user", text: "new", id: "n1" },
+      ]);
+      await sm.saveStore({ model: "m", totalTokens: 1 }, { final: true });
+      expect(rewriteSpy).toHaveBeenCalledTimes(1);
+      expect(turnIds(appendSpy.mock.calls[0][1])).toEqual(["n1"]);
+    });
+
+    it("restoreFrom(v2) rebuilds context from the active path", () => {
+      const sm = new SessionManager("s");
+      const u1Blocks = [{ type: "user" as const, text: "one", id: "u1" }];
+      const u2Blocks = [{ type: "user" as const, text: "two", id: "u2" }];
+      sm.restoreFrom({
+        version: 2,
+        turns: [
+          { type: "turn", id: "u1", parentId: null, ts: 1, blocks: u1Blocks },
+          { type: "turn", id: "u2", parentId: "u1", ts: 2, blocks: u2Blocks },
+        ],
+        activeTurnId: "u2",
+        model: "m",
+        totalTokens: 3,
+      });
+
+      expect(sm.getContext().getBlocks()).toEqual([...u1Blocks, ...u2Blocks]);
+      expect(sm.getTree().activeTurnId).toBe("u2");
     });
 
     it("skips disk for non-persistent sessions", async () => {
       const sm = new SessionManager(undefined, undefined, false);
-      const saveSpy = vi
-        .spyOn(SessionPersistence, "save")
-        .mockResolvedValue(undefined);
+      sm.getContext().replaceBlocks([{ type: "user", text: "hi", id: "u1" }]);
       await sm.saveStore({ model: "m", totalTokens: 10 });
-      expect(saveSpy).not.toHaveBeenCalled();
-      saveSpy.mockRestore();
+      expect(appendSpy).not.toHaveBeenCalled();
+      expect(rewriteSpy).not.toHaveBeenCalled();
     });
   });
 });
@@ -128,7 +254,7 @@ describe("saveStore serialization", () => {
       order.push("end");
       inFlight = false;
     });
-    vi.spyOn(SessionPersistence, "save").mockImplementation(save);
+    vi.spyOn(SessionPersistence, "appendEntries").mockImplementation(save);
 
     const sm = new SessionManager("s", undefined, new RuntimeEvents());
     await Promise.all([

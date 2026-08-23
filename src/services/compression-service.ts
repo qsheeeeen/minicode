@@ -10,6 +10,9 @@ export interface CompressionOutcome {
   blocks: LLMBlock[];
   /** How many of the original user messages survive in `blocks`. */
   keptUserMessages: number;
+  /** Stable ids of the user messages folded into the summary — the caller
+   *  prunes exactly these from the change journal. */
+  droppedMessageIds: string[];
 }
 
 export interface CompressionStrategy {
@@ -32,12 +35,17 @@ export class SummaryCompressionStrategy implements CompressionStrategy {
       return {
         blocks: context.getBlocks(),
         keptUserMessages: context.getUserMessageCount(),
+        droppedMessageIds: [],
       };
     }
 
     const { prefix, suffix } = context.splitAtRecentUserMessages(
       this.recentCount,
     );
+    const droppedMessageIds = prefix
+      .filter((b) => b.type === "user")
+      .map((b) => (b as { id?: string }).id)
+      .filter((id): id is string => typeof id === "string");
     const conversationText = this.extractConversationText(prefix);
 
     const summaryPrompt = `Summarize the following conversation concisely. Focus on:
@@ -81,6 +89,7 @@ ${conversationText}`;
           ...suffix,
         ],
         keptUserMessages: this.recentCount + 1,
+        droppedMessageIds,
       };
     } catch (e) {
       if (isTurnFaultError(e)) throw e;

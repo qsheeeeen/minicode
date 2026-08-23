@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import type {
   LLMMediaType,
   LLMImage,
@@ -78,18 +79,6 @@ export class LLMContext {
     return -1;
   }
 
-  private findUserOrdinalIndex(ordinal: number): number {
-    if (ordinal < 1) return -1;
-
-    let seen = 0;
-    for (let i = 0; i < this.blocks.length; i++) {
-      if (this.blocks[i].type !== "user") continue;
-      seen++;
-      if (seen === ordinal) return i;
-    }
-    return -1;
-  }
-
   private findNthUserFromEndIndex(count: number): number {
     if (count < 1) return this.blocks.length;
 
@@ -109,6 +98,7 @@ export class LLMContext {
 
     let seenUser = false;
     const toolIds = new Set<string>();
+    const userIds = new Set<string>();
     for (const block of blocks) {
       if (!block || typeof block !== "object") {
         throw new Error("Invalid LLM block");
@@ -118,6 +108,15 @@ export class LLMContext {
         seenUser = true;
         if (typeof block.text !== "string") {
           throw new Error("Invalid user block: text must be a string");
+        }
+        if (block.id !== undefined) {
+          if (typeof block.id !== "string" || block.id.length === 0) {
+            throw new Error("Invalid user block: id must be a non-empty string");
+          }
+          if (userIds.has(block.id)) {
+            throw new Error(`Duplicate user message id: ${block.id}`);
+          }
+          userIds.add(block.id);
         }
         continue;
       }
@@ -196,6 +195,13 @@ export class LLMContext {
   }
 
   replaceBlocks(blocks: LLMBlock[]): void {
+    // Legacy data (v1 sessions) may lack user ids — assign them on the way
+    // in so the id invariant holds for everything in memory.
+    for (const block of blocks) {
+      if (block.type === "user" && block.id === undefined) {
+        block.id = randomUUID();
+      }
+    }
     LLMContext.validateBlocks(blocks);
     this.blocks = blocks.map(cloneBlock);
     this.recount();
@@ -218,16 +224,30 @@ export class LLMContext {
       .map((block) => block.text);
   }
 
-  truncateBeforeUserMessageOrdinal(ordinal: number): void {
-    const start = this.findUserOrdinalIndex(ordinal);
-    if (start < 0) {
-      if (ordinal <= 1) {
-        this.blocks = [];
-        this.recount();
-        this.notify();
-      }
-      return;
+  /** Ordered user-message identities for pickers and journal bookkeeping. */
+  getUserMessageSummaries(): Array<{ id: string; ordinal: number; text: string }> {
+    const summaries: Array<{ id: string; ordinal: number; text: string }> = [];
+    let ordinal = 0;
+    for (const block of this.blocks) {
+      if (block.type !== "user") continue;
+      ordinal++;
+      summaries.push({
+        id: block.id ?? "",
+        ordinal,
+        text: block.text,
+      });
     }
+    return summaries;
+  }
+
+  /** Drop the user message with this id and everything after it. The id of
+   *  this run's opening message is remembered by the caller, so abort/undo
+   *  truncate by identity, never by content matching. Unknown id: no-op. */
+  truncateBeforeUserMessageId(id: string): void {
+    const start = this.blocks.findIndex(
+      (block) => block.type === "user" && block.id === id,
+    );
+    if (start < 0) return;
 
     this.blocks = this.blocks.slice(0, start);
     this.recount();
@@ -251,10 +271,13 @@ export class LLMContext {
     this.notify();
   }
 
-  startUserMessage(userText: string): void {
-    this.blocks.push({ type: "user", text: userText });
+  /** Open a new user message; returns its stable id. */
+  startUserMessage(userText: string, id?: string): string {
+    const messageId = id ?? randomUUID();
+    this.blocks.push({ type: "user", text: userText, id: messageId });
     this.userCount++;
     this.notify();
+    return messageId;
   }
 
   appendThinking(delta: string): void {

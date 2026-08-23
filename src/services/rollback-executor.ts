@@ -34,15 +34,33 @@ function fail(
   };
 }
 
+/** The user messages at and after the target — derived from the context's
+ *  ordered summaries, so both the file and conversation cuts share one
+ *  definition of "after". */
+function messagesFrom(
+  context: LLMContext,
+  fromMessageId: string,
+): Set<string> {
+  const summaries = context.getUserMessageSummaries();
+  const ids = new Set<string>();
+  let cutting = false;
+  for (const s of summaries) {
+    if (s.id === fromMessageId) cutting = true;
+    if (cutting) ids.add(s.id);
+  }
+  return ids;
+}
+
 export class RollbackExecutor {
   async rollbackConversation(
     changeJournal: ChangeJournal,
     context: LLMContext,
-    fromUserMessageOrdinal: number,
+    fromMessageId: string,
   ): Promise<RollbackOutcome> {
+    const removeIds = messagesFrom(context, fromMessageId);
     try {
-      this.truncateConversation(context, fromUserMessageOrdinal);
-      await changeJournal.pruneFromUserMessage(fromUserMessageOrdinal);
+      context.truncateBeforeUserMessageId(fromMessageId);
+      await changeJournal.pruneByMessageIds(removeIds);
       return { ok: true, result: EMPTY_RESULT };
     } catch (e) {
       return fail(e);
@@ -53,40 +71,35 @@ export class RollbackExecutor {
   async rollback(
     changeJournal: ChangeJournal,
     context: LLMContext,
-    fromUserMessageOrdinal: number,
+    fromMessageId: string,
     scope: RollbackScope,
   ): Promise<RollbackOutcome> {
     return scope === "both"
       ? this.rollbackFilesAndConversation(
           changeJournal,
           context,
-          fromUserMessageOrdinal,
+          fromMessageId,
         )
-      : this.rollbackConversation(
-          changeJournal,
-          context,
-          fromUserMessageOrdinal,
-        );
+      : this.rollbackConversation(changeJournal, context, fromMessageId);
   }
 
   async rollbackFilesAndConversation(
     changeJournal: ChangeJournal,
     context: LLMContext,
-    fromUserMessageOrdinal: number,
+    fromMessageId: string,
   ): Promise<RollbackOutcome> {
+    const removeIds = messagesFrom(context, fromMessageId);
+
     // Step 1: Restore files (may partially apply before a conflict — on
     // failure the conversation and journal are left untouched).
-    const restore = await this.restoreFiles(
-      changeJournal,
-      fromUserMessageOrdinal,
-    );
+    const restore = await this.restoreFiles(changeJournal, removeIds);
     if (!restore.ok) return restore;
 
     // Step 2: Truncate conversation. Step 3: Prune journal (last — only
     // after everything else succeeded).
     try {
-      this.truncateConversation(context, fromUserMessageOrdinal);
-      await changeJournal.pruneFromUserMessage(fromUserMessageOrdinal);
+      context.truncateBeforeUserMessageId(fromMessageId);
+      await changeJournal.pruneByMessageIds(removeIds);
     } catch (e) {
       return fail(e, restore.result);
     }
@@ -95,12 +108,10 @@ export class RollbackExecutor {
 
   private async restoreFiles(
     changeJournal: ChangeJournal,
-    fromUserMessageOrdinal: number,
+    removeIds: ReadonlySet<string>,
   ): Promise<RollbackOutcome> {
     const entries = await changeJournal.getEntries();
-    const affected = entries.filter(
-      (e) => e.userMessageOrdinal >= fromUserMessageOrdinal,
-    );
+    const affected = entries.filter((e) => removeIds.has(e.userMessageId));
 
     if (affected.length === 0) {
       return { ok: true, result: EMPTY_RESULT };
@@ -161,12 +172,5 @@ export class RollbackExecutor {
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
     }
-  }
-
-  private truncateConversation(
-    context: LLMContext,
-    fromUserMessageOrdinal: number,
-  ): void {
-    context.truncateBeforeUserMessageOrdinal(fromUserMessageOrdinal);
   }
 }

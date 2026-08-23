@@ -98,4 +98,67 @@ describe("InputArea Component", () => {
     expect(output).toContain("Type a message or /command...");
     expect(output).toContain(">");
   });
+
+  describe("steering while loading", () => {
+    const fullProps = (overrides: {
+      onSteer?: (t: string) => void;
+      loadingRef?: React.MutableRefObject<boolean>;
+      reportStatus?: (s: unknown) => void;
+    }) => ({
+      model: { getName: () => "m" } as any,
+      handleSubmit: vi.fn(async () => true),
+      onSteer: overrides.onSteer ?? vi.fn(),
+      loadingRef: overrides.loadingRef ?? mockLoadingRef(true),
+      config: {} as any,
+      modelSwitchService: {} as any,
+      sessionManager: {
+        reportStatus: overrides.reportStatus ?? vi.fn(),
+      } as any,
+      commandRegistry,
+      skillRegistry,
+    });
+
+    it("queues plain text via onSteer and clears the input", async () => {
+      const onSteer = vi.fn();
+      const { stdin } = render(
+        <InputArea {...fullProps({ onSteer })} />,
+      );
+
+      stdin.write("also check the tests");
+      await new Promise((r) => setTimeout(r, 30));
+      stdin.write("\r");
+      await new Promise((r) => setTimeout(r, 30));
+
+      expect(onSteer).toHaveBeenCalledWith("also check the tests");
+      expect(useTuiState.getState().input.value).toBe("");
+    });
+
+    it("blocks commands and shell lines while loading, keeping the text", async () => {
+      const onSteer = vi.fn();
+      const reportStatus = vi.fn();
+      const { stdin } = render(
+        <InputArea {...fullProps({ onSteer, reportStatus })} />,
+      );
+
+      stdin.write("/model");
+      await new Promise((r) => setTimeout(r, 30));
+      stdin.write("\r");
+      await new Promise((r) => setTimeout(r, 30));
+
+      expect(onSteer).not.toHaveBeenCalled();
+      expect(reportStatus).toHaveBeenCalled();
+      expect(useTuiState.getState().input.value).toBe("/model");
+    });
+
+    it("shows queued messages below the input", () => {
+      useTuiState.setState({ steeringQueue: ["first", "second"] });
+
+      const { lastFrame } = render(
+        <InputArea {...fullProps({ loadingRef: mockLoadingRef(true) })} />,
+      );
+
+      expect(lastFrame()).toContain("⇢ queued: first");
+      expect(lastFrame()).toContain("⇢ queued: second");
+    });
+  });
 });

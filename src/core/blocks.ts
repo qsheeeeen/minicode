@@ -5,6 +5,10 @@
 export interface LLMUserBlock {
   type: "user";
   text: string;
+  /** Stable identity for this user message — assigned when the message is
+   *  created and never reused. Journal entries and session-tree entries key
+   *  on it; protocol serializers ignore it. */
+  id?: string;
 }
 
 export interface LLMTextBlock {

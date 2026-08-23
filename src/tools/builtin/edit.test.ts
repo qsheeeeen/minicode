@@ -14,7 +14,7 @@ vi.mock("fs/promises", () => ({
 function makeContext() {
   const journal = { recordChange: vi.fn().mockResolvedValue(undefined) };
   const context = {
-    activeUserMessageOrdinal: 2,
+    activeMessageId: "msg-2",
     capabilities: createCapabilities([[ChangeJournalCapability, journal]]),
   } as any;
   return { context, journal };
@@ -49,7 +49,7 @@ describe("editTool", () => {
         "utf-8",
       );
       expect(journal.recordChange).toHaveBeenCalledWith(
-        2,
+        "msg-2",
         "test.txt",
         "edit",
         true,
@@ -80,7 +80,7 @@ describe("editTool", () => {
         "utf-8",
       );
       expect(journal.recordChange).toHaveBeenCalledWith(
-        2,
+        "msg-2",
         "test.txt",
         "edit",
         true,

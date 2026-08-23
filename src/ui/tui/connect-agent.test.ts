@@ -215,6 +215,29 @@ describe("connectAgent", () => {
     expect(useTuiState.getState().permissionMode).toBe("auto");
   });
 
+  it("should sync steeringQueue from queue.changed events", () => {
+    const { sessionManager, contextManager, runtimeEvents, runtimeState } =
+      createTestDeps();
+    const registry = new AgentRegistry();
+
+    const result = connectAgent({
+      sessionManager,
+      runtimeEvents,
+      uiTimeline: makeTimeline(sessionManager),
+      registry,
+    });
+    cleanup = result.cleanup;
+
+    runtimeEvents.emit({
+      type: "queue.changed",
+      messages: ["first queued"],
+    });
+    expect(useTuiState.getState().steeringQueue).toEqual(["first queued"]);
+
+    runtimeEvents.emit({ type: "queue.changed", messages: [] });
+    expect(useTuiState.getState().steeringQueue).toEqual([]);
+  });
+
   it("should register main agent in registry", () => {
     const { sessionManager, contextManager, runtimeEvents, runtimeState } =
       createTestDeps();

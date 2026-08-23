@@ -261,6 +261,7 @@ function AppContent({
         <InputArea
           model={deps.model}
           handleSubmit={handleSubmit}
+          onSteer={(text) => deps.steering?.enqueue(text)}
           loadingRef={loadingRef}
           config={config}
           modelSwitchService={modelSwitchService}

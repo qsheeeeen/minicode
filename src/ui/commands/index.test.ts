@@ -12,6 +12,7 @@ import {
   SkillRegistry,
 } from "../../skills/index.js";
 import { createDefaultRouter } from "../routing.js";
+import { SessionTree } from "../../services/session-tree.js";
 
 const { sessionPersistenceMock, configMock } = vi.hoisted(() => ({
   sessionPersistenceMock: {
@@ -71,6 +72,8 @@ describe("Builtin commands", () => {
       replaceBlocks: vi.fn(),
       getBlocks: vi.fn().mockReturnValue([]),
       getUserMessages: vi.fn().mockReturnValue([]),
+      getUserMessageSummaries: vi.fn().mockReturnValue([]),
+      truncateBeforeUserMessageId: vi.fn(),
     };
   }
 
@@ -84,6 +87,7 @@ describe("Builtin commands", () => {
   /** Create a mock SessionManager (ctx.sessionManager) */
   function makeSessionManagerMock(
     contextMock: ReturnType<typeof makeContextMock>,
+    tree?: SessionTree,
   ) {
     return {
       setSession: vi.fn(),
@@ -92,6 +96,8 @@ describe("Builtin commands", () => {
       getStore: vi.fn().mockReturnValue(contextMock),
       getChangeJournal: vi.fn(),
       reportStatus: vi.fn(),
+      saveStore: vi.fn().mockResolvedValue(undefined),
+      getTree: vi.fn().mockReturnValue(tree ?? SessionTree.empty()),
     };
   }
 
@@ -159,11 +165,16 @@ describe("Builtin commands", () => {
       const context = {
         ...makeContextMock(),
         getUserMessages: vi.fn().mockReturnValue(["first", "second"]),
-        truncateBeforeUserMessageOrdinal: vi.fn(),
+        getUserMessageSummaries: vi
+          .fn()
+          .mockReturnValue([
+            { id: "u1", ordinal: 1, text: "first" },
+            { id: "u2", ordinal: 2, text: "second" },
+          ]),
       };
       const journal = {
         getEntriesByUserMessage: vi.fn().mockResolvedValue(new Map()),
-        pruneFromUserMessage: vi.fn().mockResolvedValue(undefined),
+        pruneByMessageIds: vi.fn().mockResolvedValue(undefined),
       };
       const { ctx, sessionManager } = makeCtx({
         context,
@@ -173,8 +184,10 @@ describe("Builtin commands", () => {
       const result = await executeCommand("undo", ["2"], ctx as CommandContext);
 
       expect(result.kind).not.toBe("unknown");
-      expect(context.truncateBeforeUserMessageOrdinal).toHaveBeenCalledWith(2);
-      expect(journal.pruneFromUserMessage).toHaveBeenCalledWith(2);
+      expect(context.truncateBeforeUserMessageId).toHaveBeenCalledWith("u2");
+      expect(journal.pruneByMessageIds).toHaveBeenCalledWith(
+        new Set(["u2"]),
+      );
       expect(ctx.presentInput).not.toHaveBeenCalled();
       expect(sessionManager.reportStatus).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -188,6 +201,9 @@ describe("Builtin commands", () => {
       const context = {
         ...makeContextMock(),
         getUserMessages: vi.fn().mockReturnValue(["first"]),
+        getUserMessageSummaries: vi
+          .fn()
+          .mockReturnValue([{ id: "u1", ordinal: 1, text: "first" }]),
       };
       const { ctx } = makeCtx({
         context,
@@ -203,6 +219,7 @@ describe("Builtin commands", () => {
         .calls[0][0];
       expect(request.type).toBe("rollback-picker");
       expect(request.userMessages).toEqual(["first"]);
+      expect(request.messageIds).toEqual(["u1"]);
       expect(request.changeJournal).toBeUndefined();
       expect(request.context).toBeUndefined();
       expect(request.reportStatus).toBeUndefined();
@@ -223,6 +240,106 @@ describe("Builtin commands", () => {
           content: "(Invalid message number: 9)",
         }),
       );
+    });
+
+    describe("/fork", () => {
+      function makeForkContext() {
+        return {
+          ...makeContextMock(),
+          getUserMessages: vi.fn().mockReturnValue(["first", "second"]),
+          getUserMessageSummaries: vi
+            .fn()
+            .mockReturnValue([
+              { id: "u1", ordinal: 1, text: "first" },
+              { id: "u2", ordinal: 2, text: "second" },
+            ]),
+        };
+      }
+
+      function makeForkTree() {
+        const tree = SessionTree.empty();
+        tree.appendTurn("u1", [{ type: "user", text: "first", id: "u1" }]);
+        tree.appendTurn("u2", [{ type: "user", text: "second", id: "u2" }]);
+        return tree;
+      }
+
+      it("registers fork and tree commands", () => {
+        const names = commands.getNames();
+        expect(names).toContain("fork");
+        expect(names).toContain("tree");
+      });
+
+      it("/fork <n> moves the leaf to the parent and restores that path", async () => {
+        const context = makeForkContext();
+        const tree = makeForkTree();
+        const sessionManager = makeSessionManagerMock(context, tree);
+        const { ctx } = makeCtx({ context, sessionManager });
+
+        await executeCommand("fork", ["2"], ctx as CommandContext);
+
+        // Non-destructive: u2 stays in the tree, leaf points at u1.
+        expect(tree.has("u2")).toBe(true);
+        expect(tree.activeTurnId).toBe("u1");
+        expect(context.replaceBlocks).toHaveBeenCalledWith([
+          { type: "user", text: "first", id: "u1" },
+        ]);
+        expect(sessionManager.saveStore).toHaveBeenCalledWith(undefined, {
+          final: true,
+        });
+      });
+
+      it("bare /fork presents the picker (no domain handles)", async () => {
+        const context = makeForkContext();
+        const { ctx } = makeCtx({ context });
+
+        await executeCommand("fork", [], ctx as CommandContext);
+
+        expect(ctx.presentInput).toHaveBeenCalledWith({
+          type: "fork-picker",
+          messageIds: ["u1", "u2"],
+          userMessages: ["first", "second"],
+        });
+      });
+
+      it("/fork with an unknown-to-tree message reports an error", async () => {
+        const context = makeForkContext();
+        const sessionManager = makeSessionManagerMock(
+          context,
+          SessionTree.empty(),
+        );
+        const { ctx } = makeCtx({ context, sessionManager });
+
+        await executeCommand("fork", ["1"], ctx as CommandContext);
+
+        expect(sessionManager.reportStatus).toHaveBeenCalledWith(
+          expect.objectContaining({
+            role: "error",
+            content: expect.stringContaining("not in the persisted tree"),
+          }),
+        );
+      });
+
+      it("/tree renders branches with the active path marked and numbered", async () => {
+        const context = makeForkContext();
+        const tree = SessionTree.empty();
+        tree.appendTurn("u1", [{ type: "user", text: "first", id: "u1" }]);
+        tree.appendTurn("u2", [{ type: "user", text: "second", id: "u2" }]);
+        tree.setActiveTurn("u1"); // branch: u3 becomes u2's sibling
+        tree.appendTurn("u3", [
+          { type: "user", text: "  third  with\nnewlines ", id: "u3" },
+        ]);
+        const sessionManager = makeSessionManagerMock(context, tree);
+        const { ctx } = makeCtx({ context, sessionManager });
+
+        await executeCommand("tree", [], ctx as CommandContext);
+
+        const content = (
+          sessionManager.reportStatus as ReturnType<typeof vi.fn>
+        ).mock.calls[0][0].content;
+        expect(content).toContain('*1. "first"');
+        expect(content).toContain('  "second"'); // branched off: no number
+        expect(content).toContain('*2. "third with newlines"');
+      });
     });
 
     it("/compress calls ctx.contextManager.compress() and reports status", async () => {

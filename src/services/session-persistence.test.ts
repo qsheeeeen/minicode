@@ -39,31 +39,152 @@ describe("SessionPersistence", () => {
     });
   });
 
-  describe("save and load", () => {
+  describe("append / rewrite / loadTree", () => {
     const sessionName = `test-persist-${Date.now()}`;
 
-    it("saves and loads session data", async () => {
-      const blocks = [
-        { type: "user" as const, text: "hello" },
-        { type: "text" as const, text: "world" },
-      ];
+    const turnU1 = {
+      type: "turn" as const,
+      id: "u1",
+      parentId: null,
+      ts: 1,
+      blocks: [{ type: "user" as const, text: "hello", id: "u1" }],
+    };
+    const turnU2 = {
+      type: "turn" as const,
+      id: "u2",
+      parentId: "u1",
+      ts: 2,
+      blocks: [{ type: "user" as const, text: "again", id: "u2" }],
+    };
 
-      await SessionPersistence.save(sessionName, blocks, {
-        model: "test-model",
-        totalTokens: 100,
+    it("appends entries and loads them back as a v2 tree", async () => {
+      await SessionPersistence.appendEntries(sessionName, [
+        turnU1,
+        turnU2,
+        {
+          type: "leaf",
+          ts: 3,
+          activeTurnId: "u2",
+          model: "test-model",
+          totalTokens: 100,
+        },
+      ]);
+
+      const loaded = await SessionPersistence.loadTree(sessionName);
+      expect(loaded).not.toBeNull();
+      expect(loaded!.version).toBe(2);
+      if (loaded!.version !== 2) return;
+      expect(loaded!.turns.map((t) => t.id)).toEqual(["u1", "u2"]);
+      expect(loaded!.turns[1].parentId).toBe("u1");
+      expect(loaded!.activeTurnId).toBe("u2");
+      expect(loaded!.model).toBe("test-model");
+      expect(loaded!.totalTokens).toBe(100);
+    });
+
+    it("last leaf line wins and later duplicate turn lines win", async () => {
+      await SessionPersistence.appendEntries(sessionName, [
+        turnU1,
+        { type: "leaf", ts: 3, activeTurnId: "u1", model: "old", totalTokens: 1 },
+      ]);
+      // Simulate a refreshed turn + newer leaf appended later.
+      await SessionPersistence.appendEntries(sessionName, [
+        { ...turnU1, blocks: [{ type: "user", text: "hello v2", id: "u1" }] },
+        { type: "leaf", ts: 4, activeTurnId: "u1", model: "new", totalTokens: 9 },
+      ]);
+
+      const loaded = await SessionPersistence.loadTree(sessionName);
+      expect(loaded!.version).toBe(2);
+      if (loaded!.version !== 2) return;
+      expect(loaded!.turns).toHaveLength(1);
+      expect(loaded!.turns[0].blocks[0]).toEqual({
+        type: "user",
+        text: "hello v2",
+        id: "u1",
       });
+      expect(loaded!.model).toBe("new");
+      expect(loaded!.totalTokens).toBe(9);
+    });
 
-      const data = await SessionPersistence.load(sessionName);
-      expect(data).not.toBeNull();
-      expect(data!.model).toBe("test-model");
-      expect(data!.totalTokens).toBe(100);
-      expect(data!.blocks).toHaveLength(2);
-      expect(data!.blocks[0]).toEqual({ type: "user", text: "hello" });
+    it("skips malformed lines when loading", async () => {
+      await SessionPersistence.rewriteTree(sessionName, [
+        turnU1,
+        { type: "leaf", ts: 3, activeTurnId: "u1", model: "m", totalTokens: 0 },
+      ]);
+      const dir = SessionPersistence.getSessionDir();
+      await fs.appendFile(
+        path.join(dir, `${sessionName}.context.jsonl`),
+        '{"type":"turn","id":"broken\n{"type":"leaf","activeTurnId":"u1"}\n',
+        "utf-8",
+      );
+
+      const loaded = await SessionPersistence.loadTree(sessionName);
+      expect(loaded!.version).toBe(2);
+      if (loaded!.version !== 2) return;
+      expect(loaded!.turns.map((t) => t.id)).toEqual(["u1"]);
+    });
+
+    it("rewriteTree replaces the whole file under a v2 header", async () => {
+      await SessionPersistence.appendEntries(sessionName, [
+        turnU1,
+        turnU2,
+        { type: "leaf", ts: 3, activeTurnId: "u2", model: "m", totalTokens: 0 },
+      ]);
+      // Destructive rollback: only u1 survives.
+      await SessionPersistence.rewriteTree(sessionName, [
+        turnU1,
+        { type: "leaf", ts: 4, activeTurnId: "u1", model: "m", totalTokens: 0 },
+      ]);
+
+      const loaded = await SessionPersistence.loadTree(sessionName);
+      expect(loaded!.version).toBe(2);
+      if (loaded!.version !== 2) return;
+      expect(loaded!.turns.map((t) => t.id)).toEqual(["u1"]);
+      expect(loaded!.activeTurnId).toBe("u1");
+    });
+
+    it("detects v1 files and returns their raw blocks", async () => {
+      const v1Lines = [
+        JSON.stringify({ model: "v1-model", totalTokens: 7, blockCount: 2 }),
+        JSON.stringify({ type: "user", text: "old" }),
+        JSON.stringify({ type: "text", text: "reply" }),
+      ].join("\n");
+      const dir = SessionPersistence.getSessionDir();
+      await fs.writeFile(
+        path.join(dir, `${sessionName}.context.jsonl`),
+        v1Lines + "\n",
+        "utf-8",
+      );
+
+      const loaded = await SessionPersistence.loadTree(sessionName);
+      expect(loaded).toEqual({
+        version: 1,
+        blocks: [
+          { type: "user", text: "old" },
+          { type: "text", text: "reply" },
+        ],
+        model: "v1-model",
+        totalTokens: 7,
+      });
+    });
+
+    it("a null-pointer leaf line restores an empty active path (fork to origin)", async () => {
+      await SessionPersistence.rewriteTree(sessionName, [
+        turnU1,
+        { type: "leaf", ts: 5, activeTurnId: null, model: "m", totalTokens: 0 },
+      ]);
+
+      const loaded = await SessionPersistence.loadTree(sessionName);
+      expect(loaded!.version).toBe(2);
+      if (loaded!.version !== 2) return;
+      expect(loaded!.turns).toHaveLength(1); // turn kept on the branch
+      expect(loaded!.activeTurnId).toBeNull(); // but not active — the ?? trap
     });
 
     it("returns null when session not found", async () => {
-      const data = await SessionPersistence.load("nonexistent-session-xyz");
-      expect(data).toBeNull();
+      const loaded = await SessionPersistence.loadTree(
+        "nonexistent-session-xyz",
+      );
+      expect(loaded).toBeNull();
     });
   });
 
@@ -79,16 +200,10 @@ describe("SessionPersistence", () => {
       const name2 = `test-list-b-${Date.now()}`;
 
       try {
-        await SessionPersistence.save(name1, [], {
-          model: "test",
-          totalTokens: 0,
-        });
+        await SessionPersistence.rewriteTree(name1, []);
         // Small delay to ensure different mtime
         await new Promise((r) => setTimeout(r, 50));
-        await SessionPersistence.save(name2, [], {
-          model: "test",
-          totalTokens: 0,
-        });
+        await SessionPersistence.rewriteTree(name2, []);
 
         const sessions = await SessionPersistence.list();
         const names = sessions.map((s) => s.name);
@@ -117,16 +232,13 @@ describe("SessionPersistence", () => {
       const newName = `test-rename-new-${Date.now()}`;
 
       try {
-        await SessionPersistence.save(oldName, [], {
-          model: "test",
-          totalTokens: 0,
-        });
+        await SessionPersistence.rewriteTree(oldName, []);
         await SessionPersistence.rename(oldName, newName);
 
-        const data = await SessionPersistence.load(newName);
+        const data = await SessionPersistence.loadTree(newName);
         expect(data).not.toBeNull();
 
-        const oldData = await SessionPersistence.load(oldName);
+        const oldData = await SessionPersistence.loadTree(oldName);
         expect(oldData).toBeNull();
       } finally {
         const dir = SessionPersistence.getSessionDir();
@@ -145,15 +257,12 @@ describe("SessionPersistence", () => {
       const name = `test-delete-${Date.now()}`;
 
       try {
-        await SessionPersistence.save(name, [], {
-          model: "test",
-          totalTokens: 0,
-        });
-        const data = await SessionPersistence.load(name);
+        await SessionPersistence.rewriteTree(name, []);
+        const data = await SessionPersistence.loadTree(name);
         expect(data).not.toBeNull();
 
         await SessionPersistence.delete(name);
-        const afterDelete = await SessionPersistence.load(name);
+        const afterDelete = await SessionPersistence.loadTree(name);
         expect(afterDelete).toBeNull();
       } finally {
         const dir = SessionPersistence.getSessionDir();

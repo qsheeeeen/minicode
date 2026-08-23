@@ -17,7 +17,7 @@ describe("RollbackExecutor", () => {
   function makeMockJournal(entries: any[]) {
     return {
       getEntries: vi.fn().mockResolvedValue(entries),
-      pruneFromUserMessage: vi.fn().mockResolvedValue(undefined),
+      pruneByMessageIds: vi.fn().mockResolvedValue(undefined),
     } as any;
   }
 
@@ -28,26 +28,32 @@ describe("RollbackExecutor", () => {
   }
 
   describe("rollbackConversation", () => {
-    it("truncates conversation and prunes journal", async () => {
+    it("truncates conversation and prunes journal by message ids", async () => {
       const journal = makeMockJournal([]);
       const context = makeContext([
-        { type: "user", text: "first" },
+        { type: "user", text: "first", id: "u1" },
         { type: "text", text: "reply" },
-        { type: "user", text: "second" },
+        { type: "user", text: "second", id: "u2" },
         { type: "text", text: "reply2" },
       ]);
 
       const { RollbackExecutor } = await import("./rollback-executor.js");
       const executor = new RollbackExecutor();
-      const outcome = await executor.rollbackConversation(journal, context, 2);
+      const outcome = await executor.rollbackConversation(
+        journal,
+        context,
+        "u2",
+      );
       expect(outcome.ok).toBe(true);
       const result = (outcome as { result: any }).result;
 
       expect(context.getBlocks()).toEqual([
-        { type: "user", text: "first" },
+        { type: "user", text: "first", id: "u1" },
         { type: "text", text: "reply" },
       ]);
-      expect(journal.pruneFromUserMessage).toHaveBeenCalledWith(2);
+      expect(journal.pruneByMessageIds).toHaveBeenCalledWith(
+        new Set(["u2"]),
+      );
       expect(result.filesRestored).toEqual([]);
       expect(result.filesDeleted).toEqual([]);
     });
@@ -57,7 +63,7 @@ describe("RollbackExecutor", () => {
     it("reverts edits, deletes created writes, then prunes", async () => {
       const entries = [
         {
-          userMessageOrdinal: 2,
+          userMessageId: "u2",
           path: "a.ts",
           op: "edit",
           beforeExists: true,
@@ -65,7 +71,7 @@ describe("RollbackExecutor", () => {
           ts: 100,
         },
         {
-          userMessageOrdinal: 3,
+          userMessageId: "u3",
           path: "b.ts",
           op: "write",
           beforeExists: false,
@@ -75,9 +81,9 @@ describe("RollbackExecutor", () => {
       ];
       const journal = makeMockJournal(entries);
       const context = makeContext([
-        { type: "user", text: "first" },
-        { type: "user", text: "second" },
-        { type: "user", text: "third" },
+        { type: "user", text: "first", id: "u1" },
+        { type: "user", text: "second", id: "u2" },
+        { type: "user", text: "third", id: "u3" },
       ]);
       const fs = (await import("fs/promises")).default;
       (fs.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(
@@ -89,7 +95,7 @@ describe("RollbackExecutor", () => {
       const outcome = await executor.rollbackFilesAndConversation(
         journal,
         context,
-        2,
+        "u2",
       );
       expect(outcome.ok).toBe(true);
       const result = (outcome as { result: any }).result;
@@ -98,14 +104,18 @@ describe("RollbackExecutor", () => {
       expect(result.filesDeleted).toContain("b.ts");
       expect(fs.writeFile).toHaveBeenCalledWith("a.ts", "old content", "utf-8");
       expect(fs.unlink).toHaveBeenCalledWith("b.ts");
-      expect(context.getBlocks()).toEqual([{ type: "user", text: "first" }]);
-      expect(journal.pruneFromUserMessage).toHaveBeenCalledWith(2);
+      expect(context.getBlocks()).toEqual([
+        { type: "user", text: "first", id: "u1" },
+      ]);
+      expect(journal.pruneByMessageIds).toHaveBeenCalledWith(
+        new Set(["u2", "u3"]),
+      );
     });
 
     it("returns empty results when no affected entries", async () => {
       const journal = makeMockJournal([
         {
-          userMessageOrdinal: 1,
+          userMessageId: "u1",
           path: "a.ts",
           op: "edit",
           beforeExists: true,
@@ -113,14 +123,14 @@ describe("RollbackExecutor", () => {
           ts: 100,
         },
       ]);
-      const context = makeContext([{ type: "user", text: "first" }]);
+      const context = makeContext([{ type: "user", text: "first", id: "u1" }]);
 
       const { RollbackExecutor } = await import("./rollback-executor.js");
       const executor = new RollbackExecutor();
       const outcome = await executor.rollbackFilesAndConversation(
         journal,
         context,
-        5,
+        "u-missing",
       );
       expect(outcome.ok).toBe(true);
       const result = (outcome as { result: any }).result;
@@ -132,7 +142,7 @@ describe("RollbackExecutor", () => {
     it("replays multiple entries for the same file in reverse order", async () => {
       const entries = [
         {
-          userMessageOrdinal: 2,
+          userMessageId: "u2",
           path: "a.ts",
           op: "edit",
           beforeExists: true,
@@ -140,7 +150,7 @@ describe("RollbackExecutor", () => {
           ts: 100,
         },
         {
-          userMessageOrdinal: 3,
+          userMessageId: "u3",
           path: "a.ts",
           op: "edit",
           beforeExists: true,
@@ -150,8 +160,9 @@ describe("RollbackExecutor", () => {
       ];
       const journal = makeMockJournal(entries);
       const context = makeContext([
-        { type: "user", text: "first" },
-        { type: "user", text: "second" },
+        { type: "user", text: "first", id: "u1" },
+        { type: "user", text: "second", id: "u2" },
+        { type: "user", text: "third", id: "u3" },
       ]);
       const fs = (await import("fs/promises")).default;
       let fileContent = "C";
@@ -166,7 +177,7 @@ describe("RollbackExecutor", () => {
 
       const { RollbackExecutor } = await import("./rollback-executor.js");
       const executor = new RollbackExecutor();
-      await executor.rollbackFilesAndConversation(journal, context, 2);
+      await executor.rollbackFilesAndConversation(journal, context, "u2");
 
       expect(fileContent).toBe("A");
       expect(fs.writeFile).toHaveBeenNthCalledWith(1, "a.ts", "B", "utf-8");
@@ -176,7 +187,7 @@ describe("RollbackExecutor", () => {
     it("returns a failure value on rollback conflicts", async () => {
       const journal = makeMockJournal([
         {
-          userMessageOrdinal: 2,
+          userMessageId: "u2",
           path: "a.ts",
           op: "edit",
           beforeExists: true,
@@ -184,7 +195,10 @@ describe("RollbackExecutor", () => {
           ts: 100,
         },
       ]);
-      const context = makeContext([{ type: "user", text: "first" }]);
+      const context = makeContext([
+        { type: "user", text: "first", id: "u1" },
+        { type: "user", text: "second", id: "u2" },
+      ]);
       const fs = (await import("fs/promises")).default;
       (fs.readFile as ReturnType<typeof vi.fn>).mockResolvedValue("unexpected");
 
@@ -194,7 +208,7 @@ describe("RollbackExecutor", () => {
       const outcome = await executor.rollbackFilesAndConversation(
         journal,
         context,
-        2,
+        "u2",
       );
       expect(outcome.ok).toBe(false);
       if (!outcome.ok) {
@@ -204,7 +218,7 @@ describe("RollbackExecutor", () => {
           filesDeleted: [],
         });
       }
-      expect(journal.pruneFromUserMessage).not.toHaveBeenCalled();
+      expect(journal.pruneByMessageIds).not.toHaveBeenCalled();
     });
   });
 });

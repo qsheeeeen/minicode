@@ -21,6 +21,8 @@ export interface TuiState {
   permissionMode: PermissionMode;
   pendingPrompt: (Prompt & { resolve: (value: string) => void }) | null;
   showReceipt: boolean;
+  /** Messages queued for injection while the agent is running. */
+  steeringQueue: string[];
 }
 
 export const initialState: TuiState = {
@@ -39,6 +41,7 @@ export const initialState: TuiState = {
   permissionMode: "manual",
   pendingPrompt: null,
   showReceipt: false,
+  steeringQueue: [],
 };
 
 export const useTuiState = create<TuiState>(() => ({

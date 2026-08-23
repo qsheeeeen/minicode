@@ -15,7 +15,7 @@ vi.mock("../../services/session-persistence.js", () => ({
   SessionPersistence: {
     getSessionDir: vi.fn().mockReturnValue("/tmp/minicode-create-context-test"),
     rename: vi.fn().mockResolvedValue(undefined),
-    load: vi.fn().mockResolvedValue(null),
+    loadTree: vi.fn().mockResolvedValue(null),
   },
 }));
 
@@ -27,6 +27,7 @@ function makeOpts(overrides: Record<string, any> = {}) {
     getChangeJournal: () => journal,
     getSessionName: vi.fn().mockReturnValue("old-session"),
     setSession: vi.fn(),
+    restoreFrom: vi.fn(),
     reportStatus: vi.fn(),
   };
   const model = new Model("m", "p", 200000);
@@ -79,22 +80,26 @@ describe("createCommandContext", () => {
     expect(ctx.sessionManager).toBe(opts.deps.sessionManager);
   });
 
-  it("resumeSession restores blocks, tokens, and activates the session", async () => {
+  it("resumeSession restores the session and activates it", async () => {
     const { SessionPersistence } =
       await import("../../services/session-persistence.js");
-    (SessionPersistence.load as ReturnType<typeof vi.fn>).mockResolvedValue({
-      blocks: [{ type: "user", text: "x" }],
+    const loaded = {
+      version: 2 as const,
+      turns: [],
+      activeTurnId: null,
+      model: "m",
       totalTokens: 42,
-    });
-    const { opts, context, sessionManager } = makeOpts();
+    };
+    (SessionPersistence.loadTree as ReturnType<typeof vi.fn>).mockResolvedValue(
+      loaded,
+    );
+    const { opts, sessionManager } = makeOpts();
     const ctx = createCommandContext(opts);
 
     const result = await ctx.resumeSession("s-1");
 
     expect(result).toEqual({ loaded: true });
-    expect(context.replaceBlocks).toHaveBeenCalledWith([
-      { type: "user", text: "x" },
-    ]);
+    expect(sessionManager.restoreFrom).toHaveBeenCalledWith(loaded);
     expect(opts.contextManager.setTokenCount).toHaveBeenCalledWith(42);
     expect(sessionManager.setSession).toHaveBeenCalledWith("s-1");
   });
@@ -102,16 +107,16 @@ describe("createCommandContext", () => {
   it("resumeSession surfaces a missing session as {loaded:false}", async () => {
     const { SessionPersistence } =
       await import("../../services/session-persistence.js");
-    (SessionPersistence.load as ReturnType<typeof vi.fn>).mockResolvedValue(
+    (SessionPersistence.loadTree as ReturnType<typeof vi.fn>).mockResolvedValue(
       null,
     );
-    const { opts, context } = makeOpts();
+    const { opts, sessionManager } = makeOpts();
     const ctx = createCommandContext(opts);
 
     const result = await ctx.resumeSession("missing");
 
     expect(result).toEqual({ loaded: false });
-    expect(context.replaceBlocks).not.toHaveBeenCalled();
+    expect(sessionManager.restoreFrom).not.toHaveBeenCalled();
   });
 
   it("switchSession wires session, logger, stats, and status", async () => {

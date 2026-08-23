@@ -341,6 +341,35 @@ describe("OpenAIResponsesClient", () => {
       const collected = await collectStream(stream);
       expect(collected.result.stop_reason).toBe("max_tokens");
     });
+
+    it("reports max_tokens when truncated with tool calls (args may be partial)", async () => {
+      responsesCreateMock.mockReturnValue(
+        mockStream([
+          {
+            type: "response.completed",
+            response: {
+              output: [
+                {
+                  type: "function_call",
+                  id: "call_1",
+                  name: "Read",
+                  arguments: '{"path":"/tmp/test', // truncated mid-JSON
+                  call_id: "call_1",
+                },
+              ],
+              status: "incomplete",
+              usage: { input_tokens: 10, output_tokens: 100 },
+            },
+          },
+        ]),
+      );
+
+      const client = new OpenAIResponsesClient("test-key");
+      const stream = client.chatStream([], []);
+      const collected = await collectStream(stream);
+
+      expect(collected.result.stop_reason).toBe("max_tokens");
+    });
   });
 
   describe("message conversion", () => {

@@ -15,7 +15,7 @@ vi.mock("fs/promises", () => ({
 function makeContext() {
   const journal = { recordChange: vi.fn().mockResolvedValue(undefined) };
   const context = {
-    activeUserMessageOrdinal: 2,
+    activeMessageId: "msg-2",
     capabilities: createCapabilities([[ChangeJournalCapability, journal]]),
   } as any;
   return { context, journal };
@@ -50,7 +50,7 @@ describe("writeTool", () => {
         "utf-8",
       );
       expect(journal.recordChange).toHaveBeenCalledWith(
-        2,
+        "msg-2",
         "test.txt",
         "write",
         false,
@@ -73,7 +73,7 @@ describe("writeTool", () => {
 
       expect(fs.mkdir).toHaveBeenCalledWith("dir", { recursive: true });
       expect(journal.recordChange).toHaveBeenCalledWith(
-        2,
+        "msg-2",
         "dir/test.txt",
         "write",
         true,

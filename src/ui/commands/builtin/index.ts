@@ -10,6 +10,8 @@ import { testCommand } from "./test.js";
 import { skillsCommand } from "./skills.js";
 import { modelCommand } from "./model.js";
 import { undoCommand } from "./undo.js";
+import { forkCommand } from "./fork.js";
+import { treeCommand } from "./tree.js";
 import type { CommandRegistry } from "../registry.js";
 
 /**
@@ -29,4 +31,6 @@ export function registerBuiltinCommands(registry: CommandRegistry): void {
   registry.register(skillsCommand);
   registry.register(modelCommand);
   registry.register(undoCommand);
+  registry.register(forkCommand);
+  registry.register(treeCommand);
 }

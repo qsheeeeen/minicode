@@ -52,11 +52,20 @@ export const undoCommand: CommandHandler = {
         return;
       }
 
+      // The UI speaks ordinals; the executor speaks stable message ids.
+      const target = ctx.context
+        .getUserMessageSummaries()
+        .find((s) => s.ordinal === ordinal);
+      if (!target) {
+        report(ctx, "error", `(Invalid message number: ${args[0]})`);
+        return;
+      }
+
       const executor = new RollbackExecutor();
       const outcome = await executor.rollback(
         ctx.changeJournal,
         ctx.context,
-        ordinal,
+        target.id,
         scope,
       );
 
@@ -84,6 +93,9 @@ export const undoCommand: CommandHandler = {
         summary.push(`deleted ${outcome.result.filesDeleted.length} file(s)`);
       }
       summary.push("conversation rolled back");
+      // Undo is destructive — persist the tree rollback now, not on the next
+      // run (an exit in between would resurrect the rolled-back turns).
+      await ctx.sessionManager.saveStore(undefined, { final: true });
       report(ctx, "status", `(Rollback: ${summary.join(", ")})`);
       return;
     }
@@ -92,12 +104,16 @@ export const undoCommand: CommandHandler = {
       await ctx.changeJournal.getEntriesByUserMessage();
     const entriesByUserMessage = Array.from(
       entriesByUserMessageMap.entries(),
-    ).map(([userMessageOrdinal, entries]) => ({ userMessageOrdinal, entries }));
+    ).map(([userMessageId, entries]) => ({ userMessageId, entries }));
+    const messageIds = ctx.context
+      .getUserMessageSummaries()
+      .map((s) => s.id);
 
     ctx.presentInput({
       type: "rollback-picker",
       totalUserMessages: userMessages.length,
       entriesByUserMessage,
+      messageIds,
       userMessages,
     });
   },

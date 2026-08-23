@@ -16,6 +16,7 @@ import type { SessionManager } from "./services/session-manager.js";
 import type { ContextManager } from "./services/context-manager.js";
 import type { PermissionService } from "./services/permission.js";
 import type { RuntimeEvents } from "./services/runtime-events.js";
+import type { SteeringQueue } from "./services/steering-queue.js";
 import type { SessionStats } from "./services/session-stats.js";
 import type pino from "pino";
 
@@ -33,6 +34,8 @@ export interface AgentDeps {
   contextManager: ContextManager;
   toolExecutor: ToolExecutor;
   promptManager: PromptManager;
+  /** Mid-run message queue (main agent only; sub-agents never get one). */
+  steering?: SteeringQueue;
 }
 
 /**
@@ -54,6 +57,8 @@ export interface AgentRuntimeOpts {
   sessionStats?: SessionStats;
   /** Shared event bus; omitted → the runtime creates its own (sub-agents). */
   events?: RuntimeEvents;
+  /** Steering queue for mid-run user input; main agent only. */
+  steering?: SteeringQueue;
   compressionThresholdRatio?: number;
   /**
    * Capability assembly, evaluated after the runtime's own SessionManager
@@ -76,11 +81,23 @@ export interface AgentRuntime {
 }
 
 /** The main agent's registry id; sub-agents allocate their own. */
-export const MAIN_AGENT_ID = "1";
+export { MAIN_AGENT_ID } from "./tools/registry.js";
 
 export interface RunAgentOpts {
   prompter?: UserPrompter;
 }
+
+/**
+ * A truncated (max_tokens) response may carry half-received tool arguments —
+ * executing them would act on incomplete input. The whole batch is failed
+ * back to the model instead (pi semantics) so it can re-issue with complete
+ * arguments. Cap consecutive truncation rounds so a model stuck re-truncating
+ * cannot burn tokens forever.
+ */
+const MAX_TRUNCATED_ROUNDS = 3;
+const TRUNCATED_TOOL_RESULT =
+  "Error: Output reached the token limit; this tool call may be truncated. " +
+  "Please re-send the complete call.";
 
 /**
  * A promise that rejects as AbortError the moment the signal fires — even if
@@ -96,12 +113,18 @@ function abortRace(signal: AbortSignal): Promise<never> {
   });
 }
 
-async function saveStore(deps: AgentDeps): Promise<void> {
+async function saveStore(
+  deps: AgentDeps,
+  opts?: { final?: boolean },
+): Promise<void> {
   await deps.sessionManager
-    .saveStore({
-      model: deps.model.getName(),
-      totalTokens: deps.contextManager.getTokenCount(),
-    })
+    .saveStore(
+      {
+        model: deps.model.getName(),
+        totalTokens: deps.contextManager.getTokenCount(),
+      },
+      opts,
+    )
     .catch((e: unknown) => {
       deps.logger?.error({ error: String(e) }, "Failed to save session");
     });
@@ -176,11 +199,11 @@ export async function runAgent(
   opts?: RunAgentOpts,
 ): Promise<void> {
   const context = deps.sessionManager.getContext();
-  context.startUserMessage(userMessage);
-  // Ordinal identity for this run's user message — abort cleanup truncates
-  // from here, no content matching.
-  const userOrdinal = context.getUserMessageCount();
-  deps.sessionManager.setActiveUserMessageOrdinal(userOrdinal);
+  const messageId = context.startUserMessage(userMessage);
+  deps.sessionManager.setActiveMessageId(messageId);
+  // Pick up messages queued during a previous run's denied-break — they were
+  // typed while that run was going and belong to this one.
+  injectSteered(deps);
 
   deps.logger?.info(
     { session: deps.sessionManager.getSessionName(), userMessage },
@@ -190,6 +213,7 @@ export async function runAgent(
   try {
     // Tool set is fixed for the run — build once outside the loop.
     const toolDefs: LLMToolDef[] = [...deps.toolExecutor.getTools().values()];
+    let truncatedRounds = 0;
 
     while (true) {
       signal.throwIfAborted();
@@ -211,6 +235,26 @@ export async function runAgent(
 
       signal.throwIfAborted();
 
+      if (result.stop_reason === "max_tokens" && toolCalls.length > 0) {
+        truncatedRounds++;
+        // The truncated assistant message stays as-is; every tool_use gets
+        // an error result so the model can re-issue the batch. Steered
+        // messages are not drained here — the model is mid-reissue.
+        for (const { block } of toolCalls) {
+          context.completeToolCall(block.id, TRUNCATED_TOOL_RESULT);
+        }
+        await saveStore(deps);
+        if (truncatedRounds > MAX_TRUNCATED_ROUNDS) {
+          deps.sessionManager.reportStatus({
+            role: "error",
+            content: "(Stopped: repeated max_tokens truncation)",
+          });
+          break;
+        }
+        continue;
+      }
+      truncatedRounds = 0;
+
       const outcome = await deps.toolExecutor.execute(toolCalls, {
         signal,
         config: {
@@ -219,21 +263,28 @@ export async function runAgent(
           userPrompt: deps.promptManager.getUserPrompt(),
         },
         prompter: opts?.prompter,
-        activeUserMessageOrdinal:
-          deps.sessionManager.getActiveUserMessageOrdinal(),
+        activeMessageId: deps.sessionManager.getActiveMessageId(),
       });
       if (outcome === "denied") {
+        await saveStore(deps);
         break;
       }
 
-      if (toolCalls.length === 0) break;
+      // Steered messages inject between iterations; a queued message also
+      // keeps the loop alive when the model had nothing left to do.
+      const injected = injectSteered(deps);
+      if (toolCalls.length === 0 && !injected) break;
       await saveStore(deps);
     }
   } finally {
     if (signal.aborted) {
       // Drop the user message that triggered this aborted run (and
-      // everything after it) — by ordinal, not by content matching.
-      context.truncateBeforeUserMessageOrdinal(userOrdinal);
+      // everything after it) — by stable id, not by content matching. This
+      // covers steered messages injected during the run too.
+      context.truncateBeforeUserMessageId(messageId);
+      // Anything still queued was never injected — drop it rather than
+      // surprising the next run.
+      deps.steering?.clear();
     }
     deps.logger?.info(
       {
@@ -242,6 +293,18 @@ export async function runAgent(
       },
       "Session ended",
     );
-    await saveStore(deps);
+    // End of the run: the tail turn is complete — persist it too.
+    await saveStore(deps, { final: true });
   }
+}
+
+/** Drain the steering queue into the context as ordinary user messages.
+ *  Returns true when anything was injected. */
+function injectSteered(deps: AgentDeps): boolean {
+  const queued = deps.steering?.drain() ?? [];
+  for (const text of queued) {
+    const id = deps.sessionManager.getContext().startUserMessage(text);
+    deps.sessionManager.setActiveMessageId(id);
+  }
+  return queued.length > 0;
 }

@@ -10,6 +10,7 @@ import {
   SessionListInput,
   ModelSelectInput,
   UndoInput,
+  ForkInput,
   type InputComponentProps,
 } from "./inputs.js";
 import {
@@ -42,6 +43,7 @@ export const inputModes: Record<string, InputModeDef> = {
     handler: modelSelectHandler,
   },
   undo: { Component: UndoInput },
+  fork: { Component: ForkInput },
 };
 
 export function getInputComponent(
@@ -85,6 +87,14 @@ export function inputRequestToState(request: InputRequest): {
         props: {
           totalUserMessages: request.totalUserMessages,
           entriesByUserMessage: request.entriesByUserMessage,
+          userMessages: request.userMessages,
+        },
+      };
+    case "fork-picker":
+      return {
+        mode: "fork",
+        props: {
+          messageIds: request.messageIds,
           userMessages: request.userMessages,
         },
       };

@@ -52,7 +52,7 @@ describe("createApp", () => {
     vi.spyOn(SessionPersistence, "getSessionDir").mockReturnValue(
       "/tmp/minicode-app-test",
     );
-    vi.spyOn(SessionPersistence, "load").mockResolvedValue(null);
+    vi.spyOn(SessionPersistence, "loadTree").mockResolvedValue(null);
   });
 
   it("creates the application app object graph", async () => {
@@ -188,8 +188,10 @@ describe("createApp", () => {
   });
 
   it("restores the initial session at composition time", async () => {
-    vi.spyOn(SessionPersistence, "load").mockResolvedValue({
+    vi.spyOn(SessionPersistence, "loadTree").mockResolvedValue({
+      version: 1,
       blocks: [{ type: "user", text: "old" }],
+      model: "m",
       totalTokens: 10,
     });
 
@@ -202,9 +204,9 @@ describe("createApp", () => {
       stdinIsTTY: false,
     });
 
-    expect(SessionPersistence.load).toHaveBeenCalledWith("test-session");
+    expect(SessionPersistence.loadTree).toHaveBeenCalledWith("test-session");
     expect(runtime.sessionManager.getContext().getBlocks()).toEqual([
-      { type: "user", text: "old" },
+      expect.objectContaining({ type: "user", text: "old" }),
     ]);
     expect(runtime.contextManager.getTokenCount()).toBe(10);
     expect(runtime.runtimeState.logger).toBeDefined();

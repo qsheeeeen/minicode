@@ -8,9 +8,10 @@ import {
   SessionListInput,
   ModelSelectInput,
   UndoInput,
+  ForkInput,
 } from "../../inputs.js";
 
-const demos = ["chat", "effort", "session", "model", "undo"] as const;
+const demos = ["chat", "effort", "session", "model", "undo", "fork"] as const;
 
 function Demo() {
   const [idx, setIdx] = useState(0);
@@ -71,12 +72,13 @@ function Demo() {
         <UndoInput
           totalUserMessages={3}
           userMessages={["Fix login bug", "Add validation", "Write tests"]}
+          messageIds={["msg-1", "msg-2", "msg-3"]}
           entriesByUserMessage={[
             {
-              userMessageOrdinal: 1,
+              userMessageId: "msg-1",
               entries: [
                 {
-                  userMessageOrdinal: 1,
+                  userMessageId: "msg-1",
                   path: "src/auth.ts",
                   op: "edit",
                   beforeExists: true,
@@ -86,6 +88,14 @@ function Demo() {
               ],
             },
           ]}
+          onExecute={(v) => console.log(v)}
+          onCancel={() => {}}
+        />
+      )}
+      {current === "fork" && (
+        <ForkInput
+          userMessages={["Fix login bug", "Add validation", "Write tests"]}
+          messageIds={["msg-1", "msg-2", "msg-3"]}
           onExecute={(v) => console.log(v)}
           onCancel={() => {}}
         />

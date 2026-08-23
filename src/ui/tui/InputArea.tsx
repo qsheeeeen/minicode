@@ -13,6 +13,8 @@ import type { SessionManager } from "../../services/session-manager.js";
 interface InputAreaProps {
   model: Model;
   handleSubmit: (value: string) => Promise<boolean>;
+  /** Queue plain text for injection into the running agent (steering). */
+  onSteer: (text: string) => void;
   loadingRef: React.MutableRefObject<boolean>;
   config: AppConfig;
   modelSwitchService: ModelSwitchService;
@@ -24,6 +26,7 @@ interface InputAreaProps {
 export function InputArea({
   model,
   handleSubmit,
+  onSteer,
   loadingRef,
   config,
   modelSwitchService,
@@ -34,6 +37,7 @@ export function InputArea({
   const input = useTuiState((s) => s.input);
   const pendingPrompt = useTuiState((s) => s.pendingPrompt);
   const isLoading = useTuiState((s) => s.isLoading);
+  const steeringQueue = useTuiState((s) => s.steeringQueue);
 
   // Command autocomplete logic
   const commandList = useMemo(
@@ -108,7 +112,31 @@ export function InputArea({
         setSelectedSuggestion(0);
       } else {
         // Default chat mode
-        if (loadingRef.current) return;
+        if (loadingRef.current) {
+          // While the agent runs: plain text queues for injection; commands
+          // and shell lines wait (they need an idle agent to be safe).
+          const text = value.trim();
+          if (!text || text.startsWith("/") || text.startsWith("!")) {
+            sessionManager.reportStatus({
+              role: "status",
+              content:
+                "(Agent is running — commands wait until it finishes; plain text is queued)",
+            });
+            return;
+          }
+          useTuiState.setState((state) => ({
+            input: {
+              ...state.input,
+              mode: "chat",
+              props: {},
+              value: "",
+              key: state.input.key + 1,
+            },
+          }));
+          setSelectedSuggestion(0);
+          onSteer(text);
+          return;
+        }
         useTuiState.setState((state) => ({
           input: {
             ...state.input,
@@ -122,7 +150,16 @@ export function InputArea({
         await handleSubmit(value);
       }
     },
-    [input.mode, model, config, modelSwitchService, handleSubmit, loadingRef],
+    [
+      input.mode,
+      model,
+      config,
+      modelSwitchService,
+      handleSubmit,
+      loadingRef,
+      sessionManager,
+      onSteer,
+    ],
   );
 
   const handleCancel = useCallback(() => {
@@ -167,6 +204,16 @@ export function InputArea({
         </Box>
         <InputComponent {...inputProps} />
       </Box>
+
+      {steeringQueue.length > 0 && (
+        <Box flexDirection="column" paddingX={2}>
+          {steeringQueue.map((text, i) => (
+            <Text key={i} dimColor wrap="truncate">
+              {`⇢ queued: ${text}`}
+            </Text>
+          ))}
+        </Box>
+      )}
 
       {matchingCommands.length > 0 && !isLoading && (
         <Box flexDirection="column" paddingX={2}>
