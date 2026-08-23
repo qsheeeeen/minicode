@@ -57,4 +57,25 @@ describe("ShellService", () => {
 
     expect(service.formatResult(result)).toBe("$HOME");
   });
+
+  it("cancels a shell command and its child process", async () => {
+    const service = new ShellService({ cwd: process.cwd() });
+    const ctrl = new AbortController();
+    const running = service.run("sleep 10", { signal: ctrl.signal });
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    ctrl.abort();
+
+    await expect(
+      Promise.race([
+        running,
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error("shell command did not abort")),
+            500,
+          ),
+        ),
+      ]),
+    ).resolves.toMatchObject({ aborted: true });
+  });
 });

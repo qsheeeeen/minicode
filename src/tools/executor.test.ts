@@ -443,6 +443,26 @@ describe("ToolExecutor", () => {
       });
     });
 
+    it("aborts even when a tool ignores its signal and never settles", async () => {
+      const tool = makeTool({
+        execute: vi.fn(() => new Promise(() => {})),
+      });
+      const { executor, context } = makeExecutor({
+        tools: new Map([["testTool", tool]]),
+      });
+      const call = makeToolCall(tool);
+      prepareToolCalls(context, [call]);
+      const ctrl = new AbortController();
+      const execution = executor.execute([call], {
+        ...makeDynamic(),
+        signal: ctrl.signal,
+      });
+
+      ctrl.abort();
+
+      await expect(execution).rejects.toMatchObject({ name: "AbortError" });
+    });
+
     it("treats non-fatal failure as soft: writes reason back and continues the batch", async () => {
       const tool1 = makeTool({ name: "tool1" });
       (tool1.execute as ReturnType<typeof vi.fn>).mockResolvedValue({

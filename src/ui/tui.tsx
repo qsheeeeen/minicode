@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useEffect } from "react";
-import { Box, useInput, useApp } from "ink";
+import { Box, useApp } from "ink";
 import type { AgentDeps } from "../agent.js";
 import type { AppConfig } from "../config.js";
 import type { UserPrompter } from "../core/prompt.js";
@@ -33,6 +33,7 @@ import { InputArea } from "./tui/InputArea.js";
 import { SubAgentBar } from "./tui/SubAgentBar.js";
 import { Panel } from "./tui/Panel.js";
 import { Help } from "./tui/Help.js";
+import { GlobalControls } from "./tui/GlobalControls.js";
 
 export interface AppProps {
   deps: AgentDeps;
@@ -89,8 +90,6 @@ function AppContent({
   uiTimeline: SessionTimeline;
 }) {
   const { exit } = useApp();
-  const input = useTuiState((s) => s.input);
-  const pendingPrompt = useTuiState((s) => s.pendingPrompt);
   const isLoading = useTuiState((s) => s.isLoading);
   const showReceipt = useTuiState((s) => s.showReceipt);
   const abortRef = useRef<AbortController | null>(null);
@@ -211,53 +210,25 @@ function AppContent({
     }
   }, [connected, autoSubmitPending, initialPrompt, handleSubmit]);
 
-  const isModal = pendingPrompt !== null;
-
-  useInput(
-    (keyInput, key) => {
-      if (key.ctrl && keyInput === "c") {
-        if (isLoading) {
-          abortRef.current?.abort();
-          if (pendingPrompt) {
-            pendingPrompt.resolve("");
-            useTuiState.setState({ pendingPrompt: null });
-          }
-        } else {
-          useTuiState.setState({ showReceipt: true });
-        }
-        return;
-      }
-      if (key.shift && key.tab) {
-        permissionService.cycleMode();
-        return;
-      }
-      if (key.escape && isLoading) {
-        abortRef.current?.abort();
-        if (pendingPrompt) {
-          pendingPrompt.resolve("");
-          useTuiState.setState({ pendingPrompt: null });
-        }
-        return;
-      }
-    },
-    { isActive: input.mode === "chat" && !isModal },
-  );
-
-  useInput(
-    (keyInput, key) => {
-      if ((key.escape || (key.ctrl && keyInput === "c")) && pendingPrompt) {
-        // Cancelling a prompt mid-run means aborting the whole run, not just
-        // denying this one request.
-        abortRef.current?.abort();
-        pendingPrompt.resolve("");
-        useTuiState.setState({ pendingPrompt: null });
-      }
-    },
-    { isActive: isModal },
-  );
+  const abortCurrentTurn = useCallback(() => {
+    abortRef.current?.abort();
+    const pendingPrompt = useTuiState.getState().pendingPrompt;
+    if (pendingPrompt) {
+      // A prompt is part of its parent turn; resolve it so no modal remains
+      // waiting while the turn unwinds from the abort signal.
+      pendingPrompt.resolve("");
+      useTuiState.setState({ pendingPrompt: null });
+    }
+  }, []);
 
   return (
     <Box flexDirection="column" height="100%">
+      <GlobalControls
+        isRunning={isLoading}
+        onAbort={abortCurrentTurn}
+        onExit={() => useTuiState.setState({ showReceipt: true })}
+        onCyclePermission={() => permissionService.cycleMode()}
+      />
       <Header version={version} projectPath={process.cwd()} />
       <MessageList />
       <Status />

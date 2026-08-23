@@ -32,6 +32,20 @@ function stripAnsiCodes(text: string): string {
   return text.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");
 }
 
+/** Kill the whole process group when available, so `shell: true` commands
+ * cannot leave their foreground child running after the shell exits. */
+function stopProcess(proc: ReturnType<typeof spawn>): void {
+  if (proc.pid && process.platform !== "win32") {
+    try {
+      process.kill(-proc.pid, "SIGTERM");
+      return;
+    } catch {
+      // The process may already have exited; fall through to ChildProcess.
+    }
+  }
+  proc.kill("SIGTERM");
+}
+
 /** Accumulates chunks without re-copying the whole output per chunk; once
  *  the byte cap is reached further chunks are dropped. */
 class OutputCollector {
@@ -96,6 +110,7 @@ export class ShellService {
       const proc = spawn(command, args, {
         shell: opts.shell,
         cwd: opts.cwd,
+        detached: process.platform !== "win32",
       });
       const stdout = new OutputCollector(this.maxOutputBytes);
       const stderr = new OutputCollector(this.maxOutputBytes);
@@ -103,10 +118,10 @@ export class ShellService {
 
       const timeout = setTimeout(() => {
         timedOut = true;
-        proc.kill();
+        stopProcess(proc);
       }, opts.timeoutMs ?? this.defaultTimeoutMs);
 
-      const abort = () => proc.kill();
+      const abort = () => stopProcess(proc);
       if (opts.signal?.aborted) abort();
       opts.signal?.addEventListener("abort", abort, { once: true });
 

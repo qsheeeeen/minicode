@@ -10,7 +10,11 @@ import type { UserPrompter } from "../core/prompt.js";
 import type { LLMImage, LLMToolUseBlock } from "../core/blocks.js";
 import type { LLMContext } from "../core/context.js";
 import type { AppConfig } from "../config.js";
-import { isAbortError, isTurnFaultError } from "../core/results.js";
+import {
+  isAbortError,
+  isTurnFaultError,
+  raceWithAbort,
+} from "../core/results.js";
 import type pino from "pino";
 
 export interface ToolCall {
@@ -110,12 +114,14 @@ export class ToolExecutor {
     toolCalls: ToolCall[],
     dynamic: ToolExecutionDynamic,
   ): Promise<"denied" | null> {
+    const { signal } = dynamic;
+    signal.throwIfAborted();
     if (toolCalls.length === 0) return null;
 
     const context: ToolExecutionContext = {
       appConfig: this.appConfig,
       currentAgentId: this.currentAgentId ?? MAIN_AGENT_ID,
-      signal: dynamic.signal,
+      signal,
       config: dynamic.config,
       prompter: dynamic.prompter,
       activeMessageId: dynamic.activeMessageId,
@@ -134,6 +140,7 @@ export class ToolExecutor {
     // Phase 1 — prepare: hooks serialized, first block short-circuits.
     const prepared: Prepared[] = new Array(toolCalls.length);
     for (let i = 0; i < toolCalls.length; i++) {
+      signal.throwIfAborted();
       const { block, tool } = toolCalls[i];
       if (!tool) {
         prepared[i] = {
@@ -150,12 +157,16 @@ export class ToolExecutor {
       let blocked: { block: true; reason: string } | undefined;
       for (const hook of this.beforeHooks) {
         try {
-          const verdict = await hook({ block, tool, args }, context);
+          const verdict = await raceWithAbort(
+            hook({ block, tool, args }, context),
+            signal,
+          );
           if (verdict?.block) {
             blocked = verdict;
             break;
           }
         } catch (reason) {
+          if (isAbortError(reason) || isTurnFaultError(reason)) throw reason;
           blocked = {
             block: true,
             reason: `beforeToolCall hook failed: ${reason instanceof Error ? reason.message : String(reason)}`,
@@ -178,6 +189,7 @@ export class ToolExecutor {
     }> = new Array(toolCalls.length);
     let batchDenied = false;
     const runOne = async (i: number): Promise<void> => {
+      signal.throwIfAborted();
       const { block, tool } = toolCalls[i];
       const prep = prepared[i];
       if (prep.kind === "immediate") {
@@ -187,9 +199,9 @@ export class ToolExecutor {
 
       let result: ToolRunResult;
       try {
-        result = await tool!.execute(
-          block.input as Record<string, unknown>,
-          context,
+        result = await raceWithAbort(
+          tool!.execute(block.input as Record<string, unknown>, context),
+          signal,
         );
       } catch (reason) {
         // Turn failures (abort, fatal) must reach the turn boundary —
@@ -208,17 +220,21 @@ export class ToolExecutor {
 
       for (const hook of this.afterHooks) {
         try {
-          const next = await hook(
-            {
-              block,
-              tool: tool!,
-              args: block.input as Record<string, unknown>,
-            },
-            result,
-            context,
+          const next = await raceWithAbort(
+            hook(
+              {
+                block,
+                tool: tool!,
+                args: block.input as Record<string, unknown>,
+              },
+              result,
+              context,
+            ),
+            signal,
           );
           if (next) result = next;
         } catch (reason) {
+          if (isAbortError(reason) || isTurnFaultError(reason)) throw reason;
           this.logger?.warn(
             { toolName: tool!.name, error: String(reason) },
             "afterToolCall hook failed",

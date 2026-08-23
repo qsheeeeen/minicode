@@ -1,4 +1,4 @@
-import { TurnFaultError, abortError } from "./core/results.js";
+import { TurnFaultError, raceWithAbort } from "./core/results.js";
 import type { AppConfig } from "./config.js";
 import type { Model } from "./llm/model.js";
 import type {
@@ -99,20 +99,6 @@ const TRUNCATED_TOOL_RESULT =
   "Error: Output reached the token limit; this tool call may be truncated. " +
   "Please re-send the complete call.";
 
-/**
- * A promise that rejects as AbortError the moment the signal fires — even if
- * the awaited promise never settles (a stalled provider must not make the run
- * un-abortable). One promise serves the whole stream; each chunk races it.
- */
-function abortRace(signal: AbortSignal): Promise<never> {
-  if (signal.aborted) return Promise.reject(abortError());
-  return new Promise((_, reject) => {
-    signal.addEventListener("abort", () => reject(abortError()), {
-      once: true,
-    });
-  });
-}
-
 async function saveStore(
   deps: AgentDeps,
   opts?: { final?: boolean },
@@ -148,16 +134,13 @@ async function streamLLM(
   });
 
   const toolCalls: ToolCall[] = [];
-  const onAbort = abortRace(signal);
-
   let result: LLMStreamOk | undefined;
   try {
     while (true) {
       signal.throwIfAborted();
 
       const next = stream.next();
-      next.catch(() => {}); // lose the race → no unhandled rejection
-      const raced = (await Promise.race([next, onAbort])) as IteratorResult<
+      const raced = (await raceWithAbort(next, signal)) as IteratorResult<
         LLMAssistantBlock,
         LLMStreamResult
       >;

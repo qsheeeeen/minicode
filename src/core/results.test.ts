@@ -4,6 +4,7 @@ import {
   describeFault,
   isAbortError,
   isTurnFaultError,
+  raceWithAbort,
 } from "./results.js";
 
 describe("TurnFaultError", () => {
@@ -53,5 +54,22 @@ describe("isAbortError", () => {
   it("rejects other errors and non-errors", () => {
     expect(isAbortError(new Error("no"))).toBe(false);
     expect(isAbortError(null)).toBe(false);
+  });
+});
+
+describe("raceWithAbort", () => {
+  it("rejects promptly when an operation never settles", async () => {
+    const ctrl = new AbortController();
+    const result = raceWithAbort(new Promise<never>(() => {}), ctrl.signal);
+
+    ctrl.abort();
+
+    await expect(result).rejects.toMatchObject({ name: "AbortError" });
+  });
+
+  it("returns the operation result when it finishes first", async () => {
+    await expect(
+      raceWithAbort(Promise.resolve("done"), new AbortController().signal),
+    ).resolves.toBe("done");
   });
 });
