@@ -34,8 +34,6 @@ export class SessionManager {
   private _meta = { model: "unknown", totalTokens: 0 };
   private events: RuntimeEvents;
   private tree = SessionTree.empty();
-  /** Set when the on-disk file is not v2: the next save rewrites it whole. */
-  private needsRewrite = false;
 
   constructor(
     sessionName?: string,
@@ -69,22 +67,13 @@ export class SessionManager {
     this.changeJournal = new ChangeJournal();
     this.activeMessageId = undefined;
     this.tree = SessionTree.empty();
-    this.needsRewrite = false;
   }
 
-  /** Load a persisted session into memory. v2 restores the tree as saved
-   *  (active path becomes the context); v1 histories are normalized to
-   *  stable ids and marked for a full v2 rewrite on first save. */
+  /** Load a persisted session into memory: the tree as saved, with its
+   *  active path as the context. */
   restoreFrom(loaded: LoadedSession): void {
-    if (loaded.version === 2) {
-      this.tree = SessionTree.fromTurns(loaded.turns, loaded.activeTurnId);
-      this.context.replaceBlocks(this.tree.activePathBlocks());
-      this.needsRewrite = false;
-    } else {
-      this.context.replaceBlocks(loaded.blocks); // assigns stable user ids
-      this.tree = SessionTree.fromBlocks(this.context.getBlocksReadonly());
-      this.needsRewrite = true;
-    }
+    this.tree = SessionTree.fromTurns(loaded.turns, loaded.activeTurnId);
+    this.context.replaceBlocks(this.tree.activePathBlocks());
   }
 
   /** The conversation tree (read-only use: /tree, /fork pickers). */
@@ -145,14 +134,6 @@ export class SessionManager {
       for (const segment of newSegments) {
         this.tree.appendTurn(segment.messageId, segment.blocks);
       }
-      if (this.needsRewrite) {
-        this.needsRewrite = false;
-        await SessionPersistence.rewriteTree(
-          this._currentSession,
-          this.fileEntries(),
-        );
-        return;
-      }
       await SessionPersistence.appendEntries(this._currentSession, [
         ...newSegments.map((s): SessionEntry => this.tree.get(s.messageId)!),
         this.leafEntry(),
@@ -167,7 +148,6 @@ export class SessionManager {
       // ④ — divergence (compression): history rebuilt from context.
       this.rebuild(segments, final);
     }
-    this.needsRewrite = false;
     await SessionPersistence.rewriteTree(
       this._currentSession,
       this.fileEntries(),

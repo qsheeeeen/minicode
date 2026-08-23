@@ -82,7 +82,7 @@ describe("SessionManager", () => {
 
     it("clears messages", () => {
       const sm = new SessionManager();
-      sm.getContext().replaceBlocks([{ type: "user", text: "hello" }]);
+      sm.getContext().replaceBlocks([{ type: "user", text: "hello", id: "u1" }]);
       sm.clearSession();
       expect(sm.getContext().getBlocks()).toEqual([]);
     });
@@ -180,37 +180,6 @@ describe("SessionManager", () => {
       expect(rewriteSpy).toHaveBeenCalledTimes(1);
       const entries = rewriteSpy.mock.calls[0][1];
       expect(turnIds(entries)).toEqual(["s1"]);
-    });
-
-    it("restoreFrom(v1) migrates: first save rewrites whole file as v2", async () => {
-      const sm = new SessionManager("s");
-      sm.restoreFrom({
-        version: 1,
-        blocks: [
-          { type: "user", text: "old" }, // no id yet — replaceBlocks assigns
-          { type: "text", text: "r" },
-        ],
-        model: "v1-model",
-        totalTokens: 5,
-      });
-
-      await sm.saveStore({ model: "m", totalTokens: 1 }, { final: true });
-
-      expect(rewriteSpy).toHaveBeenCalledTimes(1);
-      const entries = rewriteSpy.mock.calls[0][1];
-      const turns = entries.filter((e) => e.type === "turn");
-      expect(turns).toHaveLength(1);
-      const summary = sm.getContext().getBlocks()[0] as { id?: string };
-      expect((turns[0] as { id: string }).id).toBe(summary.id);
-
-      // Second save is a normal append — migration is done.
-      sm.getContext().replaceBlocks([
-        ...sm.getContext().getBlocks(),
-        { type: "user", text: "new", id: "n1" },
-      ]);
-      await sm.saveStore({ model: "m", totalTokens: 1 }, { final: true });
-      expect(rewriteSpy).toHaveBeenCalledTimes(1);
-      expect(turnIds(appendSpy.mock.calls[0][1])).toEqual(["n1"]);
     });
 
     it("restoreFrom(v2) rebuilds context from the active path", () => {

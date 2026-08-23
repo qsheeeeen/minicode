@@ -191,7 +191,7 @@ describe("ContextManager", () => {
 
     it("compresses internally when usage exceeds threshold", async () => {
       const compressedBlocks = [
-        { type: "user" as const, text: "summary" },
+        { type: "user" as const, id: "summary-1", text: "summary" },
         { type: "text" as const, text: "kept" },
       ];
       const compressionStrategy = {
@@ -226,7 +226,7 @@ describe("ContextManager", () => {
         new Set(originalIds.slice(0, 2)),
       );
       expect(context.getBlocks()).toEqual([
-        expect.objectContaining({ type: "user", text: "summary" }),
+        expect.objectContaining({ type: "user", id: "summary-1", text: "summary" }),
         { type: "text", text: "kept" },
       ]);
       expect(result).toMatchObject({
@@ -235,9 +235,7 @@ describe("ContextManager", () => {
         compressed: true,
       });
       // Active id follows the new last user message (the summary).
-      expect(getActiveMessageId()).toBe(
-        (context.getBlocksReadonly()[0] as { id?: string }).id,
-      );
+      expect(getActiveMessageId()).toBe("summary-1");
     });
   });
 

@@ -87,12 +87,7 @@ export class ChangeJournal {
       for (const line of content.split("\n")) {
         if (!line.trim()) continue;
         try {
-          const parsed = JSON.parse(line) as ChangeEntry;
-          // Legacy journals (pre-stable-id) keyed by ordinal — those ids
-          // cannot map to the new scheme, so the undo history starts fresh.
-          if (typeof parsed.userMessageId === "string" && parsed.userMessageId) {
-            entries.push(parsed);
-          }
+          entries.push(JSON.parse(line) as ChangeEntry);
         } catch {
           // Skip malformed lines
         }

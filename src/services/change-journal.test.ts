@@ -79,7 +79,7 @@ describe("ChangeJournal", () => {
     expect(fs.appendFile).not.toHaveBeenCalled();
   });
 
-  it("getEntries loads existing JSONL entries and drops legacy ones", async () => {
+  it("getEntries loads existing JSONL entries", async () => {
     const fs = (await import("fs/promises")).default;
     const lines = [
       JSON.stringify({
@@ -97,15 +97,6 @@ describe("ChangeJournal", () => {
         beforeExists: false,
         ranges: [{ start: 0, oldText: "", newText: "created" }],
         ts: 200,
-      }),
-      // Pre-stable-id journal (keyed by ordinal) — cannot map, dropped.
-      JSON.stringify({
-        userMessageOrdinal: 3,
-        path: "legacy.ts",
-        op: "edit",
-        beforeExists: true,
-        ranges: [],
-        ts: 300,
       }),
     ];
     (fs.readFile as ReturnType<typeof vi.fn>).mockResolvedValue(

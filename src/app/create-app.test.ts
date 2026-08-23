@@ -189,8 +189,16 @@ describe("createApp", () => {
 
   it("restores the initial session at composition time", async () => {
     vi.spyOn(SessionPersistence, "loadTree").mockResolvedValue({
-      version: 1,
-      blocks: [{ type: "user", text: "old" }],
+      turns: [
+        {
+          type: "turn",
+          id: "old-1",
+          parentId: null,
+          ts: 1,
+          blocks: [{ type: "user", text: "old", id: "old-1" }],
+        },
+      ],
+      activeTurnId: "old-1",
       model: "m",
       totalTokens: 10,
     });

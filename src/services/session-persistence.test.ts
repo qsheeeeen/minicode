@@ -72,8 +72,6 @@ describe("SessionPersistence", () => {
 
       const loaded = await SessionPersistence.loadTree(sessionName);
       expect(loaded).not.toBeNull();
-      expect(loaded!.version).toBe(2);
-      if (loaded!.version !== 2) return;
       expect(loaded!.turns.map((t) => t.id)).toEqual(["u1", "u2"]);
       expect(loaded!.turns[1].parentId).toBe("u1");
       expect(loaded!.activeTurnId).toBe("u2");
@@ -93,8 +91,6 @@ describe("SessionPersistence", () => {
       ]);
 
       const loaded = await SessionPersistence.loadTree(sessionName);
-      expect(loaded!.version).toBe(2);
-      if (loaded!.version !== 2) return;
       expect(loaded!.turns).toHaveLength(1);
       expect(loaded!.turns[0].blocks[0]).toEqual({
         type: "user",
@@ -118,8 +114,6 @@ describe("SessionPersistence", () => {
       );
 
       const loaded = await SessionPersistence.loadTree(sessionName);
-      expect(loaded!.version).toBe(2);
-      if (loaded!.version !== 2) return;
       expect(loaded!.turns.map((t) => t.id)).toEqual(["u1"]);
     });
 
@@ -136,35 +130,8 @@ describe("SessionPersistence", () => {
       ]);
 
       const loaded = await SessionPersistence.loadTree(sessionName);
-      expect(loaded!.version).toBe(2);
-      if (loaded!.version !== 2) return;
       expect(loaded!.turns.map((t) => t.id)).toEqual(["u1"]);
       expect(loaded!.activeTurnId).toBe("u1");
-    });
-
-    it("detects v1 files and returns their raw blocks", async () => {
-      const v1Lines = [
-        JSON.stringify({ model: "v1-model", totalTokens: 7, blockCount: 2 }),
-        JSON.stringify({ type: "user", text: "old" }),
-        JSON.stringify({ type: "text", text: "reply" }),
-      ].join("\n");
-      const dir = SessionPersistence.getSessionDir();
-      await fs.writeFile(
-        path.join(dir, `${sessionName}.context.jsonl`),
-        v1Lines + "\n",
-        "utf-8",
-      );
-
-      const loaded = await SessionPersistence.loadTree(sessionName);
-      expect(loaded).toEqual({
-        version: 1,
-        blocks: [
-          { type: "user", text: "old" },
-          { type: "text", text: "reply" },
-        ],
-        model: "v1-model",
-        totalTokens: 7,
-      });
     });
 
     it("a null-pointer leaf line restores an empty active path (fork to origin)", async () => {
@@ -174,10 +141,19 @@ describe("SessionPersistence", () => {
       ]);
 
       const loaded = await SessionPersistence.loadTree(sessionName);
-      expect(loaded!.version).toBe(2);
-      if (loaded!.version !== 2) return;
       expect(loaded!.turns).toHaveLength(1); // turn kept on the branch
       expect(loaded!.activeTurnId).toBeNull(); // but not active — the ?? trap
+    });
+
+    it("returns null for files that are not v2 (foreign format)", async () => {
+      const dir = SessionPersistence.getSessionDir();
+      await fs.writeFile(
+        path.join(dir, `${sessionName}.context.jsonl`),
+        JSON.stringify({ model: "old-format", totalTokens: 1, blockCount: 0 }) +
+          "\n",
+        "utf-8",
+      );
+      expect(await SessionPersistence.loadTree(sessionName)).toBeNull();
     });
 
     it("returns null when session not found", async () => {

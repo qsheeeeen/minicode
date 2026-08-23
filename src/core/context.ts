@@ -109,15 +109,15 @@ export class LLMContext {
         if (typeof block.text !== "string") {
           throw new Error("Invalid user block: text must be a string");
         }
-        if (block.id !== undefined) {
-          if (typeof block.id !== "string" || block.id.length === 0) {
-            throw new Error("Invalid user block: id must be a non-empty string");
-          }
-          if (userIds.has(block.id)) {
-            throw new Error(`Duplicate user message id: ${block.id}`);
-          }
-          userIds.add(block.id);
+        // Ids are load-bearing (journal, session tree) — required in the
+        // context, optional on one-off request payloads.
+        if (typeof block.id !== "string" || block.id.length === 0) {
+          throw new Error("Invalid user block: id must be a non-empty string");
         }
+        if (userIds.has(block.id)) {
+          throw new Error(`Duplicate user message id: ${block.id}`);
+        }
+        userIds.add(block.id);
         continue;
       }
 
@@ -195,13 +195,6 @@ export class LLMContext {
   }
 
   replaceBlocks(blocks: LLMBlock[]): void {
-    // Legacy data (v1 sessions) may lack user ids — assign them on the way
-    // in so the id invariant holds for everything in memory.
-    for (const block of blocks) {
-      if (block.type === "user" && block.id === undefined) {
-        block.id = randomUUID();
-      }
-    }
     LLMContext.validateBlocks(blocks);
     this.blocks = blocks.map(cloneBlock);
     this.recount();

@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { TurnFaultError, isTurnFaultError } from "../core/results.js";
 import type { LLMClient, LLMStreamOk } from "../llm/client.js";
 import type { LLMContext } from "../core/context.js";
@@ -84,6 +85,7 @@ ${conversationText}`;
         blocks: [
           {
             type: "user",
+            id: randomUUID(),
             text: `[Previous conversation summary]\n${summaryText}`,
           },
           ...suffix,

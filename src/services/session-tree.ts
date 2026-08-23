@@ -75,17 +75,6 @@ export class SessionTree {
     return tree;
   }
 
-  /** Flatten a linear block history into a single-chain tree. Entry ids come
-   *  from user-block ids (v1 migration runs after replaceBlocks normalized
-   *  them). */
-  static fromBlocks(blocks: readonly LLMBlock[]): SessionTree {
-    const tree = new SessionTree();
-    for (const segment of splitSegments(blocks)) {
-      tree.appendTurn(segment.messageId, segment.blocks);
-    }
-    return tree;
-  }
-
   get activeTurnId(): string | null {
     return this._activeTurnId;
   }

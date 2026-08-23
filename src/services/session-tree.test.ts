@@ -29,15 +29,6 @@ describe("splitSegments", () => {
 });
 
 describe("SessionTree", () => {
-  it("fromBlocks builds a single chain keyed by user-block ids", () => {
-    const tree = SessionTree.fromBlocks(
-      blocks("u1", "r1", "u2", "r2"),
-    );
-    expect(tree.activePath().map((t) => t.id)).toEqual(["u1", "u2"]);
-    expect(tree.get("u2")!.parentId).toBe("u1");
-    expect(tree.activePathBlocks()).toEqual(blocks("u1", "r1", "u2", "r2"));
-  });
-
   it("fromTurns honors the persisted active turn and nulls unknown ones", () => {
     const turns = [
       { type: "turn" as const, id: "u1", parentId: null, ts: 1, blocks: [] },

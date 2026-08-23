@@ -7,6 +7,7 @@ import { Model } from "../llm/model.js";
 function userBlocks(count: number, prefix = "message"): LLMBlock[] {
   return Array.from({ length: count }, (_, i) => ({
     type: "user" as const,
+    id: `${prefix}-${i}`,
     text: `${prefix} ${i}`,
   }));
 }
@@ -60,10 +61,12 @@ describe("SummaryCompressionStrategy", () => {
       );
 
       expect(result.blocks.length).toBeLessThan(blocks.length);
-      expect(result.blocks[0]).toEqual({
-        type: "user",
-        text: expect.stringContaining("Summary"),
-      });
+      expect(result.blocks[0]).toEqual(
+        expect.objectContaining({
+          type: "user",
+          text: expect.stringContaining("Summary"),
+        }),
+      );
       expect(result.keptUserMessages).toBe(11);
     });
 

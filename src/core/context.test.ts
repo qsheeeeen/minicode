@@ -69,15 +69,11 @@ describe("LLMContext", () => {
     ]);
   });
 
-  it("assigns fresh ids to legacy blocks on replaceBlocks", () => {
+  it("rejects user blocks without an id", () => {
     const context = new LLMContext();
-    context.replaceBlocks([{ type: "user", text: "legacy" }]);
-    const first = context.getBlocksReadonly()[0] as { id?: string };
-    expect(typeof first.id).toBe("string");
-
-    context.replaceBlocks([{ type: "user", text: "legacy" }]);
-    const second = context.getBlocksReadonly()[0] as { id?: string };
-    expect(second.id).not.toBe(first.id);
+    expect(() =>
+      context.replaceBlocks([{ type: "user", text: "legacy" }]),
+    ).toThrow("id must be a non-empty string");
   });
 
   it("rejects duplicate user message ids", () => {
@@ -185,6 +181,7 @@ describe("LLMContext", () => {
         {
           type: "user",
           text: "task",
+          id: "u1",
         },
         {
           type: "tool_use",
@@ -203,7 +200,7 @@ describe("LLMContext", () => {
 
     expect(() =>
       context.replaceBlocks([
-        { type: "user", text: "task" },
+        { type: "user", text: "task", id: "u1" },
         {
           type: "tool_result",
           tool_use_id: "t1",
