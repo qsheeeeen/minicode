@@ -7,8 +7,7 @@ export type RouteResult =
   | { action: "none" }
   | { action: "shell"; command: string }
   | { action: "command"; promptText: string; displayContent?: string }
-  | { action: "llm"; promptText: string }
-  | { action: "unknown-command"; command: string };
+  | { action: "llm"; promptText: string };
 
 export interface InputHandler {
   matches(input: string): boolean;
@@ -84,9 +83,10 @@ class CommandInputHandler implements InputHandler {
         displayContent: result.displayContent,
       };
     }
-    return result.kind === "handled"
-      ? { action: "none" }
-      : { action: "unknown-command", command: parts[0] };
+    if (result.kind === "handled") return { action: "none" };
+    // Unresolved "/"-input falls through to the LLM verbatim — a leading
+    // slash is not proof of a command attempt (paths, regexes, plain text).
+    return { action: "llm", promptText: input };
   }
 }
 

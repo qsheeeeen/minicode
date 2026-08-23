@@ -10,6 +10,9 @@ export interface ShellServiceOpts {
 export interface ShellRunOptions {
   readonly timeoutMs?: number;
   readonly signal?: AbortSignal;
+  /** Written to the child's stdin (then closed) — pipes content through
+   *  filter commands (pbcopy, xclip, …) without shell-escaping argv. */
+  readonly stdinData?: string;
 }
 
 export interface ShellProcessOptions extends ShellRunOptions {
@@ -124,6 +127,10 @@ export class ShellService {
 
       proc.stdout?.on("data", (d) => stdout.push(d));
       proc.stderr?.on("data", (d) => stderr.push(d));
+      if (opts.stdinData !== undefined) {
+        proc.stdin?.on("error", () => {}); // EPIPE when the reader exits early
+        proc.stdin?.end(opts.stdinData);
+      }
       proc.on("close", (code) => {
         clearTimeout(timeout);
         opts.signal?.removeEventListener("abort", abort);

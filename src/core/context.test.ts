@@ -3,6 +3,34 @@ import { LLMContext } from "./context.js";
 import type { LLMBlock } from "./context.js";
 
 describe("LLMContext", () => {
+  it("extracts the trailing text of the last assistant reply", () => {
+    const context = new LLMContext();
+    const blocks: LLMBlock[] = [
+      { type: "user", text: "one", id: "u1" },
+      { type: "thinking", thinking: "hmm" },
+      { type: "text", text: "first reply" },
+      { type: "user", text: "two", id: "u2" },
+      { type: "text", text: "part one" },
+      { type: "tool_use", id: "t1", name: "read", input: {} },
+      { type: "tool_result", tool_use_id: "t1", content: "ok" },
+      { type: "text", text: "part two" },
+    ];
+    context.replaceBlocks(blocks);
+
+    expect(context.getLastAssistantText()).toBe("part one\npart two");
+  });
+
+  it("returns empty text when the last reply has no text blocks", () => {
+    const context = new LLMContext();
+    const blocks: LLMBlock[] = [
+      { type: "user", text: "one", id: "u1" },
+      { type: "thinking", thinking: "only thoughts" },
+    ];
+    context.replaceBlocks(blocks);
+
+    expect(context.getLastAssistantText()).toBe("");
+  });
+
   it("notifies subscribers on mutations and returns unsubscribe", () => {
     const context = new LLMContext();
     const listener = vi.fn();

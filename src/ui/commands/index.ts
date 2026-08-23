@@ -7,6 +7,7 @@ import type { AppConfig, Providers, Tier } from "../../config.js";
 import type { SkillRegistry } from "../../skills/index.js";
 import type { ModelSwitchService } from "../../services/model-switcher.js";
 import type { ContextManager } from "../../services/context-manager.js";
+import type { ClipboardService } from "../../services/clipboard.js";
 import type { ChangeEntry } from "../../services/change-journal.js";
 import type { InputRouter } from "../routing.js";
 import { registerBuiltinCommands } from "./builtin/index.js";
@@ -57,6 +58,7 @@ export interface CommandContext {
   skills: SkillRegistry;
   router: InputRouter;
   sessionManager: SessionManager;
+  clipboard: ClipboardService;
   changeJournal: ChangeJournal;
   sessionStats: SessionStats;
   modelSwitchService: ModelSwitchService;

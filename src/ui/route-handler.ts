@@ -46,15 +46,6 @@ export async function processRoute(
       return { type: "done", shellOutput: { command: route.command, output } };
     }
 
-    case "unknown-command":
-      // A slash command that resolved to nothing — say so instead of
-      // silently swallowing the input.
-      reportStatus({
-        role: "error",
-        content: `Unknown command: /${route.command}`,
-      });
-      return { type: "done" };
-
     case "command":
       return {
         type: "run",

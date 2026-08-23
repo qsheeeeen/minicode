@@ -21,6 +21,7 @@ export async function runTuiApp(app: AppRuntime): Promise<void> {
     context: app.sessionManager.getContext(),
     permissionService: app.permissionService,
     shellService: app.shellService,
+    clipboard: app.clipboard,
     commandRegistry: app.commandRegistry,
     skillRegistry: app.skillRegistry,
     router: app.router,

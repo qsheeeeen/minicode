@@ -13,6 +13,7 @@ import {
 } from "../services/index.js";
 import { ModelSwitchService } from "../services/model-switcher.js";
 import { PermissionService } from "../services/permission.js";
+import { ClipboardService } from "../services/clipboard.js";
 import { restoreSession } from "../services/session-lifecycle.js";
 import { newSessionName } from "../services/session-manager.js";
 import { RuntimeState } from "../services/runtime-state.js";
@@ -235,6 +236,8 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
     });
   }
 
+  const clipboard = new ClipboardService({ shell: shellService });
+
   const commandContext = createCommandContext({
     deps,
     config,
@@ -245,6 +248,7 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
     modelSwitchService,
     contextManager,
     runtimeState,
+    clipboard,
     bridges: {
       isAgentRunning: () => false,
       presentInput: () => {},
@@ -270,6 +274,7 @@ export async function createApp(opts: CreateAppOpts): Promise<AppRuntime> {
     permissionService,
     modelSwitchService,
     shellService,
+    clipboard,
     commandContext,
     commandRegistry,
     skillRegistry,

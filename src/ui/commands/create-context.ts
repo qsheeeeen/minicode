@@ -1,6 +1,7 @@
 import type { AgentDeps } from "../../agent.js";
 import type { AppConfig } from "../../config.js";
 import type { ContextManager } from "../../services/context-manager.js";
+import type { ClipboardService } from "../../services/clipboard.js";
 import type { ModelSwitchService } from "../../services/model-switcher.js";
 import type { RuntimeState } from "../../services/runtime-state.js";
 import type { SessionStats } from "../../services/session-stats.js";
@@ -34,6 +35,7 @@ export interface CreateCommandContextOpts {
   modelSwitchService: ModelSwitchService;
   contextManager: ContextManager;
   runtimeState: RuntimeState;
+  clipboard: ClipboardService;
   bridges: CommandContextBridges;
 }
 
@@ -51,6 +53,7 @@ export function createCommandContext(
     modelSwitchService,
     contextManager,
     runtimeState,
+    clipboard,
     bridges,
   } = opts;
   const { sessionManager } = deps;
@@ -64,6 +67,7 @@ export function createCommandContext(
     skills,
     router,
     sessionManager,
+    clipboard,
     get changeJournal() {
       return sessionManager.getChangeJournal();
     },

@@ -66,6 +66,19 @@ describe("InputRouter.route", () => {
     expect(result).toEqual({ action: "llm", promptText: "hello world" });
   });
 
+  it("falls through an unresolved '/'-input to llm verbatim", async () => {
+    const { executeCommand } = await import("./commands/index.js");
+    (executeCommand as ReturnType<typeof vi.fn>).mockResolvedValue({
+      kind: "unknown",
+    });
+
+    const result = await router.route("/not-a-command /etc/hosts", cmdContext);
+    expect(result).toEqual({
+      action: "llm",
+      promptText: "/not-a-command /etc/hosts",
+    });
+  });
+
   it("trims whitespace from input", async () => {
     const result = await router.route("  hello  ", cmdContext);
     expect(result).toEqual({ action: "llm", promptText: "hello" });

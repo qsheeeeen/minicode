@@ -12,6 +12,7 @@ import type { SessionStats } from "../services/session-stats.js";
 import type { SessionManager } from "../services/session-manager.js";
 import type { PermissionService } from "../services/permission.js";
 import type { ShellService } from "../services/shell-service.js";
+import type { ClipboardService } from "../services/clipboard.js";
 import type { ModelSwitchService } from "../services/model-switcher.js";
 import type { ContextManager } from "../services/context-manager.js";
 import type { RuntimeState } from "../services/runtime-state.js";
@@ -51,6 +52,7 @@ export interface AppProps {
   context: LLMContext;
   permissionService: PermissionService;
   shellService: ShellService;
+  clipboard: ClipboardService;
   commandRegistry: CommandRegistry;
   skillRegistry: SkillRegistry;
   router: InputRouter;
@@ -75,6 +77,7 @@ function AppContent({
   context,
   permissionService,
   shellService,
+  clipboard,
   commandRegistry,
   skillRegistry,
   router,
@@ -123,6 +126,7 @@ function AppContent({
         modelSwitchService,
         contextManager,
         runtimeState,
+        clipboard,
         bridges: {
           isAgentRunning: () => loadingRef.current,
           presentInput: (request) => {
@@ -149,6 +153,7 @@ function AppContent({
       modelSwitchService,
       contextManager,
       runtimeState,
+      clipboard,
       router,
     ],
   );

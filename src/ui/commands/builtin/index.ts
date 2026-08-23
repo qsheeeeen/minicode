@@ -1,6 +1,7 @@
 import { exitCommand } from "./exit.js";
 import { clearCommand } from "./clear.js";
 import { compressCommand } from "./compress.js";
+import { copyCommand } from "./copy.js";
 import { effortCommand } from "./effort.js";
 import { newCommand } from "./new.js";
 import { renameCommand } from "./rename.js";
@@ -22,6 +23,7 @@ export function registerBuiltinCommands(registry: CommandRegistry): void {
   registry.register(exitCommand);
   registry.register(clearCommand);
   registry.register(compressCommand);
+  registry.register(copyCommand);
   registry.register(effortCommand);
   registry.register(newCommand);
   registry.register(renameCommand);

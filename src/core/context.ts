@@ -217,6 +217,20 @@ export class LLMContext {
       .map((block) => block.text);
   }
 
+  /** Text of the last assistant reply: the trailing `text` blocks before the
+   *  most recent user message. Intervening thinking/tool blocks are skipped
+   *  (they are not reply prose); the search stops at the user message that
+   *  opened the turn. Empty string when the last reply has no text. */
+  getLastAssistantText(): string {
+    const collected: string[] = [];
+    for (let i = this.blocks.length - 1; i >= 0; i--) {
+      const block = this.blocks[i];
+      if (block.type === "user") break;
+      if (block.type === "text") collected.unshift(block.text);
+    }
+    return collected.join("\n");
+  }
+
   /** Ordered user-message identities for pickers and journal bookkeeping. */
   getUserMessageSummaries(): Array<{ id: string; ordinal: number; text: string }> {
     const summaries: Array<{ id: string; ordinal: number; text: string }> = [];
