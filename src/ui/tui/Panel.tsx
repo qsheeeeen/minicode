@@ -1,6 +1,5 @@
 import React from "react";
 import { Box, Text } from "ink";
-import { ProgressBar } from "@inkjs/ui";
 import { useTuiState } from "./state.js";
 import type { Model } from "../../llm/model.js";
 
@@ -9,8 +8,15 @@ interface PanelProps {
   promptFiles?: string[];
 }
 
+function formatTokenCount(tokens: number): string {
+  if (tokens < 1000) return tokens.toString();
+  const thousands = tokens / 1000;
+  return `${Number(thousands.toFixed(thousands < 10 ? 1 : 0))}k`;
+}
+
 export function Panel({ model, promptFiles = [] }: PanelProps) {
   const tokenCount = useTuiState((s) => s.tokenCount);
+  const cacheHitRatio = useTuiState((s) => s.cacheHitRatio);
   const permissionMode = useTuiState((s) => s.permissionMode);
   const currentSession = useTuiState((s) => s.currentSession);
 
@@ -54,14 +60,24 @@ export function Panel({ model, promptFiles = [] }: PanelProps) {
 
       <Box paddingX={1} gap={1} overflow="hidden">
         <Text wrap="truncate" dimColor>
-          {tokenCount.toLocaleString()}/{contextLength.toLocaleString()}
+          {formatTokenCount(tokenCount)}/{formatTokenCount(contextLength)}
         </Text>
-        <Box flexBasis={20}>
-          <ProgressBar value={percentage} />
-        </Box>
         <Text wrap="truncate" dimColor>
           {Math.floor(percentage)}% │{" "}
         </Text>
+        {cacheHitRatio !== null && (
+          <>
+            <Text wrap="truncate" dimColor>
+              cache{" "}
+            </Text>
+            <Text wrap="truncate" color="green">
+              {Math.round(cacheHitRatio * 100)}%
+            </Text>
+            <Text wrap="truncate" dimColor>
+              {" │ "}
+            </Text>
+          </>
+        )}
         <Text wrap="truncate" color={modeColor}>
           {permissionMode}
         </Text>

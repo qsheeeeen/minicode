@@ -16,6 +16,8 @@ export interface TuiState {
   agentSessions: AgentSession[];
   activeAgentId: string;
   tokenCount: number;
+  /** Live session cache hit ratio; null when no cache data. */
+  cacheHitRatio: number | null;
   currentSession: string;
   isLoading: boolean;
   permissionMode: PermissionMode;
@@ -36,6 +38,7 @@ export const initialState: TuiState = {
   agentSessions: [],
   activeAgentId: "1",
   tokenCount: 0,
+  cacheHitRatio: null,
   currentSession: "",
   isLoading: false,
   permissionMode: "manual",

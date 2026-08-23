@@ -90,6 +90,32 @@ describe("OpenAIChatClient", () => {
       });
     });
 
+    it("maps DeepSeek cache hit tokens when standard usage details are absent", async () => {
+      chatCreateMock.mockReturnValue(
+        mockStream([
+          {
+            choices: [{ delta: { content: "hi" }, finish_reason: null }],
+          },
+          {
+            choices: [{ delta: {}, finish_reason: "stop" }],
+            usage: {
+              prompt_tokens: 2134,
+              completion_tokens: 5,
+              prompt_cache_hit_tokens: 2048,
+            },
+          },
+        ]),
+      );
+
+      const client = new OpenAIChatClient("test-key");
+      const collected = await collectStream(client.chatStream([], []));
+
+      expect(collected.result.usage).toEqual({
+        input: { total: 2134, cache_miss: 86, cache_hit: 2048 },
+        output: 5,
+      });
+    });
+
     it("yields thinking deltas from reasoning_content", async () => {
       chatCreateMock.mockReturnValue(
         mockStream([

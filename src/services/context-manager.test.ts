@@ -21,6 +21,7 @@ function createContextManager(overrides?: {
   contextLength?: number;
   compressionStrategy?: any;
   modelName?: string;
+  includeSessionStats?: boolean;
 }) {
   const context = new LLMContext();
   const journal = changeJournal();
@@ -29,6 +30,7 @@ function createContextManager(overrides?: {
   const sessionStats = {
     recordUsage: vi.fn(),
     incrementSessionCount: vi.fn(),
+    getCacheHitRatio: vi.fn(() => null),
   } as any;
   const cm = new ContextManager({
     getClient: () => ({}) as any,
@@ -44,7 +46,8 @@ function createContextManager(overrides?: {
     },
     events,
     compressionThresholdRatio: overrides?.compressionThresholdRatio ?? 0.8,
-    sessionStats,
+    sessionStats:
+      overrides?.includeSessionStats === false ? undefined : sessionStats,
     compressionStrategy: overrides?.compressionStrategy,
   });
   return {
@@ -80,6 +83,40 @@ describe("ContextManager", () => {
       const { cm } = createContextManager();
       expect(cm).toBeDefined();
       expect(cm.getTokenCount()).toBe(0);
+    });
+  });
+
+  describe("cache ratio event", () => {
+    it("emits session.usage with the ratio read back from stats", async () => {
+      const { cm, events, sessionStats } = createContextManager();
+      (sessionStats.getCacheHitRatio as ReturnType<typeof vi.fn>)
+        .mockReturnValueOnce(0.75);
+      const emitted: unknown[] = [];
+      events.subscribe((e) => {
+        if (e.type === "session.usage") emitted.push(e);
+      });
+
+      await processUsage(cm, usage(100, 50));
+
+      expect(emitted).toEqual([
+        { type: "session.usage", cacheHitRatio: 0.75 },
+      ]);
+    });
+
+    it("emits null ratio when no stats service is attached", async () => {
+      const { cm, events } = createContextManager({
+        includeSessionStats: false,
+      });
+      const emitted: unknown[] = [];
+      events.subscribe((e) => {
+        if (e.type === "session.usage") emitted.push(e);
+      });
+
+      await processUsage(cm, usage(100, 50));
+
+      expect(emitted).toEqual([
+        { type: "session.usage", cacheHitRatio: null },
+      ]);
     });
   });
 

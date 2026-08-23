@@ -256,12 +256,15 @@ function toLLMStreamResult(
     }
   }
 
-  // Extract usage
+  // Extract usage. Cached prompt tokens come from the standard
+  // input_tokens_details.cached_tokens (DeepSeek reports it too); the
+  // uncached remainder counts as misses (mirror of the Anthropic mapping).
+  const cached = response.usage?.input_tokens_details?.cached_tokens ?? 0;
   const usage: TokenUsage = {
     input: {
       total: response.usage?.input_tokens ?? 0,
-      cache_miss: 0,
-      cache_hit: 0,
+      cache_hit: cached,
+      cache_miss: (response.usage?.input_tokens ?? 0) - cached,
     },
     output: response.usage?.output_tokens ?? 0,
   };

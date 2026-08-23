@@ -15,6 +15,7 @@ export interface RuntimeStatus {
 
 export type RuntimeEvent =
   | { type: "context.tokens_changed"; tokenCount: number }
+  | { type: "session.usage"; cacheHitRatio: number | null }
   | {
       type: "status.added";
       status: RuntimeStatus;

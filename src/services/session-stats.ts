@@ -25,6 +25,13 @@ export interface ReceiptData {
   totalTokens: number;
 }
 
+/** Cache hit ratio over cumulative reads: hit / (hit + miss). Providers
+ *  that never report cache tokens yield 0/0 → null ("no data"), not 0. */
+export function cacheHitRatio(hit: number, miss: number): number | null {
+  const reads = hit + miss;
+  return reads > 0 ? hit / reads : null;
+}
+
 export class SessionStats {
   private startTime = 0;
   private sessionCount = 1;
@@ -82,5 +89,16 @@ export class SessionStats {
       models,
       totalTokens,
     };
+  }
+
+  /** Live session-wide cache hit ratio; null when no cache data yet. */
+  getCacheHitRatio(): number | null {
+    let hit = 0;
+    let miss = 0;
+    for (const t of this.perModel.values()) {
+      hit += t.cacheHit;
+      miss += t.cacheMiss;
+    }
+    return cacheHitRatio(hit, miss);
   }
 }

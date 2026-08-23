@@ -7,6 +7,7 @@ import { Panel } from "../../Panel.js";
 
 useTuiState.setState({
   tokenCount: 24000,
+  cacheHitRatio: null, // no cache data yet — ratio hidden
   currentSession: "debug-auth",
   permissionMode: "manual",
 });
@@ -20,12 +21,14 @@ render(
 );
 useTuiState.setState({
   tokenCount: 110000,
+  cacheHitRatio: 0.87,
   currentSession: "refactor-db",
   permissionMode: "yolo",
 });
 render(<Panel model={new Model("claude-opus-4-7", "anthropic", 200000)} />);
 useTuiState.setState({
   tokenCount: 178000,
+  cacheHitRatio: 0.42,
   currentSession: "feature-x",
   permissionMode: "auto",
 });

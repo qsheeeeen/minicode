@@ -87,6 +87,12 @@ export class ContextManager {
     this.sessionStats?.recordUsage(model, usage);
     this.tokenCount = totalTokens;
     this.emitTokenCount();
+    // The ratio is a derived view of SessionStats — read it back, never
+    // recomputed here.
+    this.events.emit({
+      type: "session.usage",
+      cacheHitRatio: this.sessionStats?.getCacheHitRatio() ?? null,
+    });
 
     const contextLength = this.getModel().getContextLength();
     const ratio = totalTokens / contextLength;

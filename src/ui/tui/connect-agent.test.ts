@@ -179,6 +179,25 @@ describe("connectAgent", () => {
     expect(state.tokenCount).toBe(5000);
   });
 
+  it("should update cache hit ratio from session usage events", () => {
+    const { sessionManager, runtimeEvents } = createTestDeps();
+    const registry = new AgentRegistry();
+
+    const result = connectAgent({
+      sessionManager,
+      runtimeEvents,
+      uiTimeline: makeTimeline(sessionManager),
+      registry,
+    });
+    cleanup = result.cleanup;
+
+    runtimeEvents.emit({ type: "session.usage", cacheHitRatio: 0.875 });
+    expect(useTuiState.getState().cacheHitRatio).toBe(0.875);
+
+    runtimeEvents.emit({ type: "session.usage", cacheHitRatio: null });
+    expect(useTuiState.getState().cacheHitRatio).toBeNull();
+  });
+
   it("should sync currentSession from session.changed events", () => {
     const { sessionManager, contextManager, runtimeEvents, runtimeState } =
       createTestDeps();

@@ -81,6 +81,27 @@ describe("SessionStats", () => {
     expect(data.totalTokens).toBe(0);
   });
 
+  it("computes the session-wide cache hit ratio", () => {
+    const stats = new SessionStats();
+    stats.init(0, "test", "s1");
+
+    stats.recordUsage("model-a", usage(100, 0, 100, 300)); // 75%
+    stats.recordUsage("model-b", usage(100, 0, 0, 100)); // 100%
+
+    // 400 hits over 500 cache reads.
+    expect(stats.getCacheHitRatio()).toBeCloseTo(0.8);
+  });
+
+  it("returns null ratio when no cache data was ever reported", () => {
+    const stats = new SessionStats();
+    stats.init(0, "test", "s1");
+
+    stats.recordUsage("model-a", usage(100, 50)); // no cache fields
+    stats.recordUsage("model-b", usage(0, 0));
+
+    expect(stats.getCacheHitRatio()).toBeNull();
+  });
+
   it("preserves model insertion order", () => {
     const stats = new SessionStats();
     stats.init(0, "test", "s1");

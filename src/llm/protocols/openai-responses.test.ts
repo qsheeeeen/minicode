@@ -85,7 +85,41 @@ describe("OpenAIResponsesClient", () => {
         { type: "text", text: "Hello world" },
       ]);
       expect(collected.result.usage).toEqual({
-        input: { total: 10, cache_miss: 0, cache_hit: 0 },
+        input: { total: 10, cache_miss: 10, cache_hit: 0 },
+        output: 5,
+      });
+    });
+
+    it("maps cached input tokens to cache_hit with the remainder missed", async () => {
+      responsesCreateMock.mockReturnValue(
+        mockStream([
+          { type: "response.output_text.delta", delta: "hi" },
+          { type: "response.output_text.done" },
+          {
+            type: "response.completed",
+            response: {
+              output: [
+                {
+                  type: "message",
+                  content: [{ type: "output_text", text: "hi" }],
+                },
+              ],
+              status: "completed",
+              usage: {
+                input_tokens: 2134,
+                output_tokens: 5,
+                input_tokens_details: { cached_tokens: 2048 },
+              },
+            },
+          },
+        ]),
+      );
+
+      const client = new OpenAIResponsesClient("test-key");
+      const collected = await collectStream(client.chatStream([], []));
+
+      expect(collected.result.usage).toEqual({
+        input: { total: 2134, cache_miss: 86, cache_hit: 2048 },
         output: 5,
       });
     });

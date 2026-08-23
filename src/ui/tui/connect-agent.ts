@@ -44,6 +44,11 @@ export function connectAgent(options: ConnectAgentOptions): {
       return;
     }
 
+    if (event.type === "session.usage") {
+      useTuiState.setState({ cacheHitRatio: event.cacheHitRatio });
+      return;
+    }
+
     if (event.type === "status.added") {
       uiTimeline.appendStatus(event.status);
       return;

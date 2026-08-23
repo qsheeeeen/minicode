@@ -28,6 +28,21 @@ import type {
 
 // Stop reason mapping (OpenAI → internal)
 
+/** DeepSeek reports the cache hit/miss split as dedicated usage fields
+ *  instead of OpenAI's prompt_tokens_details.cached_tokens. */
+type CacheUsageFields = {
+  prompt_cache_hit_tokens?: number;
+};
+
+/** Cached prompt tokens: standard OpenAI field first, DeepSeek's
+ *  prompt_cache_hit_tokens as the fallback. */
+function cachedInputTokens(usage: OpenAI.CompletionUsage | undefined): number {
+  if (!usage) return 0;
+  const standard = usage.prompt_tokens_details?.cached_tokens;
+  if (typeof standard === "number") return standard;
+  return (usage as CacheUsageFields).prompt_cache_hit_tokens ?? 0;
+}
+
 function mapStopReason(reason: string | null): StopReason {
   switch (reason) {
     case "stop":
@@ -311,12 +326,14 @@ export class OpenAIChatClient implements LLMClient {
           usage: {
             input: {
               total: usage?.prompt_tokens ?? 0,
-              // OpenAI reports cached prompt tokens separately; treat the
-              // remainder as cache misses (mirror of the Anthropic mapping).
-              cache_hit: usage?.prompt_tokens_details?.cached_tokens ?? 0,
+              // Cached prompt tokens: OpenAI reports them in
+              // prompt_tokens_details.cached_tokens; DeepSeek reports the
+              // hit/miss split directly. Prefer the standard field, fall
+              // back to the DeepSeek pair, then treat the uncached
+              // remainder as misses (mirror of the Anthropic mapping).
+              cache_hit: cachedInputTokens(usage),
               cache_miss:
-                (usage?.prompt_tokens ?? 0) -
-                (usage?.prompt_tokens_details?.cached_tokens ?? 0),
+                (usage?.prompt_tokens ?? 0) - cachedInputTokens(usage),
             },
             output: usage?.completion_tokens ?? 0,
           },
